@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PdmSystem — przeglądarka elementów CAD</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>PdmSystem</h1>
+    <div class="toolbar">
+      <select id="projectSelect"><option value="">Wszystkie projekty</option></select>
+      <button id="newProjectBtn">+ Projekt</button>
+      <input id="searchInput" type="text" placeholder="Szukaj po nazwie lub właściwościach…" />
+      <select id="tagFilter"><option value="">Wszystkie tagi</option></select>
+      <button id="addItemBtn" class="primary">+ Element</button>
+      <button id="refreshBtn">Odśwież</button>
+    </div>
+
+    <div id="newProjectPanel" class="panel hidden">
+      <div class="panel-title">Nowy projekt</div>
+      <input id="newProjectName" type="text" placeholder="Nazwa projektu" />
+      <input id="newProjectDesc" type="text" placeholder="Opis (opcjonalnie)" />
+      <div class="panel-actions">
+        <button id="createProjectBtn" class="primary">Utwórz</button>
+        <button id="cancelProjectBtn">Anuluj</button>
+      </div>
+      <p id="newProjectError" class="error hidden"></p>
+    </div>
+
+    <div id="addItemPanel" class="panel hidden">
+      <div class="panel-title">Nowy element</div>
+      <p class="hint" id="addItemProjectHint"></p>
+      <input type="file" id="newItemFile" />
+      <input id="newItemProps" type="text" placeholder='Właściwości JSON, np. {"material":"Stal S235"} (opcjonalnie)' />
+      <div class="panel-actions">
+        <button id="uploadItemBtn" class="primary">Wgraj</button>
+        <button id="cancelItemBtn">Anuluj</button>
+      </div>
+      <p id="addItemError" class="error hidden"></p>
+    </div>
+  </header>
+
+  <main id="itemList">
+    <p class="hint">Ładowanie…</p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
