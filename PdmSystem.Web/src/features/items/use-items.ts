@@ -6,7 +6,6 @@ import type { Item } from "@/api/types"
 interface ItemFilters {
   search: string
   tag: string
-  projectId: string
 }
 
 export function useItems(filters: ItemFilters) {
@@ -25,7 +24,7 @@ export function useItems(filters: ItemFilters) {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.search, filters.tag, filters.projectId])
+  }, [filters.search, filters.tag])
 
   useEffect(() => {
     refetch()

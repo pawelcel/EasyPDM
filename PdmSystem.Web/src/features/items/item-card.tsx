@@ -1,4 +1,4 @@
-import { itemTypeLabel, type Item } from "@/api/types"
+import { itemDisplayLabel, itemTypeLabel, type Item } from "@/api/types"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
@@ -27,14 +27,7 @@ function ItemCard({
         <CollapsibleTrigger className="w-full cursor-pointer text-left">
           <CardHeader className="flex-row items-baseline justify-between">
             <div>
-              <div className="text-[15px] font-semibold">
-                {item.fileName}
-                {item.itemNumber !== null && (
-                  <span className="ml-1.5 text-[12.5px] font-normal text-muted-foreground">
-                    #{item.itemNumber}
-                  </span>
-                )}
-              </div>
+              <div className="text-[15px] font-semibold">{itemDisplayLabel(item)}</div>
               <div className="text-[12.5px] text-muted-foreground">
                 {typeLabel} · zmodyfikowano {modified}
                 {projectName ? ` · ${projectName}` : ""}

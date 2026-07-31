@@ -1,4 +1,4 @@
-import type { Item, ItemRelation, ItemType, Project, Tag } from "./types"
+import type { Attachment, Item, ItemRelation, ItemStatus, ItemType, Material, Project, Tag } from "./types"
 
 const BASE = "/api"
 
@@ -79,12 +79,26 @@ export const api = {
       body: JSON.stringify({ showInTree }),
     }).then((r) => handleResponse<void>(r)),
 
+  moveItemToProject: (itemId: string, projectId: string) =>
+    fetch(`${BASE}/items/${itemId}/project`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId }),
+    }).then((r) => handleResponse<void>(r)),
+
   renameItem: (itemId: string, name: string) =>
     fetch(`${BASE}/items/${itemId}/name`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     }).then((r) => handleResponse<void>(r)),
+
+  setStatus: (itemId: string, status: ItemStatus) =>
+    fetch(`${BASE}/items/${itemId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    }).then((r) => handleResponse<{ status: ItemStatus; revisionNumber: number | null }>(r)),
 
   fileDownloadUrl: (itemId: string) => `${BASE}/items/${itemId}/file`,
 
@@ -124,4 +138,43 @@ export const api = {
     fetch(`${BASE}/items/${parentId}/children/${childId}`, { method: "DELETE" }).then((r) =>
       handleResponse<void>(r)
     ),
+
+  setChildPosition: (parentId: string, childId: string, position: number) =>
+    fetch(`${BASE}/items/${parentId}/children/${childId}/position`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ position }),
+    }).then((r) => handleResponse<void>(r)),
+
+  reorderChildren: (parentId: string, childIds: string[]) =>
+    fetch(`${BASE}/items/${parentId}/children/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ childIds }),
+    }).then((r) => handleResponse<void>(r)),
+
+  getMaterials: () => fetch(`${BASE}/materials`).then((r) => handleResponse<Material[]>(r)),
+
+  addMaterial: (name: string, group: string | null) =>
+    fetch(`${BASE}/materials`, json({ name, group })).then((r) => handleResponse<void>(r)),
+
+  removeMaterial: (name: string) =>
+    fetch(`${BASE}/materials/${encodeURIComponent(name)}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
+    ),
+
+  getAttachments: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/attachments`).then((r) => handleResponse<Attachment[]>(r)),
+
+  uploadAttachment: (itemId: string, formData: FormData) =>
+    fetch(`${BASE}/items/${itemId}/attachments`, { method: "POST", body: formData }).then((r) =>
+      handleResponse<{ id: string; fileName: string }>(r)
+    ),
+
+  deleteAttachment: (attachmentId: string) =>
+    fetch(`${BASE}/attachments/${attachmentId}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
+    ),
+
+  attachmentDownloadUrl: (attachmentId: string) => `${BASE}/attachments/${attachmentId}/file`,
 }

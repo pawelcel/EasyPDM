@@ -3,6 +3,13 @@ using Npgsql;
 
 static class PropertyEndpoints
 {
+    // Właściwości Ceny (cena/waluta/brutto-netto/data wprowadzenia ceny) można zmieniać
+    // w dowolnym statusie — wszystko inne tylko w statusie 'w_pracy'.
+    private static readonly HashSet<string> AlwaysEditableKeys = new()
+    {
+        "price", "currency", "priceType", "priceDate"
+    };
+
     public static void MapPropertyEndpoints(this WebApplication app, string connectionString)
     {
         // ============================================================
@@ -10,6 +17,20 @@ static class PropertyEndpoints
         // ============================================================
         app.MapPatch("/api/items/{id:guid}/properties", async (Guid id, JsonElement body) =>
         {
+            var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+
+            if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
+            {
+                foreach (var prop in body.EnumerateObject())
+                {
+                    if (!AlwaysEditableKeys.Contains(prop.Name))
+                        return Results.BadRequest(
+                            "Właściwości można zmieniać tylko w statusie 'W pracy' (wyjątek: cena, waluta, brutto/netto).");
+                }
+            }
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
@@ -30,6 +51,14 @@ static class PropertyEndpoints
         // ============================================================
         app.MapDelete("/api/items/{id:guid}/properties/{key}", async (Guid id, string key) =>
         {
+            var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+
+            if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status) && !AlwaysEditableKeys.Contains(key))
+                return Results.BadRequest(
+                    "Właściwości można zmieniać tylko w statusie 'W pracy' (wyjątek: cena, waluta, brutto/netto).");
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 

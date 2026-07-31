@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { api } from "@/api/client"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Hint } from "@/components/ui/hint"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
 import { ItemTree } from "@/features/tree/item-tree"
@@ -17,6 +18,7 @@ function ProjectTreeView({
 }) {
   const tree = useProjectTree(projectId)
   const [selected, setSelected] = useState<{ id: string; parentId: string | null } | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   // Jeśli wybrany element zniknął z drzewka (np. go usunięto), czyścimy zaznaczenie.
   useEffect(() => {
@@ -39,13 +41,10 @@ function ProjectTreeView({
     await tree.refetch()
   }
 
-  async function handleDeleteCompletely() {
+  async function confirmDeleteCompletely() {
     if (!selectedItem) return
-    const confirmed = window.confirm(
-      `Na pewno usunąć „${selectedItem.fileName}” wraz ze wszystkimi podelementami? Tej operacji nie można cofnąć.`
-    )
-    if (!confirmed) return
     await api.deleteItem(selectedItem.id)
+    setConfirmingDelete(false)
     setSelected(null)
     await tree.refetch()
   }
@@ -67,16 +66,29 @@ function ProjectTreeView({
             key={selectedItem.id}
             item={selectedItem}
             projectName={projectName}
-            childItems={tree.childrenOf(selectedItem.id).map((c) => c.item)}
+            childEntries={tree.childrenOf(selectedItem.id)}
+            onSelectChild={(childId) => setSelected({ id: childId, parentId: selectedItem.id })}
             onItemsRefetch={tree.refetch}
             onTagsRefetch={onTagsRefetch}
             onRemoveFromStructure={handleRemoveFromStructure}
-            onDeleteCompletely={handleDeleteCompletely}
+            onDeleteCompletely={() => setConfirmingDelete(true)}
           />
         ) : (
           <Hint>Wybierz element w strukturze po lewej, żeby zobaczyć jego właściwości.</Hint>
         )}
       </div>
+
+      {confirmingDelete && selectedItem && (
+        <ConfirmDialog
+          open
+          title="Usuń całkowicie"
+          description={`Na pewno usunąć „${selectedItem.fileName}” wraz ze wszystkimi podelementami? Tej operacji nie można cofnąć.`}
+          confirmLabel="Usuń całkowicie"
+          variant="destructive"
+          onConfirm={confirmDeleteCompletely}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </div>
   )
 }

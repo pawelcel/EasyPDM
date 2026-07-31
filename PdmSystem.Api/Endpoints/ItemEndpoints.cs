@@ -38,6 +38,15 @@ static class ItemEndpoints
                     return Results.NotFound("Projekt nie istnieje.");
             }
 
+            if (parentId is not null)
+            {
+                var parentInfo = await GetItemTypeAndStatus(connectionString, parentId.Value);
+                if (parentInfo is null)
+                    return Results.NotFound("Element nadrzędny nie istnieje.");
+                if (!IsChildTypeAllowed(parentInfo.Value.ItemType, "file"))
+                    return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
+            }
+
             string propertiesJson = "{}";
             if (form.TryGetValue("properties", out var propsValue) && !string.IsNullOrWhiteSpace(propsValue))
             {
@@ -127,14 +136,25 @@ static class ItemEndpoints
                     return Results.NotFound("Projekt nie istnieje.");
             }
 
+            if (body.ParentId is not null)
+            {
+                var parentInfo = await GetItemTypeAndStatus(connectionString, body.ParentId.Value);
+                if (parentInfo is null)
+                    return Results.NotFound("Element nadrzędny nie istnieje.");
+                if (!IsChildTypeAllowed(parentInfo.Value.ItemType, body.ItemType))
+                    return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
+            }
+
             var itemId = Guid.NewGuid();
             var propertiesJson = body.Properties.HasValue ? body.Properties.Value.GetRawText() : "{}";
 
             const string insertSql = """
-                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, modified_at)
+                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at)
                 VALUES (
                     @id, @projectId, @itemType, @name, @props::jsonb,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN nextval('item_number_seq') ELSE NULL END,
+                    CASE WHEN @itemType IN ('part', 'assembly') THEN 'w_pracy' ELSE NULL END,
+                    CASE WHEN @itemType IN ('part', 'assembly') THEN 1 ELSE NULL END,
                     now()
                 )
                 RETURNING item_number;
@@ -200,7 +220,7 @@ static class ItemEndpoints
 
             const string sql = """
                 SELECT i.id, i.project_id, i.file_name, i.file_type, i.file_path, i.properties, i.modified_at,
-                       i.item_type, i.item_number, i.show_in_tree
+                       i.item_type, i.item_number, i.show_in_tree, i.status, i.revision_number
                 FROM items i
                 WHERE (@search::text IS NULL OR i.file_name ILIKE '%' || @search || '%'
                                                OR i.properties::text ILIKE '%' || @search || '%')
@@ -238,6 +258,8 @@ static class ItemEndpoints
                         ["itemType"] = reader.GetString(7),
                         ["itemNumber"] = reader.IsDBNull(8) ? null : reader.GetInt32(8),
                         ["showInTree"] = reader.GetBoolean(9),
+                        ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
+                        ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
                         ["tags"] = new List<string>()
                     });
                 }
@@ -267,7 +289,7 @@ static class ItemEndpoints
 
             const string sql = """
                 SELECT id, project_id, file_name, file_type, file_path, properties, modified_at,
-                       item_type, item_number, show_in_tree
+                       item_type, item_number, show_in_tree, status, revision_number
                 FROM items WHERE id = @id;
                 """;
 
@@ -292,6 +314,8 @@ static class ItemEndpoints
                 ["itemType"] = reader.GetString(7),
                 ["itemNumber"] = reader.IsDBNull(8) ? null : reader.GetInt32(8),
                 ["showInTree"] = reader.GetBoolean(9),
+                ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
+                ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
                 ["tags"] = tagsByItem.TryGetValue(id, out var t) ? t : new List<string>()
             };
 
@@ -306,6 +330,12 @@ static class ItemEndpoints
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest("Nazwa nie może być pusta.");
 
+            var info = await GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+            if (IsLocked(info.Value.ItemType, info.Value.Status))
+                return Results.BadRequest("Nazwę można zmieniać tylko w statusie 'W pracy'.");
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
@@ -316,6 +346,54 @@ static class ItemEndpoints
             var affected = await cmd.ExecuteNonQueryAsync();
 
             return affected == 0 ? Results.NotFound() : Results.Ok();
+        });
+
+        // ============================================================
+        // PATCH /api/items/{id}/status   body: { "status": "w_pracy"|"sprawdzany"|"wydany" }
+        // Maszyna stanów dla Części/Złożeń:
+        //   w_pracy    -> sprawdzany
+        //   sprawdzany -> w_pracy | wydany
+        //   wydany     -> w_pracy  (podnosi revision_number o 1 — frontend prosi o potwierdzenie)
+        // ============================================================
+        app.MapPatch("/api/items/{id:guid}/status", async (Guid id, StatusRequest body) =>
+        {
+            if (body.Status != "w_pracy" && body.Status != "sprawdzany" && body.Status != "wydany")
+                return Results.BadRequest("Nieprawidłowy status — dozwolone: 'w_pracy', 'sprawdzany', 'wydany'.");
+
+            var info = await GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+            var (itemType, currentStatus) = info.Value;
+
+            if (itemType != "part" && itemType != "assembly")
+                return Results.BadRequest("Status dotyczy tylko Części i Złożeń.");
+
+            bool isValidTransition = body.Status == currentStatus || (currentStatus, body.Status) switch
+            {
+                ("w_pracy", "sprawdzany") => true,
+                ("sprawdzany", "w_pracy") => true,
+                ("sprawdzany", "wydany") => true,
+                ("wydany", "w_pracy") => true,
+                (null, "w_pracy") => true,
+                _ => false
+            };
+            if (!isValidTransition)
+                return Results.BadRequest($"Nie można zmienić statusu z '{currentStatus}' na '{body.Status}'.");
+
+            bool bumpRevision = currentStatus == "wydany" && body.Status == "w_pracy";
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            string sql = bumpRevision
+                ? "UPDATE items SET status = @status, revision_number = COALESCE(revision_number, 0) + 1 WHERE id = @id RETURNING revision_number;"
+                : "UPDATE items SET status = @status WHERE id = @id RETURNING revision_number;";
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("status", body.Status);
+            var revisionNumber = (int?)await cmd.ExecuteScalarAsync();
+
+            return Results.Ok(new { status = body.Status, revisionNumber });
         });
 
         // PATCH /api/items/{id}/visibility   body: { "showInTree": false }
@@ -330,6 +408,32 @@ static class ItemEndpoints
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("value", body.ShowInTree);
+            var affected = await cmd.ExecuteNonQueryAsync();
+
+            return affected == 0 ? Results.NotFound() : Results.Ok();
+        });
+
+        // PATCH /api/items/{id}/project   body: { "projectId": "..." }
+        // Przenosi Część/Złożenie do innego projektu jako widoczny korzeń jego drzewka — używane,
+        // gdy dodajemy "Istniejący element" z całej bazy na poziomie głównym (bez rodzica) projektu,
+        // do którego element jeszcze nie należy. Zagnieżdżone odwołania w item_relations (element
+        // jako komponent BOM w innych złożeniach) zostają nienaruszone niezależnie od project_id.
+        app.MapPatch("/api/items/{id:guid}/project", async (Guid id, MoveToProjectRequest body) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using (var checkCmd = new NpgsqlCommand("SELECT 1 FROM projects WHERE id = @projectId;", conn))
+            {
+                checkCmd.Parameters.AddWithValue("projectId", body.ProjectId);
+                if (await checkCmd.ExecuteScalarAsync() is null)
+                    return Results.NotFound("Projekt docelowy nie istnieje.");
+            }
+
+            const string sql = "UPDATE items SET project_id = @projectId, show_in_tree = true WHERE id = @id;";
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("projectId", body.ProjectId);
             var affected = await cmd.ExecuteNonQueryAsync();
 
             return affected == 0 ? Results.NotFound() : Results.Ok();
@@ -400,6 +504,40 @@ static class ItemEndpoints
         });
     }
 
+    // Część/Złożenie poza statusem 'w_pracy' ma zablokowaną edycję właściwości/nazwy
+    // (wyjątek: Cena/waluta/brutto-netto — patrz PropertyEndpoints). Folder/plik nie mają
+    // statusu (null), więc nigdy nie są traktowane jako zablokowane.
+    internal static bool IsLocked(string itemType, string? status) =>
+        (itemType == "part" || itemType == "assembly") && status != "w_pracy";
+
+    // Co wolno podpiąć jako dziecko pod czym w strukturze:
+    //   folder    -> wszystko (folder/część/złożenie/plik)
+    //   assembly  -> tylko część i złożenie (BOM)
+    //   part      -> nic (Część jest liściem)
+    //   file      -> nic (Plik jest liściem)
+    internal static bool IsChildTypeAllowed(string parentType, string childType) => parentType switch
+    {
+        "folder" => true,
+        "assembly" => childType is "part" or "assembly",
+        _ => false
+    };
+
+    internal static async Task<(string ItemType, string? Status)?> GetItemTypeAndStatus(string connectionString, Guid id)
+    {
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync();
+
+        const string sql = "SELECT item_type, status FROM items WHERE id = @id;";
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("id", id);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+            return null;
+
+        return (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1));
+    }
+
     internal static async Task<Dictionary<Guid, List<string>>> LoadTagsForItems(string connectionString, List<Guid> ids)
     {
         var result = ids.ToDictionary(id => id, _ => new List<string>());
@@ -430,3 +568,5 @@ static class ItemEndpoints
 record CreateNodeRequest(string Name, string ItemType, JsonElement? Properties, Guid? ParentId);
 record VisibilityRequest(bool ShowInTree);
 record RenameRequest(string Name);
+record StatusRequest(string Status);
+record MoveToProjectRequest(Guid ProjectId);
