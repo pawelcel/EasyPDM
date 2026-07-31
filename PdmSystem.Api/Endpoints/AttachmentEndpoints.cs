@@ -108,6 +108,71 @@ static class AttachmentEndpoints
             return Results.Created($"/api/attachments/{attachmentId}", new { id = attachmentId, fileName = file.FileName });
         });
 
+        // POST /api/items/{itemId}/attachments/register   body: { "filePath": "..." }
+        // Rejestruje JUŻ ISTNIEJĄCY plik w magazynie jako załącznik, BEZ kopiowania —
+        // używane, gdy klient (np. makro FreeCAD) i serwer współdzielą ten sam dysk/magazyn:
+        // plik już fizycznie leży w storageRoot, więc nie ma sensu przesyłać go drugi raz
+        // przez HTTP. Ze względu na brak autoryzacji w API akceptowane są WYŁĄCZNIE ścieżki
+        // leżące wewnątrz skonfigurowanego StorageRoot — inaczej dowolny wywołujący mógłby
+        // "podpiąć" jako załącznik dowolny plik z dysku serwera.
+        app.MapPost("/api/items/{itemId:guid}/attachments/register", async (Guid itemId, RegisterAttachmentRequest body) =>
+        {
+            var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
+            if (info is null)
+                return Results.NotFound("Element nie istnieje.");
+            if (!AcceptsAttachments(info.Value.ItemType))
+                return Results.BadRequest("Ten typ elementu nie przyjmuje załączników.");
+            if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
+                return Results.BadRequest("Załączniki można dodawać tylko w statusie 'W pracy'.");
+
+            string fullPath;
+            string storageRootFull;
+            try
+            {
+                fullPath = Path.GetFullPath(body.FilePath);
+                storageRootFull = Path.GetFullPath(storageRoot);
+            }
+            catch (ArgumentException)
+            {
+                return Results.BadRequest("Niepoprawna ścieżka pliku.");
+            }
+
+            if (!fullPath.StartsWith(storageRootFull + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                return Results.BadRequest("Ścieżka musi znajdować się wewnątrz magazynu plików serwera.");
+
+            if (!File.Exists(fullPath))
+                return Results.NotFound("Plik nie istnieje pod podaną ścieżką.");
+
+            var attachmentId = Guid.NewGuid();
+            var fileName = Path.GetFileName(fullPath);
+            var fileSize = new FileInfo(fullPath).Length;
+
+            string hash;
+            using (var sha256 = SHA256.Create())
+            await using (var readStream = File.OpenRead(fullPath))
+            {
+                hash = Convert.ToHexString(await sha256.ComputeHashAsync(readStream));
+            }
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string insertSql = """
+                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at)
+                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now());
+                """;
+            await using var insertCmd = new NpgsqlCommand(insertSql, conn);
+            insertCmd.Parameters.AddWithValue("id", attachmentId);
+            insertCmd.Parameters.AddWithValue("itemId", itemId);
+            insertCmd.Parameters.AddWithValue("fileName", fileName);
+            insertCmd.Parameters.AddWithValue("filePath", fullPath);
+            insertCmd.Parameters.AddWithValue("hash", hash);
+            insertCmd.Parameters.AddWithValue("size", fileSize);
+            await insertCmd.ExecuteNonQueryAsync();
+
+            return Results.Created($"/api/attachments/{attachmentId}", new { id = attachmentId, fileName });
+        });
+
         // GET /api/attachments/{id}/file — pobranie załącznika.
         app.MapGet("/api/attachments/{id:guid}/file", async (Guid id) =>
         {
@@ -165,3 +230,5 @@ static class AttachmentEndpoints
         });
     }
 }
+
+record RegisterAttachmentRequest(string FilePath);

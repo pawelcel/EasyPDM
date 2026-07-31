@@ -99,7 +99,13 @@ static class ItemEndpoints
                 if (parentId is not null)
                 {
                     await using var relCmd = new NpgsqlCommand(
-                        "INSERT INTO item_relations (parent_id, child_id, quantity) VALUES (@parentId, @childId, 1);", conn);
+                        """
+                        INSERT INTO item_relations (parent_id, child_id, quantity, position)
+                        VALUES (
+                            @parentId, @childId, 1,
+                            COALESCE((SELECT MAX(position) FROM item_relations WHERE parent_id = @parentId), 0) + 1
+                        );
+                        """, conn);
                     relCmd.Parameters.AddWithValue("parentId", parentId.Value);
                     relCmd.Parameters.AddWithValue("childId", itemId);
                     await relCmd.ExecuteNonQueryAsync();
@@ -174,7 +180,13 @@ static class ItemEndpoints
             if (body.ParentId is not null)
             {
                 await using var relCmd = new NpgsqlCommand(
-                    "INSERT INTO item_relations (parent_id, child_id, quantity) VALUES (@parentId, @childId, 1);", conn);
+                    """
+                    INSERT INTO item_relations (parent_id, child_id, quantity, position)
+                    VALUES (
+                        @parentId, @childId, 1,
+                        COALESCE((SELECT MAX(position) FROM item_relations WHERE parent_id = @parentId), 0) + 1
+                    );
+                    """, conn);
                 relCmd.Parameters.AddWithValue("parentId", body.ParentId.Value);
                 relCmd.Parameters.AddWithValue("childId", itemId);
                 await relCmd.ExecuteNonQueryAsync();
@@ -349,11 +361,14 @@ static class ItemEndpoints
         });
 
         // ============================================================
-        // PATCH /api/items/{id}/status   body: { "status": "w_pracy"|"sprawdzany"|"wydany" }
+        // PATCH /api/items/{id}/status   body: { "status": "...", "comment": "..." (opcjonalnie) }
         // Maszyna stanów dla Części/Złożeń:
         //   w_pracy    -> sprawdzany
         //   sprawdzany -> w_pracy | wydany
         //   wydany     -> w_pracy  (podnosi revision_number o 1 — frontend prosi o potwierdzenie)
+        // "comment" ma sens tylko przy podnoszeniu rewizji (wydany -> w_pracy) — opisuje, co
+        // się zmieniło w nowej rewizji; tworzony zarówno z aplikacji webowej, jak i z makra
+        // FreeCAD. Jest opcjonalny — puste/brak pola nic nie zapisuje.
         // ============================================================
         app.MapPatch("/api/items/{id:guid}/status", async (Guid id, StatusRequest body) =>
         {
@@ -393,7 +408,52 @@ static class ItemEndpoints
             cmd.Parameters.AddWithValue("status", body.Status);
             var revisionNumber = (int?)await cmd.ExecuteScalarAsync();
 
+            if (bumpRevision && revisionNumber is not null && !string.IsNullOrWhiteSpace(body.Comment))
+            {
+                const string commentSql = """
+                    INSERT INTO item_revision_comments (item_id, revision_number, comment)
+                    VALUES (@itemId, @revisionNumber, @comment)
+                    ON CONFLICT (item_id, revision_number) DO UPDATE SET comment = EXCLUDED.comment, created_at = now();
+                    """;
+                await using var commentCmd = new NpgsqlCommand(commentSql, conn);
+                commentCmd.Parameters.AddWithValue("itemId", id);
+                commentCmd.Parameters.AddWithValue("revisionNumber", revisionNumber.Value);
+                commentCmd.Parameters.AddWithValue("comment", body.Comment!.Trim());
+                await commentCmd.ExecuteNonQueryAsync();
+            }
+
             return Results.Ok(new { status = body.Status, revisionNumber });
+        });
+
+        // GET /api/items/{id}/revisions — historia komentarzy rewizji (tylko te, które mają
+        // komentarz — rewizje bez komentarza nie mają tu wpisu).
+        app.MapGet("/api/items/{id:guid}/revisions", async (Guid id) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string sql = """
+                SELECT revision_number, comment, created_at
+                FROM item_revision_comments
+                WHERE item_id = @id
+                ORDER BY revision_number;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", id);
+
+            var result = new List<object>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                result.Add(new
+                {
+                    revisionNumber = reader.GetInt32(0),
+                    comment = reader.GetString(1),
+                    createdAt = reader.GetDateTime(2)
+                });
+            }
+
+            return Results.Ok(result);
         });
 
         // PATCH /api/items/{id}/visibility   body: { "showInTree": false }
@@ -568,5 +628,5 @@ static class ItemEndpoints
 record CreateNodeRequest(string Name, string ItemType, JsonElement? Properties, Guid? ParentId);
 record VisibilityRequest(bool ShowInTree);
 record RenameRequest(string Name);
-record StatusRequest(string Status);
+record StatusRequest(string Status, string? Comment = null);
 record MoveToProjectRequest(Guid ProjectId);
