@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Box, Boxes, ChevronDown, ChevronRight, File, Folder, Plus, X } from "lucide-react"
 
 import { api } from "@/api/client"
-import type { Item } from "@/api/types"
+import { itemDisplayLabel, type Item } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { AddNodeDialog } from "@/features/items/add-node-dialog"
@@ -16,6 +16,17 @@ const TYPE_ICON = {
   assembly: Boxes,
   file: File,
 } as const
+
+const STATUS_ICON_COLOR: Record<string, string> = {
+  w_pracy: "text-muted-foreground",
+  sprawdzany: "text-yellow-400",
+  wydany: "text-green-400",
+}
+
+function iconColorClass(item: Item): string {
+  if (item.itemType !== "part" && item.itemType !== "assembly") return "text-muted-foreground"
+  return STATUS_ICON_COLOR[item.status ?? "w_pracy"]
+}
 
 function ItemTree({
   tree,
@@ -41,7 +52,7 @@ function ItemTree({
           }
           projectId={projectId}
           parentId={null}
-          existingItems={tree.items}
+          parentType={null}
           onCreated={tree.refetch}
         />
       </div>
@@ -57,7 +68,6 @@ function ItemTree({
             parentId={null}
             depth={0}
             projectId={projectId}
-            allItems={tree.items}
             childrenOf={tree.childrenOf}
             selectedId={selectedId}
             onSelect={onSelect}
@@ -75,7 +85,6 @@ function TreeNode({
   parentId,
   depth,
   projectId,
-  allItems,
   childrenOf,
   selectedId,
   onSelect,
@@ -86,7 +95,6 @@ function TreeNode({
   parentId: string | null
   depth: number
   projectId: string
-  allItems: Item[]
   childrenOf: Tree["childrenOf"]
   selectedId: string | null
   onSelect: (id: string, parentId: string | null) => void
@@ -117,34 +125,33 @@ function TreeNode({
           {expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         </button>
 
-        <TypeIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        <TypeIcon className={cn("size-3.5 shrink-0", iconColorClass(item))} />
 
         <button
           type="button"
           onClick={() => onSelect(item.id, parentId)}
           className="flex-1 truncate text-left"
         >
-          {item.fileName}
-          {item.itemNumber !== null && (
-            <span className="ml-1.5 text-xs text-muted-foreground">#{item.itemNumber}</span>
-          )}
+          {itemDisplayLabel(item)}
           {quantity !== null && quantity !== 1 && (
             <span className="ml-1.5 text-xs text-muted-foreground">×{quantity}</span>
           )}
         </button>
 
         <div className="hidden items-center gap-0.5 group-hover:flex">
-          <AddNodeDialog
-            trigger={
-              <Button size="icon-xs" variant="ghost" aria-label="Dodaj podelement">
-                <Plus className="size-3" />
-              </Button>
-            }
-            projectId={projectId}
-            parentId={item.id}
-            existingItems={allItems}
-            onCreated={onRefetch}
-          />
+          {(item.itemType === "folder" || item.itemType === "assembly") && (
+            <AddNodeDialog
+              trigger={
+                <Button size="icon-xs" variant="ghost" aria-label="Dodaj podelement">
+                  <Plus className="size-3" />
+                </Button>
+              }
+              projectId={projectId}
+              parentId={item.id}
+              parentType={item.itemType}
+              onCreated={onRefetch}
+            />
+          )}
           {parentId && (
             <Button
               size="icon-xs"
@@ -171,7 +178,6 @@ function TreeNode({
               parentId={item.id}
               depth={depth + 1}
               projectId={projectId}
-              allItems={allItems}
               childrenOf={childrenOf}
               selectedId={selectedId}
               onSelect={onSelect}

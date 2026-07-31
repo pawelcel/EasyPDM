@@ -44,7 +44,9 @@ CREATE TABLE items (
     current_revision_id UUID,                   -- FK dodane niżej (cykliczna referencja)
     checked_out_by      UUID REFERENCES users(id),
     checked_out_at      TIMESTAMPTZ,
-    show_in_tree        BOOLEAN NOT NULL DEFAULT true  -- dla elementów bez rodzica: czy pokazywać jako korzeń w drzewku
+    show_in_tree        BOOLEAN NOT NULL DEFAULT true,  -- dla elementów bez rodzica: czy pokazywać jako korzeń w drzewku
+    status              TEXT CHECK (status IN ('w_pracy', 'sprawdzany', 'wydany')),  -- tylko dla part/assembly
+    revision_number     INTEGER                     -- tylko dla part/assembly, rośnie przy przejściu wydany -> w_pracy
 );
 
 CREATE SEQUENCE item_number_seq START 1;
@@ -113,6 +115,15 @@ CREATE TABLE tags (
     name TEXT NOT NULL UNIQUE
 );
 
+-- ============================================================
+-- Materiały (katalog do wyboru w Części, zarządzany z panelu bocznego)
+-- ============================================================
+CREATE TABLE materials (
+    id         SERIAL PRIMARY KEY,
+    name       TEXT NOT NULL UNIQUE,
+    group_name TEXT  -- czysto porządkowe/filtrujące, nigdy nie trafia do właściwości Części
+);
+
 CREATE TABLE item_tags (
     item_id UUID REFERENCES items(id) ON DELETE CASCADE,
     tag_id  INT REFERENCES tags(id) ON DELETE CASCADE,
@@ -126,5 +137,23 @@ CREATE TABLE item_relations (
     parent_id UUID REFERENCES items(id) ON DELETE CASCADE,
     child_id  UUID REFERENCES items(id) ON DELETE CASCADE,
     quantity  NUMERIC DEFAULT 1,
+    position  INTEGER NOT NULL DEFAULT 1,  -- L.p. w BOM rodzica — ręcznie edytowalne/przeciągalne w UI
     PRIMARY KEY (parent_id, child_id)
 );
+
+-- ============================================================
+-- Załączniki (pliki dograne "z zewnątrz" do Części/Złożenia/Pliku) — w odróżnieniu
+-- od item_relations NIE są osobnym elementem w drzewku, zarządzane tylko z panelu
+-- właściwości po prawej stronie.
+-- ============================================================
+CREATE TABLE item_attachments (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id     UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    file_name   TEXT NOT NULL,
+    file_path   TEXT NOT NULL UNIQUE,
+    file_hash   TEXT,
+    file_size   BIGINT,
+    uploaded_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_item_attachments_item ON item_attachments (item_id);

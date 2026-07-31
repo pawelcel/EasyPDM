@@ -10,10 +10,12 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 function PropertyEditor({
   itemId,
   properties,
+  locked = false,
   onChanged,
 }: {
   itemId: string
   properties: Record<string, unknown>
+  locked?: boolean
   onChanged: () => void
 }) {
   const [newKey, setNewKey] = useState("")
@@ -41,6 +43,8 @@ function PropertyEditor({
 
   return (
     <div>
+      {locked && <Hint>Właściwości można edytować tylko w statusie „W pracy”.</Hint>}
+
       {entries.length > 0 ? (
         <Table>
           <TableBody>
@@ -49,6 +53,7 @@ function PropertyEditor({
                 key={key}
                 propKey={key}
                 value={String(value)}
+                disabled={locked}
                 onSave={(v) => updateValue(key, v)}
                 onDelete={() => removeKey(key)}
               />
@@ -64,6 +69,7 @@ function PropertyEditor({
           value={newKey}
           onChange={(e) => setNewKey(e.target.value)}
           placeholder="klucz"
+          disabled={locked}
           className="h-7 w-28 text-[13px]"
         />
         <Input
@@ -73,9 +79,10 @@ function PropertyEditor({
             if (e.key === "Enter") addProperty()
           }}
           placeholder="wartość"
+          disabled={locked}
           className="h-7 text-[13px]"
         />
-        <Button size="sm" variant="secondary" onClick={addProperty}>
+        <Button size="sm" variant="secondary" onClick={addProperty} disabled={locked}>
           Dodaj
         </Button>
       </div>
@@ -86,11 +93,13 @@ function PropertyEditor({
 function PropertyRow({
   propKey,
   value,
+  disabled,
   onSave,
   onDelete,
 }: {
   propKey: string
   value: string
+  disabled: boolean
   onSave: (value: string) => void
   onDelete: () => void
 }) {
@@ -102,6 +111,7 @@ function PropertyRow({
       <TableCell>
         <Input
           value={draft}
+          disabled={disabled}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => {
             if (draft !== value) onSave(draft)
@@ -113,7 +123,13 @@ function PropertyRow({
         />
       </TableCell>
       <TableCell className="w-8">
-        <Button size="icon-sm" variant="ghost" onClick={onDelete} aria-label={`Usuń ${propKey}`}>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          onClick={onDelete}
+          disabled={disabled}
+          aria-label={`Usuń ${propKey}`}
+        >
           <Trash2 className="size-3.5 text-muted-foreground" />
         </Button>
       </TableCell>

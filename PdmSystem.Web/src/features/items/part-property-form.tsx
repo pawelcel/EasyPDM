@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { api } from "@/api/client"
-import type { Item } from "@/api/types"
+import { isLocked, type Item } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useMaterials } from "@/features/materials/use-materials"
 
 const CURRENCIES = [
   { value: "PLN", symbol: "zł" },
@@ -28,6 +29,7 @@ function PartPropertyForm({
   onChanged: () => void | Promise<void>
 }) {
   const rodzaj = typeof item.properties.rodzaj === "string" ? item.properties.rodzaj : ""
+  const locked = isLocked(item)
 
   const [name, setName] = useState(item.fileName)
   useEffect(() => setName(item.fileName), [item.fileName])
@@ -54,11 +56,16 @@ function PartPropertyForm({
 
   return (
     <div className="flex flex-col gap-2">
+      {locked && (
+        <Hint>Właściwości (poza ceną) można edytować tylko w statusie „W pracy”.</Hint>
+      )}
+
       <Label>Rodzaj</Label>
       <div className="flex gap-1.5">
         <Button
           size="sm"
           variant={rodzaj === "Wykonywana" ? "default" : "outline"}
+          disabled={locked}
           onClick={() => changeRodzaj("Wykonywana")}
         >
           Wykonywana
@@ -66,6 +73,7 @@ function PartPropertyForm({
         <Button
           size="sm"
           variant={rodzaj === "Zakupowa" ? "default" : "outline"}
+          disabled={locked}
           onClick={() => changeRodzaj("Zakupowa")}
         >
           Zakupowa
@@ -76,6 +84,7 @@ function PartPropertyForm({
       <Input
         id="part-name"
         value={name}
+        disabled={locked}
         onChange={(e) => setName(e.target.value)}
         onBlur={saveName}
         onKeyDown={(e) => {
@@ -85,25 +94,66 @@ function PartPropertyForm({
 
       {rodzaj === "Wykonywana" && (
         <>
-          <PropField label="Materiał" propKey="material" item={item} onSave={saveField} />
+          <MaterialField item={item} onSave={saveField} disabled={locked} />
           <PriceRow item={item} onChanged={onChanged} />
-          <PropField label="Dodatkowe informacje" propKey="notes" item={item} onSave={saveField} />
+          <PropField label="Dodatkowe informacje" propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
       )}
 
       {rodzaj === "Zakupowa" && (
         <>
-          <PropField label="Producent" propKey="manufacturer" item={item} onSave={saveField} />
-          <PropField label="Numer zamówieniowy" propKey="orderNumber" item={item} onSave={saveField} />
-          <PropField label="Numer zamówieniowy 2" propKey="orderNumber2" item={item} onSave={saveField} />
-          <PropField label="Masa [kg]" propKey="mass" item={item} onSave={saveField} type="number" />
+          <PropField label="Producent" propKey="manufacturer" item={item} onSave={saveField} disabled={locked} />
+          <PropField label="Numer zamówieniowy" propKey="orderNumber" item={item} onSave={saveField} disabled={locked} />
+          <PropField label="Numer zamówieniowy 2" propKey="orderNumber2" item={item} onSave={saveField} disabled={locked} />
+          <PropField label="Masa [kg]" propKey="mass" item={item} onSave={saveField} type="number" disabled={locked} />
           <PriceRow item={item} onChanged={onChanged} />
-          <PropField label="Dodatkowe informacje" propKey="notes" item={item} onSave={saveField} />
+          <PropField label="Dodatkowe informacje" propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
       )}
 
       {!rodzaj && <Hint>Wybierz rodzaj, żeby zobaczyć właściwości części.</Hint>}
     </div>
+  )
+}
+
+function MaterialField({
+  item,
+  onSave,
+  disabled,
+}: {
+  item: Item
+  onSave: (key: string, value: string) => void | Promise<void>
+  disabled: boolean
+}) {
+  const { materials } = useMaterials()
+  const stored = item.properties.material
+  const value = typeof stored === "string" ? stored : ""
+
+  return (
+    <>
+      <Label>Materiał</Label>
+      {materials.length > 0 ? (
+        <Select
+          value={value || "none"}
+          onValueChange={(v) => onSave("material", v === "none" ? "" : (v as string))}
+          disabled={disabled}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue>{(v: string) => (v === "none" || !v ? "Nie wybrano" : v)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Nie wybrano</SelectItem>
+            {materials.map((m) => (
+              <SelectItem key={m.name} value={m.name}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Hint>Brak materiałów — dodaj je w panelu bocznym („Lista materiałów”).</Hint>
+      )}
+    </>
   )
 }
 
@@ -193,12 +243,14 @@ function PropField({
   item,
   onSave,
   type = "text",
+  disabled = false,
 }: {
   label: string
   propKey: string
   item: Item
   onSave: (key: string, value: string) => void | Promise<void>
   type?: "text" | "number"
+  disabled?: boolean
 }) {
   const stored = item.properties[propKey]
   const initial = stored === undefined || stored === null ? "" : String(stored)
@@ -213,6 +265,7 @@ function PropField({
         type={type}
         step={type === "number" ? "any" : undefined}
         value={value}
+        disabled={disabled}
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => {
           if (value !== initial) onSave(propKey, value)

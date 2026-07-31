@@ -1,8 +1,16 @@
-import { type ReactElement, useState } from "react"
+import { type ReactElement, useEffect, useState } from "react"
 
 import { api } from "@/api/client"
-import type { Item, ItemType } from "@/api/types"
+import { itemDisplayLabel, type Item, type ItemType } from "@/api/types"
 import { Button } from "@/components/ui/button"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 import {
   Dialog,
   DialogContent,
@@ -12,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { FormError } from "@/components/ui/form-error"
+import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -32,23 +41,41 @@ const MODE_LABELS: Record<Mode, string> = {
   existing: "Istniejący element",
 }
 
+// Elementy o tej samej nazwie mogą pochodzić z różnych projektów — numer odróżnia je.
+function candidateLabel(item: Item | undefined): string | undefined {
+  return item ? itemDisplayLabel(item) : undefined
+}
+
+// Co wolno dodać jako dziecko pod czym w strukturze:
+//   projekt (brak rodzica) / folder -> wszystko
+//   złożenie                        -> tylko część i złożenie (BOM)
+//   część / plik                    -> nic (są liśćmi struktury)
+function modesForParent(parentType: ItemType | null): Mode[] {
+  if (parentType === null || parentType === "folder")
+    return ["folder", "part", "assembly", "file", "existing"]
+  if (parentType === "assembly") return ["part", "assembly", "existing"]
+  return []
+}
+
 function AddNodeDialog({
   trigger,
   projectId,
   parentId,
-  existingItems,
+  parentType,
   lockMode,
   onCreated,
 }: {
   trigger: ReactElement
   projectId: string
   parentId: string | null
-  existingItems: Item[]
+  parentType: ItemType | null
   lockMode?: ItemType
   onCreated: () => void | Promise<void>
 }) {
+  const availableModes = modesForParent(parentType)
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<Mode>(lockMode ?? "folder")
+  const [mode, setMode] = useState<Mode>(lockMode ?? availableModes[0] ?? "folder")
+  const [allItems, setAllItems] = useState<Item[]>([])
 
   // Folder / Część
   const [name, setName] = useState("")
@@ -67,13 +94,28 @@ function AddNodeDialog({
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
-  const availableModes: Mode[] = parentId
-    ? ["folder", "part", "assembly", "file", "existing"]
-    : ["folder", "part", "assembly", "file"]
-  const candidates = existingItems.filter((i) => i.id !== parentId)
+  // Kandydaci do "Istniejący element" — pobierane leniwie z całej bazy, nie tylko z tego
+  // projektu, bo Część/Złożenie mogą być współdzielone jako komponent w wielu projektach.
+  useEffect(() => {
+    if (!open) return
+    api.getItems({}).then(setAllItems)
+  }, [open])
+
+  const partsAndAssemblies = allItems.filter(
+    (i) => i.itemType === "part" || i.itemType === "assembly"
+  )
+
+  // Dowolna Część/Złożenie z całej bazy (poza samym sobą, gdy dodajemy pod konkretnym
+  // rodzicem) — ten sam komponent można wykorzystać w wielu złożeniach/projektach.
+  // Na poziomie głównym (bez rodzica): wybór elementu z innego projektu przenosi go
+  // (project_id) i pokazuje jako korzeń tego projektu; wybór elementu już należącego
+  // do tego projektu po prostu przywraca go, jeśli był odpięty („Usuń ze struktury”).
+  const candidates = parentId
+    ? partsAndAssemblies.filter((i) => i.id !== parentId)
+    : partsAndAssemblies
 
   function reset() {
-    setMode(lockMode ?? "folder")
+    setMode(lockMode ?? availableModes[0] ?? "folder")
     setName("")
     setMaterial("")
     setMass("")
@@ -172,26 +214,37 @@ function AddNodeDialog({
   }
 
   async function handleLinkExisting() {
-    if (!parentId) return
     if (!childId) {
       setError("Wybierz element.")
-      return
-    }
-    const qty = Number(quantity)
-    if (!Number.isFinite(qty) || qty <= 0) {
-      setError("Ilość musi być liczbą większą od zera.")
       return
     }
 
     setSubmitting(true)
     setError("")
     try {
-      await api.addChild(parentId, childId, qty)
+      if (parentId) {
+        const qty = Number(quantity)
+        if (!Number.isFinite(qty) || qty <= 0) {
+          setError("Ilość musi być liczbą większą od zera.")
+          setSubmitting(false)
+          return
+        }
+        await api.addChild(parentId, childId, qty)
+      } else {
+        // Bez rodzica: element z innego projektu trzeba przenieść (project_id) i pokazać jako
+        // korzeń; element już należący do tego projektu — po prostu przywracamy jego widoczność.
+        const target = candidates.find((c) => c.id === childId)
+        if (target && target.projectId !== projectId) {
+          await api.moveItemToProject(childId, projectId)
+        } else {
+          await api.setShowInTree(childId, true)
+        }
+      }
       setOpen(false)
       reset()
       await onCreated()
     } catch {
-      setError("Nie udało się dodać podelementu.")
+      setError("Nie udało się dodać elementu.")
     } finally {
       setSubmitting(false)
     }
@@ -339,30 +392,58 @@ function AddNodeDialog({
 
         {mode === "existing" && (
           <div className="flex flex-col gap-2">
-            <Label>Element</Label>
-            <Select value={childId} onValueChange={(v) => setChildId(v as string)}>
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {(v: string) => candidates.find((c) => c.id === v)?.fileName ?? "Wybierz…"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {candidates.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.fileName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Label htmlFor="node-quantity">Ilość</Label>
-            <Input
-              id="node-quantity"
-              type="number"
-              min="0"
-              step="any"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
+            {parentId ? (
+              <Hint>
+                Część lub Złożenie z całej bazy — ten sam komponent można wykorzystać w wielu
+                złożeniach, także z innych projektów.
+              </Hint>
+            ) : (
+              <Hint>
+                Część lub Złożenie z całej bazy — element z innego projektu zostanie do niego
+                przeniesiony jako widoczny korzeń; odpięty wcześniej element tego projektu
+                zostanie po prostu przywrócony.
+              </Hint>
+            )}
+            {candidates.length === 0 ? (
+              <Hint>Brak Części/Złożeń w bazie.</Hint>
+            ) : (
+              <>
+                <Label>Element</Label>
+                <Combobox
+                  items={candidates.map((c) => c.id)}
+                  value={childId || null}
+                  onValueChange={(v) => setChildId((v as string | null) ?? "")}
+                  itemToStringLabel={(id: string) =>
+                    candidateLabel(candidates.find((c) => c.id === id)) ?? ""
+                  }
+                >
+                  <ComboboxInput placeholder="Wpisz nazwę, żeby wyszukać…" />
+                  <ComboboxContent>
+                    <ComboboxEmpty>Brak pasujących elementów.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(id: string) => (
+                        <ComboboxItem key={id} value={id}>
+                          {candidateLabel(candidates.find((c) => c.id === id))}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+                {parentId && (
+                  <>
+                    <Label htmlFor="node-quantity">Ilość</Label>
+                    <Input
+                      id="node-quantity"
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                    />
+                  </>
+                )}
+              </>
+            )}
             <FormError>{error}</FormError>
           </div>
         )}
