@@ -3,9 +3,16 @@ bin/
 obj/
 *.user
 
+# Magazyn wgranych plików/załączników (PdmSystem.Api StorageRoot) — dane użytkownika, nie kod
+/storage/
+
 # Node / frontend
 node_modules/
 dist/
+
+# Python (makro FreeCAD)
+__pycache__/
+*.pyc
 
 # Editor
 .vscode/

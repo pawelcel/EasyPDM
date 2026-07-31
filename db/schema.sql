@@ -157,3 +157,15 @@ CREATE TABLE item_attachments (
 );
 
 CREATE INDEX idx_item_attachments_item ON item_attachments (item_id);
+
+-- ============================================================
+-- Komentarze do rewizji Części/Złożenia (opcjonalne) — tworzone przy zmianie statusu
+-- Wydany -> W pracy, zarówno w aplikacji webowej, jak i przez makro FreeCAD.
+-- ============================================================
+CREATE TABLE item_revision_comments (
+    item_id         UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    revision_number INTEGER NOT NULL,
+    comment         TEXT NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (item_id, revision_number)
+);

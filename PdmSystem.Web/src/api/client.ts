@@ -1,4 +1,14 @@
-import type { Attachment, Item, ItemRelation, ItemStatus, ItemType, Material, Project, Tag } from "./types"
+import type {
+  Attachment,
+  Item,
+  ItemRelation,
+  ItemStatus,
+  ItemType,
+  Material,
+  Project,
+  RevisionComment,
+  Tag,
+} from "./types"
 
 const BASE = "/api"
 
@@ -93,12 +103,15 @@ export const api = {
       body: JSON.stringify({ name }),
     }).then((r) => handleResponse<void>(r)),
 
-  setStatus: (itemId: string, status: ItemStatus) =>
+  setStatus: (itemId: string, status: ItemStatus, comment?: string) =>
     fetch(`${BASE}/items/${itemId}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, comment: comment || null }),
     }).then((r) => handleResponse<{ status: ItemStatus; revisionNumber: number | null }>(r)),
+
+  getRevisionComments: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/revisions`).then((r) => handleResponse<RevisionComment[]>(r)),
 
   fileDownloadUrl: (itemId: string) => `${BASE}/items/${itemId}/file`,
 

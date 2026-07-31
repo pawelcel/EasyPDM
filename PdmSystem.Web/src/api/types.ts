@@ -39,6 +39,19 @@ export function itemDisplayLabel(item: Pick<Item, "fileName" | "itemNumber">): s
   return item.itemNumber !== null ? `${item.itemNumber} (${item.fileName})` : item.fileName
 }
 
+// Rewizje wyświetlamy jako wielkie litery zamiast cyfr: 1->A, 2->B, ..., 26->Z, 27->AA...
+// (jak numeracja kolumn arkusza) — sama liczba w bazie (revision_number) się nie zmienia.
+export function revisionLabel(n: number): string {
+  let value = n
+  let label = ""
+  while (value > 0) {
+    const remainder = (value - 1) % 26
+    label = String.fromCharCode(65 + remainder) + label
+    value = Math.floor((value - 1) / 26)
+  }
+  return label || "A"
+}
+
 export interface Item {
   id: string
   projectId: string
@@ -56,6 +69,14 @@ export interface Item {
 }
 
 export type Tag = string
+
+// Opcjonalny komentarz do rewizji (tylko rewizje, którym faktycznie nadano komentarz —
+// nie każda rewizja go ma).
+export interface RevisionComment {
+  revisionNumber: number
+  comment: string
+  createdAt: string
+}
 
 export interface ItemRelation {
   parentId: string

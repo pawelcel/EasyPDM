@@ -29,6 +29,10 @@ wprost do `PdmSystem.Api/wwwroot/` — patrz "Frontend" niżej. Przetestowane na
   też zbudowany frontend ze swojego `wwwroot/`.
 - **`PdmSystem.Web/`** — frontend: React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui
   (komponenty na bazie Base UI, styl „base-nova”).
+- **`PdmSystem.FreeCad/`** — makro `PdmUpload.FCMacro`: uruchamiane z poziomu FreeCAD,
+  zapisuje aktywny dokument, pyta o dane (projekt, typ, rodzaj, materiał/producent/numery
+  zamówieniowe...), tworzy Część/Złożenie w PDM, dogrywa plik jako załącznik i zmienia
+  nazwę lokalnego pliku na `numer (nazwa)`. Szczegóły w `PdmSystem.FreeCad/README.md`.
 
 ### Model danych — elementy i struktura
 

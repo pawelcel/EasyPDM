@@ -1,0 +1,756 @@
+# -*- coding: utf-8 -*-
+"""
+PdmUpload — makro FreeCAD do wysyłania aktywnego dokumentu do PdmSystem.
+
+Instalacja / uruchomienie:
+    Macro -> Macros... -> "Add path to macro path list" -> wskaż ten folder,
+    albo po prostu "Execute macro from file" i wybierz ten plik bezpośrednio.
+    Nie wymaga instalacji jako workbench.
+
+Co robi (w tej kolejności):
+    1. Zapisuje aktywny dokument na dysku (jeśli nie był jeszcze zapisany, prosi o
+       wskazanie ścieżki przez natywne okno "Zapisz jako").
+    2. Pyta, czy chodzi o **nowy** rekord w PDM, czy o wgranie pliku do **już
+       istniejącego** — w drugim przypadku pozwala wpisać/wyszukać (Część/Złożenie
+       z całej bazy, nie tylko bieżącego projektu — dokładnie jak w aplikacji webowej).
+       Dla nowego rekordu: projekt PDM, element nadrzędny (opcjonalnie), typ
+       (Część/Złożenie), nazwa, rodzaj i zależne od niego pola (Materiał / Producent /
+       Numer zamówieniowy 1 i 2 / Masa).
+    2a. Dla istniejącego elementu ze statusem "wydany" (w tym statusie PDM nie pozwala
+        dogrywać plików — sprawdzane też po stronie serwera): pyta, czy stworzyć nową
+        rewizję. Odmowa → nic nie jest zapisywane. Zgoda → status zmienia się na
+        "w pracy" (ten sam mechanizm co w aplikacji webowej), co podnosi numer rewizji.
+    3. Nowy rekord: tworzy go w PDM (POST /api/projects/{id}/nodes). Dla obu trybów:
+       KOPIUJE bieżący plik dokumentu do PDM pod nazwą "numer (nazwa).REWIZJA.rozszerzenie"
+       — ten sam format numer/nazwa, w jakim PDM wyświetla Części/Złożenia wszędzie indziej
+       (zob. itemDisplayLabel w froncie), plus rewizja jako WIELKA LITERA (A, B, C... — ta
+       sama konwencja co revisionLabel() we froncie; numer w bazie zostaje liczbą, to czysto
+       kwestia formatowania nazwy). LOKALNY plik, w miejscu gdzie został otwarty, NIE jest
+       ruszany — nie jest ani przenoszony, ani usuwany (przyda się, gdy serwer PDM przestanie
+       współdzielić dysk z klientem, np. po przeniesieniu do kontenera Docker). Jeśli magazyn
+       PDM jest widoczny z tej maszyny (zob. GET /api/config), kopia trafia do WSPÓLNEGO
+       folderu storage/components/ (jednego dla wszystkich projektów — Część/Złożenie bywa
+       współdzielone jako komponent BOM między projektami) i jest REJESTROWANA
+       (POST .../attachments/register, bez ponownego przesyłania przez HTTP — kopia już
+       fizycznie leży w magazynie serwera). PDM ZACHOWUJE kopie poprzednich rewizji (np.
+       "67 (nazwa).A.FCStd" zostaje, gdy powstaje rewizja B) — nadpisywana jest tylko kopia
+       TEJ SAMEJ rewizji (powtórna wysyłka bez zmiany statusu). Jeśli magazyn jest
+       nieosiągalny, kopia trafia przez zwykły upload HTTP (POST /api/items/{id}/attachments,
+       ten sam mechanizm co dogrywanie plików CAD z panelu właściwości w aplikacji webowej).
+
+Ograniczenia (świadomie poza zakresem pierwszej wersji):
+    - Obsługuje tylko BIEŻĄCY, pojedynczy dokument — nie chodzi rekurencyjnie po
+      App::Link / złączach złożenia, żeby automatycznie zbudować cały BOM.
+    - Kopiowanie/rejestrowanie pliku w folderze magazynu zakłada, że jest on widoczny
+      w systemie plików tej maszyny (dziś: klient i serwer na tym samym dysku) — jeśli
+      GET /api/config jest nieosiągalne albo ścieżka nie istnieje/nie da się do niej
+      zapisać, kopia trafia do PDM zwykłym uploadem (kopia HTTP) — w tym trybie
+      fallbackowym historia rewizji nie jest zachowywana (każda wysyłka nadpisuje
+      poprzednią kopię po stronie PDM). W obu trybach lokalny plik zawsze zostaje
+      nienaruszony w miejscu, gdzie go otwarto.
+    - Brak logowania/autoryzacji — zakłada, że PdmSystem.Api jest dostępne bez
+      uwierzytelniania (tak jak dziś działa cała reszta systemu).
+    - Adres API zapisywany jest w preferencjach FreeCAD (User parameter:BaseApp/PdmSystem),
+      domyślnie http://localhost:5000/api.
+"""
+
+import json
+import os
+import re
+import shutil
+import uuid
+from urllib import error, request
+
+import FreeCAD as App
+
+try:
+    from PySide6 import QtCore, QtWidgets
+except ImportError:
+    try:
+        from PySide2 import QtCore, QtWidgets
+    except ImportError:
+        from PySide import QtCore
+        from PySide import QtGui as QtWidgets  # bardzo stare FreeCAD (Qt4)
+
+
+PARAM_GROUP = "User parameter:BaseApp/PdmSystem"
+DEFAULT_BASE_URL = "http://localhost:5000/api"
+
+# Dopasowuje własną konwencję nazewnictwa "numer (nazwa).REWIZJA" (nadawaną plikom/etykietom
+# przez to samo makro po wysłaniu do PDM) — np. "76 (RewizjaTest).C". Jeśli dokument został
+# ponownie otwarty z takiego pliku, nazwa/etykieta NIE jest już samą nazwą elementu, tylko
+# tym pełnym formatem — trzeba wyłuskać numer, żeby rozpoznać, o który element chodzi.
+_REVISION_NAME_PATTERN = re.compile(r"^(\d+)\s*\((.+)\)(?:\.[A-Za-z]+)?$")
+
+
+def get_base_url():
+    return App.ParamGet(PARAM_GROUP).GetString("ApiBaseUrl", DEFAULT_BASE_URL).rstrip("/")
+
+
+def set_base_url(url):
+    App.ParamGet(PARAM_GROUP).SetString("ApiBaseUrl", url.rstrip("/"))
+
+
+def _read_error_body(http_error):
+    try:
+        return http_error.read().decode("utf-8") or str(http_error)
+    except Exception:
+        return str(http_error)
+
+
+def api_get(path):
+    req = request.Request(get_base_url() + path, method="GET")
+    try:
+        with request.urlopen(req, timeout=10) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body) if body else None
+    except error.HTTPError as e:
+        raise RuntimeError(_read_error_body(e))
+    except error.URLError as e:
+        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+
+
+def api_post_json(path, payload):
+    data = json.dumps(payload).encode("utf-8")
+    req = request.Request(
+        get_base_url() + path, data=data, method="POST", headers={"Content-Type": "application/json"}
+    )
+    try:
+        with request.urlopen(req, timeout=15) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body) if body else None
+    except error.HTTPError as e:
+        raise RuntimeError(_read_error_body(e))
+    except error.URLError as e:
+        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+
+
+def api_upload_file(path, file_path, field_name="file", override_filename=None):
+    boundary = f"----PdmUploadBoundary{uuid.uuid4().hex}"
+    with open(file_path, "rb") as f:
+        file_content = f.read()
+    filename = override_filename or os.path.basename(file_path)
+
+    parts = [
+        f"--{boundary}\r\n".encode("utf-8"),
+        f'Content-Disposition: form-data; name="{field_name}"; filename="{filename}"\r\n'.encode("utf-8"),
+        b"Content-Type: application/octet-stream\r\n\r\n",
+        file_content,
+        f"\r\n--{boundary}--\r\n".encode("utf-8"),
+    ]
+    payload = b"".join(parts)
+
+    req = request.Request(
+        get_base_url() + path,
+        data=payload,
+        method="POST",
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    try:
+        with request.urlopen(req, timeout=60) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body) if body else None
+    except error.HTTPError as e:
+        raise RuntimeError(_read_error_body(e))
+    except error.URLError as e:
+        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+
+
+def api_patch_json(path, payload):
+    data = json.dumps(payload).encode("utf-8")
+    req = request.Request(
+        get_base_url() + path, data=data, method="PATCH", headers={"Content-Type": "application/json"}
+    )
+    try:
+        with request.urlopen(req, timeout=15) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body) if body else None
+    except error.HTTPError as e:
+        raise RuntimeError(_read_error_body(e))
+    except error.URLError as e:
+        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+
+
+def api_register_attachment(item_id, file_path):
+    """Rejestruje JUŻ ISTNIEJĄCY plik (już wewnątrz magazynu PDM) jako załącznik —
+    bez przesyłania go drugi raz przez HTTP (zob. POST .../attachments/register)."""
+    return api_post_json(f"/items/{item_id}/attachments/register", {"filePath": file_path})
+
+
+def sanitize_filename(name):
+    cleaned = re.sub(r'[\\/:*?"<>|]+', "_", name).strip()
+    return cleaned or "bez_nazwy"
+
+
+def revision_label(n):
+    """Rewizje jako wielkie litery zamiast cyfr: 1->A, 2->B, ..., 26->Z, 27->AA...
+    (jak numeracja kolumn arkusza) — sama liczba w bazie (revisionNumber) się nie zmienia.
+    Ta sama konwersja jest po stronie frontu w api/types.ts (revisionLabel)."""
+    n = int(n)
+    label = ""
+    while n > 0:
+        n, remainder = divmod(n - 1, 26)
+        label = chr(65 + remainder) + label
+    return label or "A"
+
+
+def get_storage_root():
+    """Pyta API o skonfigurowany StorageRoot — działa tylko, gdy magazyn jest
+    widoczny w systemie plików tej maszyny (dziś: klient i serwer na tym samym
+    dysku). Zwraca None, jeśli API nie odpowie albo ścieżka jest niedostępna."""
+    try:
+        config = api_get("/config")
+        return config.get("storageRoot") if config else None
+    except Exception:
+        return None
+
+
+def _rename_and_upload(doc, item_id, item_number, name, revision):
+    """Wspólna końcówka obu trybów: KOPIUJE bieżący plik dokumentu do PDM pod nazwą
+    "numer (nazwa).REWIZJA.rozszerzenie" (ta sama konwencja numer/nazwa co itemDisplayLabel
+    we froncie, plus litera rewizji — zob. revision_label). Lokalny plik, w miejscu gdzie
+    został otwarty, NIE jest ruszany — nie jest ani przenoszony, ani usuwany (tylko etykieta
+    dokumentu w FreeCAD się zmienia, co nie ma wpływu na dysk). Dzięki temu ten sam mechanizm
+    będzie działał także wtedy, gdy serwer PDM przestanie współdzielić dysk z klientem (np.
+    po przeniesieniu do kontenera Docker) — dziś to jeszcze zwykła kopia na tym samym dysku,
+    ale nic nie zakłada, że lokalny plik i magazyn muszą leżeć w tym samym miejscu na stałe.
+
+    Jeśli magazyn PDM jest osiągalny z tej maszyny (zob. GET /api/config): kopia trafia do
+    WSPÓLNEGO folderu storage/components/ (jeden dla wszystkich projektów — Część/Złożenie
+    bywa współdzielone jako komponent BOM między projektami) i jest REJESTROWANA
+    (POST .../attachments/register, bez ponownego przesyłania przez HTTP — plik już fizycznie
+    leży w magazynie serwera). PDM ZACHOWUJE kopie poprzednich rewizji (np. "67 (nazwa).A.FCStd"
+    zostaje, gdy powstaje rewizja B) — nadpisywana jest tylko kopia TEJ SAMEJ rewizji, czyli
+    powtórna wysyłka bez zmiany statusu. Jeśli magazyn nie jest osiągalny, kopia trafia przez
+    zwykły upload HTTP (POST .../attachments) pod tą samą, ładną nazwą.
+
+    Zwraca dict: {"itemId", "itemNumber", "newPath"} — "newPath" to ścieżka KOPII na serwerze
+    (albo lokalny plik, jeśli magazyn jest nieosiągalny), NIE lokalny plik dokumentu."""
+    ext = os.path.splitext(doc.FileName)[1]
+    name_prefix = f"{item_number} ({sanitize_filename(name)})"
+    new_filename = f"{name_prefix}.{revision_label(revision)}{ext}"
+
+    doc.Label = f"{item_number} ({name}).{revision_label(revision)}"
+
+    storage_root = get_storage_root()
+    target_path = None
+    if storage_root:
+        components_dir = os.path.join(storage_root, "components")
+        try:
+            os.makedirs(components_dir, exist_ok=True)
+            target_path = os.path.join(components_dir, new_filename)
+            shutil.copy2(doc.FileName, target_path)
+        except OSError:
+            target_path = None  # magazyn niedostępny z tej maszyny — spadamy do zwykłego uploadu
+
+    if target_path:
+        # Jeśli kopia TEJ SAMEJ rewizji (dokładnie ta sama nazwa) jest już zarejestrowana,
+        # nie trzeba nic robić — świeże bajty już tam leżą (shutil.copy2 nadpisał w miejscu),
+        # a rejestrowanie drugi raz tej samej ścieżki i tak by się nie udało (unikalny
+        # file_path w bazie). Załączniki innych rewizji (inna litera) zostają nietknięte —
+        # to zachowana historia rewizji.
+        try:
+            existing = api_get(f"/items/{item_id}/attachments")
+        except Exception:
+            existing = []
+        already_registered = any(a["fileName"] == new_filename for a in existing or [])
+        if not already_registered:
+            api_register_attachment(item_id, target_path)
+        return {"itemId": item_id, "itemNumber": item_number, "newPath": target_path}
+
+    api_upload_file(f"/items/{item_id}/attachments", doc.FileName, override_filename=new_filename)
+    return {"itemId": item_id, "itemNumber": item_number, "newPath": doc.FileName}
+
+
+def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id=None):
+    """Tworzy NOWY element w PDM, a potem dogrywa bieżący dokument jako jego załącznik
+    (zob. _rename_and_upload). Nowy element zawsze zaczyna od rewizji 1."""
+    if not doc.FileName:
+        raise RuntimeError("Dokument nie jest zapisany na dysku.")
+    doc.save()
+
+    body = {"name": name, "itemType": item_type, "properties": properties}
+    if parent_id:
+        body["parentId"] = parent_id
+
+    created = api_post_json(f"/projects/{project_id}/nodes", body)
+    return _rename_and_upload(doc, created["id"], created["itemNumber"], name, 1)
+
+
+def push_to_existing_item(doc, item_id, confirm_new_revision):
+    """Dogrywa bieżący dokument jako aktualny plik JUŻ ISTNIEJĄCEJ Części/Złożenia
+    (np. nowa wersja po zmianach) — bez tworzenia nowego rekordu w PDM.
+
+    Jeśli element ma status "wydany", w tym statusie nie da się dogrywać plików
+    (backend blokuje to na wszelki wypadek, ale pytamy PRZED próbą, żeby nie kończyć się
+    zwykłym błędem) — wywołuje `confirm_new_revision()` (funkcja bezargumentowa), pytając,
+    czy stworzyć nową rewizję. Zwraca None, jeśli użytkownik odmówił — wtedy NIC nie jest
+    zapisywane. W przeciwnym razie zwraca (możliwie pusty) tekst komentarza do rewizji.
+    Status zmienia się na "w pracy" (PATCH /items/{id}/status — ten sam mechanizm co
+    w aplikacji webowej, podnosi numer rewizji i opcjonalnie zapisuje komentarz), a dopiero
+    potem plik trafia do PDM pod nazwą nowej rewizji."""
+    if not doc.FileName:
+        raise RuntimeError("Dokument nie jest zapisany na dysku.")
+    doc.save()
+
+    item = api_get(f"/items/{item_id}")
+    revision = item.get("revisionNumber") or 1
+
+    if item.get("status") == "wydany":
+        comment = confirm_new_revision()
+        if comment is None:
+            return None
+        status_result = api_patch_json(
+            f"/items/{item_id}/status", {"status": "w_pracy", "comment": comment or None}
+        )
+        revision = (status_result or {}).get("revisionNumber") or (revision + 1)
+
+    return _rename_and_upload(doc, item_id, item["itemNumber"], item["fileName"], revision)
+
+
+class NewRevisionDialog(QtWidgets.QDialog):
+    """Pytanie o stworzenie nowej rewizji elementu o statusie "Wydany", z opcjonalnym
+    komentarzem opisującym zmianę — ta sama treść, którą zapisuje aplikacja webowa."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Nowa rewizja")
+        self.setMinimumWidth(380)
+
+        layout = QtWidgets.QVBoxLayout(self)
+
+        label = QtWidgets.QLabel(
+            'Ten element ma status "Wydany" — nie można do niego dogrywać plików.\n\n'
+            'Czy chcesz stworzyć nową rewizję (status zmieni się na "W pracy")?'
+        )
+        label.setWordWrap(True)
+        layout.addWidget(label)
+
+        layout.addWidget(QtWidgets.QLabel("Komentarz do rewizji (opcjonalnie):"))
+        self.comment_edit = QtWidgets.QPlainTextEdit()
+        self.comment_edit.setFixedHeight(70)
+        self.comment_edit.setPlaceholderText("Co zmieniło się w tej rewizji…")
+        layout.addWidget(self.comment_edit)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText("Stwórz rewizję")
+        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText("Anuluj")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def comment_text(self):
+        return self.comment_edit.toPlainText().strip()
+
+
+class PdmUploadDialog(QtWidgets.QDialog):
+    def __init__(self, doc, parent=None):
+        super().__init__(parent)
+        self.doc = doc
+        self.result_info = None
+        self._existing_items = []
+
+        self.setWindowTitle("Wyślij do PDM")
+        self.setMinimumWidth(440)
+
+        outer = QtWidgets.QVBoxLayout(self)
+
+        top_form = QtWidgets.QFormLayout()
+        outer.addLayout(top_form)
+
+        self.server_edit = QtWidgets.QLineEdit(get_base_url())
+        top_form.addRow("Adres API:", self.server_edit)
+
+        reload_btn = QtWidgets.QPushButton("Odśwież listy z serwera")
+        reload_btn.clicked.connect(self.reload_lists)
+        top_form.addRow("", reload_btn)
+
+        self.mode_combo = QtWidgets.QComboBox()
+        self.mode_combo.addItems(["Nowy element w PDM", "Istniejący element w PDM"])
+        self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
+        top_form.addRow("Tryb:", self.mode_combo)
+
+        # --- Tryb: nowy element -----------------------------------------
+        self.new_group = QtWidgets.QWidget()
+        new_form = QtWidgets.QFormLayout(self.new_group)
+        new_form.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(self.new_group)
+
+        self.project_combo = QtWidgets.QComboBox()
+        self.project_combo.currentIndexChanged.connect(self.on_project_changed)
+        new_form.addRow("Projekt:", self.project_combo)
+
+        self.parent_combo = QtWidgets.QComboBox()
+        new_form.addRow("Element nadrzędny:", self.parent_combo)
+
+        self.type_combo = QtWidgets.QComboBox()
+        self.type_combo.addItems(["Część", "Złożenie"])
+        self.type_combo.currentIndexChanged.connect(self.on_type_changed)
+        new_form.addRow("Typ:", self.type_combo)
+
+        self.name_edit = QtWidgets.QLineEdit(doc.Label)
+        self.name_edit.textChanged.connect(self._check_name_and_maybe_switch)
+        new_form.addRow("Nazwa:", self.name_edit)
+
+        self.rodzaj_combo = QtWidgets.QComboBox()
+        self.rodzaj_combo.currentIndexChanged.connect(self.on_rodzaj_changed)
+        new_form.addRow("Rodzaj:", self.rodzaj_combo)
+
+        self.material_label = QtWidgets.QLabel("Materiał:")
+        self.material_combo = QtWidgets.QComboBox()
+        self.material_combo.setEditable(True)
+        new_form.addRow(self.material_label, self.material_combo)
+
+        self.mass_label = QtWidgets.QLabel("Masa [kg]:")
+        self.mass_edit = QtWidgets.QLineEdit()
+        new_form.addRow(self.mass_label, self.mass_edit)
+
+        self.manufacturer_label = QtWidgets.QLabel("Producent:")
+        self.manufacturer_edit = QtWidgets.QLineEdit()
+        new_form.addRow(self.manufacturer_label, self.manufacturer_edit)
+
+        self.order1_label = QtWidgets.QLabel("Numer zamówieniowy 1:")
+        self.order1_edit = QtWidgets.QLineEdit()
+        new_form.addRow(self.order1_label, self.order1_edit)
+
+        self.order2_label = QtWidgets.QLabel("Numer zamówieniowy 2:")
+        self.order2_edit = QtWidgets.QLineEdit()
+        new_form.addRow(self.order2_label, self.order2_edit)
+
+        # --- Tryb: istniejący element ------------------------------------
+        self.existing_group = QtWidgets.QWidget()
+        existing_form = QtWidgets.QFormLayout(self.existing_group)
+        existing_form.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(self.existing_group)
+
+        self.existing_combo = QtWidgets.QComboBox()
+        self.existing_combo.setEditable(True)
+        self.existing_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
+        self.existing_combo.setMinimumContentsLength(30)
+        existing_form.addRow("Element (Część/Złożenie z całej bazy):", self.existing_combo)
+        existing_form.addRow(
+            "", QtWidgets.QLabel("Zacznij pisać, żeby wyszukać po numerze albo nazwie.")
+        )
+
+        # --- Wspólne --------------------------------------------------------
+        bottom_form = QtWidgets.QFormLayout()
+        outer.addLayout(bottom_form)
+
+        self.error_label = QtWidgets.QLabel("")
+        self.error_label.setStyleSheet("color: #c0392b;")
+        self.error_label.setWordWrap(True)
+        bottom_form.addRow(self.error_label)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        buttons.accepted.connect(self.on_submit)
+        buttons.rejected.connect(self.reject)
+        bottom_form.addRow(buttons)
+
+        self.on_type_changed()
+        self.on_mode_changed()
+        self.reload_lists()
+        # Sprawdzamy od razu nazwę dokumentu — jeśli Część/Złożenie o tej nazwie już
+        # istnieje w PDM, od razu przełączamy na tryb "Istniejący element".
+        self._check_name_and_maybe_switch(doc.Label)
+
+    # ------------------------------------------------------------------
+    # Automatyczne wykrycie już istniejącego elementu po nazwie
+    # ------------------------------------------------------------------
+    def _check_name_and_maybe_switch(self, name):
+        # Tylko PODPOWIADAMY (przełączamy tryb i zaznaczamy dopasowanie) — nigdy nie
+        # wysyłamy niczego automatycznie. Użytkownik i tak musi kliknąć "Dodaj", więc
+        # może w każdej chwili wrócić do "Nowy element", jeśli o to mu chodziło.
+        name = name.strip()
+        if not name:
+            return
+
+        # Plik/etykieta mogła już być w formacie "numer (nazwa).REWIZJA" — np. gdy dokument
+        # został ponownie otwarty z pliku zapisanego wcześniej przez to samo makro. Wtedy
+        # dopasowujemy po NUMERZE (jednoznaczny), a nie po całym tekście jako nazwie.
+        number_match = _REVISION_NAME_PATTERN.match(name)
+        if number_match:
+            item_number = int(number_match.group(1))
+            matches = [it for it in self._existing_items if it["itemNumber"] == item_number]
+        else:
+            matches = [it for it in self._existing_items if it["fileName"].strip().lower() == name.lower()]
+        if not matches:
+            return
+
+        self.mode_combo.setCurrentIndex(1)
+        if len(matches) == 1:
+            idx = self.existing_combo.findData(matches[0]["id"])
+            if idx >= 0:
+                self.existing_combo.setCurrentIndex(idx)
+        else:
+            # Kilka elementów o tej samej nazwie (np. w różnych projektach) — zawężamy
+            # wyszukiwanie do tej nazwy, ale wybór zostawiamy użytkownikowi.
+            self.existing_combo.setCurrentIndex(-1)
+            self.existing_combo.setEditText(name)
+
+    # ------------------------------------------------------------------
+    # Ładowanie danych z serwera
+    # ------------------------------------------------------------------
+    def reload_lists(self):
+        set_base_url(self.server_edit.text().strip())
+        self.error_label.setText("")
+
+        try:
+            projects = api_get("/projects")
+        except Exception as e:
+            self.error_label.setText(f"Nie udało się pobrać projektów: {e}")
+            projects = []
+        self.project_combo.clear()
+        for p in projects:
+            self.project_combo.addItem(p["name"], p["id"])
+
+        try:
+            materials = api_get("/materials")
+        except Exception:
+            materials = []
+        self.material_combo.clear()
+        self.material_combo.addItem("", "")
+        for m in materials:
+            self.material_combo.addItem(m["name"], m["name"])
+
+        # Część/Złożenie z CAŁEJ bazy (nie tylko bieżącego projektu) — ten sam komponent
+        # może być współdzielony/wersjonowany niezależnie od tego, gdzie formalnie żyje.
+        try:
+            all_items = api_get("/items")
+        except Exception as e:
+            self.error_label.setText(f"Nie udało się pobrać listy elementów: {e}")
+            all_items = []
+        self._existing_items = [it for it in all_items if it["itemType"] in ("part", "assembly")]
+        self.existing_combo.clear()
+        labels = []
+        for it in self._existing_items:
+            label = f'{it["itemNumber"]} ({it["fileName"]})'
+            labels.append(label)
+            self.existing_combo.addItem(label, it["id"])
+        completer = QtWidgets.QCompleter(labels, self.existing_combo)
+        completer.setCaseSensitivity(QtCore.Qt.CaseInsensitive)
+        completer.setFilterMode(QtCore.Qt.MatchContains)
+        completer.setCompletionMode(QtWidgets.QCompleter.PopupCompletion)
+        completer.activated.connect(self._on_existing_picked)
+        self.existing_combo.setCompleter(completer)
+        self.existing_combo.setCurrentIndex(-1)
+        self.existing_combo.clearEditText()
+
+        self.on_project_changed()
+
+    def on_mode_changed(self):
+        is_new = self.mode_combo.currentIndex() == 0
+        self.new_group.setVisible(is_new)
+        self.existing_group.setVisible(not is_new)
+
+    def _on_existing_picked(self, text):
+        # Wybór podpowiedzi z QCompleter nie zawsze sam ustawia currentIndex/currentData
+        # edytowalnego QComboBox — dowiązujemy to ręcznie po dokładnym dopasowaniu tekstu.
+        idx = self.existing_combo.findText(text)
+        if idx >= 0:
+            self.existing_combo.setCurrentIndex(idx)
+
+    def on_project_changed(self):
+        self.parent_combo.clear()
+        self.parent_combo.addItem("Brak (poziom główny projektu)", None)
+
+        project_id = self.project_combo.currentData()
+        if not project_id:
+            return
+        try:
+            items = api_get(f"/items?projectId={project_id}")
+        except Exception as e:
+            self.error_label.setText(f"Nie udało się pobrać elementów projektu: {e}")
+            return
+        # Do struktury można dodać coś tylko pod Folderem albo Złożeniem (Część/Plik są liśćmi).
+        for it in items:
+            if it["itemType"] == "folder":
+                label = it["fileName"]
+            elif it["itemType"] == "assembly":
+                label = f'{it["itemNumber"]} ({it["fileName"]})'
+            else:
+                continue
+            self.parent_combo.addItem(label, it["id"])
+
+    # ------------------------------------------------------------------
+    # Widoczność pól zależna od typu/rodzaju (odzwierciedla reguły z aplikacji webowej)
+    # ------------------------------------------------------------------
+    def on_type_changed(self):
+        is_part = self.type_combo.currentText() == "Część"
+        self.rodzaj_combo.blockSignals(True)
+        self.rodzaj_combo.clear()
+        if is_part:
+            self.rodzaj_combo.addItems(["Wykonywana", "Zakupowa"])
+        else:
+            self.rodzaj_combo.addItem("(nie wybrano)", "")
+            self.rodzaj_combo.addItem("Wykonywana", "Wykonywana")
+            self.rodzaj_combo.addItem("Zakupowa", "Zakupowa")
+        self.rodzaj_combo.blockSignals(False)
+        self.on_rodzaj_changed()
+
+    def on_rodzaj_changed(self):
+        is_part = self.type_combo.currentText() == "Część"
+        rodzaj = self.rodzaj_combo.currentText()
+        wykonywana = rodzaj == "Wykonywana"
+        zakupowa = rodzaj == "Zakupowa"
+
+        # Część: pola zależne wyłącznie od rodzaju (dokładnie jak PartPropertyForm).
+        # Złożenie: Materiał/Masa zawsze widoczne razem, niezależnie od rodzaju
+        # (dokładnie jak formularz tworzenia złożenia w aplikacji webowej).
+        show_material = wykonywana if is_part else True
+        show_mass = zakupowa if is_part else True
+        show_purchase_fields = is_part and zakupowa
+
+        for w in (self.material_label, self.material_combo):
+            w.setVisible(show_material)
+        for w in (self.mass_label, self.mass_edit):
+            w.setVisible(show_mass)
+        for w in (
+            self.manufacturer_label,
+            self.manufacturer_edit,
+            self.order1_label,
+            self.order1_edit,
+            self.order2_label,
+            self.order2_edit,
+        ):
+            w.setVisible(show_purchase_fields)
+
+    # ------------------------------------------------------------------
+    # Zapis
+    # ------------------------------------------------------------------
+    def on_submit(self):
+        self.error_label.setText("")
+
+        if self.mode_combo.currentIndex() == 1:
+            self._submit_existing()
+        else:
+            self._submit_new()
+
+    def _submit_existing(self):
+        item_id = self.existing_combo.currentData()
+        if not item_id:
+            # Użytkownik mógł wpisać dokładny tekst ręcznie, bez klikania w podpowiedź.
+            idx = self.existing_combo.findText(self.existing_combo.currentText().strip())
+            if idx >= 0:
+                item_id = self.existing_combo.itemData(idx)
+        if not item_id:
+            self.error_label.setText("Wybierz element z listy (Część albo Złożenie).")
+            return
+
+        def confirm_new_revision():
+            dlg = NewRevisionDialog(self)
+            if dlg.exec() != QtWidgets.QDialog.Accepted:
+                return None
+            return dlg.comment_text()
+
+        try:
+            # None oznacza: element był "Wydany", a użytkownik odmówił nowej rewizji —
+            # nic nie zostało zapisane, ale to nie jest błąd.
+            self.result_info = push_to_existing_item(self.doc, item_id, confirm_new_revision)
+        except Exception as e:
+            self.error_label.setText(str(e))
+            return
+
+        self.accept()
+
+    def _submit_new(self):
+        project_id = self.project_combo.currentData()
+        if not project_id:
+            self.error_label.setText("Wybierz projekt.")
+            return
+
+        item_type = "part" if self.type_combo.currentText() == "Część" else "assembly"
+        name = self.name_edit.text().strip()
+        if not name:
+            self.error_label.setText("Nazwa jest wymagana.")
+            return
+
+        rodzaj = self.rodzaj_combo.currentText()
+        if item_type == "part" and rodzaj not in ("Wykonywana", "Zakupowa"):
+            self.error_label.setText("Dla Części wybierz rodzaj: Wykonywana albo Zakupowa.")
+            return
+        if rodzaj == "(nie wybrano)":
+            rodzaj = ""
+
+        properties = {}
+        if rodzaj:
+            properties["rodzaj"] = rodzaj
+
+        if self.material_combo.isVisible():
+            material = self.material_combo.currentText().strip()
+            if material:
+                properties["material"] = material
+        if self.mass_edit.isVisible():
+            mass = self.mass_edit.text().strip()
+            if mass:
+                properties["mass"] = mass
+        if self.manufacturer_edit.isVisible():
+            manufacturer = self.manufacturer_edit.text().strip()
+            if manufacturer:
+                properties["manufacturer"] = manufacturer
+            order1 = self.order1_edit.text().strip()
+            if order1:
+                properties["orderNumber"] = order1
+            order2 = self.order2_edit.text().strip()
+            if order2:
+                properties["orderNumber2"] = order2
+
+        parent_id = self.parent_combo.currentData()
+
+        try:
+            self.result_info = push_new_item_to_pdm(
+                self.doc, project_id, item_type, name, properties, parent_id
+            )
+        except Exception as e:
+            self.error_label.setText(str(e))
+            return
+
+        self.accept()
+
+
+def run():
+    doc = App.ActiveDocument
+    if doc is None:
+        QtWidgets.QMessageBox.warning(None, "PDM", "Brak otwartego dokumentu.")
+        return
+
+    # Krok 1: zapisz element przed wrzuceniem do PDM.
+    if not doc.FileName:
+        QtWidgets.QMessageBox.information(
+            None, "PDM", "Dokument nie jest jeszcze zapisany — wskaż, gdzie go zapisać."
+        )
+        import FreeCADGui as Gui
+
+        Gui.runCommand("Std_SaveAs")
+        if not doc.FileName:
+            return  # użytkownik anulował zapis
+    else:
+        doc.save()
+
+    # Krok 2: uzupełnienie danych w oknie dialogowym (tworzy element + dogrywa plik + zmienia nazwę).
+    dialog = PdmUploadDialog(doc)
+    if dialog.exec() != QtWidgets.QDialog.Accepted:
+        return
+
+    if dialog.result_info is None:
+        # Element był "Wydany", a użytkownik odmówił stworzenia nowej rewizji.
+        QtWidgets.QMessageBox.information(None, "PDM", "Anulowano — nic nie zostało wysłane.")
+        return
+
+    info = dialog.result_info
+    QtWidgets.QMessageBox.information(
+        None,
+        "PDM",
+        f"Wysłano do PDM jako {info['itemNumber']}.\n"
+        f"Kopia w magazynie PDM:\n{info['newPath']}\n\n"
+        f"Lokalny plik pozostał bez zmian:\n{doc.FileName}",
+    )
+
+
+# Odpala się tylko, gdy faktycznie działa GUI FreeCAD (a nie np. freecadcmd/import
+# do testów) — bez GUI i tak nie dałoby się pokazać okna dialogowego.
+if App.GuiUp:
+    run()
