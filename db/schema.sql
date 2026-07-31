@@ -29,9 +29,12 @@ CREATE TABLE projects (
 CREATE TABLE items (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id          UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    file_path           TEXT NOT NULL UNIQUE,        -- ścieżka w wewnętrznym magazynie API, nie na dysku użytkownika
-    file_name           TEXT NOT NULL,               -- oryginalna nazwa pliku podana przy wgraniu
-    file_type           TEXT NOT NULL,          -- sldprt, sldasm, slddrw, step, dxf...
+    item_type           TEXT NOT NULL DEFAULT 'file'
+                            CHECK (item_type IN ('folder', 'part', 'file', 'assembly')),
+    item_number         INTEGER,                -- numer nadawany automatycznie Częściom i Złożeniom (item_number_seq)
+    file_path           TEXT UNIQUE,             -- ścieżka w wewnętrznym magazynie API; puste dla folderów/Części (to kontenery bez własnego pliku)
+    file_name           TEXT NOT NULL,           -- nazwa pliku (dla typu 'file') albo nazwa folderu/Części
+    file_type           TEXT,                    -- sldprt, sldasm, slddrw, step, dxf... — puste dla folderów/Części
     file_hash           TEXT,
     file_size           BIGINT,
     created_at          TIMESTAMPTZ DEFAULT now(),
@@ -40,8 +43,12 @@ CREATE TABLE items (
     properties          JSONB DEFAULT '{}',
     current_revision_id UUID,                   -- FK dodane niżej (cykliczna referencja)
     checked_out_by      UUID REFERENCES users(id),
-    checked_out_at      TIMESTAMPTZ
+    checked_out_at      TIMESTAMPTZ,
+    show_in_tree        BOOLEAN NOT NULL DEFAULT true  -- dla elementów bez rodzica: czy pokazywać jako korzeń w drzewku
 );
+
+CREATE SEQUENCE item_number_seq START 1;
+GRANT USAGE, SELECT ON SEQUENCE item_number_seq TO pdm_user;
 
 CREATE INDEX idx_items_properties ON items USING GIN (properties);
 CREATE INDEX idx_items_file_type ON items (file_type);
@@ -95,7 +102,8 @@ CREATE TABLE property_definitions (
 INSERT INTO property_definitions (key, display_name, data_type, enum_values) VALUES
     ('material', 'Materiał', 'enum', ARRAY['Stal S235', 'Stal nierdzewna 304', 'Aluminium 6061', 'Tworzywo POM']),
     ('mass', 'Masa [kg]', 'number', NULL),
-    ('supplier', 'Dostawca', 'text', NULL);
+    ('supplier', 'Dostawca', 'text', NULL),
+    ('rodzaj', 'Rodzaj', 'enum', ARRAY['Zakupowa', 'Wykonywana']);
 
 -- ============================================================
 -- Tagi
