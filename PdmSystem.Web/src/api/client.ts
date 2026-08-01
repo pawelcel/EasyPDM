@@ -7,9 +7,12 @@ import type {
   ItemStatus,
   ItemType,
   ManagedUser,
+  Manufacturer,
+  ManufacturerDetail,
   Material,
   Project,
   RevisionComment,
+  StorageInfo,
   Tag,
   UserRole,
 } from "./types"
@@ -33,6 +36,14 @@ type MaterialWriteBody = {
   name: string
   group: string | null
   subgroup: string | null
+}
+
+type ContactWriteBody = {
+  firstName: string | null
+  lastName: string | null
+  phone: string | null
+  position: string | null
+  email: string | null
 }
 
 export class ApiError extends Error {
@@ -228,6 +239,53 @@ export const api = {
 
   removeMaterial: (id: number) =>
     fetch(`${BASE}/materials/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  getManufacturers: (search?: string) =>
+    fetch(`${BASE}/manufacturers${search ? `?search=${encodeURIComponent(search)}` : ""}`).then(
+      (r) => handleResponse<Manufacturer[]>(r)
+    ),
+
+  getManufacturer: (id: number) =>
+    fetch(`${BASE}/manufacturers/${id}`).then((r) => handleResponse<ManufacturerDetail>(r)),
+
+  createManufacturer: (name: string) =>
+    fetch(`${BASE}/manufacturers`, json({ name })).then((r) => handleResponse<{ id: number }>(r)),
+
+  updateManufacturer: (id: number, name: string) =>
+    fetch(`${BASE}/manufacturers/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeManufacturer: (id: number) =>
+    fetch(`${BASE}/manufacturers/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  addManufacturerContact: (manufacturerId: number, body: ContactWriteBody) =>
+    fetch(`${BASE}/manufacturers/${manufacturerId}/contacts`, json(body)).then((r) =>
+      handleResponse<{ id: number }>(r)
+    ),
+
+  updateManufacturerContact: (manufacturerId: number, contactId: number, body: ContactWriteBody) =>
+    fetch(`${BASE}/manufacturers/${manufacturerId}/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeManufacturerContact: (manufacturerId: number, contactId: number) =>
+    fetch(`${BASE}/manufacturers/${manufacturerId}/contacts/${contactId}`, {
+      method: "DELETE",
+    }).then((r) => handleResponse<void>(r)),
+
+  getStorageInfo: () => fetch(`${BASE}/settings/storage`).then((r) => handleResponse<StorageInfo>(r)),
+
+  moveStorage: (newPath: string, migrateExisting: boolean) =>
+    fetch(`${BASE}/settings/storage/move`, json({ newPath, migrateExisting })).then((r) =>
+      handleResponse<{ path: string; migratedFiles: number }>(r)
+    ),
+
+  backupUrl: () => `${BASE}/settings/backup`,
 
   getAttachments: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/attachments`).then((r) => handleResponse<Attachment[]>(r)),

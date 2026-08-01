@@ -338,6 +338,7 @@ function AddNodeDialog({
                   step="any"
                   value={mass}
                   onChange={(e) => setMass(e.target.value)}
+                  className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <Label>Rodzaj (opcjonalnie)</Label>
                 <Select value={rodzaj || "none"} onValueChange={(v) => setRodzaj(v === "none" ? "" : (v as string))}>

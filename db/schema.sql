@@ -141,6 +141,26 @@ CREATE TABLE materials (
     subgroup_name TEXT   -- jw., podrzędne wobec grupy
 );
 
+-- ============================================================
+-- Producenci (katalog z osobami kontaktowymi, zarządzany z panelu bocznego)
+-- ============================================================
+CREATE TABLE manufacturers (
+    id   SERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE manufacturer_contacts (
+    id              SERIAL PRIMARY KEY,
+    manufacturer_id INTEGER NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+    first_name      TEXT,
+    last_name       TEXT,
+    phone           TEXT,
+    position        TEXT,
+    email           TEXT
+);
+
+CREATE INDEX idx_manufacturer_contacts_manufacturer ON manufacturer_contacts (manufacturer_id);
+
 CREATE TABLE item_tags (
     item_id UUID REFERENCES items(id) ON DELETE CASCADE,
     tag_id  INT REFERENCES tags(id) ON DELETE CASCADE,

@@ -140,6 +140,35 @@ export interface Material {
   subgroup: string | null
 }
 
+// Lekki wpis do listy/wyszukiwarki producentów — bez osób kontaktowych (te dociągane są
+// osobno, dopiero po zaznaczeniu konkretnego producenta).
+export interface Manufacturer {
+  id: number
+  name: string
+  contactCount: number
+}
+
+export interface ManufacturerContact {
+  id: number
+  firstName: string | null
+  lastName: string | null
+  phone: string | null
+  position: string | null
+  email: string | null
+}
+
+export interface ManufacturerDetail {
+  id: number
+  name: string
+  contacts: ManufacturerContact[]
+}
+
+export interface StorageInfo {
+  path: string
+  fileCount: number
+  totalSizeBytes: number
+}
+
 // Załącznik (plik dograny "z zewnątrz", np. plik CAD) — w odróżnieniu od struktury
 // (item_relations) NIE jest osobnym elementem w drzewku, zarządzany tylko z panelu
 // właściwości po prawej stronie.
