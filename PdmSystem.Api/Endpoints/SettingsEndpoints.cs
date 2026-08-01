@@ -121,6 +121,11 @@ static class SettingsEndpoints
                 psi.ArgumentList.Add(csb.Database ?? "");
                 psi.ArgumentList.Add("-F");
                 psi.ArgumentList.Add("c");
+                // --no-owner: kto odtworzy bazę (patrz pg_restore niżej) i tak będzie
+                // właścicielem nowo tworzonych tabel. GRANT-y (np. dla pdm_user) NIE są tu
+                // pomijane — to nie są uprawnienia domyślne, więc bez nich po restore appka
+                // straciłaby dostęp do własnych tabel.
+                psi.ArgumentList.Add("--no-owner");
                 psi.ArgumentList.Add("-f");
                 psi.ArgumentList.Add(dumpPath);
                 psi.Environment["PGPASSWORD"] = csb.Password ?? "";
@@ -149,6 +154,112 @@ static class SettingsEndpoints
                 var bytes = await File.ReadAllBytesAsync(zipPath);
                 var fileName = $"pdm-backup-{DateTime.Now:yyyy-MM-dd_HHmm}.zip";
                 return Results.File(bytes, "application/zip", fileName);
+            }
+            finally
+            {
+                try { Directory.Delete(tempDir, recursive: true); } catch (IOException) { }
+            }
+        });
+
+        // POST /api/settings/restore   multipart/form-data: file (ZIP z GET /settings/backup)
+        // Odtwarza bazę (pg_restore --clean, więc nadpisuje WSZYSTKIE bieżące dane) i podmienia
+        // cały magazyn plików na ten z kopii. To NIEODWRACALNA operacja — frontend pokazuje
+        // ostrzeżenie przed wywołaniem. Po przywróceniu baza jest inna niż ta, z którą łączy
+        // się pula połączeń Npgsql, więc czyścimy pule, żeby kolejne zapytania od razu
+        // dostały świeże połączenia zamiast (potencjalnie nieaktualnych) z cache'u.
+        app.MapPost("/api/settings/restore", async (HttpContext ctx, HttpRequest request) =>
+        {
+            if (!IsAdmin(ctx))
+                return Forbidden();
+
+            if (!request.HasFormContentType)
+                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+
+            var form = await request.ReadFormAsync();
+            var file = form.Files.GetFile("file");
+            if (file is null || file.Length == 0)
+                return Results.BadRequest("Brak pliku kopii zapasowej w polu 'file'.");
+
+            var tempDir = Path.Combine(Path.GetTempPath(), $"pdm_restore_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDir);
+            try
+            {
+                var zipPath = Path.Combine(tempDir, "upload.zip");
+                await using (var stream = File.Create(zipPath))
+                    await file.CopyToAsync(stream);
+
+                var extractDir = Path.Combine(tempDir, "extracted");
+                try
+                {
+                    ZipFile.ExtractToDirectory(zipPath, extractDir);
+                }
+                catch (InvalidDataException)
+                {
+                    return Results.BadRequest("Przesłany plik nie jest poprawnym archiwum ZIP.");
+                }
+
+                var dumpPath = Path.Combine(extractDir, "database.dump");
+                if (!File.Exists(dumpPath))
+                {
+                    return Results.BadRequest(
+                        "Plik ZIP nie zawiera database.dump — to nie jest kopia zapasowa PdmSystem.");
+                }
+
+                var csb = new NpgsqlConnectionStringBuilder(connectionString);
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "pg_restore",
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                };
+                psi.ArgumentList.Add("-h");
+                psi.ArgumentList.Add(csb.Host ?? "localhost");
+                psi.ArgumentList.Add("-p");
+                psi.ArgumentList.Add((csb.Port == 0 ? 5432 : csb.Port).ToString());
+                // Tabele w tej bazie należą do "postgres" (schemat był zakładany tą rolą —
+                // ten sam powód, dla którego część migracji w db/migrations/ wymaga
+                // uruchomienia jako "postgres", nie zwykłego pdm_user z connection stringa).
+                // --clean musi więc łączyć się jako właściciel, inaczej DROP/CREATE każdej
+                // tabeli kończy się błędem "must be owner of table" i restore nic nie zmienia.
+                psi.ArgumentList.Add("-U");
+                psi.ArgumentList.Add("postgres");
+                psi.ArgumentList.Add("-d");
+                psi.ArgumentList.Add(csb.Database ?? "");
+                psi.ArgumentList.Add("--clean");
+                psi.ArgumentList.Add("--if-exists");
+                psi.ArgumentList.Add(dumpPath);
+
+                using var process = Process.Start(psi)
+                    ?? throw new InvalidOperationException("Nie udało się uruchomić pg_restore.");
+                var stderr = await process.StandardError.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                // pg_restore nie jest tu uruchamiany w jednej transakcji — pojedyncze,
+                // nieszkodliwe błędy (np. brak uprawnień do rozszerzenia, które i tak już
+                // istnieje) nie przerywają reszty odtwarzania, więc niezerowy kod zwracamy
+                // jako ostrzeżenie, a nie twardy błąd blokujący dalsze kroki.
+                NpgsqlConnection.ClearAllPools();
+
+                var filesRestored = 0;
+                var storageBackupDir = Path.Combine(extractDir, "storage");
+                if (Directory.Exists(storageBackupDir))
+                {
+                    if (Directory.Exists(storage.Path))
+                    {
+                        foreach (var entry in Directory.EnumerateFileSystemEntries(storage.Path))
+                        {
+                            if (Directory.Exists(entry)) Directory.Delete(entry, recursive: true);
+                            else File.Delete(entry);
+                        }
+                    }
+                    else
+                    {
+                        Directory.CreateDirectory(storage.Path);
+                    }
+                    filesRestored = CopyDirectoryRecursive(storageBackupDir, storage.Path);
+                }
+
+                return Results.Ok(new { success = process.ExitCode == 0, warnings = stderr, filesRestored });
             }
             finally
             {

@@ -287,6 +287,14 @@ export const api = {
 
   backupUrl: () => `${BASE}/settings/backup`,
 
+  restoreBackup: (file: File) => {
+    const formData = new FormData()
+    formData.append("file", file)
+    return fetch(`${BASE}/settings/restore`, { method: "POST", body: formData }).then((r) =>
+      handleResponse<{ success: boolean; warnings: string; filesRestored: number }>(r)
+    )
+  },
+
   getAttachments: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/attachments`).then((r) => handleResponse<Attachment[]>(r)),
 

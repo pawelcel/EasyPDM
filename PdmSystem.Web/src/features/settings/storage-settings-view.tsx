@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { api } from "@/api/client"
 import type { StorageInfo } from "@/api/types"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
   Dialog,
   DialogContent,
@@ -120,6 +121,8 @@ function StorageSettingsView() {
             <Button variant="outline">⬇ Pobierz kopię zapasową</Button>
           </a>
         </div>
+
+        <RestoreSection />
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={(next) => !moving && setConfirmOpen(next)}>
@@ -146,6 +149,94 @@ function StorageSettingsView() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function RestoreSection() {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const [error, setError] = useState("")
+  const [result, setResult] = useState<{ success: boolean; warnings: string; filesRestored: number } | null>(null)
+
+  async function performRestore() {
+    if (!file) return
+    setRestoring(true)
+    setError("")
+    try {
+      const res = await api.restoreBackup(file)
+      setConfirmOpen(false)
+      setResult(res)
+    } catch (err) {
+      setConfirmOpen(false)
+      setError(err instanceof Error ? err.message : "Nie udało się przywrócić kopii zapasowej.")
+    } finally {
+      setRestoring(false)
+    }
+  }
+
+  return (
+    <>
+      <SectionLabel>Przywracanie z kopii zapasowej</SectionLabel>
+      {result ? (
+        <div className="flex flex-col gap-2">
+          <Hint>
+            {result.success ? "Przywrócono pomyślnie." : "Przywrócono z ostrzeżeniami — sprawdź poniżej."}{" "}
+            Przywrócono {result.filesRestored} plików. Twoja sesja przestała być ważna — zaloguj się
+            ponownie.
+          </Hint>
+          {result.warnings && (
+            <pre className="max-h-32 overflow-auto rounded-md bg-muted p-2 text-[11px] whitespace-pre-wrap text-muted-foreground">
+              {result.warnings}
+            </pre>
+          )}
+          <div>
+            <Button onClick={() => window.location.reload()}>Odśwież stronę</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <Hint>
+            Wgraj plik ZIP pobrany wcześniej jako kopia zapasowa. To NADPISZE całą bieżącą bazę
+            danych i magazyn plików — operacji nie da się cofnąć.
+          </Hint>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip"
+            className="hidden"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={restoring}>
+              Wybierz plik ZIP…
+            </Button>
+            {file && <span className="text-[12.5px] text-muted-foreground">{file.name}</span>}
+          </div>
+          <div>
+            <Button
+              variant="destructive"
+              onClick={() => setConfirmOpen(true)}
+              disabled={!file || restoring}
+            >
+              Przywróć z pliku
+            </Button>
+          </div>
+          <FormError>{error}</FormError>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Przywrócić bazę z kopii zapasowej?"
+        description={`Ta operacja NADPISZE całą bieżącą bazę danych i magazyn plików zawartością pliku „${file?.name}”. Wszystkie zmiany wprowadzone od czasu tej kopii zostaną utracone. Tej operacji nie można cofnąć.`}
+        confirmLabel="Przywróć i nadpisz"
+        variant="destructive"
+        onConfirm={performRestore}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   )
 }
 
