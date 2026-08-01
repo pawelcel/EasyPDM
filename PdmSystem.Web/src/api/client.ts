@@ -29,6 +29,12 @@ type ProjectWriteBody = {
   endDate: string | null
 }
 
+type MaterialWriteBody = {
+  name: string
+  group: string | null
+  subgroup: string | null
+}
+
 export class ApiError extends Error {
   status: number
 
@@ -194,6 +200,13 @@ export const api = {
       body: JSON.stringify({ childIds }),
     }).then((r) => handleResponse<void>(r)),
 
+  reorderRoots: (projectId: string, itemIds: string[]) =>
+    fetch(`${BASE}/projects/${projectId}/roots/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemIds }),
+    }).then((r) => handleResponse<void>(r)),
+
   getBom: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/bom`).then((r) => handleResponse<BomEntry[]>(r)),
 
@@ -203,13 +216,18 @@ export const api = {
 
   getMaterials: () => fetch(`${BASE}/materials`).then((r) => handleResponse<Material[]>(r)),
 
-  addMaterial: (name: string, group: string | null) =>
-    fetch(`${BASE}/materials`, json({ name, group })).then((r) => handleResponse<void>(r)),
+  addMaterial: (body: MaterialWriteBody) =>
+    fetch(`${BASE}/materials`, json(body)).then((r) => handleResponse<{ id: number }>(r)),
 
-  removeMaterial: (name: string) =>
-    fetch(`${BASE}/materials/${encodeURIComponent(name)}`, { method: "DELETE" }).then((r) =>
-      handleResponse<void>(r)
-    ),
+  updateMaterial: (id: number, body: MaterialWriteBody) =>
+    fetch(`${BASE}/materials/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeMaterial: (id: number) =>
+    fetch(`${BASE}/materials/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
   getAttachments: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/attachments`).then((r) => handleResponse<Attachment[]>(r)),

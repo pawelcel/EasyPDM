@@ -80,8 +80,11 @@ static class ItemEndpoints
             }
 
             const string insertSql = """
-                INSERT INTO items (id, project_id, item_type, file_path, file_name, file_type, file_hash, file_size, modified_at, properties)
-                VALUES (@id, @projectId, 'file', @filePath, @fileName, @fileType, @hash, @size, now(), @props::jsonb);
+                INSERT INTO items (id, project_id, item_type, file_path, file_name, file_type, file_hash, file_size, modified_at, properties, root_position)
+                VALUES (
+                    @id, @projectId, 'file', @filePath, @fileName, @fileType, @hash, @size, now(), @props::jsonb,
+                    COALESCE((SELECT MAX(root_position) FROM items WHERE project_id = @projectId), 0) + 1
+                );
                 """;
             try
             {
@@ -155,13 +158,14 @@ static class ItemEndpoints
             var propertiesJson = body.Properties.HasValue ? body.Properties.Value.GetRawText() : "{}";
 
             const string insertSql = """
-                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at)
+                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position)
                 VALUES (
                     @id, @projectId, @itemType, @name, @props::jsonb,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN nextval('item_number_seq') ELSE NULL END,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN 'w_pracy' ELSE NULL END,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN 1 ELSE NULL END,
-                    now()
+                    now(),
+                    COALESCE((SELECT MAX(root_position) FROM items WHERE project_id = @projectId), 0) + 1
                 )
                 RETURNING item_number;
                 """;
@@ -232,7 +236,7 @@ static class ItemEndpoints
 
             const string sql = """
                 SELECT i.id, i.project_id, i.file_name, i.file_type, i.file_path, i.properties, i.modified_at,
-                       i.item_type, i.item_number, i.show_in_tree, i.status, i.revision_number
+                       i.item_type, i.item_number, i.show_in_tree, i.status, i.revision_number, i.root_position
                 FROM items i
                 WHERE (@search::text IS NULL OR i.file_name ILIKE '%' || @search || '%'
                                                OR i.properties::text ILIKE '%' || @search || '%')
@@ -272,6 +276,7 @@ static class ItemEndpoints
                         ["showInTree"] = reader.GetBoolean(9),
                         ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
                         ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
+                        ["rootPosition"] = reader.GetInt32(12),
                         ["tags"] = new List<string>()
                     });
                 }
@@ -301,7 +306,7 @@ static class ItemEndpoints
 
             const string sql = """
                 SELECT id, project_id, file_name, file_type, file_path, properties, modified_at,
-                       item_type, item_number, show_in_tree, status, revision_number
+                       item_type, item_number, show_in_tree, status, revision_number, root_position
                 FROM items WHERE id = @id;
                 """;
 
@@ -328,6 +333,7 @@ static class ItemEndpoints
                 ["showInTree"] = reader.GetBoolean(9),
                 ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
                 ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
+                ["rootPosition"] = reader.GetInt32(12),
                 ["tags"] = tagsByItem.TryGetValue(id, out var t) ? t : new List<string>()
             };
 

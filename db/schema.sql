@@ -61,7 +61,8 @@ CREATE TABLE items (
     checked_out_at      TIMESTAMPTZ,
     show_in_tree        BOOLEAN NOT NULL DEFAULT true,  -- dla elementów bez rodzica: czy pokazywać jako korzeń w drzewku
     status              TEXT CHECK (status IN ('w_pracy', 'sprawdzany', 'wydany')),  -- tylko dla part/assembly
-    revision_number     INTEGER                     -- tylko dla part/assembly, rośnie przy przejściu wydany -> w_pracy
+    revision_number     INTEGER,                    -- tylko dla part/assembly, rośnie przy przejściu wydany -> w_pracy
+    root_position       INTEGER NOT NULL DEFAULT 1  -- kolejność wśród korzeni tego samego projektu (przeciąganie w drzewku)
 );
 
 CREATE SEQUENCE item_number_seq START 1;
@@ -134,9 +135,10 @@ CREATE TABLE tags (
 -- Materiały (katalog do wyboru w Części, zarządzany z panelu bocznego)
 -- ============================================================
 CREATE TABLE materials (
-    id         SERIAL PRIMARY KEY,
-    name       TEXT NOT NULL UNIQUE,
-    group_name TEXT  -- czysto porządkowe/filtrujące, nigdy nie trafia do właściwości Części
+    id            SERIAL PRIMARY KEY,
+    name          TEXT NOT NULL UNIQUE,
+    group_name    TEXT,  -- czysto porządkowe/filtrujące, nigdy nie trafia do właściwości Części
+    subgroup_name TEXT   -- jw., podrzędne wobec grupy
 );
 
 CREATE TABLE item_tags (

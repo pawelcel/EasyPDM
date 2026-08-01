@@ -92,6 +92,7 @@ export interface Item {
   showInTree: boolean
   status: ItemStatus | null
   revisionNumber: number | null
+  rootPosition: number
   tags: string[]
 }
 
@@ -133,8 +134,10 @@ export function bomPositionLabel(path: number[]): string {
 // "group" jest wyłącznie polem porządkowym/filtrującym katalogu materiałów —
 // nigdy nie trafia do właściwości Części (Część zapisuje tylko "name").
 export interface Material {
+  id: number
   name: string
   group: string | null
+  subgroup: string | null
 }
 
 // Załącznik (plik dograny "z zewnątrz", np. plik CAD) — w odróżnieniu od struktury

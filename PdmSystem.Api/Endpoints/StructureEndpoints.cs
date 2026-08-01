@@ -182,9 +182,53 @@ static class StructureEndpoints
 
             return Results.Ok();
         });
+
+        // PATCH /api/projects/{projectId}/roots/reorder   body: { "itemIds": ["...", "...", ...] }
+        // To samo co /children/reorder, ale dla elementów bez rodzica (korzeni drzewka
+        // w danym projekcie) — te nie mają wpisu w item_relations, więc kolejność trzyma
+        // osobna kolumna items.root_position, przenumerowywana tu na 1..N.
+        app.MapPatch("/api/projects/{projectId:guid}/roots/reorder", async (Guid projectId, RootReorderRequest body) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            await using var tx = await conn.BeginTransactionAsync();
+
+            var existingIds = new List<Guid>();
+            const string selectSql = """
+                SELECT i.id FROM items i
+                WHERE i.project_id = @projectId AND i.show_in_tree = true
+                  AND NOT EXISTS (SELECT 1 FROM item_relations ir WHERE ir.child_id = i.id);
+                """;
+            await using (var selectCmd = new NpgsqlCommand(selectSql, conn, tx))
+            {
+                selectCmd.Parameters.AddWithValue("projectId", projectId);
+                await using var reader = await selectCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    existingIds.Add(reader.GetGuid(0));
+            }
+
+            if (existingIds.Count != body.ItemIds.Count || existingIds.ToHashSet().SetEquals(body.ItemIds) is false)
+            {
+                await tx.RollbackAsync();
+                return Results.BadRequest("Nowa kolejność musi zawierać dokładnie te same korzenie, co obecne drzewko.");
+            }
+
+            for (var i = 0; i < body.ItemIds.Count; i++)
+            {
+                await using var updateCmd = new NpgsqlCommand(
+                    "UPDATE items SET root_position = @position WHERE id = @id;", conn, tx);
+                updateCmd.Parameters.AddWithValue("id", body.ItemIds[i]);
+                updateCmd.Parameters.AddWithValue("position", i + 1);
+                await updateCmd.ExecuteNonQueryAsync();
+            }
+
+            await tx.CommitAsync();
+            return Results.Ok();
+        });
     }
 }
 
 record ChildRelationRequest(Guid ChildId, decimal? Quantity);
 record PositionRequest(int Position);
+record RootReorderRequest(List<Guid> ItemIds);
 record ReorderRequest(List<Guid> ChildIds);
