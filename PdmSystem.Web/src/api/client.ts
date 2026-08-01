@@ -1,5 +1,6 @@
 import type {
   Attachment,
+  BomEntry,
   CurrentUser,
   Item,
   ItemRelation,
@@ -192,6 +193,13 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ childIds }),
     }).then((r) => handleResponse<void>(r)),
+
+  getBom: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/bom`).then((r) => handleResponse<BomEntry[]>(r)),
+
+  bomCsvUrl: (itemId: string) => `${BASE}/items/${itemId}/bom/csv`,
+
+  bomAggregatedCsvUrl: (itemId: string) => `${BASE}/items/${itemId}/bom/aggregated-csv`,
 
   getMaterials: () => fetch(`${BASE}/materials`).then((r) => handleResponse<Material[]>(r)),
 

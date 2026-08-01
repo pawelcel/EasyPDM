@@ -112,6 +112,24 @@ export interface ItemRelation {
   position: number
 }
 
+// Zagłębiony wpis BOM-u (głębiej niż bezpośrednie dziecko) — zwracany przez
+// GET /api/items/{id}/bom. "path" to pełna ścieżka L.p. od bieżącego złożenia w dół,
+// np. [2, 1] dla drugiego bezpośredniego dziecka, pierwszego elementu w jego BOM-ie.
+export interface BomEntry {
+  itemId: string
+  quantity: number
+  depth: number
+  path: number[]
+  itemNumber: number | null
+  fileName: string
+  properties: Record<string, unknown>
+}
+
+// L.p. zagłębionego wpisu BOM-u jako tekst, np. [2, 1] -> "2.1".
+export function bomPositionLabel(path: number[]): string {
+  return path.join(".")
+}
+
 // "group" jest wyłącznie polem porządkowym/filtrującym katalogu materiałów —
 // nigdy nie trafia do właściwości Części (Część zapisuje tylko "name").
 export interface Material {

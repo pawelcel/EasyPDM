@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { Button } from "@/components/ui/button"
@@ -42,6 +42,18 @@ function App() {
 
   const selectedProject = projects.find((p) => p.id === projectId) ?? null
   const isAdmin = user?.role === "admin"
+
+  // useProjects/useTags/useItems montują się (i odpalają swój jedyny fetch) razem z App,
+  // czyli JESZCZE PRZED zalogowaniem — ten pierwszy fetch dostaje 401 i nigdy się sam nie
+  // powtarza. Dopiero to odświeża dane naprawdę PO udanym logowaniu (user zmienia się z
+  // null na realnego użytkownika).
+  useEffect(() => {
+    if (!user) return
+    refetchProjects()
+    refetchTags()
+    refetchItems()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   async function refreshAfterMutation() {
     await refetchProjects()

@@ -50,6 +50,7 @@ app.MapItemEndpoints(connectionString, storageRoot);
 app.MapTagEndpoints(connectionString);
 app.MapPropertyEndpoints(connectionString);
 app.MapStructureEndpoints(connectionString);
+app.MapBomEndpoints(connectionString);
 app.MapMaterialEndpoints(connectionString);
 app.MapAttachmentEndpoints(connectionString, storageRoot);
 app.MapConfigEndpoints(storageRoot);
