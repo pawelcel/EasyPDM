@@ -1,43 +1,54 @@
-import { useEffect, useState } from "react"
 
+import { useEffect, useState } from "react"
 import { api } from "@/api/client"
+import type { Project } from "@/api/types"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { Hint } from "@/components/ui/hint"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
+import { ProjectDetailPanel } from "@/features/projects/project-detail-panel"
 import { ItemTree } from "@/features/tree/item-tree"
 import { useProjectTree } from "@/features/tree/use-project-tree"
 
+type Selection = { kind: "project" } | { kind: "item"; id: string; parentId: string | null }
+
 function ProjectTreeView({
-  projectId,
-  projectName,
+  project,
+  isAdmin,
   onTagsRefetch,
+  onProjectUpdated,
+  onProjectDeleted,
 }: {
-  projectId: string
-  projectName: string
+  project: Project
+  isAdmin: boolean
   onTagsRefetch: () => void | Promise<void>
+  onProjectUpdated: () => void | Promise<void>
+  onProjectDeleted: () => void | Promise<void>
 }) {
-  const tree = useProjectTree(projectId)
-  const [selected, setSelected] = useState<{ id: string; parentId: string | null } | null>(null)
+  const tree = useProjectTree(project.id)
+  // Domyślnie zaznaczony jest sam projekt — to teraz pierwsza (i zawsze widoczna) pozycja
+  // w strukturze, więc naturalnie jest tym, co widać po wejściu w projekt.
+  const [selection, setSelection] = useState<Selection>({ kind: "project" })
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
-  // Jeśli wybrany element zniknął z drzewka (np. go usunięto), czyścimy zaznaczenie.
+  // Jeśli wybrany element zniknął z drzewka (np. go usunięto), wracamy do projektu.
   useEffect(() => {
-    if (selected && !tree.itemsById.has(selected.id)) setSelected(null)
-  }, [selected, tree.itemsById])
+    if (selection.kind === "item" && !tree.itemsById.has(selection.id)) {
+      setSelection({ kind: "project" })
+    }
+  }, [selection, tree.itemsById])
 
-  const selectedItem = selected ? tree.itemsById.get(selected.id) : undefined
+  const selectedItem = selection.kind === "item" ? tree.itemsById.get(selection.id) : undefined
 
   async function handleRemoveFromStructure() {
-    if (!selected) return
-    if (selected.parentId) {
+    if (selection.kind !== "item") return
+    if (selection.parentId) {
       // Element z rodzicem — odpinamy konkretną krawędź, sam rekord zostaje.
-      await api.removeChild(selected.parentId, selected.id)
+      await api.removeChild(selection.parentId, selection.id)
     } else {
       // Element bez rodzica — nie ma czego odpiąć, więc przestaje być widoczny
       // jako korzeń w drzewku (rekord i przynależność do projektu zostają).
-      await api.setShowInTree(selected.id, false)
+      await api.setShowInTree(selection.id, false)
     }
-    setSelected(null)
+    setSelection({ kind: "project" })
     await tree.refetch()
   }
 
@@ -45,7 +56,7 @@ function ProjectTreeView({
     if (!selectedItem) return
     await api.deleteItem(selectedItem.id)
     setConfirmingDelete(false)
-    setSelected(null)
+    setSelection({ kind: "project" })
     await tree.refetch()
   }
 
@@ -54,9 +65,12 @@ function ProjectTreeView({
       <div className="col-span-1 rounded-xl bg-card ring-1 ring-foreground/10">
         <ItemTree
           tree={tree}
-          projectId={projectId}
-          selectedId={selected?.id ?? null}
-          onSelect={(id, parentId) => setSelected({ id, parentId })}
+          projectId={project.id}
+          projectName={project.name}
+          isProjectSelected={selection.kind === "project"}
+          selectedId={selection.kind === "item" ? selection.id : null}
+          onSelect={(id, parentId) => setSelection({ kind: "item", id, parentId })}
+          onSelectProject={() => setSelection({ kind: "project" })}
         />
       </div>
 
@@ -65,16 +79,21 @@ function ProjectTreeView({
           <ItemDetailPanel
             key={selectedItem.id}
             item={selectedItem}
-            projectName={projectName}
+            projectName={project.name}
             childEntries={tree.childrenOf(selectedItem.id)}
-            onSelectChild={(childId) => setSelected({ id: childId, parentId: selectedItem.id })}
+            onSelectChild={(childId) => setSelection({ kind: "item", id: childId, parentId: selectedItem.id })}
             onItemsRefetch={tree.refetch}
             onTagsRefetch={onTagsRefetch}
             onRemoveFromStructure={handleRemoveFromStructure}
-            onDeleteCompletely={() => setConfirmingDelete(true)}
+            onDeleteCompletely={isAdmin ? () => setConfirmingDelete(true) : undefined}
           />
         ) : (
-          <Hint>Wybierz element w strukturze po lewej, żeby zobaczyć jego właściwości.</Hint>
+          <ProjectDetailPanel
+            project={project}
+            isAdmin={isAdmin}
+            onUpdated={onProjectUpdated}
+            onDeleted={onProjectDeleted}
+          />
         )}
       </div>
 

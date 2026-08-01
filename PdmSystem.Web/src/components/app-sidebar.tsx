@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ChevronLeft, ChevronRight, Database, FolderKanban, Home, Layers, type LucideIcon } from "lucide-react"
+import { ChevronLeft, ChevronRight, Database, FolderKanban, Home, Layers, Users, type LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -17,14 +17,19 @@ const OPTIONS: SidebarOption[] = [
   { id: "materials", label: "Lista materiałów", icon: Layers },
 ]
 
+const USERS_OPTION: SidebarOption = { id: "users", label: "Użytkownicy", icon: Users }
+
 function AppSidebar({
   activeId,
   onSelect,
+  showUsers = false,
 }: {
   activeId: string | null
   onSelect: (id: string) => void
+  showUsers?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
+  const options = showUsers ? [...OPTIONS, USERS_OPTION] : OPTIONS
 
   return (
     <div
@@ -45,7 +50,7 @@ function AppSidebar({
       </div>
 
       <div className="flex flex-col gap-0.5 px-1.5">
-        {OPTIONS.map((opt) => (
+        {options.map((opt) => (
           <button
             key={opt.id}
             type="button"

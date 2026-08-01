@@ -1,16 +1,32 @@
 import type {
   Attachment,
+  CurrentUser,
   Item,
   ItemRelation,
   ItemStatus,
   ItemType,
+  ManagedUser,
   Material,
   Project,
   RevisionComment,
   Tag,
+  UserRole,
 } from "./types"
 
+// Zdarzenie globalne: dowolne wywołanie API, które dostanie 401, oznacza że sesja wygasła
+// (albo nigdy nie było zalogowania) — AuthProvider nasłuchuje na to zamiast każdy komponent
+// musiałby osobno sprawdzać ApiError.status.
+export const UNAUTHORIZED_EVENT = "pdm:unauthorized"
+
 const BASE = "/api"
+
+type ProjectWriteBody = {
+  name: string
+  description: string | null
+  client: string | null
+  startDate: string | null
+  endDate: string | null
+}
 
 export class ApiError extends Error {
   status: number
@@ -27,6 +43,7 @@ export class ApiError extends Error {
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text().catch(() => "")
+    if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
     throw new ApiError(res.status, text || `Żądanie nie powiodło się (${res.status}).`)
   }
   if (res.status === 204) return undefined as T
@@ -45,8 +62,18 @@ function json(body: unknown): RequestInit {
 export const api = {
   getProjects: () => fetch(`${BASE}/projects`).then((r) => handleResponse<Project[]>(r)),
 
-  createProject: (body: { name: string; description: string | null }) =>
+  createProject: (body: ProjectWriteBody) =>
     fetch(`${BASE}/projects`, json(body)).then((r) => handleResponse<Project>(r)),
+
+  updateProject: (id: string, body: ProjectWriteBody) =>
+    fetch(`${BASE}/projects/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<Project>(r)),
+
+  deleteProject: (id: string) =>
+    fetch(`${BASE}/projects/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
   getItems: (params: { search?: string; tag?: string; projectId?: string }) => {
     const query = new URLSearchParams()
@@ -190,4 +217,44 @@ export const api = {
     ),
 
   attachmentDownloadUrl: (attachmentId: string) => `${BASE}/attachments/${attachmentId}/file`,
+
+  login: (username: string, password: string) =>
+    fetch(`${BASE}/auth/login`, json({ username, password })).then((r) =>
+      handleResponse<CurrentUser>(r)
+    ),
+
+  logout: () =>
+    fetch(`${BASE}/auth/logout`, { method: "POST" }).then((r) => handleResponse<void>(r)),
+
+  getMe: () => fetch(`${BASE}/auth/me`).then((r) => handleResponse<CurrentUser>(r)),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    fetch(`${BASE}/auth/password`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }).then((r) => handleResponse<void>(r)),
+
+  getUsers: () => fetch(`${BASE}/users`).then((r) => handleResponse<ManagedUser[]>(r)),
+
+  createUser: (body: {
+    username: string
+    password: string
+    displayName: string
+    email: string | null
+    role: UserRole
+  }) => fetch(`${BASE}/users`, json(body)).then((r) => handleResponse<{ id: string }>(r)),
+
+  updateUser: (
+    id: string,
+    body: { displayName?: string; email?: string; role?: UserRole; password?: string }
+  ) =>
+    fetch(`${BASE}/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<void>(r)),
+
+  deleteUser: (id: string) =>
+    fetch(`${BASE}/users/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 }

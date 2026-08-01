@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Box, Boxes, ChevronDown, ChevronRight, File, Folder, Plus, X } from "lucide-react"
+import { Box, Boxes, ChevronDown, ChevronRight, File, Folder, FolderKanban, Plus, X } from "lucide-react"
 
 import { api } from "@/api/client"
 import { itemDisplayLabel, type Item } from "@/api/types"
@@ -31,50 +31,74 @@ function iconColorClass(item: Item): string {
 function ItemTree({
   tree,
   projectId,
+  projectName,
+  isProjectSelected,
   selectedId,
   onSelect,
+  onSelectProject,
 }: {
   tree: Tree
   projectId: string
+  projectName: string
+  isProjectSelected: boolean
   selectedId: string | null
   onSelect: (id: string, parentId: string | null) => void
+  onSelectProject: () => void
 }) {
   if (tree.loading) return null
 
   return (
     <div className="flex flex-col gap-0.5 p-2">
-      <div className="flex justify-end px-1.5 pb-1">
-        <AddNodeDialog
-          trigger={
-            <Button size="icon-xs" variant="ghost" aria-label="Dodaj element w projekcie">
-              <Plus className="size-3.5" />
-            </Button>
-          }
-          projectId={projectId}
-          parentId={null}
-          parentType={null}
-          onCreated={tree.refetch}
-        />
+      <div
+        className={cn(
+          "group flex items-center gap-1 rounded-md px-1.5 py-1 text-sm hover:bg-accent",
+          isProjectSelected && "bg-accent"
+        )}
+      >
+        <span className="size-4 shrink-0" />
+        <FolderKanban className="size-3.5 shrink-0 text-muted-foreground" />
+        <button
+          type="button"
+          onClick={onSelectProject}
+          className="flex-1 truncate text-left font-medium"
+        >
+          {projectName}
+        </button>
+        <div className="hidden items-center gap-0.5 group-hover:flex">
+          <AddNodeDialog
+            trigger={
+              <Button size="icon-xs" variant="ghost" aria-label="Dodaj element w projekcie">
+                <Plus className="size-3" />
+              </Button>
+            }
+            projectId={projectId}
+            parentId={null}
+            parentType={null}
+            onCreated={tree.refetch}
+          />
+        </div>
       </div>
 
-      {tree.roots.length === 0 ? (
-        <p className="px-1.5 text-sm text-muted-foreground">Brak elementów w tym projekcie.</p>
-      ) : (
-        tree.roots.map((item) => (
-          <TreeNode
-            key={item.id}
-            item={item}
-            quantity={null}
-            parentId={null}
-            depth={0}
-            projectId={projectId}
-            childrenOf={tree.childrenOf}
-            selectedId={selectedId}
-            onSelect={onSelect}
-            onRefetch={tree.refetch}
-          />
-        ))
-      )}
+      <div className="flex flex-col gap-0.5 pl-3.5">
+        {tree.roots.length === 0 ? (
+          <p className="px-1.5 py-1 text-sm text-muted-foreground">Brak elementów w tym projekcie.</p>
+        ) : (
+          tree.roots.map((item) => (
+            <TreeNode
+              key={item.id}
+              item={item}
+              quantity={null}
+              parentId={null}
+              depth={0}
+              projectId={projectId}
+              childrenOf={tree.childrenOf}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              onRefetch={tree.refetch}
+            />
+          ))
+        )}
+      </div>
     </div>
   )
 }

@@ -19,12 +19,18 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
+  const [client, setClient] = useState("")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
   function reset() {
     setName("")
     setDescription("")
+    setClient("")
+    setStartDate("")
+    setEndDate("")
     setError("")
   }
 
@@ -41,6 +47,9 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
       const project = await api.createProject({
         name: trimmed,
         description: description.trim() || null,
+        client: client.trim() || null,
+        startDate: startDate || null,
+        endDate: endDate || null,
       })
       setOpen(false)
       reset()
@@ -85,6 +94,33 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Opis (opcjonalnie)"
           />
+          <Label htmlFor="new-project-client">Klient (opcjonalnie)</Label>
+          <Input
+            id="new-project-client"
+            value={client}
+            onChange={(e) => setClient(e.target.value)}
+            placeholder="Klient (opcjonalnie)"
+          />
+          <div className="flex gap-2">
+            <div className="flex flex-1 flex-col gap-2">
+              <Label htmlFor="new-project-start">Data rozpoczęcia</Label>
+              <Input
+                id="new-project-start"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-1 flex-col gap-2">
+              <Label htmlFor="new-project-end">Data zakończenia</Label>
+              <Input
+                id="new-project-end"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          </div>
           <FormError>{error}</FormError>
         </div>
 
