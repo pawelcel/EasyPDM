@@ -15,9 +15,9 @@ wprost do `PdmSystem.Api/wwwroot/` — patrz "Frontend" niżej. Przetestowane na
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera.
-- **`db/migrations/`** — migracje `002`–`010` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`012` dla już istniejącej bazy: projekty, typy
   elementów (folder/część/złożenie/plik), widoczność w drzewku, status/rewizje, materiały
-  (+ grupy), załączniki, kolejność BOM (`position`).
+  (+ grupy), załączniki, kolejność BOM (`position`), komentarze do rewizji, logowanie i role.
 - **`PdmSystem.Core/`** — wspólna biblioteka: adaptery CAD (`FreeCadAdapter`, zaparkowany
   `SolidWorksAdapter`), `FileScanner`, `ScanRunner`. **Obecnie nieużywana przez `Api`** —
   patrz "Znane ograniczenia" niżej.
@@ -25,8 +25,9 @@ wprost do `PdmSystem.Api/wwwroot/` — patrz "Frontend" niżej. Przetestowane na
   `002` (patrz "Znane ograniczenia").
 - **`PdmSystem.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
   po funkcjach w `Endpoints/` (`ProjectEndpoints`, `ItemEndpoints`, `StructureEndpoints`,
-  `PropertyEndpoints`, `TagEndpoints`, `MaterialEndpoints`, `AttachmentEndpoints`). Serwuje
-  też zbudowany frontend ze swojego `wwwroot/`.
+  `PropertyEndpoints`, `TagEndpoints`, `MaterialEndpoints`, `AttachmentEndpoints`,
+  `AuthEndpoints`, `UserEndpoints`, `ConfigEndpoints`). Serwuje też zbudowany frontend ze
+  swojego `wwwroot/`.
 - **`PdmSystem.Web/`** — frontend: React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui
   (komponenty na bazie Base UI, styl „base-nova”).
 - **`PdmSystem.FreeCad/`** — makro `PdmUpload.FCMacro`: uruchamiane z poziomu FreeCAD,
@@ -66,6 +67,22 @@ Załączniki (`item_attachments`) to osobny mechanizm od struktury — dowolny p
 można dopiąć do Części/Złożenia/Pliku z panelu właściwości; nie da się ich dodać ani
 usunąć przez drzewko po lewej.
 
+### Logowanie i role
+
+Każde żądanie do `/api/*` (poza `/api/auth/login`) wymaga zalogowania — sesja to losowy
+token w ciasteczku httpOnly (`pdm_session`, 30 dni ważności), zapisany w tabeli `sessions`.
+Hasła trzymane jako PBKDF2 (własna, zależna wyłącznie od `System.Security.Cryptography`
+implementacja w `PasswordHasher.cs` — bez dodatkowych pakietów NuGet).
+
+Dwie role (`users.role`): **administrator** (pełny dostęp) i **użytkownik** (wszystko poza
+zarządzaniem kontami i endpointem `DELETE /api/items/{id}` — może odpinać elementy ze
+struktury, ale nie usuwać ich całkowicie z bazy). System pilnuje, żeby zawsze zostawał co
+najmniej jeden administrator (nie da się usunąć ani zdegradować ostatniego).
+
+Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
+**`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
+po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
+
 ### Endpointy API
 
 | Metoda | Ścieżka | Co robi |
@@ -86,6 +103,12 @@ usunąć przez drzewko po lewej.
 | PATCH/DELETE | `/api/items/{id}/properties[/{key}]` | zarządzanie właściwościami (zablokowane poza statusem `w_pracy`, poza polami ceny) |
 | GET/POST/DELETE | `/api/materials[/{name}]` | katalog materiałów do wyboru w Części (`name` + opcjonalna `group`) |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/api/attachments/{id}/file` | załączniki (upload/lista/pobranie/usunięcie) |
+| GET | `/api/items/{id}/revisions` | historia komentarzy rewizji (tylko rewizje z komentarzem) |
+| POST | `/api/auth/login` | logowanie (`{username, password}`) — jedyny endpoint bez wymaganej sesji |
+| POST | `/api/auth/logout` | wylogowanie (kasuje sesję) |
+| GET | `/api/auth/me` | dane aktualnie zalogowanego użytkownika |
+| PATCH | `/api/auth/password` | zmiana WŁASNEGO hasła (wymaga podania obecnego) |
+| GET/POST/PATCH/DELETE | `/api/users[/{id}]` | zarządzanie kontami — **tylko administrator** |
 
 ## Jak uruchomić
 
@@ -112,9 +135,13 @@ npm run dev      # http://localhost:5173
 Do wdrożenia: `npm run build` w `PdmSystem.Web/` nadpisuje `PdmSystem.Api/wwwroot/` —
 `dotnet run` serwuje wynik pod `http://localhost:5000` bez dodatkowej konfiguracji.
 
-Workflow w przeglądarce: strona startowa **„Witaj”** → **Projekty** (wybierz/utwórz
-projekt → buduj strukturę drzewa) albo **Cała baza** (przeszukaj wszystkie elementy
-niezależnie od projektu) albo **Lista materiałów**.
+Pierwsze logowanie: **`admin` / `admin`** (konto zakładane automatycznie, jeśli tabela
+`users` jest pusta — zob. "Logowanie i role" wyżej). Zmień hasło od razu po zalogowaniu.
+
+Workflow w przeglądarce: ekran logowania → strona startowa **„Witaj”** → **Projekty**
+(wybierz/utwórz projekt → buduj strukturę drzewa) albo **Cała baza** (przeszukaj wszystkie
+elementy niezależnie od projektu) albo **Lista materiałów** albo (tylko administrator)
+**Użytkownicy**.
 
 ## Znane ograniczenia
 
@@ -125,12 +152,16 @@ niezależnie od projektu) albo **Lista materiałów**.
 2. **Brak walidacji rozmiaru/typu wgrywanego pliku i załącznika** — każdy plik przejdzie,
    niezależnie od rozszerzenia czy wielkości.
 3. **Magazyn plików (`storage/`) to zwykły folder na dysku serwera** — brak kopii
-   zapasowych, brak wersjonowania fizycznego pliku przy podmianie (rewizja w bazie
-   rośnie, ale nie przechowuje historycznych plików).
+   zapasowych. Wersjonowanie pliku przy zmianie rewizji działa dziś tylko w przepływie
+   makra FreeCAD (`storage/components/`, jeden plik na rewizję, zob.
+   `PdmSystem.FreeCad/README.md`) — zwykłe załączniki dodawane z aplikacji webowej nie mają
+   automatycznego powiązania z numerem rewizji.
 4. **Brak logiki checkout/checkin** — schemat bazy to wspiera (`checked_out_by`,
    `checkout_history`), endpointy jeszcze nie.
-5. **Brak autoryzacji/wieloużytkownikowości** — `users` istnieje w schemacie, ale nic
-   dziś nie loguje, kto co zmienił.
+5. **Logowanie/role są, ale nic jeszcze nie zapisuje "kto to zrobił"** — endpointy wiedzą,
+   kto jest zalogowany (`HttpContext.Items["CurrentUser"]`), ale żadna operacja (dodanie
+   elementu, zmiana statusu/właściwości, komentarz do rewizji...) nie zapisuje jeszcze
+   autora do bazy.
 
 ## Następne kroki (proponowana kolejność)
 

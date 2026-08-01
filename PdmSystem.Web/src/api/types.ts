@@ -1,7 +1,34 @@
+export type UserRole = "admin" | "user"
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  admin: "Administrator",
+  user: "Użytkownik",
+}
+
+// Zwracane przez GET/POST /api/auth/... — kim jest AKTUALNIE zalogowany.
+export interface CurrentUser {
+  id: string
+  username: string
+  displayName: string
+  role: UserRole
+}
+
+// Zwracane przez GET /api/users — konta zarządzane przez administratora.
+export interface ManagedUser {
+  id: string
+  username: string
+  displayName: string
+  email: string | null
+  role: UserRole
+}
+
 export interface Project {
   id: string
   name: string
   description: string | null
+  client: string | null
+  startDate: string | null
+  endDate: string | null
   createdAt: string
   itemCount: number
 }

@@ -7,11 +7,23 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto"; -- dla gen_random_uuid()
 -- Użytkownicy
 -- ============================================================
 CREATE TABLE users (
-    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username     TEXT NOT NULL UNIQUE,
-    display_name TEXT NOT NULL,
-    email        TEXT
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username      TEXT NOT NULL UNIQUE,
+    display_name  TEXT NOT NULL,
+    email         TEXT,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user'))
 );
+
+-- Sesje logowania (ciasteczko httpOnly "pdm_session" trzyma losowy token z tej tabeli).
+CREATE TABLE sessions (
+    token      TEXT PRIMARY KEY,
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX idx_sessions_user ON sessions (user_id);
 
 -- ============================================================
 -- Projekty (kontener grupujący elementy)
@@ -20,6 +32,9 @@ CREATE TABLE projects (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        TEXT NOT NULL UNIQUE,
     description TEXT,
+    client      TEXT,
+    start_date  DATE,
+    end_date    DATE,
     created_at  TIMESTAMPTZ DEFAULT now()
 );
 

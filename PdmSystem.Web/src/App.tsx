@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { useAuth } from "@/features/auth/use-auth"
+import { LoginView } from "@/features/auth/login-view"
 import { NewProjectDialog } from "@/features/projects/new-project-dialog"
 import { ProjectSelect } from "@/features/projects/project-select"
 import { useProjects } from "@/features/projects/use-projects"
@@ -15,11 +17,13 @@ import { MaterialsView } from "@/features/materials/materials-view"
 import { TagFilterSelect } from "@/features/tags/tag-filter-select"
 import { useTags } from "@/features/tags/use-tags"
 import { ProjectTreeView } from "@/features/tree/project-tree-view"
+import { UsersView } from "@/features/users/users-view"
 import { WelcomeView } from "@/features/welcome/welcome-view"
 
-type View = "welcome" | "projects" | "database" | "materials"
+type View = "welcome" | "projects" | "database" | "materials" | "users"
 
 function App() {
+  const { user, loading: authLoading, refetch: refetchAuth, logout } = useAuth()
   const [view, setView] = useState<View>("welcome")
   const [projectId, setProjectId] = useState("")
   const [tag, setTag] = useState("")
@@ -37,6 +41,7 @@ function App() {
   } = useItems({ search: debouncedSearch, tag })
 
   const selectedProject = projects.find((p) => p.id === projectId) ?? null
+  const isAdmin = user?.role === "admin"
 
   async function refreshAfterMutation() {
     await refetchProjects()
@@ -44,29 +49,48 @@ function App() {
     setTreeRefreshKey((k) => k + 1)
   }
 
+  if (authLoading) return null
+  if (!user) return <LoginView onLoggedIn={refetchAuth} />
+
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <AppSidebar activeId={view} onSelect={(id) => setView(id as View)} />
+      <AppSidebar
+        activeId={view}
+        onSelect={(id) => setView(id as View)}
+        showUsers={isAdmin}
+      />
 
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-10 border-b bg-background px-8 py-5">
-          <button
-            type="button"
-            onClick={() => setView("welcome")}
-            className="mb-3.5 text-xl font-semibold tracking-tight hover:text-primary"
-          >
-            PdmSystem
-          </button>
+          <div className="mb-3.5 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setView("welcome")}
+              className="text-xl font-semibold tracking-tight hover:text-primary"
+            >
+              PdmSystem
+            </button>
+            <div className="flex items-center gap-2.5 text-[13px] text-muted-foreground">
+              <span>
+                {user.displayName} ({user.role === "admin" ? "administrator" : "użytkownik"})
+              </span>
+              <Button size="sm" variant="outline" onClick={logout}>
+                Wyloguj
+              </Button>
+            </div>
+          </div>
 
           {view === "projects" && (
             <div className="flex flex-wrap gap-2.5">
               <ProjectSelect projects={projects} value={projectId} onChange={setProjectId} />
-              <NewProjectDialog
-                onCreated={async (project) => {
-                  setProjectId(project.id)
-                  await refreshAfterMutation()
-                }}
-              />
+              {isAdmin && (
+                <NewProjectDialog
+                  onCreated={async (project) => {
+                    setProjectId(project.id)
+                    await refreshAfterMutation()
+                  }}
+                />
+              )}
               {selectedProject && (
                 <AddNodeDialog
                   trigger={<Button>+ Element</Button>}
@@ -117,9 +141,14 @@ function App() {
             (selectedProject ? (
               <ProjectTreeView
                 key={`${selectedProject.id}-${treeRefreshKey}`}
-                projectId={selectedProject.id}
-                projectName={selectedProject.name}
+                project={selectedProject}
+                isAdmin={isAdmin}
                 onTagsRefetch={refetchTags}
+                onProjectUpdated={refetchProjects}
+                onProjectDeleted={async () => {
+                  setProjectId("")
+                  await refetchProjects()
+                }}
               />
             ) : (
               <Hint>Wybierz projekt z listy powyżej albo utwórz nowy.</Hint>
@@ -137,6 +166,8 @@ function App() {
           )}
 
           {view === "materials" && <MaterialsView />}
+
+          {view === "users" && (isAdmin ? <UsersView /> : <Hint>Brak uprawnień.</Hint>)}
         </main>
       </div>
     </div>

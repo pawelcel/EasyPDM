@@ -503,8 +503,13 @@ static class ItemEndpoints
         // Element potomny jest usuwany razem z rodzicem tylko wtedy, gdy nie ma innego rodzica
         // spoza usuwanego poddrzewa (współdzielona część w innym złożeniu zostaje nietknięta —
         // zostaje jedynie odpięta od tej gałęzi, którą kasujemy).
-        app.MapDelete("/api/items/{id:guid}", async (Guid id) =>
+        // Tylko administrator — zwykły użytkownik może odpinać ze struktury (visibility/children),
+        // ale nie usuwać rekordów całkowicie z bazy.
+        app.MapDelete("/api/items/{id:guid}", async (Guid id, HttpContext httpContext) =>
         {
+            if ((httpContext.Items["CurrentUser"] as CurrentUser)?.Role != "admin")
+                return Results.Text("Tylko administrator może usuwać elementy całkowicie z bazy.", statusCode: StatusCodes.Status403Forbidden);
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
