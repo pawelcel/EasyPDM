@@ -1,8 +1,16 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { api } from "@/api/client"
 import { isLocked, type Item } from "@/api/types"
 import { Button } from "@/components/ui/button"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -129,27 +137,103 @@ function MaterialField({
   const stored = item.properties.material
   const value = typeof stored === "string" ? stored : ""
 
+  // Grupa/podgrupa tu to wyłącznie pomoc przy zawężaniu wyboru materiału poniżej — nie są
+  // same w sobie zapisywane we właściwościach Części (ta zapisuje tylko nazwę materiału).
+  const [groupFilter, setGroupFilter] = useState("")
+  const [subgroupFilter, setSubgroupFilter] = useState("")
+
+  const existingGroups = useMemo(
+    () => Array.from(new Set(materials.map((m) => m.group).filter((g): g is string => !!g))).sort(),
+    [materials]
+  )
+  const filterableSubgroups = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          materials
+            .filter((m) => !groupFilter || m.group === groupFilter)
+            .map((m) => m.subgroup)
+            .filter((s): s is string => !!s)
+        )
+      ).sort(),
+    [materials, groupFilter]
+  )
+  const filteredMaterialNames = materials
+    .filter(
+      (m) => (!groupFilter || m.group === groupFilter) && (!subgroupFilter || m.subgroup === subgroupFilter)
+    )
+    .map((m) => m.name)
+
   return (
     <>
       <Label>Materiał</Label>
       {materials.length > 0 ? (
-        <Select
-          value={value || "none"}
-          onValueChange={(v) => onSave("material", v === "none" ? "" : (v as string))}
-          disabled={disabled}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue>{(v: string) => (v === "none" || !v ? "Nie wybrano" : v)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Nie wybrano</SelectItem>
-            {materials.map((m) => (
-              <SelectItem key={m.name} value={m.name}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <>
+          {existingGroups.length > 0 && (
+            <div className="flex gap-1.5">
+              <Select
+                value={groupFilter || "all"}
+                onValueChange={(v) => {
+                  setGroupFilter(v === "all" ? "" : (v as string))
+                  setSubgroupFilter("")
+                }}
+                disabled={disabled}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue>
+                    {(v: string) => (v === "all" || !v ? "Wszystkie grupy" : v)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Wszystkie grupy</SelectItem>
+                  {existingGroups.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {filterableSubgroups.length > 0 && (
+                <Select
+                  value={subgroupFilter || "all"}
+                  onValueChange={(v) => setSubgroupFilter(v === "all" ? "" : (v as string))}
+                  disabled={disabled}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue>
+                      {(v: string) => (v === "all" || !v ? "Wszystkie podgrupy" : v)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Wszystkie podgrupy</SelectItem>
+                    {filterableSubgroups.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
+          <Combobox
+            items={filteredMaterialNames}
+            value={value || null}
+            onValueChange={(v) => onSave("material", (v as string | null) ?? "")}
+            itemToStringLabel={(name: string) => name}
+            disabled={disabled}
+          >
+            <ComboboxInput placeholder="Wpisz nazwę, żeby wyszukać…" showClear />
+            <ComboboxContent>
+              <ComboboxEmpty>Brak pasujących materiałów.</ComboboxEmpty>
+              <ComboboxList>
+                {(name: string) => <ComboboxItem key={name} value={name}>{name}</ComboboxItem>}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        </>
       ) : (
         <Hint>Brak materiałów — dodaj je w panelu bocznym („Lista materiałów”).</Hint>
       )}

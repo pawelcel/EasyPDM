@@ -75,14 +75,16 @@ function ItemDetailPanel({
     api.getBom(item.id).then(setNestedBom).catch(() => setNestedBom([]))
   }, [item.id])
 
-  // Wystarczy raz przy wejściu w ten element (ItemDetailPanel ma key={selectedItem.id}
-  // u wywołującego, więc zmiana zaznaczenia i tak remontuje panel) — poza tym dociągamy
-  // ponownie tylko po zmianie L.p. bezpośrednich dzieci (drag&drop albo ręczny wpis),
-  // bo grupowanie zagłębionych wpisów po path[0] opiera się na aktualnych "position".
+  // Odświeżamy przy wejściu w ten element ORAZ za każdym razem, gdy childEntries się zmienia
+  // (nowa referencja tablicy przychodzi po każdym tree.refetch()) — zmiana L.p. bezpośrednich
+  // dzieci może przyjść nie tylko z tej tabeli (drag&drop/ręczny wpis tutaj), ale też z
+  // przeciągania w drzewku po lewej, dodania/usunięcia elementu gdzie indziej itd. Grupowanie
+  // zagłębionych wpisów po path[0] opiera się na aktualnych "position", więc musi nadążać za
+  // KAŻDĄ zmianą struktury, nie tylko tą zainicjowaną z poziomu BOM-u.
   useEffect(() => {
     if (item.itemType !== "assembly") return
     refetchNestedBom()
-  }, [item.itemType, refetchNestedBom])
+  }, [item.itemType, refetchNestedBom, childEntries])
 
   // path[0] odpowiada "position" bezpośredniego dziecka, pod którym dany wpis się
   // zagłębia — backend zwraca wiersze już posortowane po path, więc kolejność w każdej
@@ -111,7 +113,6 @@ function ItemDetailPanel({
     try {
       await api.reorderChildren(item.id, reordered)
       await onItemsRefetch()
-      refetchNestedBom()
     } catch (err) {
       setBomError(err instanceof Error ? err.message : "Nie udało się zmienić kolejności.")
     }
@@ -264,7 +265,6 @@ function ItemDetailPanel({
                         nestedEntries={nestedByTopPosition.get(position) ?? []}
                         onSelectChild={onSelectChild}
                         onItemsRefetch={onItemsRefetch}
-                        refetchNestedBom={refetchNestedBom}
                         setBomError={setBomError}
                       />
                     ))}
@@ -336,7 +336,6 @@ function SortableBomRow({
   nestedEntries,
   onSelectChild,
   onItemsRefetch,
-  refetchNestedBom,
   setBomError,
 }: {
   parentId: string
@@ -346,7 +345,6 @@ function SortableBomRow({
   nestedEntries: BomEntry[]
   onSelectChild?: (id: string) => void
   onItemsRefetch: () => void | Promise<void>
-  refetchNestedBom: () => void
   setBomError: (message: string | null) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -374,10 +372,7 @@ function SortableBomRow({
               parentId={parentId}
               childId={child.id}
               position={position}
-              onChanged={async () => {
-                await onItemsRefetch()
-                refetchNestedBom()
-              }}
+              onChanged={onItemsRefetch}
               onError={setBomError}
             />
           </div>

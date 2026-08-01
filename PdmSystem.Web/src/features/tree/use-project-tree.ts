@@ -47,7 +47,10 @@ export function useProjectTree(projectId: string) {
 
   const childIds = useMemo(() => new Set(relations.map((r) => r.childId)), [relations])
   const roots = useMemo(
-    () => items.filter((i) => i.projectId === projectId && i.showInTree && !childIds.has(i.id)),
+    () =>
+      items
+        .filter((i) => i.projectId === projectId && i.showInTree && !childIds.has(i.id))
+        .sort((a, b) => a.rootPosition - b.rootPosition),
     [items, childIds, projectId]
   )
 
