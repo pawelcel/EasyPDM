@@ -4,7 +4,7 @@ using Npgsql;
 
 static class ItemEndpoints
 {
-    public static void MapItemEndpoints(this WebApplication app, string connectionString, string storageRoot)
+    public static void MapItemEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
     {
         // POST /api/projects/{projectId}/items   multipart/form-data:
         //   file        — wymagany, sam plik
@@ -63,7 +63,7 @@ static class ItemEndpoints
 
             var itemId = Guid.NewGuid();
             var extension = Path.GetExtension(file.FileName);
-            var projectStorageDir = Path.Combine(storageRoot, projectId.ToString());
+            var projectStorageDir = Path.Combine(storage.Path, projectId.ToString());
             Directory.CreateDirectory(projectStorageDir);
             var storedPath = Path.Combine(projectStorageDir, $"{itemId}{extension}");
 

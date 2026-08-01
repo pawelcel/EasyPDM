@@ -14,17 +14,21 @@ import { AddNodeDialog } from "@/features/items/add-node-dialog"
 import { ItemList } from "@/features/items/item-list"
 import { useItems } from "@/features/items/use-items"
 import { MaterialsView } from "@/features/materials/materials-view"
+import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
+import { SettingsSidebar } from "@/features/settings/settings-sidebar"
+import { StorageSettingsView } from "@/features/settings/storage-settings-view"
 import { TagFilterSelect } from "@/features/tags/tag-filter-select"
 import { useTags } from "@/features/tags/use-tags"
 import { ProjectTreeView } from "@/features/tree/project-tree-view"
 import { UsersView } from "@/features/users/users-view"
 import { WelcomeView } from "@/features/welcome/welcome-view"
 
-type View = "welcome" | "projects" | "database" | "materials" | "users"
+type View = "welcome" | "projects" | "database" | "materials" | "manufacturers" | "settings"
 
 function App() {
   const { user, loading: authLoading, refetch: refetchAuth, logout } = useAuth()
   const [view, setView] = useState<View>("welcome")
+  const [settingsSection, setSettingsSection] = useState("users")
   const [projectId, setProjectId] = useState("")
   const [tag, setTag] = useState("")
   const [search, setSearch] = useState("")
@@ -69,8 +73,12 @@ function App() {
       <AppSidebar
         activeId={view}
         onSelect={(id) => setView(id as View)}
-        showUsers={isAdmin}
+        showSettings={isAdmin}
       />
+
+      {view === "settings" && (
+        <SettingsSidebar activeId={settingsSection} onSelect={setSettingsSection} />
+      )}
 
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-10 border-b bg-background px-8 py-5">
@@ -179,7 +187,15 @@ function App() {
 
           {view === "materials" && <MaterialsView />}
 
-          {view === "users" && (isAdmin ? <UsersView /> : <Hint>Brak uprawnień.</Hint>)}
+          {view === "manufacturers" && <ManufacturersView />}
+
+          {view === "settings" &&
+            settingsSection === "users" &&
+            (isAdmin ? <UsersView /> : <Hint>Brak uprawnień.</Hint>)}
+
+          {view === "settings" &&
+            settingsSection === "storage" &&
+            (isAdmin ? <StorageSettingsView /> : <Hint>Brak uprawnień.</Hint>)}
         </main>
       </div>
     </div>

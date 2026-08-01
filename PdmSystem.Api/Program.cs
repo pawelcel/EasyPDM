@@ -13,6 +13,8 @@ string storageRoot = app.Configuration["StorageRoot"] ?? "storage";
 if (!Path.IsPathRooted(storageRoot))
     storageRoot = Path.Combine(AppContext.BaseDirectory, storageRoot);
 Directory.CreateDirectory(storageRoot);
+var storage = new StorageSettings(storageRoot);
+string appSettingsPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.json");
 
 await EnsureDefaultAdminAsync(connectionString);
 
@@ -46,14 +48,16 @@ app.Use(async (context, next) =>
 app.MapAuthEndpoints(connectionString);
 app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
-app.MapItemEndpoints(connectionString, storageRoot);
+app.MapItemEndpoints(connectionString, storage);
 app.MapTagEndpoints(connectionString);
 app.MapPropertyEndpoints(connectionString);
 app.MapStructureEndpoints(connectionString);
 app.MapBomEndpoints(connectionString);
 app.MapMaterialEndpoints(connectionString);
-app.MapAttachmentEndpoints(connectionString, storageRoot);
-app.MapConfigEndpoints(storageRoot);
+app.MapManufacturerEndpoints(connectionString);
+app.MapAttachmentEndpoints(connectionString, storage);
+app.MapConfigEndpoints(storage);
+app.MapSettingsEndpoints(connectionString, storage, appSettingsPath);
 
 app.Run();
 

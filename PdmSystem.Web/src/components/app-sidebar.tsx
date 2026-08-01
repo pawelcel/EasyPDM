@@ -1,5 +1,15 @@
 import { useState } from "react"
-import { ChevronLeft, ChevronRight, Database, FolderKanban, Home, Layers, Users, type LucideIcon } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  Factory,
+  FolderKanban,
+  Home,
+  Layers,
+  Settings,
+  type LucideIcon,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -15,21 +25,22 @@ const OPTIONS: SidebarOption[] = [
   { id: "projects", label: "Projekty", icon: FolderKanban },
   { id: "database", label: "Cała baza", icon: Database },
   { id: "materials", label: "Lista materiałów", icon: Layers },
+  { id: "manufacturers", label: "Producenci", icon: Factory },
 ]
 
-const USERS_OPTION: SidebarOption = { id: "users", label: "Użytkownicy", icon: Users }
+const SETTINGS_OPTION: SidebarOption = { id: "settings", label: "Ustawienia", icon: Settings }
 
 function AppSidebar({
   activeId,
   onSelect,
-  showUsers = false,
+  showSettings = false,
 }: {
   activeId: string | null
   onSelect: (id: string) => void
-  showUsers?: boolean
+  showSettings?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
-  const options = showUsers ? [...OPTIONS, USERS_OPTION] : OPTIONS
+  const options = showSettings ? [...OPTIONS, SETTINGS_OPTION] : OPTIONS
 
   return (
     <div

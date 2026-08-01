@@ -20,6 +20,7 @@ import {
   FolderKanban,
   GripVertical,
   Plus,
+  ShoppingCart,
   X,
 } from "lucide-react"
 
@@ -45,6 +46,13 @@ const STATUS_ICON_COLOR: Record<string, string> = {
   wydany: "text-green-400",
 }
 
+// Część zakupowa dostaje inną ikonkę niż wykonywana (koszyk zamiast zwykłego pudełka) —
+// Złożenie ma też opcjonalne "rodzaj", ale to rozróżnienie dotyczy wyłącznie Części.
+function itemIcon(item: Item) {
+  if (item.itemType === "part" && item.properties.rodzaj === "Zakupowa") return ShoppingCart
+  return TYPE_ICON[item.itemType]
+}
+
 function iconColorClass(item: Item): string {
   if (item.itemType !== "part" && item.itemType !== "assembly") return "text-muted-foreground"
   return STATUS_ICON_COLOR[item.status ?? "w_pracy"]
@@ -54,7 +62,7 @@ function iconColorClass(item: Item): string {
 // drzewem (portal), nie fragment drzewka, więc nie próbuje odtwarzać wcięć/ikon rozwijania.
 function TreeDragPreview({ item }: { item: Item | undefined }) {
   if (!item) return null
-  const TypeIcon = TYPE_ICON[item.itemType]
+  const TypeIcon = itemIcon(item)
   return (
     <div className="flex items-center gap-1.5 rounded-md border bg-popover px-2.5 py-1.5 text-sm shadow-md">
       <TypeIcon className={cn("size-3.5 shrink-0", iconColorClass(item))} />
@@ -192,7 +200,7 @@ function TreeNode({
   const [expanded, setExpanded] = useState(true)
   const children = childrenOf(item.id)
   const hasChildren = children.length > 0
-  const TypeIcon = TYPE_ICON[item.itemType]
+  const TypeIcon = itemIcon(item)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,

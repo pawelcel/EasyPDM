@@ -11,7 +11,7 @@ static class AttachmentEndpoints
     // (podpięcie pliku jako elementu podrzędnego w strukturze).
     private static bool AcceptsAttachments(string itemType) => itemType != "folder";
 
-    public static void MapAttachmentEndpoints(this WebApplication app, string connectionString, string storageRoot)
+    public static void MapAttachmentEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
     {
         // GET /api/items/{itemId}/attachments
         app.MapGet("/api/items/{itemId:guid}/attachments", async (Guid itemId) =>
@@ -65,7 +65,7 @@ static class AttachmentEndpoints
 
             var attachmentId = Guid.NewGuid();
             var extension = Path.GetExtension(file.FileName);
-            var attachmentDir = Path.Combine(storageRoot, "attachments", itemId.ToString());
+            var attachmentDir = Path.Combine(storage.Path, "attachments", itemId.ToString());
             Directory.CreateDirectory(attachmentDir);
             var storedPath = Path.Combine(attachmentDir, $"{attachmentId}{extension}");
 
@@ -130,7 +130,7 @@ static class AttachmentEndpoints
             try
             {
                 fullPath = Path.GetFullPath(body.FilePath);
-                storageRootFull = Path.GetFullPath(storageRoot);
+                storageRootFull = Path.GetFullPath(storage.Path);
             }
             catch (ArgumentException)
             {
