@@ -13,22 +13,24 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import type { TranslationKey } from "@/i18n/translations"
+import { useLanguage } from "@/i18n/use-language"
 
 interface SidebarOption {
   id: string
-  label: string
+  labelKey: TranslationKey
   icon: LucideIcon
 }
 
 const OPTIONS: SidebarOption[] = [
-  { id: "welcome", label: "Strona główna", icon: Home },
-  { id: "projects", label: "Projekty", icon: FolderKanban },
-  { id: "database", label: "Cała baza", icon: Database },
-  { id: "materials", label: "Lista materiałów", icon: Layers },
-  { id: "manufacturers", label: "Producenci", icon: Factory },
+  { id: "welcome", labelKey: "nav.welcome", icon: Home },
+  { id: "projects", labelKey: "nav.projects", icon: FolderKanban },
+  { id: "database", labelKey: "nav.database", icon: Database },
+  { id: "materials", labelKey: "nav.materials", icon: Layers },
+  { id: "manufacturers", labelKey: "nav.manufacturers", icon: Factory },
 ]
 
-const SETTINGS_OPTION: SidebarOption = { id: "settings", label: "Ustawienia", icon: Settings }
+const SETTINGS_OPTION: SidebarOption = { id: "settings", labelKey: "nav.settings", icon: Settings }
 
 function AppSidebar({
   activeId,
@@ -39,6 +41,7 @@ function AppSidebar({
   onSelect: (id: string) => void
   showSettings?: boolean
 }) {
+  const { t } = useLanguage()
   const [expanded, setExpanded] = useState(false)
   const options = showSettings ? [...OPTIONS, SETTINGS_OPTION] : OPTIONS
 
@@ -53,7 +56,7 @@ function AppSidebar({
         <Button
           size="icon-xs"
           variant="ghost"
-          aria-label={expanded ? "Zwiń pasek" : "Rozwiń pasek"}
+          aria-label={t(expanded ? "nav.collapse" : "nav.expand")}
           onClick={() => setExpanded((e) => !e)}
         >
           {expanded ? <ChevronLeft className="size-3.5" /> : <ChevronRight className="size-3.5" />}
@@ -66,14 +69,14 @@ function AppSidebar({
             key={opt.id}
             type="button"
             onClick={() => onSelect(opt.id)}
-            title={opt.label}
+            title={t(opt.labelKey)}
             className={cn(
               "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground",
               activeId === opt.id && "bg-accent text-foreground"
             )}
           >
             <opt.icon className="size-4 shrink-0" />
-            {expanded && <span className="truncate">{opt.label}</span>}
+            {expanded && <span className="truncate">{t(opt.labelKey)}</span>}
           </button>
         ))}
       </div>

@@ -32,6 +32,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useMaterials } from "@/features/materials/use-materials"
 import { useManufacturers } from "@/features/manufacturers/use-manufacturers"
+import { useLanguage } from "@/i18n/use-language"
 
 const CURRENCIES = [
   { value: "PLN", symbol: "zł" },
@@ -46,6 +47,7 @@ function PartPropertyForm({
   item: Item
   onChanged: () => void | Promise<void>
 }) {
+  const { t } = useLanguage()
   const rodzaj = typeof item.properties.rodzaj === "string" ? item.properties.rodzaj : ""
   const locked = isLocked(item)
 
@@ -74,11 +76,9 @@ function PartPropertyForm({
 
   return (
     <div className="flex flex-col gap-2">
-      {locked && (
-        <Hint>Właściwości (poza ceną) można edytować tylko w statusie „W pracy”.</Hint>
-      )}
+      {locked && <Hint>{t("part.lockedHint")}</Hint>}
 
-      <Label>Rodzaj</Label>
+      <Label>{t("part.kind")}</Label>
       <div className="flex gap-1.5">
         <Button
           size="sm"
@@ -86,7 +86,7 @@ function PartPropertyForm({
           disabled={locked}
           onClick={() => changeRodzaj("Wykonywana")}
         >
-          Wykonywana
+          {t("part.kindManufactured")}
         </Button>
         <Button
           size="sm"
@@ -94,11 +94,11 @@ function PartPropertyForm({
           disabled={locked}
           onClick={() => changeRodzaj("Zakupowa")}
         >
-          Zakupowa
+          {t("part.kindPurchased")}
         </Button>
       </div>
 
-      <Label htmlFor="part-name">Nazwa</Label>
+      <Label htmlFor="part-name">{t("common.name")}</Label>
       <Input
         id="part-name"
         value={name}
@@ -114,22 +114,22 @@ function PartPropertyForm({
         <>
           <MaterialField item={item} onSave={saveField} disabled={locked} />
           <PriceRow item={item} onChanged={onChanged} />
-          <PropField label="Dodatkowe informacje" propKey="notes" item={item} onSave={saveField} disabled={locked} />
+          <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
       )}
 
       {rodzaj === "Zakupowa" && (
         <>
           <ManufacturerField item={item} onSave={saveField} disabled={locked} />
-          <PropField label="Numer zamówieniowy" propKey="orderNumber" item={item} onSave={saveField} disabled={locked} />
-          <PropField label="Numer zamówieniowy 2" propKey="orderNumber2" item={item} onSave={saveField} disabled={locked} />
-          <PropField label="Masa [kg]" propKey="mass" item={item} onSave={saveField} type="number" disabled={locked} />
+          <PropField label={t("part.orderNumber")} propKey="orderNumber" item={item} onSave={saveField} disabled={locked} />
+          <PropField label={t("part.orderNumber2")} propKey="orderNumber2" item={item} onSave={saveField} disabled={locked} />
+          <PropField label={t("part.mass")} propKey="mass" item={item} onSave={saveField} type="number" disabled={locked} />
           <PriceRow item={item} onChanged={onChanged} />
-          <PropField label="Dodatkowe informacje" propKey="notes" item={item} onSave={saveField} disabled={locked} />
+          <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
       )}
 
-      {!rodzaj && <Hint>Wybierz rodzaj, żeby zobaczyć właściwości części.</Hint>}
+      {!rodzaj && <Hint>{t("part.selectKindHint")}</Hint>}
     </div>
   )
 }
@@ -143,6 +143,7 @@ function MaterialField({
   onSave: (key: string, value: string) => void | Promise<void>
   disabled: boolean
 }) {
+  const { t } = useLanguage()
   const { materials } = useMaterials()
   const stored = item.properties.material
   const value = typeof stored === "string" ? stored : ""
@@ -176,7 +177,7 @@ function MaterialField({
 
   return (
     <>
-      <Label>Materiał</Label>
+      <Label>{t("part.material")}</Label>
       {materials.length > 0 ? (
         <div className="flex gap-1.5">
           <div className="min-w-0 flex-1">
@@ -187,9 +188,9 @@ function MaterialField({
               itemToStringLabel={(name: string) => name}
               disabled={disabled}
             >
-              <ComboboxInput placeholder="Wpisz nazwę, żeby wyszukać…" showClear />
+              <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear />
               <ComboboxContent>
-                <ComboboxEmpty>Brak pasujących materiałów.</ComboboxEmpty>
+                <ComboboxEmpty>{t("part.noMatchingMaterials")}</ComboboxEmpty>
                 <ComboboxList>
                   {(name: string) => <ComboboxItem key={name} value={name}>{name}</ComboboxItem>}
                 </ComboboxList>
@@ -208,11 +209,11 @@ function MaterialField({
             >
               <SelectTrigger className="w-44 shrink-0">
                 <SelectValue>
-                  {(v: string) => (v === "all" || !v ? "Wszystkie grupy" : v)}
+                  {(v: string) => (v === "all" || !v ? t("material.allGroups") : v)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Wszystkie grupy</SelectItem>
+                <SelectItem value="all">{t("material.allGroups")}</SelectItem>
                 {existingGroups.map((g) => (
                   <SelectItem key={g} value={g}>
                     {g}
@@ -230,11 +231,11 @@ function MaterialField({
             >
               <SelectTrigger className="w-44 shrink-0">
                 <SelectValue>
-                  {(v: string) => (v === "all" || !v ? "Wszystkie podgrupy" : v)}
+                  {(v: string) => (v === "all" || !v ? t("material.allSubgroups") : v)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Wszystkie podgrupy</SelectItem>
+                <SelectItem value="all">{t("material.allSubgroups")}</SelectItem>
                 {filterableSubgroups.map((s) => (
                   <SelectItem key={s} value={s}>
                     {s}
@@ -245,7 +246,7 @@ function MaterialField({
           )}
         </div>
       ) : (
-        <Hint>Brak materiałów — dodaj je w panelu bocznym („Lista materiałów”).</Hint>
+        <Hint>{t("part.noMaterialsHint")}</Hint>
       )}
     </>
   )
@@ -260,6 +261,7 @@ function ManufacturerField({
   onSave: (key: string, value: string) => void | Promise<void>
   disabled: boolean
 }) {
+  const { t } = useLanguage()
   const { manufacturers } = useManufacturers("")
   const stored = item.properties.manufacturer
   const value = typeof stored === "string" ? stored : ""
@@ -268,7 +270,7 @@ function ManufacturerField({
 
   return (
     <>
-      <Label>Producent</Label>
+      <Label>{t("part.manufacturer")}</Label>
       {manufacturers.length > 0 ? (
         <div className="flex gap-1.5">
           <div className="flex-1">
@@ -279,9 +281,9 @@ function ManufacturerField({
               itemToStringLabel={(name: string) => name}
               disabled={disabled}
             >
-              <ComboboxInput placeholder="Wpisz nazwę, żeby wyszukać…" showClear />
+              <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear />
               <ComboboxContent>
-                <ComboboxEmpty>Brak pasujących producentów.</ComboboxEmpty>
+                <ComboboxEmpty>{t("part.noMatchingManufacturers")}</ComboboxEmpty>
                 <ComboboxList>
                   {(name: string) => (
                     <ComboboxItem key={name} value={name}>
@@ -295,13 +297,14 @@ function ManufacturerField({
           <ManufacturerInfoButton manufacturerId={matched?.id ?? null} />
         </div>
       ) : (
-        <Hint>Brak producentów — dodaj ich w panelu bocznym („Producenci”).</Hint>
+        <Hint>{t("part.noManufacturersHint")}</Hint>
       )}
     </>
   )
 }
 
 function ManufacturerInfoButton({ manufacturerId }: { manufacturerId: number | null }) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [detail, setDetail] = useState<ManufacturerDetail | null>(null)
 
@@ -324,7 +327,7 @@ function ManufacturerInfoButton({ manufacturerId }: { manufacturerId: number | n
             size="icon"
             variant="outline"
             disabled={manufacturerId === null}
-            aria-label="Zobacz dane producenta"
+            aria-label={t("part.viewManufacturerAria")}
           >
             <Info className="size-4" />
           </Button>
@@ -332,17 +335,17 @@ function ManufacturerInfoButton({ manufacturerId }: { manufacturerId: number | n
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{detail?.name ?? "Producent"}</DialogTitle>
+          <DialogTitle>{detail?.name ?? t("part.manufacturer")}</DialogTitle>
         </DialogHeader>
         {detail ? (
           detail.contacts.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Imię i nazwisko</TableHead>
-                  <TableHead>Stanowisko</TableHead>
-                  <TableHead>Telefon</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>{t("common.fullName")}</TableHead>
+                  <TableHead>{t("common.position")}</TableHead>
+                  <TableHead>{t("common.phone")}</TableHead>
+                  <TableHead>{t("common.email")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -357,10 +360,10 @@ function ManufacturerInfoButton({ manufacturerId }: { manufacturerId: number | n
               </TableBody>
             </Table>
           ) : (
-            <Hint>brak osób kontaktowych</Hint>
+            <Hint>{t("common.noContacts")}</Hint>
           )
         ) : (
-          <Hint>Ładowanie…</Hint>
+          <Hint>{t("common.loading")}</Hint>
         )}
       </DialogContent>
     </Dialog>
@@ -374,6 +377,7 @@ function PriceRow({
   item: Item
   onChanged: () => void | Promise<void>
 }) {
+  const { t } = useLanguage()
   const stored = item.properties.price
   const initial = stored === undefined || stored === null ? "" : String(stored)
   const currency = typeof item.properties.currency === "string" ? item.properties.currency : "PLN"
@@ -393,7 +397,7 @@ function PriceRow({
 
   return (
     <>
-      <Label htmlFor="part-price">Cena</Label>
+      <Label htmlFor="part-price">{t("part.price")}</Label>
       <div className="flex gap-1.5">
         <Input
           id="part-price"
@@ -434,14 +438,14 @@ function PriceRow({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">—</SelectItem>
-            <SelectItem value="Netto">Netto</SelectItem>
-            <SelectItem value="Brutto">Brutto</SelectItem>
+            <SelectItem value="Netto">{t("part.priceNetto")}</SelectItem>
+            <SelectItem value="Brutto">{t("part.priceBrutto")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <div className="-mt-1 text-[12.5px] text-muted-foreground">
-        {priceDate && `Cena wprowadzona: ${priceDate}`}
+        {priceDate && t("part.priceEnteredOn", { date: priceDate })}
       </div>
     </>
   )

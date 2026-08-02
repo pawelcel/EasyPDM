@@ -11,16 +11,11 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
-  Box,
-  Boxes,
   ChevronDown,
   ChevronRight,
-  File,
-  Folder,
   FolderKanban,
   GripVertical,
   Plus,
-  ShoppingCart,
   X,
 } from "lucide-react"
 
@@ -28,35 +23,11 @@ import { api } from "@/api/client"
 import { itemDisplayLabel, type Item } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { iconColorClass, itemIcon } from "@/lib/item-visuals"
 import { AddNodeDialog } from "@/features/items/add-node-dialog"
 import type { useProjectTree } from "@/features/tree/use-project-tree"
 
 type Tree = ReturnType<typeof useProjectTree>
-
-const TYPE_ICON = {
-  folder: Folder,
-  part: Box,
-  assembly: Boxes,
-  file: File,
-} as const
-
-const STATUS_ICON_COLOR: Record<string, string> = {
-  w_pracy: "text-muted-foreground",
-  sprawdzany: "text-yellow-400",
-  wydany: "text-green-400",
-}
-
-// Część zakupowa dostaje inną ikonkę niż wykonywana (koszyk zamiast zwykłego pudełka) —
-// Złożenie ma też opcjonalne "rodzaj", ale to rozróżnienie dotyczy wyłącznie Części.
-function itemIcon(item: Item) {
-  if (item.itemType === "part" && item.properties.rodzaj === "Zakupowa") return ShoppingCart
-  return TYPE_ICON[item.itemType]
-}
-
-function iconColorClass(item: Item): string {
-  if (item.itemType !== "part" && item.itemType !== "assembly") return "text-muted-foreground"
-  return STATUS_ICON_COLOR[item.status ?? "w_pracy"]
-}
 
 // Podgląd przeciąganego wiersza pokazywany przez DragOverlay — to zwykły "chip" poza
 // drzewem (portal), nie fragment drzewka, więc nie próbuje odtwarzać wcięć/ikon rozwijania.

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
+import { useLanguage } from "@/i18n/use-language"
 
 function PropertyEditor({
   itemId,
@@ -18,6 +19,7 @@ function PropertyEditor({
   locked?: boolean
   onChanged: () => void
 }) {
+  const { t } = useLanguage()
   const [newKey, setNewKey] = useState("")
   const [newValue, setNewValue] = useState("")
   const entries = Object.entries(properties)
@@ -43,7 +45,7 @@ function PropertyEditor({
 
   return (
     <div>
-      {locked && <Hint>Właściwości można edytować tylko w statusie „W pracy”.</Hint>}
+      {locked && <Hint>{t("item.propertiesLockedHint")}</Hint>}
 
       {entries.length > 0 ? (
         <Table>
@@ -61,14 +63,14 @@ function PropertyEditor({
           </TableBody>
         </Table>
       ) : (
-        <Hint>brak właściwości</Hint>
+        <Hint>{t("item.noProperties")}</Hint>
       )}
 
       <div className="mt-2 flex gap-1.5">
         <Input
           value={newKey}
           onChange={(e) => setNewKey(e.target.value)}
-          placeholder="klucz"
+          placeholder={t("item.propKeyPlaceholder")}
           disabled={locked}
           className="h-7 w-28 text-[13px]"
         />
@@ -78,12 +80,12 @@ function PropertyEditor({
           onKeyDown={(e) => {
             if (e.key === "Enter") addProperty()
           }}
-          placeholder="wartość"
+          placeholder={t("item.propValuePlaceholder")}
           disabled={locked}
           className="h-7 text-[13px]"
         />
         <Button size="sm" variant="secondary" onClick={addProperty} disabled={locked}>
-          Dodaj
+          {t("common.add")}
         </Button>
       </div>
     </div>
@@ -103,6 +105,7 @@ function PropertyRow({
   onSave: (value: string) => void
   onDelete: () => void
 }) {
+  const { t } = useLanguage()
   const [draft, setDraft] = useState(value)
 
   return (
@@ -128,7 +131,7 @@ function PropertyRow({
           variant="ghost"
           onClick={onDelete}
           disabled={disabled}
-          aria-label={`Usuń ${propKey}`}
+          aria-label={t("common.deleteNamed", { name: propKey })}
         >
           <Trash2 className="size-3.5 text-muted-foreground" />
         </Button>

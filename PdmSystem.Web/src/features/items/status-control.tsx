@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react"
 
 import { api } from "@/api/client"
-import { revisionLabel, STATUS_LABELS, type Item, type ItemStatus, type RevisionComment } from "@/api/types"
+import { revisionLabel, STATUS_LABEL_KEYS, type Item, type ItemStatus, type RevisionComment } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { useLanguage } from "@/i18n/use-language"
 
 const NEXT_STATUSES: Record<ItemStatus, ItemStatus[]> = {
   w_pracy: ["sprawdzany"],
@@ -27,6 +28,7 @@ function StatusControl({
   item: Item
   onChanged: () => void | Promise<void>
 }) {
+  const { t } = useLanguage()
   const status = item.status ?? "w_pracy"
   const [pending, setPending] = useState<ItemStatus | null>(null)
   const [comment, setComment] = useState("")
@@ -50,7 +52,7 @@ function StatusControl({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Badge variant={BADGE_VARIANT[status]}>{STATUS_LABELS[status]}</Badge>
+      <Badge variant={BADGE_VARIANT[status]}>{t(STATUS_LABEL_KEYS[status])}</Badge>
       {item.revisionNumber !== null && (
         <span className="text-[12.5px] text-muted-foreground">rev. {revisionLabel(item.revisionNumber)}</span>
       )}
@@ -65,7 +67,7 @@ function StatusControl({
               setPending(next)
             }}
           >
-            → {STATUS_LABELS[next]}
+            → {t(STATUS_LABEL_KEYS[next])}
           </Button>
         ))}
       </div>
@@ -83,29 +85,37 @@ function StatusControl({
       {pending && (
         <ConfirmDialog
           open
-          title="Zmiana statusu"
+          title={t("item.statusChangeTitle")}
           description={
             isRevisionBump ? (
               <div className="flex flex-col gap-2">
                 <p>
-                  {`Zmiana statusu z "Wydany" na "W pracy" podniesie rewizję z ${revisionLabel(current)} na ${revisionLabel(current + 1)}.`}
+                  {t("item.revisionBumpNotice", {
+                    statusFrom: t("status.wydany"),
+                    statusTo: t("status.w_pracy"),
+                    from: revisionLabel(current),
+                    to: revisionLabel(current + 1),
+                  })}
                 </p>
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="revision-comment">Komentarz do rewizji (opcjonalnie)</Label>
+                  <Label htmlFor="revision-comment">{t("item.revisionCommentLabel")}</Label>
                   <Textarea
                     id="revision-comment"
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     rows={3}
-                    placeholder="Co zmieniło się w tej rewizji…"
+                    placeholder={t("item.revisionCommentPlaceholder")}
                   />
                 </div>
               </div>
             ) : (
-              `Zmienić status z "${STATUS_LABELS[status]}" na "${STATUS_LABELS[pending]}"?`
+              t("item.statusChangeConfirmText", {
+                statusFrom: t(STATUS_LABEL_KEYS[status]),
+                statusTo: t(STATUS_LABEL_KEYS[pending]),
+              })
             )
           }
-          confirmLabel="Zmień status"
+          confirmLabel={t("item.statusChangeConfirm")}
           onConfirm={confirmChange}
           onCancel={() => {
             setPending(null)

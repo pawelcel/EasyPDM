@@ -2,7 +2,7 @@ import { useState } from "react"
 import { KeyRound, Trash2 } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
-import { ROLE_LABELS, type ManagedUser, type UserRole } from "@/api/types"
+import { ROLE_LABEL_KEYS, type ManagedUser, type UserRole } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
@@ -26,8 +26,10 @@ import {
 } from "@/components/ui/select"
 import { useAuth } from "@/features/auth/use-auth"
 import { useUsers } from "@/features/users/use-users"
+import { useLanguage } from "@/i18n/use-language"
 
 function UsersView() {
+  const { t } = useLanguage()
   const { users, refetch } = useUsers()
   const { user: me } = useAuth()
   const [error, setError] = useState("")
@@ -41,7 +43,7 @@ function UsersView() {
       await api.updateUser(u.id, { role })
       await refetch()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Nie udało się zmienić roli.")
+      setError(err instanceof ApiError ? err.message : t("users.roleChangeFailed"))
     }
   }
 
@@ -53,7 +55,7 @@ function UsersView() {
       await api.deleteUser(id)
       await refetch()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Nie udało się usunąć użytkownika.")
+      setError(err instanceof ApiError ? err.message : t("users.deleteFailed"))
     }
   }
 
@@ -62,7 +64,7 @@ function UsersView() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h2 className="mb-4 text-lg font-semibold tracking-tight">Użytkownicy</h2>
+      <h2 className="mb-4 text-lg font-semibold tracking-tight">{t("settings.users")}</h2>
 
       <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         <div className="mb-3 flex items-center justify-between gap-2">
@@ -81,7 +83,9 @@ function UsersView() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">
                     {u.displayName} <span className="text-muted-foreground">({u.username})</span>
-                    {u.id === me?.id && <span className="ml-1.5 text-[12.5px] text-muted-foreground">(Ty)</span>}
+                    {u.id === me?.id && (
+                      <span className="ml-1.5 text-[12.5px] text-muted-foreground">({t("users.you")})</span>
+                    )}
                   </div>
                   {u.email && (
                     <div className="truncate text-[12.5px] text-muted-foreground">{u.email}</div>
@@ -90,18 +94,18 @@ function UsersView() {
 
                 <Select value={u.role} onValueChange={(v) => changeRole(u, v as UserRole)}>
                   <SelectTrigger className="w-40 shrink-0">
-                    <SelectValue>{(v: string) => ROLE_LABELS[v as UserRole]}</SelectValue>
+                    <SelectValue>{(v: string) => t(ROLE_LABEL_KEYS[v as UserRole])}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
-                    <SelectItem value="user">{ROLE_LABELS.user}</SelectItem>
+                    <SelectItem value="admin">{t(ROLE_LABEL_KEYS.admin)}</SelectItem>
+                    <SelectItem value="user">{t(ROLE_LABEL_KEYS.user)}</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  aria-label={`Zmień hasło ${u.username}`}
+                  aria-label={t("users.changePasswordAria", { username: u.username })}
                   onClick={() => setResettingId(u.id)}
                 >
                   <KeyRound className="size-3.5 text-muted-foreground" />
@@ -109,7 +113,7 @@ function UsersView() {
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  aria-label={`Usuń ${u.username}`}
+                  aria-label={t("common.deleteNamed", { name: u.username })}
                   disabled={u.id === me?.id}
                   onClick={() => setDeletingId(u.id)}
                 >
@@ -119,16 +123,16 @@ function UsersView() {
             ))}
           </ul>
         ) : (
-          <Hint>Brak użytkowników.</Hint>
+          <Hint>{t("users.empty")}</Hint>
         )}
       </div>
 
       {deletingUser && (
         <ConfirmDialog
           open
-          title="Usuń użytkownika"
-          description={`Na pewno usunąć konto „${deletingUser.username}”? Tej operacji nie można cofnąć.`}
-          confirmLabel="Usuń"
+          title={t("users.deleteTitle")}
+          description={t("users.deleteConfirmDescription", { username: deletingUser.username })}
+          confirmLabel={t("common.delete")}
           variant="destructive"
           onConfirm={confirmDelete}
           onCancel={() => setDeletingId(null)}
@@ -143,6 +147,7 @@ function UsersView() {
 }
 
 function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -162,7 +167,7 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
 
   async function add() {
     if (!username.trim() || !password || !displayName.trim()) {
-      setError("Nazwa użytkownika, hasło i wyświetlana nazwa są wymagane.")
+      setError(t("users.addValidation"))
       return
     }
     try {
@@ -177,7 +182,7 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
       reset()
       await onAdded()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Nie udało się dodać użytkownika.")
+      setError(err instanceof ApiError ? err.message : t("users.addFailed"))
     }
   }
 
@@ -189,27 +194,27 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
         if (!next) reset()
       }}
     >
-      <DialogTrigger render={<Button>+ Dodaj użytkownika</Button>} />
+      <DialogTrigger render={<Button>{t("users.addButton")}</Button>} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Dodaj użytkownika</DialogTitle>
+          <DialogTitle>{t("users.addTitle")}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="user-username">Nazwa użytkownika (login)</Label>
+          <Label htmlFor="user-username">{t("users.usernameLabel")}</Label>
           <Input id="user-username" value={username} onChange={(e) => setUsername(e.target.value)} />
 
-          <Label htmlFor="user-display-name">Wyświetlana nazwa</Label>
+          <Label htmlFor="user-display-name">{t("users.displayNameLabel")}</Label>
           <Input
             id="user-display-name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
           />
 
-          <Label htmlFor="user-email">Email (opcjonalnie)</Label>
+          <Label htmlFor="user-email">{t("users.emailOptionalLabel")}</Label>
           <Input id="user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
-          <Label htmlFor="user-password">Hasło</Label>
+          <Label htmlFor="user-password">{t("users.passwordLabel")}</Label>
           <Input
             id="user-password"
             type="password"
@@ -217,14 +222,14 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          <Label>Rola</Label>
+          <Label>{t("users.roleLabel")}</Label>
           <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
             <SelectTrigger className="w-full">
-              <SelectValue>{(v: string) => ROLE_LABELS[v as UserRole]}</SelectValue>
+              <SelectValue>{(v: string) => t(ROLE_LABEL_KEYS[v as UserRole])}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
-              <SelectItem value="user">{ROLE_LABELS.user}</SelectItem>
+              <SelectItem value="admin">{t(ROLE_LABEL_KEYS.admin)}</SelectItem>
+              <SelectItem value="user">{t(ROLE_LABEL_KEYS.user)}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -233,9 +238,9 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Anuluj
+            {t("common.cancel")}
           </Button>
-          <Button onClick={add}>Dodaj</Button>
+          <Button onClick={add}>{t("common.add")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -243,13 +248,14 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
 }
 
 function ResetPasswordDialog({ user, onClose }: { user: ManagedUser; onClose: () => void }) {
+  const { t } = useLanguage()
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
   async function submit() {
     if (!password) {
-      setError("Podaj nowe hasło.")
+      setError(t("users.newPasswordRequired"))
       return
     }
     setSubmitting(true)
@@ -258,7 +264,7 @@ function ResetPasswordDialog({ user, onClose }: { user: ManagedUser; onClose: ()
       await api.updateUser(user.id, { password })
       onClose()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Nie udało się zmienić hasła.")
+      setError(err instanceof ApiError ? err.message : t("users.resetPasswordFailed"))
     } finally {
       setSubmitting(false)
     }
@@ -268,10 +274,10 @@ function ResetPasswordDialog({ user, onClose }: { user: ManagedUser; onClose: ()
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Zmień hasło — {user.username}</DialogTitle>
+          <DialogTitle>{t("users.resetPasswordTitle", { username: user.username })}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="reset-password">Nowe hasło</Label>
+          <Label htmlFor="reset-password">{t("users.newPasswordLabel")}</Label>
           <Input
             id="reset-password"
             type="password"
@@ -282,10 +288,10 @@ function ResetPasswordDialog({ user, onClose }: { user: ManagedUser; onClose: ()
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Anuluj
+            {t("common.cancel")}
           </Button>
           <Button onClick={submit} disabled={submitting}>
-            {submitting ? "Zapisywanie…" : "Zapisz"}
+            {submitting ? t("common.saving") : t("common.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

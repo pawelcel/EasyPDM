@@ -1,15 +1,18 @@
 import { cn } from "@/lib/utils"
+import type { TranslationKey } from "@/i18n/translations"
+import { useLanguage } from "@/i18n/use-language"
 
 // Lista rozwija się dalej w prawo od głównego paska ikon, gdy aktywna jest zakładka
 // "Ustawienia" — to miejsce na kolejne sekcje ustawień w przyszłości.
 interface SettingsOption {
   id: string
-  label: string
+  labelKey: TranslationKey
 }
 
 const SETTINGS_OPTIONS: SettingsOption[] = [
-  { id: "users", label: "Użytkownicy" },
-  { id: "storage", label: "Magazyn plików" },
+  { id: "users", labelKey: "settings.users" },
+  { id: "storage", labelKey: "settings.storage" },
+  { id: "language", labelKey: "settings.language" },
 ]
 
 function SettingsSidebar({
@@ -19,10 +22,12 @@ function SettingsSidebar({
   activeId: string
   onSelect: (id: string) => void
 }) {
+  const { t } = useLanguage()
+
   return (
     <div className="flex w-44 shrink-0 flex-col gap-0.5 border-r bg-card p-1.5">
       <div className="px-2 py-1.5 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">
-        Ustawienia
+        {t("nav.settings")}
       </div>
       {SETTINGS_OPTIONS.map((opt) => (
         <button
@@ -34,7 +39,7 @@ function SettingsSidebar({
             activeId === opt.id && "bg-accent text-foreground"
           )}
         >
-          {opt.label}
+          {t(opt.labelKey)}
         </button>
       ))}
     </div>

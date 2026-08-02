@@ -239,7 +239,8 @@ static class ItemEndpoints
                        i.item_type, i.item_number, i.show_in_tree, i.status, i.revision_number, i.root_position
                 FROM items i
                 WHERE (@search::text IS NULL OR i.file_name ILIKE '%' || @search || '%'
-                                               OR i.properties::text ILIKE '%' || @search || '%')
+                                               OR i.properties::text ILIKE '%' || @search || '%'
+                                               OR i.item_number::text ILIKE '%' || @search || '%')
                   AND (@tag::text IS NULL OR EXISTS (
                         SELECT 1 FROM item_tags it
                         JOIN tags t ON t.id = it.tag_id
