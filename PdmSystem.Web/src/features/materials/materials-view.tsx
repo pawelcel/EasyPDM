@@ -24,8 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useMaterials } from "@/features/materials/use-materials"
+import { useLanguage } from "@/i18n/use-language"
 
 function MaterialsView() {
+  const { t } = useLanguage()
   const { materials, refetch } = useMaterials()
   const [groupFilter, setGroupFilter] = useState("")
   const [subgroupFilter, setSubgroupFilter] = useState("")
@@ -65,14 +67,14 @@ function MaterialsView() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h2 className="mb-4 text-lg font-semibold tracking-tight">Lista materiałów</h2>
+      <h2 className="mb-4 text-lg font-semibold tracking-tight">{t("nav.materials")}</h2>
 
       <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <MaterialDialog
-            trigger={<Button>+ Dodaj materiał</Button>}
-            title="Dodaj materiał"
-            confirmLabel="Dodaj"
+            trigger={<Button>{t("material.addButton")}</Button>}
+            title={t("material.addTitle")}
+            confirmLabel={t("common.add")}
             existingGroups={existingGroups}
             existingSubgroups={existingSubgroups}
             onSubmit={async (body) => {
@@ -84,7 +86,7 @@ function MaterialsView() {
           <div className="flex flex-wrap items-center gap-2">
             {existingGroups.length > 0 && (
               <>
-                <Label className="text-xs whitespace-nowrap">Grupa:</Label>
+                <Label className="text-xs whitespace-nowrap">{t("material.groupLabel")}</Label>
                 <Select
                   value={groupFilter || "all"}
                   onValueChange={(v) => {
@@ -94,11 +96,11 @@ function MaterialsView() {
                 >
                   <SelectTrigger className="min-w-48 max-w-64">
                     <SelectValue>
-                      {(v: string) => (v === "all" || !v ? "Wszystkie grupy" : v)}
+                      {(v: string) => (v === "all" || !v ? t("material.allGroups") : v)}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Wszystkie grupy</SelectItem>
+                    <SelectItem value="all">{t("material.allGroups")}</SelectItem>
                     {existingGroups.map((g) => (
                       <SelectItem key={g} value={g}>
                         {g}
@@ -111,18 +113,18 @@ function MaterialsView() {
 
             {filterableSubgroups.length > 0 && (
               <>
-                <Label className="text-xs whitespace-nowrap">Podgrupa:</Label>
+                <Label className="text-xs whitespace-nowrap">{t("material.subgroupLabel")}</Label>
                 <Select
                   value={subgroupFilter || "all"}
                   onValueChange={(v) => setSubgroupFilter(v === "all" ? "" : (v as string))}
                 >
                   <SelectTrigger className="min-w-48 max-w-64">
                     <SelectValue>
-                      {(v: string) => (v === "all" || !v ? "Wszystkie podgrupy" : v)}
+                      {(v: string) => (v === "all" || !v ? t("material.allSubgroups") : v)}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Wszystkie podgrupy</SelectItem>
+                    <SelectItem value="all">{t("material.allSubgroups")}</SelectItem>
                     {filterableSubgroups.map((s) => (
                       <SelectItem key={s} value={s}>
                         {s}
@@ -153,12 +155,12 @@ function MaterialsView() {
                 <div className="flex shrink-0 items-center gap-0.5">
                   <MaterialDialog
                     trigger={
-                      <Button size="icon-xs" variant="ghost" aria-label={`Edytuj ${m.name}`}>
+                      <Button size="icon-xs" variant="ghost" aria-label={t("common.editNamed", { name: m.name })}>
                         <Pencil className="size-3.5 text-muted-foreground" />
                       </Button>
                     }
-                    title="Edytuj materiał"
-                    confirmLabel="Zapisz"
+                    title={t("material.editTitle")}
+                    confirmLabel={t("common.save")}
                     initial={m}
                     existingGroups={existingGroups}
                     existingSubgroups={existingSubgroups}
@@ -170,7 +172,7 @@ function MaterialsView() {
                   <Button
                     size="icon-xs"
                     variant="ghost"
-                    aria-label={`Usuń ${m.name}`}
+                    aria-label={t("common.deleteNamed", { name: m.name })}
                     onClick={() => remove(m.id)}
                   >
                     <Trash2 className="size-3.5 text-muted-foreground" />
@@ -181,9 +183,7 @@ function MaterialsView() {
           </ul>
         ) : (
           <Hint>
-            {materials.length === 0
-              ? "Brak materiałów — dodaj pierwszy przyciskiem powyżej."
-              : "Brak materiałów w tej grupie."}
+            {materials.length === 0 ? t("material.emptyAll") : t("material.emptyFiltered")}
           </Hint>
         )}
       </div>
@@ -208,6 +208,7 @@ function MaterialDialog({
   existingSubgroups: string[]
   onSubmit: (body: { name: string; group: string | null; subgroup: string | null }) => Promise<void>
 }) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState(initial?.name ?? "")
   const [group, setGroup] = useState(initial?.group ?? "")
@@ -233,7 +234,7 @@ function MaterialDialog({
   async function submit() {
     const trimmed = name.trim()
     if (!trimmed) {
-      setError("Nazwa materiału jest wymagana.")
+      setError(t("material.nameRequired"))
       return
     }
     setError("")
@@ -243,9 +244,9 @@ function MaterialDialog({
       reset()
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setError("Materiał o tej nazwie już istnieje.")
+        setError(t("material.nameConflict"))
       } else {
-        setError("Nie udało się zapisać materiału.")
+        setError(t("material.saveFailed"))
       }
     }
   }
@@ -265,21 +266,21 @@ function MaterialDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="material-name">Nazwa</Label>
+          <Label htmlFor="material-name">{t("common.name")}</Label>
           <Input
             id="material-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="np. Stal S235"
+            placeholder={t("material.namePlaceholder")}
           />
 
-          <Label htmlFor="material-group">Grupa (opcjonalnie)</Label>
+          <Label htmlFor="material-group">{t("material.groupOptionalLabel")}</Label>
           <Input
             id="material-group"
             value={group}
             onChange={(e) => setGroup(e.target.value)}
             list="material-group-options"
-            placeholder="np. Stal"
+            placeholder={t("material.groupPlaceholder")}
           />
           <datalist id="material-group-options">
             {existingGroups.map((g) => (
@@ -287,13 +288,13 @@ function MaterialDialog({
             ))}
           </datalist>
 
-          <Label htmlFor="material-subgroup">Podgrupa (opcjonalnie)</Label>
+          <Label htmlFor="material-subgroup">{t("material.subgroupOptionalLabel")}</Label>
           <Input
             id="material-subgroup"
             value={subgroup}
             onChange={(e) => setSubgroup(e.target.value)}
             list="material-subgroup-options"
-            placeholder="np. Węglowe"
+            placeholder={t("material.subgroupPlaceholder")}
           />
           <datalist id="material-subgroup-options">
             {existingSubgroups.map((s) => (
@@ -301,17 +302,14 @@ function MaterialDialog({
             ))}
           </datalist>
 
-          <Hint>
-            Grupa i podgrupa to tylko pomoc przy filtrowaniu tej listy — nie trafiają do
-            właściwości Części.
-          </Hint>
+          <Hint>{t("material.groupSubgroupHint")}</Hint>
 
           <FormError>{error}</FormError>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Anuluj
+            {t("common.cancel")}
           </Button>
           <Button onClick={submit}>{confirmLabel}</Button>
         </DialogFooter>

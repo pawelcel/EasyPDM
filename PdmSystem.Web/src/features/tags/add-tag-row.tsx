@@ -2,8 +2,10 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useLanguage } from "@/i18n/use-language"
 
 function AddTagRow({ onAdd }: { onAdd: (name: string) => void }) {
+  const { t } = useLanguage()
   const [value, setValue] = useState("")
 
   function submit() {
@@ -21,11 +23,11 @@ function AddTagRow({ onAdd }: { onAdd: (name: string) => void }) {
         onKeyDown={(e) => {
           if (e.key === "Enter") submit()
         }}
-        placeholder="nowy tag…"
+        placeholder={t("item.newTagPlaceholder")}
         className="h-7 text-[13px]"
       />
       <Button size="sm" variant="secondary" onClick={submit}>
-        Dodaj
+        {t("common.add")}
       </Button>
     </div>
   )

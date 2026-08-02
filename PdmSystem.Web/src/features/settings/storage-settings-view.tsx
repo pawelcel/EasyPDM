@@ -17,6 +17,7 @@ import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
+import { useLanguage } from "@/i18n/use-language"
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -31,6 +32,7 @@ function formatBytes(bytes: number): string {
 }
 
 function StorageSettingsView() {
+  const { t } = useLanguage()
   const [info, setInfo] = useState<StorageInfo | null>(null)
   const [newPath, setNewPath] = useState("")
   const [error, setError] = useState("")
@@ -53,11 +55,11 @@ function StorageSettingsView() {
     setError("")
     setResult("")
     if (!trimmed) {
-      setError("Nowa ścieżka nie może być pusta.")
+      setError(t("storage.pathEmpty"))
       return
     }
     if (info && trimmed === info.path) {
-      setError("Nowa ścieżka jest taka sama jak obecna.")
+      setError(t("storage.pathUnchanged"))
       return
     }
     setConfirmOpen(true)
@@ -71,13 +73,13 @@ function StorageSettingsView() {
       setConfirmOpen(false)
       setResult(
         migrateExisting
-          ? `Lokalizacja zmieniona, przeniesiono ${res.migratedFiles} plików.`
-          : "Lokalizacja zmieniona dla nowych plików. Istniejące pliki zostały w poprzednim miejscu."
+          ? t("storage.movedWithFiles", { count: res.migratedFiles })
+          : t("storage.movedNoFiles")
       )
       await refetch()
     } catch (err) {
       setConfirmOpen(false)
-      setError(err instanceof Error ? err.message : "Nie udało się zmienić lokalizacji.")
+      setError(err instanceof Error ? err.message : t("storage.moveFailed"))
     } finally {
       setMoving(false)
     }
@@ -87,38 +89,39 @@ function StorageSettingsView() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h2 className="mb-4 text-lg font-semibold tracking-tight">Magazyn plików</h2>
+      <h2 className="mb-4 text-lg font-semibold tracking-tight">{t("settings.storage")}</h2>
 
       <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-        <SectionLabel>Bieżąca lokalizacja</SectionLabel>
+        <SectionLabel>{t("storage.currentLocation")}</SectionLabel>
         <p className="text-sm">{info.path}</p>
         <p className="text-[12.5px] text-muted-foreground">
-          {info.fileCount} {info.fileCount === 1 ? "plik" : "plików"} · {formatBytes(info.totalSizeBytes)}
+          {info.fileCount} {info.fileCount === 1 ? t("storage.fileSingular") : t("storage.filePlural")} ·{" "}
+          {formatBytes(info.totalSizeBytes)}
         </p>
 
-        <SectionLabel>Nowa lokalizacja</SectionLabel>
+        <SectionLabel>{t("storage.newLocation")}</SectionLabel>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="storage-new-path">Ścieżka bezwzględna na dysku serwera</Label>
+          <Label htmlFor="storage-new-path">{t("storage.pathLabel")}</Label>
           <Input
             id="storage-new-path"
             value={newPath}
             onChange={(e) => setNewPath(e.target.value)}
-            placeholder="np. /mnt/dysk/magazyn"
+            placeholder={t("storage.pathPlaceholder")}
           />
           <div>
             <Button onClick={requestMove} disabled={moving}>
-              Zmień lokalizację
+              {t("storage.changeLocationButton")}
             </Button>
           </div>
           <FormError>{error}</FormError>
           {result && <Hint>{result}</Hint>}
         </div>
 
-        <SectionLabel>Kopia zapasowa</SectionLabel>
-        <Hint>Pobiera jeden plik ZIP z bazą danych (pg_dump) i całym magazynem plików.</Hint>
+        <SectionLabel>{t("storage.backupLabel")}</SectionLabel>
+        <Hint>{t("storage.backupHint")}</Hint>
         <div className="mt-2">
           <a href={api.backupUrl()} download>
-            <Button variant="outline">⬇ Pobierz kopię zapasową</Button>
+            <Button variant="outline">{t("storage.downloadBackupButton")}</Button>
           </a>
         </div>
 
@@ -128,22 +131,20 @@ function StorageSettingsView() {
       <Dialog open={confirmOpen} onOpenChange={(next) => !moving && setConfirmOpen(next)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Przenieść istniejące pliki?</DialogTitle>
+            <DialogTitle>{t("storage.moveDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Zmieniasz lokalizację magazynu z „{info.path}” na „{newPath.trim()}”. Czy przenieść
-              tam też już istniejące pliki (skopiuje je i zaktualizuje bazę), czy zostawić je w
-              obecnym miejscu i przenieść tylko lokalizację dla nowo dodawanych plików?
+              {t("storage.moveDialogDescription", { from: info.path, to: newPath.trim() })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={moving}>
-              Anuluj
+              {t("common.cancel")}
             </Button>
             <Button variant="outline" onClick={() => performMove(false)} disabled={moving}>
-              Nie przenoś
+              {t("storage.moveDialogSkip")}
             </Button>
             <Button onClick={() => performMove(true)} disabled={moving}>
-              Przenieś pliki
+              {t("storage.moveDialogConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -153,6 +154,7 @@ function StorageSettingsView() {
 }
 
 function RestoreSection() {
+  const { t } = useLanguage()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -170,7 +172,7 @@ function RestoreSection() {
       setResult(res)
     } catch (err) {
       setConfirmOpen(false)
-      setError(err instanceof Error ? err.message : "Nie udało się przywrócić kopii zapasowej.")
+      setError(err instanceof Error ? err.message : t("storage.restoreFailed"))
     } finally {
       setRestoring(false)
     }
@@ -178,13 +180,12 @@ function RestoreSection() {
 
   return (
     <>
-      <SectionLabel>Przywracanie z kopii zapasowej</SectionLabel>
+      <SectionLabel>{t("storage.restoreLabel")}</SectionLabel>
       {result ? (
         <div className="flex flex-col gap-2">
           <Hint>
-            {result.success ? "Przywrócono pomyślnie." : "Przywrócono z ostrzeżeniami — sprawdź poniżej."}{" "}
-            Przywrócono {result.filesRestored} plików. Twoja sesja przestała być ważna — zaloguj się
-            ponownie.
+            {result.success ? t("storage.restoreSuccess") : t("storage.restoreWarnings")}{" "}
+            {t("storage.restoreDetail", { count: result.filesRestored })}
           </Hint>
           {result.warnings && (
             <pre className="max-h-32 overflow-auto rounded-md bg-muted p-2 text-[11px] whitespace-pre-wrap text-muted-foreground">
@@ -192,15 +193,12 @@ function RestoreSection() {
             </pre>
           )}
           <div>
-            <Button onClick={() => window.location.reload()}>Odśwież stronę</Button>
+            <Button onClick={() => window.location.reload()}>{t("storage.reloadPageButton")}</Button>
           </div>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          <Hint>
-            Wgraj plik ZIP pobrany wcześniej jako kopia zapasowa. To NADPISZE całą bieżącą bazę
-            danych i magazyn plików — operacji nie da się cofnąć.
-          </Hint>
+          <Hint>{t("storage.restoreHint")}</Hint>
           <input
             ref={fileInputRef}
             type="file"
@@ -210,7 +208,7 @@ function RestoreSection() {
           />
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={restoring}>
-              Wybierz plik ZIP…
+              {t("storage.chooseZipButton")}
             </Button>
             {file && <span className="text-[12.5px] text-muted-foreground">{file.name}</span>}
           </div>
@@ -220,7 +218,7 @@ function RestoreSection() {
               onClick={() => setConfirmOpen(true)}
               disabled={!file || restoring}
             >
-              Przywróć z pliku
+              {t("storage.restoreButton")}
             </Button>
           </div>
           <FormError>{error}</FormError>
@@ -229,9 +227,9 @@ function RestoreSection() {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Przywrócić bazę z kopii zapasowej?"
-        description={`Ta operacja NADPISZE całą bieżącą bazę danych i magazyn plików zawartością pliku „${file?.name}”. Wszystkie zmiany wprowadzone od czasu tej kopii zostaną utracone. Tej operacji nie można cofnąć.`}
-        confirmLabel="Przywróć i nadpisz"
+        title={t("storage.restoreConfirmTitle")}
+        description={t("storage.restoreConfirmDescription", { name: file?.name ?? "" })}
+        confirmLabel={t("storage.restoreConfirmButton")}
         variant="destructive"
         onConfirm={performRestore}
         onCancel={() => setConfirmOpen(false)}

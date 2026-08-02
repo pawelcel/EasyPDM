@@ -5,6 +5,7 @@ import { api } from "@/api/client"
 import type { Attachment } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Hint } from "@/components/ui/hint"
+import { useLanguage } from "@/i18n/use-language"
 
 function formatSize(size: number | null): string {
   if (size === null) return ""
@@ -24,6 +25,7 @@ function AttachmentsPanel({
   locked?: boolean
   onChanged?: () => void | Promise<void>
 }) {
+  const { t } = useLanguage()
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,7 +53,7 @@ function AttachmentsPanel({
       await refetch()
       await onChanged?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nie udało się przesłać załącznika.")
+      setError(err instanceof Error ? err.message : t("item.uploadAttachmentFailed"))
     } finally {
       setUploading(false)
     }
@@ -64,13 +66,13 @@ function AttachmentsPanel({
       await refetch()
       await onChanged?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nie udało się usunąć załącznika.")
+      setError(err instanceof Error ? err.message : t("item.deleteAttachmentFailed"))
     }
   }
 
   return (
     <div>
-      {locked && <Hint>Załączniki można dodawać/usuwać tylko w statusie „W pracy”.</Hint>}
+      {locked && <Hint>{t("item.attachmentsLockedHint")}</Hint>}
       {error && <p className="text-[12.5px] text-destructive">{error}</p>}
 
       {attachments.length > 0 ? (
@@ -94,7 +96,7 @@ function AttachmentsPanel({
                   variant="ghost"
                   onClick={() => handleDelete(attachment)}
                   disabled={locked}
-                  aria-label={`Usuń ${attachment.fileName}`}
+                  aria-label={t("common.deleteNamed", { name: attachment.fileName })}
                 >
                   <Trash2 className="size-3.5 text-muted-foreground" />
                 </Button>
@@ -103,7 +105,7 @@ function AttachmentsPanel({
           ))}
         </ul>
       ) : (
-        <Hint>brak załączników</Hint>
+        <Hint>{t("item.noAttachments")}</Hint>
       )}
 
       <div className="mt-2">
@@ -120,7 +122,7 @@ function AttachmentsPanel({
           disabled={locked || uploading}
           onClick={() => fileInputRef.current?.click()}
         >
-          <Upload className="size-3.5" /> {uploading ? "Przesyłanie…" : "Dodaj załącznik"}
+          <Upload className="size-3.5" /> {uploading ? t("common.uploading") : t("item.addAttachment")}
         </Button>
       </div>
     </div>

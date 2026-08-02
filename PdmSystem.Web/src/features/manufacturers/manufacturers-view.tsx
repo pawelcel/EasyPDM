@@ -21,8 +21,10 @@ import { SectionLabel } from "@/components/ui/section-label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useManufacturers } from "@/features/manufacturers/use-manufacturers"
+import { useLanguage } from "@/i18n/use-language"
 
 function ManufacturersView() {
+  const { t } = useLanguage()
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search, 300)
   const { manufacturers, refetch } = useManufacturers(debouncedSearch)
@@ -35,7 +37,7 @@ function ManufacturersView() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Szukaj producenta…"
+            placeholder={t("manufacturer.searchPlaceholder")}
             className="flex-1"
           />
           <NewManufacturerDialog
@@ -59,14 +61,15 @@ function ManufacturersView() {
                 >
                   <span className="truncate">{m.name}</span>
                   <span className="shrink-0 text-[12px] text-muted-foreground">
-                    {m.contactCount} {m.contactCount === 1 ? "kontakt" : "kontaktów"}
+                    {m.contactCount}{" "}
+                    {t(m.contactCount === 1 ? "manufacturer.contactSingular" : "manufacturer.contactPlural")}
                   </span>
                 </button>
               </li>
             ))}
           </ul>
         ) : (
-          <Hint>{search ? "Brak pasujących producentów." : "Brak producentów — dodaj pierwszego."}</Hint>
+          <Hint>{search ? t("manufacturer.noMatches") : t("manufacturer.emptyAll")}</Hint>
         )}
       </div>
 
@@ -79,7 +82,7 @@ function ManufacturersView() {
             onDeleted={() => setSelectedId(null)}
           />
         ) : (
-          <Hint>Wybierz producenta z listy po lewej albo dodaj nowego.</Hint>
+          <Hint>{t("manufacturer.selectHint")}</Hint>
         )}
       </div>
     </div>
@@ -87,6 +90,7 @@ function ManufacturersView() {
 }
 
 function NewManufacturerDialog({ onCreated }: { onCreated: (id: number) => void | Promise<void> }) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [error, setError] = useState("")
@@ -99,7 +103,7 @@ function NewManufacturerDialog({ onCreated }: { onCreated: (id: number) => void 
   async function submit() {
     const trimmed = name.trim()
     if (!trimmed) {
-      setError("Nazwa producenta jest wymagana.")
+      setError(t("manufacturer.nameRequired"))
       return
     }
     setError("")
@@ -110,9 +114,9 @@ function NewManufacturerDialog({ onCreated }: { onCreated: (id: number) => void 
       await onCreated(id)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setError("Producent o tej nazwie już istnieje.")
+        setError(t("manufacturer.nameConflict"))
       } else {
-        setError("Nie udało się dodać producenta.")
+        setError(t("manufacturer.addFailed"))
       }
     }
   }
@@ -125,26 +129,26 @@ function NewManufacturerDialog({ onCreated }: { onCreated: (id: number) => void 
         if (!next) reset()
       }}
     >
-      <DialogTrigger render={<Button size="icon-sm" aria-label="Dodaj producenta"><Plus className="size-4" /></Button>} />
+      <DialogTrigger render={<Button size="icon-sm" aria-label={t("manufacturer.addAria")}><Plus className="size-4" /></Button>} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Dodaj producenta</DialogTitle>
+          <DialogTitle>{t("manufacturer.addTitle")}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="mfg-name">Nazwa</Label>
+          <Label htmlFor="mfg-name">{t("common.name")}</Label>
           <Input
             id="mfg-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="np. Bosch"
+            placeholder={t("manufacturer.namePlaceholder")}
           />
           <FormError>{error}</FormError>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Anuluj
+            {t("common.cancel")}
           </Button>
-          <Button onClick={submit}>Dodaj</Button>
+          <Button onClick={submit}>{t("common.add")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -160,6 +164,7 @@ function ManufacturerDetailPanel({
   onManufacturersRefetch: () => void | Promise<void>
   onDeleted: () => void
 }) {
+  const { t } = useLanguage()
   const [manufacturer, setManufacturer] = useState<ManufacturerDetail | null>(null)
   const [name, setName] = useState("")
   const [nameError, setNameError] = useState("")
@@ -190,9 +195,9 @@ function ManufacturerDetailPanel({
     } catch (err) {
       setName(manufacturer.name)
       if (err instanceof ApiError && err.status === 409) {
-        setNameError("Producent o tej nazwie już istnieje.")
+        setNameError(t("manufacturer.nameConflict"))
       } else {
-        setNameError("Nie udało się zapisać nazwy.")
+        setNameError(t("manufacturer.saveNameFailed"))
       }
     }
   }
@@ -225,20 +230,20 @@ function ManufacturerDetailPanel({
           <FormError>{nameError}</FormError>
         </div>
         <Button size="sm" variant="destructive" onClick={() => setConfirmingDelete(true)}>
-          Usuń producenta
+          {t("manufacturer.deleteButton")}
         </Button>
       </div>
 
       <div className="mb-1 flex items-center justify-between">
-        <SectionLabel>Osoby kontaktowe</SectionLabel>
+        <SectionLabel>{t("manufacturer.contactsLabel")}</SectionLabel>
         <ContactDialog
           trigger={
             <Button size="sm" variant="secondary">
-              + Dodaj kontakt
+              {t("manufacturer.addContactButton")}
             </Button>
           }
-          title="Dodaj osobę kontaktową"
-          confirmLabel="Dodaj"
+          title={t("manufacturer.addContactTitle")}
+          confirmLabel={t("common.add")}
           onSubmit={async (body) => {
             await api.addManufacturerContact(id, body)
             await refetch()
@@ -251,10 +256,10 @@ function ManufacturerDetailPanel({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Imię i nazwisko</TableHead>
-              <TableHead>Stanowisko</TableHead>
-              <TableHead>Telefon</TableHead>
-              <TableHead>Email</TableHead>
+              <TableHead>{t("common.fullName")}</TableHead>
+              <TableHead>{t("common.position")}</TableHead>
+              <TableHead>{t("common.phone")}</TableHead>
+              <TableHead>{t("common.email")}</TableHead>
               <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
@@ -271,12 +276,12 @@ function ManufacturerDetailPanel({
                   <div className="flex items-center gap-0.5">
                     <ContactDialog
                       trigger={
-                        <Button size="icon-xs" variant="ghost" aria-label="Edytuj kontakt">
+                        <Button size="icon-xs" variant="ghost" aria-label={t("manufacturer.editContactAria")}>
                           <Pencil className="size-3.5 text-muted-foreground" />
                         </Button>
                       }
-                      title="Edytuj osobę kontaktową"
-                      confirmLabel="Zapisz"
+                      title={t("manufacturer.editContactTitle")}
+                      confirmLabel={t("common.save")}
                       initial={c}
                       onSubmit={async (body) => {
                         await api.updateManufacturerContact(id, c.id, body)
@@ -286,7 +291,7 @@ function ManufacturerDetailPanel({
                     <Button
                       size="icon-xs"
                       variant="ghost"
-                      aria-label="Usuń kontakt"
+                      aria-label={t("manufacturer.deleteContactAria")}
                       onClick={() => removeContact(c.id)}
                     >
                       <Trash2 className="size-3.5 text-muted-foreground" />
@@ -298,15 +303,18 @@ function ManufacturerDetailPanel({
           </TableBody>
         </Table>
       ) : (
-        <Hint>brak osób kontaktowych</Hint>
+        <Hint>{t("common.noContacts")}</Hint>
       )}
 
       {confirmingDelete && (
         <ConfirmDialog
           open
-          title="Usuń producenta"
-          description={`Na pewno usunąć producenta „${manufacturer.name}” wraz ze wszystkimi osobami kontaktowymi (${manufacturer.contacts.length})? Tej operacji nie można cofnąć.`}
-          confirmLabel="Usuń producenta"
+          title={t("manufacturer.deleteButton")}
+          description={t("manufacturer.deleteConfirmDescription", {
+            name: manufacturer.name,
+            count: manufacturer.contacts.length,
+          })}
+          confirmLabel={t("manufacturer.deleteButton")}
           variant="destructive"
           onConfirm={confirmDelete}
           onCancel={() => setConfirmingDelete(false)}
@@ -337,6 +345,7 @@ function ContactDialog({
   initial?: ManufacturerContact
   onSubmit: (body: ContactFormBody) => Promise<void>
 }) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [firstName, setFirstName] = useState(initial?.firstName ?? "")
   const [lastName, setLastName] = useState(initial?.lastName ?? "")
@@ -367,7 +376,7 @@ function ContactDialog({
       setOpen(false)
       reset()
     } catch {
-      setError("Nie udało się zapisać osoby kontaktowej.")
+      setError(t("manufacturer.saveContactFailed"))
     }
   }
 
@@ -388,22 +397,22 @@ function ContactDialog({
         <div className="flex flex-col gap-2">
           <div className="flex gap-2">
             <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="contact-first-name">Imię</Label>
+              <Label htmlFor="contact-first-name">{t("common.firstName")}</Label>
               <Input id="contact-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
             </div>
             <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="contact-last-name">Nazwisko</Label>
+              <Label htmlFor="contact-last-name">{t("common.lastName")}</Label>
               <Input id="contact-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </div>
           </div>
 
-          <Label htmlFor="contact-position">Stanowisko</Label>
+          <Label htmlFor="contact-position">{t("common.position")}</Label>
           <Input id="contact-position" value={position} onChange={(e) => setPosition(e.target.value)} />
 
-          <Label htmlFor="contact-phone">Numer telefonu</Label>
+          <Label htmlFor="contact-phone">{t("common.phoneNumber")}</Label>
           <Input id="contact-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
 
-          <Label htmlFor="contact-email">Email</Label>
+          <Label htmlFor="contact-email">{t("common.email")}</Label>
           <Input id="contact-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
           <FormError>{error}</FormError>
@@ -411,7 +420,7 @@ function ContactDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Anuluj
+            {t("common.cancel")}
           </Button>
           <Button onClick={submit}>{confirmLabel}</Button>
         </DialogFooter>

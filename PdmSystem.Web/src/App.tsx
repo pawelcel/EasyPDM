@@ -15,6 +15,7 @@ import { ItemList } from "@/features/items/item-list"
 import { useItems } from "@/features/items/use-items"
 import { MaterialsView } from "@/features/materials/materials-view"
 import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
+import { LanguageSettingsView } from "@/features/settings/language-settings-view"
 import { SettingsSidebar } from "@/features/settings/settings-sidebar"
 import { StorageSettingsView } from "@/features/settings/storage-settings-view"
 import { TagFilterSelect } from "@/features/tags/tag-filter-select"
@@ -22,11 +23,14 @@ import { useTags } from "@/features/tags/use-tags"
 import { ProjectTreeView } from "@/features/tree/project-tree-view"
 import { UsersView } from "@/features/users/users-view"
 import { WelcomeView } from "@/features/welcome/welcome-view"
+import { LanguageSelect } from "@/i18n/language-select"
+import { useLanguage } from "@/i18n/use-language"
 
 type View = "welcome" | "projects" | "database" | "materials" | "manufacturers" | "settings"
 
 function App() {
   const { user, loading: authLoading, refetch: refetchAuth, logout } = useAuth()
+  const { t } = useLanguage()
   const [view, setView] = useState<View>("welcome")
   const [settingsSection, setSettingsSection] = useState("users")
   const [projectId, setProjectId] = useState("")
@@ -92,10 +96,11 @@ function App() {
             </button>
             <div className="flex items-center gap-2.5 text-[13px] text-muted-foreground">
               <span>
-                {user.displayName} ({user.role === "admin" ? "administrator" : "użytkownik"})
+                {user.displayName} ({t(user.role === "admin" ? "app.role.admin" : "app.role.user")})
               </span>
+              <LanguageSelect className="w-24" />
               <Button size="sm" variant="outline" onClick={logout}>
-                Wyloguj
+                {t("app.logout")}
               </Button>
             </div>
           </div>
@@ -127,7 +132,7 @@ function App() {
                   setTreeRefreshKey((k) => k + 1)
                 }}
               >
-                Odśwież
+                {t("common.refresh")}
               </Button>
             </div>
           )}
@@ -137,7 +142,7 @@ function App() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Szukaj po nazwie lub właściwościach…"
+                placeholder={t("app.searchPlaceholder")}
                 className="min-w-52 flex-1"
               />
               <TagFilterSelect tags={tags} value={tag} onChange={setTag} />
@@ -148,7 +153,7 @@ function App() {
                   refetchItems()
                 }}
               >
-                Odśwież
+                {t("common.refresh")}
               </Button>
             </div>
           )}
@@ -171,7 +176,7 @@ function App() {
                 }}
               />
             ) : (
-              <Hint>Wybierz projekt z listy powyżej albo utwórz nowy.</Hint>
+              <Hint>{t("app.selectProjectHint")}</Hint>
             ))}
 
           {view === "database" && (
@@ -180,8 +185,15 @@ function App() {
               loading={loading}
               error={error}
               projects={projects}
+              search={debouncedSearch}
+              isAdmin={isAdmin}
               onItemsRefetch={refetchItems}
               onTagsRefetch={refetchTags}
+              onProjectsRefetch={refetchProjects}
+              onNavigateToProject={(id) => {
+                setProjectId(id)
+                setView("projects")
+              }}
             />
           )}
 
@@ -191,11 +203,13 @@ function App() {
 
           {view === "settings" &&
             settingsSection === "users" &&
-            (isAdmin ? <UsersView /> : <Hint>Brak uprawnień.</Hint>)}
+            (isAdmin ? <UsersView /> : <Hint>{t("settings.noPermission")}</Hint>)}
 
           {view === "settings" &&
             settingsSection === "storage" &&
-            (isAdmin ? <StorageSettingsView /> : <Hint>Brak uprawnień.</Hint>)}
+            (isAdmin ? <StorageSettingsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
+
+          {view === "settings" && settingsSection === "language" && <LanguageSettingsView />}
         </main>
       </div>
     </div>

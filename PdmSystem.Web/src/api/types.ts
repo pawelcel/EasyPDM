@@ -1,8 +1,10 @@
+import type { TranslationKey } from "@/i18n/translations"
+
 export type UserRole = "admin" | "user"
 
-export const ROLE_LABELS: Record<UserRole, string> = {
-  admin: "Administrator",
-  user: "Użytkownik",
+export const ROLE_LABEL_KEYS: Record<UserRole, TranslationKey> = {
+  admin: "role.admin",
+  user: "role.user",
 }
 
 // Zwracane przez GET/POST /api/auth/... — kim jest AKTUALNIE zalogowany.
@@ -37,27 +39,35 @@ export type ItemType = "folder" | "part" | "file" | "assembly"
 
 export type ItemStatus = "w_pracy" | "sprawdzany" | "wydany"
 
-export const STATUS_LABELS: Record<ItemStatus, string> = {
-  w_pracy: "W pracy",
-  sprawdzany: "Sprawdzany",
-  wydany: "Wydany",
+export const STATUS_LABEL_KEYS: Record<ItemStatus, TranslationKey> = {
+  w_pracy: "status.w_pracy",
+  sprawdzany: "status.sprawdzany",
+  wydany: "status.wydany",
 }
 
 export function isLocked(item: Pick<Item, "itemType" | "status">): boolean {
   return (item.itemType === "part" || item.itemType === "assembly") && item.status !== "w_pracy"
 }
 
-export function itemTypeLabel(item: Pick<Item, "itemType" | "fileType">): string | undefined {
+// Folder/Część/Złożenie mają stałe, tłumaczone nazwy (klucz do t()) — Plik pokazuje zamiast
+// tego swoje rozszerzenie (np. "PDF"), które nie jest tekstem do tłumaczenia.
+export function itemTypeLabelKey(
+  item: Pick<Item, "itemType" | "fileType">
+): TranslationKey | undefined {
   switch (item.itemType) {
     case "folder":
-      return "Folder"
+      return "itemType.folder"
     case "part":
-      return "Część"
+      return "itemType.part"
     case "assembly":
-      return "Złożenie"
+      return "itemType.assembly"
     case "file":
-      return item.fileType?.toUpperCase()
+      return undefined
   }
+}
+
+export function fileTypeLabel(item: Pick<Item, "itemType" | "fileType">): string | undefined {
+  return item.itemType === "file" ? item.fileType?.toUpperCase() : undefined
 }
 
 // Część/Złożenie mają numer z bazy (item_number) — wyświetlamy je zawsze jako "numer (nazwa)".

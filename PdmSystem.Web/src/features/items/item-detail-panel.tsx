@@ -13,7 +13,15 @@ import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Upload } from "lucide-react"
 
 import { api } from "@/api/client"
-import { bomPositionLabel, isLocked, itemDisplayLabel, itemTypeLabel, type BomEntry, type Item } from "@/api/types"
+import {
+  bomPositionLabel,
+  fileTypeLabel,
+  isLocked,
+  itemDisplayLabel,
+  itemTypeLabelKey,
+  type BomEntry,
+  type Item,
+} from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
@@ -27,6 +35,7 @@ import { AttachmentsPanel } from "@/features/items/attachments-panel"
 import { PartPropertyForm } from "@/features/items/part-property-form"
 import { PropertyEditor } from "@/features/items/property-editor"
 import { StatusControl } from "@/features/items/status-control"
+import { useLanguage } from "@/i18n/use-language"
 
 // W BOM-ie nie każda Część ma Materiał/Producenta/Numery zamówieniowe (zależy od "rodzaju") —
 // brakującą wartość pokazujemy jako "-", zamiast pustej komórki.
@@ -56,12 +65,14 @@ function ItemDetailPanel({
   onRemoveFromStructure?: () => void | Promise<void>
   onDeleteCompletely?: () => void | Promise<void>
 }) {
+  const { t } = useLanguage()
   const attachedFiles = childEntries.filter((c) => c.item.itemType === "file").map((c) => c.item)
   const bomEntries = childEntries.filter(
     (c) => c.item.itemType === "part" || c.item.itemType === "assembly"
   )
   const modified = item.modifiedAt ? new Date(item.modifiedAt).toLocaleString("pl-PL") : "—"
-  const typeLabel = itemTypeLabel(item)
+  const typeLabelKey = itemTypeLabelKey(item)
+  const typeLabel = typeLabelKey ? t(typeLabelKey) : fileTypeLabel(item)
 
   const [bomError, setBomError] = useState<string | null>(null)
   const [activeChildId, setActiveChildId] = useState<string | null>(null)
@@ -114,7 +125,7 @@ function ItemDetailPanel({
       await api.reorderChildren(item.id, reordered)
       await onItemsRefetch()
     } catch (err) {
-      setBomError(err instanceof Error ? err.message : "Nie udało się zmienić kolejności.")
+      setBomError(err instanceof Error ? err.message : t("item.reorderFailed"))
     }
   }
 
@@ -135,12 +146,12 @@ function ItemDetailPanel({
         <div className="mb-3 flex gap-1.5 border-b pb-3">
           {onRemoveFromStructure && (
             <Button size="sm" variant="outline" onClick={onRemoveFromStructure}>
-              Usuń ze struktury
+              {t("item.removeFromStructure")}
             </Button>
           )}
           {onDeleteCompletely && (
             <Button size="sm" variant="destructive" onClick={onDeleteCompletely}>
-              Usuń całkowicie
+              {t("item.deleteCompletely")}
             </Button>
           )}
         </div>
@@ -150,7 +161,7 @@ function ItemDetailPanel({
         <>
           <div className="text-[15px] font-semibold">{itemDisplayLabel(item)}</div>
           <div className="text-[12.5px] text-muted-foreground">
-            {typeLabel} · zmodyfikowano {modified}
+            {typeLabel} · {t("item.modifiedOn")} {modified}
             {projectName ? ` · ${projectName}` : ""}
           </div>
         </>
@@ -169,10 +180,10 @@ function ItemDetailPanel({
             href={api.fileDownloadUrl(item.id)}
             download
           >
-            ⬇ Pobierz plik
+            {t("item.downloadFile")}
           </a>
         ) : (
-          <Hint>Plik nie został jeszcze przesłany.</Hint>
+          <Hint>{t("item.fileNotUploaded")}</Hint>
         ))}
 
       {item.itemType === "folder" && (
@@ -180,7 +191,7 @@ function ItemDetailPanel({
           <AddNodeDialog
             trigger={
               <Button size="sm" variant="outline">
-                <Upload className="size-3.5" /> Wgraj plik
+                <Upload className="size-3.5" /> {t("item.uploadFile")}
               </Button>
             }
             projectId={item.projectId}
@@ -192,19 +203,19 @@ function ItemDetailPanel({
         </div>
       )}
 
-      <SectionLabel>Tagi</SectionLabel>
+      <SectionLabel>{t("item.tags")}</SectionLabel>
       <div className="flex flex-wrap gap-1.5">
         {item.tags.length > 0 ? (
           item.tags.map((tag) => (
             <TagPill key={tag} name={tag} onRemove={() => handleRemoveTag(tag)} />
           ))
         ) : (
-          <Hint>brak tagów</Hint>
+          <Hint>{t("item.noTags")}</Hint>
         )}
       </div>
       <AddTagRow onAdd={handleAddTag} />
 
-      <SectionLabel>Właściwości</SectionLabel>
+      <SectionLabel>{t("item.properties")}</SectionLabel>
       {item.itemType === "part" ? (
         <PartPropertyForm item={item} onChanged={onItemsRefetch} />
       ) : (
@@ -219,17 +230,17 @@ function ItemDetailPanel({
       {item.itemType === "assembly" && (
         <>
           <div className="flex items-end justify-between gap-2">
-            <SectionLabel>BOM</SectionLabel>
+            <SectionLabel>{t("item.bom")}</SectionLabel>
             <div className="mb-1 flex items-center gap-3 text-[12.5px]">
               <a className="text-primary hover:underline" href={api.bomCsvUrl(item.id)} download>
-                ⬇ Pobierz CSV
+                {t("item.downloadCsv")}
               </a>
               <a
                 className="text-primary hover:underline"
                 href={api.bomAggregatedCsvUrl(item.id)}
                 download
               >
-                ⬇ Pobierz CSV (zsumowany)
+                {t("item.downloadCsvAggregated")}
               </a>
             </div>
           </div>
@@ -244,13 +255,13 @@ function ItemDetailPanel({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10">L.p.</TableHead>
-                    <TableHead>Nazwa</TableHead>
-                    <TableHead className="text-right">Ilość</TableHead>
-                    <TableHead>Materiał</TableHead>
-                    <TableHead>Producent</TableHead>
-                    <TableHead>Numer zamówieniowy 1</TableHead>
-                    <TableHead>Numer zamówieniowy 2</TableHead>
+                    <TableHead className="w-10">{t("item.colPosition")}</TableHead>
+                    <TableHead>{t("common.name")}</TableHead>
+                    <TableHead className="text-right">{t("common.quantity")}</TableHead>
+                    <TableHead>{t("common.material")}</TableHead>
+                    <TableHead>{t("common.manufacturer")}</TableHead>
+                    <TableHead>{t("item.colOrderNumber1")}</TableHead>
+                    <TableHead>{t("item.colOrderNumber2")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -281,7 +292,7 @@ function ItemDetailPanel({
               </DragOverlay>
             </DndContext>
           ) : (
-            <Hint>brak części w złożeniu</Hint>
+            <Hint>{t("item.noPartsInAssembly")}</Hint>
           )}
           <FormError>{bomError}</FormError>
         </>
@@ -289,7 +300,7 @@ function ItemDetailPanel({
 
       {item.itemType === "folder" && (
         <>
-          <SectionLabel>Pliki</SectionLabel>
+          <SectionLabel>{t("item.files")}</SectionLabel>
           {attachedFiles.length > 0 ? (
             <ul className="flex flex-col gap-1">
               {attachedFiles.map((file) => (
@@ -301,23 +312,23 @@ function ItemDetailPanel({
                       href={api.fileDownloadUrl(file.id)}
                       download
                     >
-                      ⬇ Pobierz
+                      {t("common.download")}
                     </a>
                   ) : (
-                    <span className="shrink-0 text-muted-foreground">brak pliku</span>
+                    <span className="shrink-0 text-muted-foreground">{t("item.noFile")}</span>
                   )}
                 </li>
               ))}
             </ul>
           ) : (
-            <Hint>brak dodanych plików</Hint>
+            <Hint>{t("item.noFilesAdded")}</Hint>
           )}
         </>
       )}
 
       {(item.itemType === "part" || item.itemType === "assembly" || item.itemType === "file") && (
         <>
-          <SectionLabel>Załączniki</SectionLabel>
+          <SectionLabel>{t("item.attachments")}</SectionLabel>
           <AttachmentsPanel itemId={item.id} locked={isLocked(item)} onChanged={onItemsRefetch} />
         </>
       )}
@@ -347,6 +358,7 @@ function SortableBomRow({
   onItemsRefetch: () => void | Promise<void>
   setBomError: (message: string | null) => void
 }) {
+  const { t } = useLanguage()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: child.id,
   })
@@ -364,7 +376,7 @@ function SortableBomRow({
               {...attributes}
               {...listeners}
               className="cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
-              aria-label="Przeciągnij, żeby zmienić kolejność"
+              aria-label={t("item.dragToReorderAria")}
             >
               <GripVertical className="size-3.5" />
             </span>
@@ -497,6 +509,7 @@ function BomPositionCell({
   onChanged: () => void | Promise<void>
   onError: (message: string | null) => void
 }) {
+  const { t } = useLanguage()
   const initial = String(position)
   const [value, setValue] = useState(initial)
   useEffect(() => setValue(initial), [initial])
@@ -506,7 +519,7 @@ function BomPositionCell({
     const parsed = Number(value)
     if (!Number.isInteger(parsed) || parsed <= 0) {
       setValue(initial)
-      onError("L.p. musi być liczbą całkowitą większą od zera.")
+      onError(t("item.positionInvalid"))
       return
     }
     try {
@@ -515,7 +528,7 @@ function BomPositionCell({
       await onChanged()
     } catch (err) {
       setValue(initial)
-      onError(err instanceof Error ? err.message : "Nie udało się zmienić L.p.")
+      onError(err instanceof Error ? err.message : t("item.positionFailed"))
     }
   }
 

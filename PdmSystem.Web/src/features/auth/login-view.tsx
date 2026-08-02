@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FormError } from "@/components/ui/form-error"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useLanguage } from "@/i18n/use-language"
 
 function LoginView({ onLoggedIn }: { onLoggedIn: () => void | Promise<void> }) {
+  const { t } = useLanguage()
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -16,7 +18,7 @@ function LoginView({ onLoggedIn }: { onLoggedIn: () => void | Promise<void> }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!username.trim() || !password) {
-      setError("Podaj nazwę użytkownika i hasło.")
+      setError(t("login.errorMissingFields"))
       return
     }
 
@@ -26,7 +28,7 @@ function LoginView({ onLoggedIn }: { onLoggedIn: () => void | Promise<void> }) {
       await api.login(username.trim(), password)
       await onLoggedIn()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Nie udało się zalogować.")
+      setError(err instanceof ApiError ? err.message : t("login.errorGeneric"))
     } finally {
       setSubmitting(false)
     }
@@ -36,13 +38,13 @@ function LoginView({ onLoggedIn }: { onLoggedIn: () => void | Promise<void> }) {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Zaloguj się do PdmSystem</CardTitle>
-          <CardDescription>Podaj login i hasło swojego konta.</CardDescription>
+          <CardTitle>{t("login.title")}</CardTitle>
+          <CardDescription>{t("login.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="login-username">Nazwa użytkownika</Label>
+              <Label htmlFor="login-username">{t("login.username")}</Label>
               <Input
                 id="login-username"
                 value={username}
@@ -51,7 +53,7 @@ function LoginView({ onLoggedIn }: { onLoggedIn: () => void | Promise<void> }) {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="login-password">Hasło</Label>
+              <Label htmlFor="login-password">{t("login.password")}</Label>
               <Input
                 id="login-password"
                 type="password"
@@ -61,7 +63,7 @@ function LoginView({ onLoggedIn }: { onLoggedIn: () => void | Promise<void> }) {
             </div>
             <FormError>{error}</FormError>
             <Button type="submit" disabled={submitting} className="mt-1">
-              {submitting ? "Logowanie…" : "Zaloguj"}
+              {submitting ? t("login.submitting") : t("login.submit")}
             </Button>
           </form>
         </CardContent>

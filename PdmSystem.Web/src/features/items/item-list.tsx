@@ -1,45 +1,168 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import type { Item, Project } from "@/api/types"
 import { Hint } from "@/components/ui/hint"
-import { ItemCard } from "@/features/items/item-card"
+import { ItemDetailPanel } from "@/features/items/item-detail-panel"
+import { ItemRow } from "@/features/items/item-row"
+import { PartKindSelect, type PartKindFilter } from "@/features/items/part-kind-select"
+import { RecordTypeSelect, type RecordType } from "@/features/items/record-type-select"
+import { ManufacturerFilterSelect } from "@/features/manufacturers/manufacturer-filter-select"
+import { ProjectDetailPanel } from "@/features/projects/project-detail-panel"
+import { ProjectRow } from "@/features/projects/project-row"
+import { useLanguage } from "@/i18n/use-language"
+
+type Selection = { kind: "item"; id: string } | { kind: "project"; id: string }
 
 function ItemList({
   items,
   loading,
   error,
   projects,
+  search,
+  isAdmin,
   onItemsRefetch,
   onTagsRefetch,
+  onProjectsRefetch,
+  onNavigateToProject,
 }: {
   items: Item[]
   loading: boolean
   error: boolean
   projects: Project[]
+  search: string
+  isAdmin: boolean
   onItemsRefetch: () => void | Promise<void>
   onTagsRefetch: () => void | Promise<void>
+  onProjectsRefetch: () => void | Promise<void>
+  onNavigateToProject: (projectId: string) => void
 }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const { t } = useLanguage()
+  const [recordType, setRecordType] = useState<RecordType>("all")
+  const [partKind, setPartKind] = useState<PartKindFilter>("all")
+  const [manufacturer, setManufacturer] = useState("")
+  const [selection, setSelection] = useState<Selection | null>(null)
 
-  if (loading) return <Hint>Ładowanie…</Hint>
-  if (error) return <Hint>Błąd ładowania danych z API.</Hint>
-  if (items.length === 0) {
-    return <Hint>Brak elementów pasujących do filtra. Kliknij "+ Element", żeby dodać pierwszy.</Hint>
+  // Filtr "rodzaj części" ma sens tylko dla Części, a "producent" tylko dla Części
+  // zakupowych — zmiana filtra wyżej w hierarchii kasuje te niżej, żeby nie został
+  // "ukryty" filtr, który dalej coś zawęża, choć jego kontrolka jest już wyszarzona.
+  function changeRecordType(next: RecordType) {
+    setRecordType(next)
+    setPartKind("all")
+    setManufacturer("")
+    setSelection(null)
   }
+
+  function changePartKind(next: PartKindFilter) {
+    setPartKind(next)
+    setManufacturer("")
+  }
+
+  const visibleProjects =
+    recordType === "project"
+      ? projects.filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()))
+      : []
+
+  const visibleItems =
+    recordType === "project"
+      ? []
+      : items.filter((item) => {
+          if (recordType === "part" && item.itemType !== "part") return false
+          if (recordType === "assembly" && item.itemType !== "assembly") return false
+          if (recordType === "other" && (item.itemType === "part" || item.itemType === "assembly")) {
+            return false
+          }
+          if (partKind !== "all" && (item.itemType !== "part" || item.properties.rodzaj !== partKind)) {
+            return false
+          }
+          if (manufacturer && (item.itemType !== "part" || item.properties.manufacturer !== manufacturer)) {
+            return false
+          }
+          return true
+        })
+
+  // Jeśli zaznaczony rekord zniknie z bieżącej, przefiltrowanej listy (zmiana filtra,
+  // odświeżenie, usunięcie) — panel po prawej wraca do stanu "nic nie wybrano".
+  useEffect(() => {
+    if (!selection) return
+    const stillVisible =
+      selection.kind === "item"
+        ? visibleItems.some((item) => item.id === selection.id)
+        : visibleProjects.some((p) => p.id === selection.id)
+    if (!stillVisible) setSelection(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleItems, visibleProjects])
+
+  if (loading) return <Hint>{t("common.loading")}</Hint>
+  if (error) return <Hint>{t("database.loadError")}</Hint>
+
+  const selectedItem =
+    selection?.kind === "item" ? (visibleItems.find((i) => i.id === selection.id) ?? null) : null
+  const selectedProject =
+    selection?.kind === "project" ? (visibleProjects.find((p) => p.id === selection.id) ?? null) : null
 
   return (
     <div className="flex flex-col gap-3">
-      {items.map((item) => (
-        <ItemCard
-          key={item.id}
-          item={item}
-          projectName={projects.find((p) => p.id === item.projectId)?.name}
-          open={expandedId === item.id}
-          onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
-          onItemsRefetch={onItemsRefetch}
-          onTagsRefetch={onTagsRefetch}
+      <div className="flex flex-wrap gap-2">
+        <RecordTypeSelect value={recordType} onChange={changeRecordType} />
+        <PartKindSelect value={partKind} onChange={changePartKind} disabled={recordType !== "part"} />
+        <ManufacturerFilterSelect
+          value={manufacturer}
+          onChange={setManufacturer}
+          disabled={partKind !== "Zakupowa"}
         />
-      ))}
+      </div>
+
+      {visibleProjects.length === 0 && visibleItems.length === 0 ? (
+        <Hint>{t("database.empty")}</Hint>
+      ) : (
+        <div className="grid grid-cols-4 gap-4">
+          <div className="col-span-1 flex flex-col gap-0.5 rounded-xl bg-card p-2 ring-1 ring-foreground/10">
+            {visibleProjects.map((project) => (
+              <ProjectRow
+                key={project.id}
+                project={project}
+                selected={selection?.kind === "project" && selection.id === project.id}
+                onSelect={() => setSelection({ kind: "project", id: project.id })}
+              />
+            ))}
+            {visibleItems.map((item) => (
+              <ItemRow
+                key={item.id}
+                item={item}
+                projectName={projects.find((p) => p.id === item.projectId)?.name}
+                selected={selection?.kind === "item" && selection.id === item.id}
+                onSelect={() => setSelection({ kind: "item", id: item.id })}
+              />
+            ))}
+          </div>
+
+          <div className="col-span-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+            {selectedItem ? (
+              <ItemDetailPanel
+                key={selectedItem.id}
+                item={selectedItem}
+                projectName={projects.find((p) => p.id === selectedItem.projectId)?.name}
+                onItemsRefetch={onItemsRefetch}
+                onTagsRefetch={onTagsRefetch}
+              />
+            ) : selectedProject ? (
+              <ProjectDetailPanel
+                key={selectedProject.id}
+                project={selectedProject}
+                isAdmin={isAdmin}
+                onUpdated={onProjectsRefetch}
+                onDeleted={async () => {
+                  setSelection(null)
+                  await onProjectsRefetch()
+                }}
+                onNavigateToProject={() => onNavigateToProject(selectedProject.id)}
+              />
+            ) : (
+              <Hint>{t("database.selectItemHint")}</Hint>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
