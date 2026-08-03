@@ -49,44 +49,48 @@
 }
 
 /*
- * PdmSystem is dark-only today (no light/dark toggle in the old UI) — tokens
- * below are mapped 1:1 from the previous wwwroot/style.css palette so the
- * look stays the same while the components move to shadcn/ui primitives.
+ * Jasny motyw (domyślny, brak klasy ".dark" na <html>) — ten sam układ ról co ciemny
+ * poniżej (tło/tekst/karta/akcent...), z tym samym niebieskim akcentem dla spójności marki.
  */
 :root {
-    --background: #0f1115;
-    --foreground: #e6e8eb;
-    --card: #171a21;
-    --card-foreground: #e6e8eb;
-    --popover: #171a21;
-    --popover-foreground: #e6e8eb;
-    --primary: #4f8cff;
+    --background: #ffffff;
+    --foreground: #0f1115;
+    --card: #ffffff;
+    --card-foreground: #0f1115;
+    --popover: #ffffff;
+    --popover-foreground: #0f1115;
+    --primary: #3a6fe0;
     --primary-foreground: #ffffff;
-    --secondary: #253048;
-    --secondary-foreground: #4f8cff;
-    --muted: #171a21;
-    --muted-foreground: #8b909c;
-    --accent: #1e222b;
-    --accent-foreground: #e6e8eb;
-    --destructive: #ff5f6d;
-    --border: #2a2e38;
-    --input: #2a2e38;
-    --ring: #4f8cff;
-    --chart-1: #4f8cff;
-    --chart-2: #8b909c;
+    --secondary: #eaf0ff;
+    --secondary-foreground: #2c4a80;
+    --muted: #f1f2f4;
+    --muted-foreground: #6b7078;
+    --accent: #eef1f5;
+    --accent-foreground: #0f1115;
+    --destructive: #dc3d43;
+    --border: #e2e4e8;
+    --input: #e2e4e8;
+    --ring: #3a6fe0;
+    --chart-1: #3a6fe0;
+    --chart-2: #6b7078;
     --chart-3: #2c4a80;
-    --chart-4: #253048;
-    --chart-5: #ff5f6d;
+    --chart-4: #a8c0f0;
+    --chart-5: #dc3d43;
     --radius: 0.5rem;
-    --sidebar: #171a21;
-    --sidebar-foreground: #e6e8eb;
-    --sidebar-primary: #4f8cff;
+    --sidebar: #f7f8fa;
+    --sidebar-foreground: #0f1115;
+    --sidebar-primary: #3a6fe0;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #1e222b;
-    --sidebar-accent-foreground: #e6e8eb;
-    --sidebar-border: #2a2e38;
-    --sidebar-ring: #4f8cff;
+    --sidebar-accent: #eef1f5;
+    --sidebar-accent-foreground: #0f1115;
+    --sidebar-border: #e2e4e8;
+    --sidebar-ring: #3a6fe0;
 }
+
+/*
+ * Ciemny motyw (klasa ".dark" na <html>, ustawiana przez ThemeProvider) — dotychczasowy
+ * jedyny wygląd aplikacji, przeniesiony 1:1 z poprzedniej palety wwwroot/style.css.
+ */
 
 .dark {
     --background: #0f1115;

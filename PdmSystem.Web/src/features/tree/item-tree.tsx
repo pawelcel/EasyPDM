@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils"
 import { iconColorClass, itemIcon } from "@/lib/item-visuals"
 import { AddNodeDialog } from "@/features/items/add-node-dialog"
 import type { useProjectTree } from "@/features/tree/use-project-tree"
+import { useLanguage } from "@/i18n/use-language"
 
 type Tree = ReturnType<typeof useProjectTree>
 
@@ -50,6 +51,9 @@ function ItemTree({
   selectedId,
   onSelect,
   onSelectProject,
+  selectionMode,
+  selectedIds,
+  onToggleSelect,
 }: {
   tree: Tree
   projectId: string
@@ -58,7 +62,11 @@ function ItemTree({
   selectedId: string | null
   onSelect: (id: string, parentId: string | null) => void
   onSelectProject: () => void
+  selectionMode: boolean
+  selectedIds: Set<string>
+  onToggleSelect: (id: string) => void
 }) {
+  const { t } = useLanguage()
   const rootSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   const [activeRootId, setActiveRootId] = useState<string | null>(null)
 
@@ -98,7 +106,7 @@ function ItemTree({
         <div className="hidden items-center gap-0.5 group-hover:flex">
           <AddNodeDialog
             trigger={
-              <Button size="icon-xs" variant="ghost" aria-label="Dodaj element w projekcie">
+              <Button size="icon-xs" variant="ghost" aria-label={t("addNode.addToProjectAria")}>
                 <Plus className="size-3" />
               </Button>
             }
@@ -112,7 +120,7 @@ function ItemTree({
 
       <div className="flex flex-col gap-0.5 pl-3.5">
         {tree.roots.length === 0 ? (
-          <p className="px-1.5 py-1 text-sm text-muted-foreground">Brak elementów w tym projekcie.</p>
+          <p className="px-1.5 py-1 text-sm text-muted-foreground">{t("addNode.noItemsInProject")}</p>
         ) : (
           <DndContext
             sensors={rootSensors}
@@ -134,6 +142,9 @@ function ItemTree({
                   selectedId={selectedId}
                   onSelect={onSelect}
                   onRefetch={tree.refetch}
+                  selectionMode={selectionMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={onToggleSelect}
                 />
               ))}
             </SortableContext>
@@ -157,6 +168,9 @@ function TreeNode({
   selectedId,
   onSelect,
   onRefetch,
+  selectionMode,
+  selectedIds,
+  onToggleSelect,
 }: {
   item: Item
   quantity: number | null
@@ -167,11 +181,16 @@ function TreeNode({
   selectedId: string | null
   onSelect: (id: string, parentId: string | null) => void
   onRefetch: () => void | Promise<void>
+  selectionMode: boolean
+  selectedIds: Set<string>
+  onToggleSelect: (id: string) => void
 }) {
+  const { t } = useLanguage()
   const [expanded, setExpanded] = useState(true)
   const children = childrenOf(item.id)
   const hasChildren = children.length > 0
   const TypeIcon = itemIcon(item)
+  const checked = selectedIds.has(item.id)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -202,16 +221,27 @@ function TreeNode({
     >
       <div
         className={cn(
-          "group flex items-center gap-1 rounded-md px-1.5 py-1 text-sm hover:bg-accent",
+          "group flex items-center gap-1 rounded-md px-1.5 py-1 text-sm select-none hover:bg-accent",
           selectedId === item.id && "bg-accent"
         )}
         style={{ paddingLeft: depth * 16 + 6 }}
       >
+        {selectionMode && (
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={() => onToggleSelect(item.id)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={t("bulk.selectItemAria", { name: itemDisplayLabel(item) })}
+            className="size-3.5 shrink-0 accent-primary"
+          />
+        )}
+
         <span
           {...attributes}
           {...listeners}
           className="flex size-4 shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground/40 hover:text-muted-foreground active:cursor-grabbing"
-          aria-label="Przeciągnij, żeby zmienić kolejność"
+          aria-label={t("item.dragToReorderAria")}
         >
           <GripVertical className="size-3.5" />
         </span>
@@ -244,7 +274,7 @@ function TreeNode({
           {(item.itemType === "folder" || item.itemType === "assembly") && (
             <AddNodeDialog
               trigger={
-                <Button size="icon-xs" variant="ghost" aria-label="Dodaj podelement">
+                <Button size="icon-xs" variant="ghost" aria-label={t("addNode.addSubitemAria")}>
                   <Plus className="size-3" />
                 </Button>
               }
@@ -258,7 +288,7 @@ function TreeNode({
             <Button
               size="icon-xs"
               variant="ghost"
-              aria-label="Usuń powiązanie"
+              aria-label={t("addNode.removeRelationAria")}
               onClick={async () => {
                 await api.removeChild(parentId, item.id)
                 await onRefetch()
@@ -292,6 +322,9 @@ function TreeNode({
                   selectedId={selectedId}
                   onSelect={onSelect}
                   onRefetch={onRefetch}
+                  selectionMode={selectionMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={onToggleSelect}
                 />
               ))}
             </div>

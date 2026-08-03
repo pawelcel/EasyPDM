@@ -55,6 +55,7 @@ app.MapStructureEndpoints(connectionString);
 app.MapBomEndpoints(connectionString);
 app.MapMaterialEndpoints(connectionString);
 app.MapManufacturerEndpoints(connectionString);
+app.MapSavedFilterEndpoints(connectionString);
 app.MapAttachmentEndpoints(connectionString, storage);
 app.MapConfigEndpoints(storage);
 app.MapSettingsEndpoints(connectionString, storage, appSettingsPath);

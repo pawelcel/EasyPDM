@@ -54,6 +54,8 @@ function ItemDetailPanel({
   onTagsRefetch,
   onRemoveFromStructure,
   onDeleteCompletely,
+  onDuplicated,
+  duplicateParentId,
 }: {
   item: Item
   projectName?: string
@@ -64,8 +66,33 @@ function ItemDetailPanel({
   onTagsRefetch: () => void | Promise<void>
   onRemoveFromStructure?: () => void | Promise<void>
   onDeleteCompletely?: () => void | Promise<void>
+  onDuplicated?: (newItemId: string) => void | Promise<void>
+  // Obecność tego pola (nawet gdy null — oryginał jest korzeniem projektu) włącza
+  // umieszczenie kopii DOKŁADNIE pod oryginałem, na tym samym poziomie struktury. Brak tego
+  // pola (undefined — np. duplikowanie z widoku całej bazy, bez załadowanej struktury/relacji)
+  // po prostu dopisuje kopię na koniec listy korzeni projektu.
+  duplicateParentId?: string | null
 }) {
   const { t } = useLanguage()
+  const [duplicateError, setDuplicateError] = useState<string | null>(null)
+  const canDuplicate =
+    (item.itemType === "part" || item.itemType === "assembly") && onDuplicated !== undefined
+
+  async function handleDuplicate() {
+    setDuplicateError(null)
+    try {
+      const { id: newItemId } = await api.duplicateItem(
+        item.id,
+        duplicateParentId !== undefined
+          ? { parentId: duplicateParentId, insertAfterOriginal: true }
+          : undefined
+      )
+      await onItemsRefetch()
+      await onDuplicated?.(newItemId)
+    } catch (err) {
+      setDuplicateError(err instanceof Error ? err.message : t("item.duplicateFailed"))
+    }
+  }
   const attachedFiles = childEntries.filter((c) => c.item.itemType === "file").map((c) => c.item)
   const bomEntries = childEntries.filter(
     (c) => c.item.itemType === "part" || c.item.itemType === "assembly"
@@ -142,18 +169,26 @@ function ItemDetailPanel({
 
   return (
     <div>
-      {(onRemoveFromStructure || onDeleteCompletely) && (
-        <div className="mb-3 flex gap-1.5 border-b pb-3">
-          {onRemoveFromStructure && (
-            <Button size="sm" variant="outline" onClick={onRemoveFromStructure}>
-              {t("item.removeFromStructure")}
-            </Button>
-          )}
-          {onDeleteCompletely && (
-            <Button size="sm" variant="destructive" onClick={onDeleteCompletely}>
-              {t("item.deleteCompletely")}
-            </Button>
-          )}
+      {(onRemoveFromStructure || canDuplicate || onDeleteCompletely) && (
+        <div className="mb-3 flex flex-col gap-1.5 border-b pb-3">
+          <div className="flex gap-1.5">
+            {onRemoveFromStructure && (
+              <Button size="sm" variant="outline" onClick={onRemoveFromStructure}>
+                {t("item.removeFromStructure")}
+              </Button>
+            )}
+            {canDuplicate && (
+              <Button size="sm" variant="outline" onClick={handleDuplicate}>
+                {t("item.duplicate")}
+              </Button>
+            )}
+            {onDeleteCompletely && (
+              <Button size="sm" variant="destructive" onClick={onDeleteCompletely}>
+                {t("item.deleteCompletely")}
+              </Button>
+            )}
+          </div>
+          <FormError>{duplicateError}</FormError>
         </div>
       )}
 
@@ -213,7 +248,7 @@ function ItemDetailPanel({
           <Hint>{t("item.noTags")}</Hint>
         )}
       </div>
-      <AddTagRow onAdd={handleAddTag} />
+      <AddTagRow onAdd={handleAddTag} className="mt-2" />
 
       <SectionLabel>{t("item.properties")}</SectionLabel>
       {item.itemType === "part" ? (

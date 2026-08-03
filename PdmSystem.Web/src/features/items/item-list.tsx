@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react"
 
+import { api } from "@/api/client"
 import type { Item, Project } from "@/api/types"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Hint } from "@/components/ui/hint"
+import type { DatabaseFilters } from "@/features/items/database-filters"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
 import { ItemRow } from "@/features/items/item-row"
 import { PartKindSelect, type PartKindFilter } from "@/features/items/part-kind-select"
 import { RecordTypeSelect, type RecordType } from "@/features/items/record-type-select"
+import { SavedFiltersBar } from "@/features/items/saved-filters-bar"
 import { ManufacturerFilterSelect } from "@/features/manufacturers/manufacturer-filter-select"
 import { ProjectDetailPanel } from "@/features/projects/project-detail-panel"
 import { ProjectRow } from "@/features/projects/project-row"
@@ -19,6 +23,9 @@ function ItemList({
   error,
   projects,
   search,
+  tag,
+  onSearchChange,
+  onTagChange,
   isAdmin,
   onItemsRefetch,
   onTagsRefetch,
@@ -30,6 +37,9 @@ function ItemList({
   error: boolean
   projects: Project[]
   search: string
+  tag: string
+  onSearchChange: (value: string) => void
+  onTagChange: (value: string) => void
   isAdmin: boolean
   onItemsRefetch: () => void | Promise<void>
   onTagsRefetch: () => void | Promise<void>
@@ -41,6 +51,7 @@ function ItemList({
   const [partKind, setPartKind] = useState<PartKindFilter>("all")
   const [manufacturer, setManufacturer] = useState("")
   const [selection, setSelection] = useState<Selection | null>(null)
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
 
   // Filtr "rodzaj części" ma sens tylko dla Części, a "producent" tylko dla Części
   // zakupowych — zmiana filtra wyżej w hierarchii kasuje te niżej, żeby nie został
@@ -55,6 +66,26 @@ function ItemList({
   function changePartKind(next: PartKindFilter) {
     setPartKind(next)
     setManufacturer("")
+  }
+
+  // Wczytanie zapisanego zestawu filtrów ustawia WSZYSTKIE pięć wartości naraz, więc celowo
+  // omija powyższe funkcje z kaskadowym resetem (np. changeRecordType zerowałby partKind
+  // i manufacturer, które ten sam zapis chce ustawić na coś innego niż "wszystkie").
+  function applyFilters(f: DatabaseFilters) {
+    onSearchChange(f.search)
+    onTagChange(f.tag)
+    setRecordType(f.recordType)
+    setPartKind(f.partKind)
+    setManufacturer(f.manufacturer)
+    setSelection(null)
+  }
+
+  async function confirmDeleteCompletely() {
+    if (!confirmingDeleteId) return
+    await api.deleteItem(confirmingDeleteId)
+    setConfirmingDeleteId(null)
+    setSelection(null)
+    await onItemsRefetch()
   }
 
   const visibleProjects =
@@ -99,6 +130,7 @@ function ItemList({
     selection?.kind === "item" ? (visibleItems.find((i) => i.id === selection.id) ?? null) : null
   const selectedProject =
     selection?.kind === "project" ? (visibleProjects.find((p) => p.id === selection.id) ?? null) : null
+  const deletingItem = confirmingDeleteId ? visibleItems.find((i) => i.id === confirmingDeleteId) : null
 
   return (
     <div className="flex flex-col gap-3">
@@ -109,6 +141,10 @@ function ItemList({
           value={manufacturer}
           onChange={setManufacturer}
           disabled={partKind !== "Zakupowa"}
+        />
+        <SavedFiltersBar
+          currentFilters={{ search, tag, recordType, partKind, manufacturer }}
+          onApply={applyFilters}
         />
       </div>
 
@@ -144,6 +180,8 @@ function ItemList({
                 projectName={projects.find((p) => p.id === selectedItem.projectId)?.name}
                 onItemsRefetch={onItemsRefetch}
                 onTagsRefetch={onTagsRefetch}
+                onDeleteCompletely={isAdmin ? () => setConfirmingDeleteId(selectedItem.id) : undefined}
+                onDuplicated={(newId) => setSelection({ kind: "item", id: newId })}
               />
             ) : selectedProject ? (
               <ProjectDetailPanel
@@ -162,6 +200,18 @@ function ItemList({
             )}
           </div>
         </div>
+      )}
+
+      {deletingItem && (
+        <ConfirmDialog
+          open
+          title={t("item.deleteCompletely")}
+          description={t("item.deleteConfirmDescription", { name: deletingItem.fileName })}
+          confirmLabel={t("item.deleteCompletely")}
+          variant="destructive"
+          onConfirm={confirmDeleteCompletely}
+          onCancel={() => setConfirmingDeleteId(null)}
+        />
       )}
     </div>
   )
