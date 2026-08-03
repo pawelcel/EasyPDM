@@ -23,9 +23,11 @@ const BADGE_VARIANT: Record<ItemStatus, "secondary" | "outline" | "default"> = {
 
 function StatusControl({
   item,
+  disabled = false,
   onChanged,
 }: {
   item: Item
+  disabled?: boolean
   onChanged: () => void | Promise<void>
 }) {
   const { t } = useLanguage()
@@ -62,6 +64,7 @@ function StatusControl({
             key={next}
             size="sm"
             variant="outline"
+            disabled={disabled}
             onClick={() => {
               setComment("")
               setPending(next)

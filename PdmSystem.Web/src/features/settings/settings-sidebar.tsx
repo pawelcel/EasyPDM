@@ -20,10 +20,12 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
 function SettingsSidebar({
   activeId,
   isAdmin,
+  myLabel,
   onSelect,
 }: {
   activeId: string
   isAdmin: boolean
+  myLabel: string
   onSelect: (id: string) => void
 }) {
   const { t } = useLanguage()
@@ -47,6 +49,17 @@ function SettingsSidebar({
           {t(opt.labelKey)}
         </button>
       ))}
+
+      <button
+        type="button"
+        onClick={() => onSelect("myProjects")}
+        className={cn(
+          "truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground",
+          activeId === "myProjects" && "bg-accent text-foreground"
+        )}
+      >
+        {myLabel}
+      </button>
     </div>
   )
 }

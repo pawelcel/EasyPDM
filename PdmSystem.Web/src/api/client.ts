@@ -11,6 +11,7 @@ import type {
   ManufacturerDetail,
   Material,
   Project,
+  ProjectUserAssignment,
   RevisionComment,
   SavedFilter,
   StorageInfo,
@@ -94,6 +95,19 @@ export const api = {
   deleteProject: (id: string) =>
     fetch(`${BASE}/projects/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
+  getProjectUsers: () =>
+    fetch(`${BASE}/project-users`).then((r) => handleResponse<ProjectUserAssignment[]>(r)),
+
+  grantProjectAccess: (projectId: string, userId: string) =>
+    fetch(`${BASE}/projects/${projectId}/users/${userId}`, { method: "POST" }).then((r) =>
+      handleResponse<void>(r)
+    ),
+
+  revokeProjectAccess: (projectId: string, userId: string) =>
+    fetch(`${BASE}/projects/${projectId}/users/${userId}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
+    ),
+
   getItems: (params: { search?: string; tag?: string; projectId?: string }) => {
     const query = new URLSearchParams()
     if (params.search) query.set("search", params.search)
@@ -167,6 +181,16 @@ export const api = {
 
   getRevisionComments: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/revisions`).then((r) => handleResponse<RevisionComment[]>(r)),
+
+  lockItem: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/lock`, { method: "POST" }).then((r) =>
+      handleResponse<{ ownerId: string; ownerLocked: boolean }>(r)
+    ),
+
+  releaseItem: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/release`, { method: "POST" }).then((r) =>
+      handleResponse<{ ownerId: string | null; ownerLocked: boolean }>(r)
+    ),
 
   fileDownloadUrl: (itemId: string) => `${BASE}/items/${itemId}/file`,
 

@@ -15,6 +15,7 @@ import { GripVertical, Upload } from "lucide-react"
 import { api } from "@/api/client"
 import {
   bomPositionLabel,
+  canEditOwnerLocked,
   fileTypeLabel,
   isLocked,
   itemDisplayLabel,
@@ -32,6 +33,8 @@ import { TagPill } from "@/components/ui/tag-pill"
 import { AddNodeDialog } from "@/features/items/add-node-dialog"
 import { AddTagRow } from "@/features/tags/add-tag-row"
 import { AttachmentsPanel } from "@/features/items/attachments-panel"
+import { useAuth } from "@/features/auth/use-auth"
+import { OwnerControl } from "@/features/items/owner-control"
 import { PartPropertyForm } from "@/features/items/part-property-form"
 import { PropertyEditor } from "@/features/items/property-editor"
 import { StatusControl } from "@/features/items/status-control"
@@ -74,9 +77,13 @@ function ItemDetailPanel({
   duplicateParentId?: string | null
 }) {
   const { t } = useLanguage()
+  const { user } = useAuth()
   const [duplicateError, setDuplicateError] = useState<string | null>(null)
   const canDuplicate =
     (item.itemType === "part" || item.itemType === "assembly") && onDuplicated !== undefined
+  // Niezależne od isLocked (status 'w_pracy') — dopóki właściciel ma tego elementu
+  // zablokowanego, tylko on może edytować (nawet admin nie omija tego).
+  const ownerEditable = user ? canEditOwnerLocked(item, user.id) : true
 
   async function handleDuplicate() {
     setDuplicateError(null)
@@ -204,7 +211,8 @@ function ItemDetailPanel({
 
       {(item.itemType === "part" || item.itemType === "assembly") && (
         <div className="mt-2">
-          <StatusControl item={item} onChanged={onItemsRefetch} />
+          <StatusControl item={item} disabled={!ownerEditable} onChanged={onItemsRefetch} />
+          <OwnerControl item={item} onChanged={onItemsRefetch} />
         </div>
       )}
 
@@ -257,7 +265,8 @@ function ItemDetailPanel({
         <PropertyEditor
           itemId={item.id}
           properties={item.properties}
-          locked={isLocked(item)}
+          locked={isLocked(item) || !ownerEditable}
+          lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
           onChanged={onItemsRefetch}
         />
       )}
@@ -312,6 +321,7 @@ function ItemDetailPanel({
                         onSelectChild={onSelectChild}
                         onItemsRefetch={onItemsRefetch}
                         setBomError={setBomError}
+                        disabled={!ownerEditable}
                       />
                     ))}
                   </SortableContext>
@@ -364,7 +374,12 @@ function ItemDetailPanel({
       {(item.itemType === "part" || item.itemType === "assembly" || item.itemType === "file") && (
         <>
           <SectionLabel>{t("item.attachments")}</SectionLabel>
-          <AttachmentsPanel itemId={item.id} locked={isLocked(item)} onChanged={onItemsRefetch} />
+          <AttachmentsPanel
+            itemId={item.id}
+            locked={isLocked(item) || !ownerEditable}
+            lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
+            onChanged={onItemsRefetch}
+          />
         </>
       )}
     </div>
@@ -383,6 +398,7 @@ function SortableBomRow({
   onSelectChild,
   onItemsRefetch,
   setBomError,
+  disabled = false,
 }: {
   parentId: string
   child: Item
@@ -392,10 +408,12 @@ function SortableBomRow({
   onSelectChild?: (id: string) => void
   onItemsRefetch: () => void | Promise<void>
   setBomError: (message: string | null) => void
+  disabled?: boolean
 }) {
   const { t } = useLanguage()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: child.id,
+    disabled,
   })
 
   return (
@@ -410,7 +428,11 @@ function SortableBomRow({
             <span
               {...attributes}
               {...listeners}
-              className="cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
+              className={
+                disabled
+                  ? "text-muted-foreground/30"
+                  : "cursor-grab touch-none text-muted-foreground/50 hover:text-muted-foreground active:cursor-grabbing"
+              }
               aria-label={t("item.dragToReorderAria")}
             >
               <GripVertical className="size-3.5" />
@@ -421,6 +443,7 @@ function SortableBomRow({
               position={position}
               onChanged={onItemsRefetch}
               onError={setBomError}
+              disabled={disabled}
             />
           </div>
         </TableCell>
@@ -443,6 +466,7 @@ function SortableBomRow({
             childId={child.id}
             quantity={quantity}
             onChanged={onItemsRefetch}
+            disabled={disabled}
           />
         </TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "material")}</TableCell>
@@ -493,11 +517,13 @@ function BomQuantityCell({
   childId,
   quantity,
   onChanged,
+  disabled = false,
 }: {
   parentId: string
   childId: string
   quantity: number
   onChanged: () => void | Promise<void>
+  disabled?: boolean
 }) {
   const initial = String(quantity)
   const [value, setValue] = useState(initial)
@@ -519,6 +545,7 @@ function BomQuantityCell({
       type="text"
       inputMode="decimal"
       value={value}
+      disabled={disabled}
       onChange={(e) => setValue(e.target.value)}
       onBlur={save}
       onKeyDown={(e) => {
@@ -537,12 +564,14 @@ function BomPositionCell({
   position,
   onChanged,
   onError,
+  disabled = false,
 }: {
   parentId: string
   childId: string
   position: number
   onChanged: () => void | Promise<void>
   onError: (message: string | null) => void
+  disabled?: boolean
 }) {
   const { t } = useLanguage()
   const initial = String(position)
@@ -572,6 +601,7 @@ function BomPositionCell({
       type="text"
       inputMode="numeric"
       value={value}
+      disabled={disabled}
       onChange={(e) => setValue(e.target.value)}
       onBlur={save}
       onKeyDown={(e) => {

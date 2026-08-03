@@ -48,6 +48,7 @@ app.Use(async (context, next) =>
 app.MapAuthEndpoints(connectionString);
 app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
+app.MapProjectAccessEndpoints(connectionString);
 app.MapItemEndpoints(connectionString, storage);
 app.MapTagEndpoints(connectionString);
 app.MapPropertyEndpoints(connectionString);

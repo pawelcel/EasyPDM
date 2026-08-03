@@ -137,6 +137,7 @@ function AddNodeDialog({
           manufactured: t("part.kindManufactured"),
           purchased: t("part.kindPurchased"),
           standard: t("part.kindStandard"),
+          client: t("part.kindClient"),
         })
       )
       return
@@ -326,6 +327,14 @@ function AddNodeDialog({
                 onClick={() => setRodzaj("Normalia")}
               >
                 {t("part.kindStandard")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={rodzaj === "Klienta" ? "default" : "outline"}
+                onClick={() => setRodzaj("Klienta")}
+              >
+                {t("part.kindClient")}
               </Button>
             </div>
             <Label htmlFor="node-name">{t("common.name")}</Label>

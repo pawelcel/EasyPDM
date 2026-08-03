@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useAuth } from "@/features/auth/use-auth"
+import { ProjectAccessView } from "@/features/users/project-access-view"
 import { useUsers } from "@/features/users/use-users"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -63,7 +64,7 @@ function UsersView() {
   const resettingUser = users.find((u) => u.id === resettingId)
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-4xl">
       <h2 className="mb-4 text-lg font-semibold tracking-tight">{t("settings.users")}</h2>
 
       <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
@@ -125,6 +126,8 @@ function UsersView() {
         ) : (
           <Hint>{t("users.empty")}</Hint>
         )}
+
+        <ProjectAccessView users={users} />
       </div>
 
       {deletingUser && (

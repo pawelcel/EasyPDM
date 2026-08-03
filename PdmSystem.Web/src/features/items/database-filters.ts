@@ -10,7 +10,7 @@ export interface DatabaseFilters {
 }
 
 const RECORD_TYPES: RecordType[] = ["all", "project", "part", "assembly", "other"]
-const PART_KINDS: PartKindFilter[] = ["all", "Zakupowa", "Wykonywana", "Normalia"]
+const PART_KINDS: PartKindFilter[] = ["all", "Zakupowa", "Wykonywana", "Normalia", "Klienta"]
 
 // Filtry zapisane wcześniej trzymane są jako luźno typowany JSONB (Record<string, unknown>
 // po stronie API) — ta funkcja broni się przed nieoczekiwanym/przestarzałym kształtem (np.

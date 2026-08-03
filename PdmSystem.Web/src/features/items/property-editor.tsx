@@ -12,11 +12,13 @@ function PropertyEditor({
   itemId,
   properties,
   locked = false,
+  lockedHint,
   onChanged,
 }: {
   itemId: string
   properties: Record<string, unknown>
   locked?: boolean
+  lockedHint?: string
   onChanged: () => void
 }) {
   const { t } = useLanguage()
@@ -45,7 +47,7 @@ function PropertyEditor({
 
   return (
     <div>
-      {locked && <Hint>{t("item.propertiesLockedHint")}</Hint>}
+      {locked && <Hint>{lockedHint ?? t("item.propertiesLockedHint")}</Hint>}
 
       {entries.length > 0 ? (
         <Table>
