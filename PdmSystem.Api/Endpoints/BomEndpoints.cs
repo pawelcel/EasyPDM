@@ -13,13 +13,16 @@ static class BomEndpoints
         // GET /api/items/{id}/bom — zagłębione (depth >= 2) wpisy BOM-u tego elementu,
         // do dołączenia na ekranie pod bezpośrednimi dziećmi (te dziś obsługuje
         // tree.childrenOf po stronie frontendu — nie duplikujemy ich tutaj).
-        app.MapGet("/api/items/{id:guid}/bom", async (Guid id) =>
+        app.MapGet("/api/items/{id:guid}/bom", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            if (!await ItemExists(conn, id))
+            var projectId = await GetProjectId(conn, id);
+            if (projectId is null)
                 return Results.NotFound();
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId.Value))
+                return ItemEndpoints.ProjectAccessForbidden();
 
             var rows = await FetchBomRowsAsync(conn, id);
             var result = rows
@@ -41,13 +44,16 @@ static class BomEndpoints
         // GET /api/items/{id}/bom/csv — pełny (depth >= 1), zagłębiony BOM jako CSV
         // do pobrania (średnik jako separator + BOM UTF-8, żeby polski Excel otwierał
         // to poprawnie).
-        app.MapGet("/api/items/{id:guid}/bom/csv", async (Guid id) =>
+        app.MapGet("/api/items/{id:guid}/bom/csv", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            if (!await ItemExists(conn, id))
+            var projectId = await GetProjectId(conn, id);
+            if (projectId is null)
                 return Results.NotFound();
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId.Value))
+                return ItemEndpoints.ProjectAccessForbidden();
 
             var rows = await FetchBomRowsAsync(conn, id);
 
@@ -81,13 +87,16 @@ static class BomEndpoints
         // złożenia, różne poziomy) daje JEDEN wiersz z łączną ilością. Ilość jest "rozwinięta"
         // przez cały łańcuch (extended_quantity = iloczyn quantity na ścieżce od @id) — np.
         // złożenie użyte 2x, a w nim część 3x, liczy się jako 6 sztuk tej części łącznie.
-        app.MapGet("/api/items/{id:guid}/bom/aggregated-csv", async (Guid id) =>
+        app.MapGet("/api/items/{id:guid}/bom/aggregated-csv", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            if (!await ItemExists(conn, id))
+            var projectId = await GetProjectId(conn, id);
+            if (projectId is null)
                 return Results.NotFound();
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId.Value))
+                return ItemEndpoints.ProjectAccessForbidden();
 
             var rows = await FetchBomRowsAsync(conn, id);
             var aggregated = rows
@@ -126,11 +135,12 @@ static class BomEndpoints
         });
     }
 
-    private static async Task<bool> ItemExists(NpgsqlConnection conn, Guid id)
+    private static async Task<Guid?> GetProjectId(NpgsqlConnection conn, Guid id)
     {
-        await using var cmd = new NpgsqlCommand("SELECT 1 FROM items WHERE id = @id;", conn);
+        await using var cmd = new NpgsqlCommand("SELECT project_id FROM items WHERE id = @id;", conn);
         cmd.Parameters.AddWithValue("id", id);
-        return await cmd.ExecuteScalarAsync() is not null;
+        var result = await cmd.ExecuteScalarAsync();
+        return result is null ? null : (Guid)result;
     }
 
     private static async Task<string> GetItemLabel(NpgsqlConnection conn, Guid id)

@@ -140,6 +140,30 @@ export interface RevisionComment {
   createdAt: string
 }
 
+// Historia Części/Złożenia (do panelu "Historia") — kilka rodzajów wpisów połączonych
+// przez backend w jedną chronologiczną listę: utworzenie elementu, zmiana statusu,
+// rewizja z komentarzem, dodanie/usunięcie załącznika, zablokowanie/zwolnienie właściciela.
+// Pola nieistotne dla danego "type" przychodzą jako null.
+export type HistoryEventType =
+  | "created"
+  | "status"
+  | "revision"
+  | "attachment_added"
+  | "attachment_removed"
+  | "owner_locked"
+  | "owner_released"
+
+export interface HistoryEntry {
+  type: HistoryEventType
+  at: string
+  userDisplayName: string | null
+  fromStatus: ItemStatus | null
+  toStatus: ItemStatus | null
+  revisionNumber: number | null
+  comment: string | null
+  fileName: string | null
+}
+
 export interface ItemRelation {
   parentId: string
   childId: string

@@ -10,7 +10,7 @@ static class ItemEndpoints
         //   file        — wymagany, sam plik
         //   properties  — opcjonalny, JSON np. {"material":"Stal S235"}
         //   parentId    — opcjonalny, guid — jeśli podany, plik od razu trafia jako podelement w drzewku
-        app.MapPost("/api/projects/{projectId:guid}/items", async (Guid projectId, HttpRequest request) =>
+        app.MapPost("/api/projects/{projectId:guid}/items", async (Guid projectId, HttpRequest request, HttpContext ctx) =>
         {
             if (!request.HasFormContentType)
                 return Results.BadRequest("Oczekiwano danych multipart/form-data.");
@@ -37,6 +37,9 @@ static class ItemEndpoints
                 if (await checkCmd.ExecuteScalarAsync() is null)
                     return Results.NotFound("Projekt nie istnieje.");
             }
+
+            if (!await HasProjectAccessAsync(conn, ctx, projectId))
+                return ProjectAccessForbidden();
 
             if (parentId is not null)
             {
@@ -145,16 +148,10 @@ static class ItemEndpoints
                     return Results.NotFound("Projekt nie istnieje.");
             }
 
+            if (!await HasProjectAccessAsync(conn, ctx, projectId))
+                return ProjectAccessForbidden();
+
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            if (user.Role != "admin")
-            {
-                await using var accessCmd = new NpgsqlCommand(
-                    "SELECT 1 FROM project_users WHERE project_id = @projectId AND user_id = @userId;", conn);
-                accessCmd.Parameters.AddWithValue("projectId", projectId);
-                accessCmd.Parameters.AddWithValue("userId", user.Id);
-                if (await accessCmd.ExecuteScalarAsync() is null)
-                    return Results.Text("Brak dostępu do tego projektu.", statusCode: StatusCodes.Status403Forbidden);
-            }
 
             if (body.ParentId is not null)
             {
@@ -169,7 +166,7 @@ static class ItemEndpoints
             var propertiesJson = body.Properties.HasValue ? body.Properties.Value.GetRawText() : "{}";
 
             const string insertSql = """
-                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position, owner_id, owner_locked)
+                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by)
                 VALUES (
                     @id, @projectId, @itemType, @name, @props::jsonb,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN nextval('item_number_seq') ELSE NULL END,
@@ -178,7 +175,8 @@ static class ItemEndpoints
                     now(),
                     COALESCE((SELECT MAX(root_position) FROM items WHERE project_id = @projectId), 0) + 1,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN @ownerId ELSE NULL END,
-                    @itemType IN ('part', 'assembly')
+                    @itemType IN ('part', 'assembly'),
+                    @ownerId
                 )
                 RETURNING item_number;
                 """;
@@ -244,6 +242,10 @@ static class ItemEndpoints
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
             await using var tx = await conn.BeginTransactionAsync();
 
             var newId = Guid.NewGuid();
@@ -325,24 +327,33 @@ static class ItemEndpoints
         });
 
         // GET /api/items/{id}/file — pobranie/podgląd samego pliku.
-        app.MapGet("/api/items/{id:guid}/file", async (Guid id) =>
+        app.MapGet("/api/items/{id:guid}/file", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            const string sql = "SELECT file_path, file_name FROM items WHERE id = @id;";
+            const string sql = "SELECT file_path, file_name, project_id FROM items WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
 
-            await using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync())
-                return Results.NotFound();
+            string? path;
+            string fileName;
+            Guid projectId;
+            await using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                if (!await reader.ReadAsync())
+                    return Results.NotFound();
 
-            if (reader.IsDBNull(0))
-                return Results.BadRequest("Ten element nie ma przypisanego pliku.");
+                if (reader.IsDBNull(0))
+                    return Results.BadRequest("Ten element nie ma przypisanego pliku.");
 
-            var path = reader.GetString(0);
-            var fileName = reader.GetString(1);
+                path = reader.GetString(0);
+                fileName = reader.GetString(1);
+                projectId = reader.GetGuid(2);
+            }
+
+            if (!await HasProjectAccessAsync(conn, ctx, projectId))
+                return ProjectAccessForbidden();
 
             if (!File.Exists(path))
                 return Results.NotFound("Plik zniknął z magazynu na dysku serwera.");
@@ -439,7 +450,7 @@ static class ItemEndpoints
         // GET /api/items/{id}
         // Szczegóły pojedynczego elementu.
         // ============================================================
-        app.MapGet("/api/items/{id:guid}", async (Guid id) =>
+        app.MapGet("/api/items/{id:guid}", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -456,32 +467,40 @@ static class ItemEndpoints
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
 
-            await using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync())
-                return Results.NotFound();
+            Dictionary<string, object?> result;
+            Guid projectId;
+            await using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                if (!await reader.ReadAsync())
+                    return Results.NotFound();
+
+                projectId = reader.GetGuid(1);
+                result = new Dictionary<string, object?>
+                {
+                    ["id"] = reader.GetGuid(0),
+                    ["projectId"] = projectId,
+                    ["fileName"] = reader.GetString(2),
+                    ["fileType"] = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    ["filePath"] = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    ["properties"] = JsonDocument.Parse(reader.GetFieldValue<string>(5)).RootElement,
+                    ["modifiedAt"] = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                    ["itemType"] = reader.GetString(7),
+                    ["itemNumber"] = reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                    ["showInTree"] = reader.GetBoolean(9),
+                    ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
+                    ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
+                    ["rootPosition"] = reader.GetInt32(12),
+                    ["ownerId"] = reader.IsDBNull(13) ? null : reader.GetGuid(13),
+                    ["ownerLocked"] = reader.GetBoolean(14),
+                    ["ownerDisplayName"] = reader.IsDBNull(15) ? null : reader.GetString(15),
+                };
+            }
+
+            if (!await HasProjectAccessAsync(conn, ctx, projectId))
+                return ProjectAccessForbidden();
 
             var tagsByItem = await LoadTagsForItems(connectionString, new List<Guid> { id });
-
-            var result = new Dictionary<string, object?>
-            {
-                ["id"] = reader.GetGuid(0),
-                ["projectId"] = reader.GetGuid(1),
-                ["fileName"] = reader.GetString(2),
-                ["fileType"] = reader.IsDBNull(3) ? null : reader.GetString(3),
-                ["filePath"] = reader.IsDBNull(4) ? null : reader.GetString(4),
-                ["properties"] = JsonDocument.Parse(reader.GetFieldValue<string>(5)).RootElement,
-                ["modifiedAt"] = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
-                ["itemType"] = reader.GetString(7),
-                ["itemNumber"] = reader.IsDBNull(8) ? null : reader.GetInt32(8),
-                ["showInTree"] = reader.GetBoolean(9),
-                ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
-                ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
-                ["rootPosition"] = reader.GetInt32(12),
-                ["ownerId"] = reader.IsDBNull(13) ? null : reader.GetGuid(13),
-                ["ownerLocked"] = reader.GetBoolean(14),
-                ["ownerDisplayName"] = reader.IsDBNull(15) ? null : reader.GetString(15),
-                ["tags"] = tagsByItem.TryGetValue(id, out var t) ? t : new List<string>()
-            };
+            result["tags"] = tagsByItem.TryGetValue(id, out var t) ? t : new List<string>();
 
             return Results.Ok(result);
         });
@@ -505,6 +524,9 @@ static class ItemEndpoints
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
 
             const string sql = "UPDATE items SET file_name = @name WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -560,6 +582,9 @@ static class ItemEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
             // Wydany element nie może mieć właściciela ani być zablokowany — zawsze jest zwolniony
             // (patrz też /lock i /release, które odrzucają próby zmiany blokady w tym statusie).
             string sql = bumpRevision
@@ -581,15 +606,32 @@ static class ItemEndpoints
             if (bumpRevision && revisionNumber is not null && !string.IsNullOrWhiteSpace(body.Comment))
             {
                 const string commentSql = """
-                    INSERT INTO item_revision_comments (item_id, revision_number, comment)
-                    VALUES (@itemId, @revisionNumber, @comment)
-                    ON CONFLICT (item_id, revision_number) DO UPDATE SET comment = EXCLUDED.comment, created_at = now();
+                    INSERT INTO item_revision_comments (item_id, revision_number, comment, created_by)
+                    VALUES (@itemId, @revisionNumber, @comment, @userId)
+                    ON CONFLICT (item_id, revision_number) DO UPDATE SET comment = EXCLUDED.comment, created_at = now(), created_by = EXCLUDED.created_by;
                     """;
                 await using var commentCmd = new NpgsqlCommand(commentSql, conn);
                 commentCmd.Parameters.AddWithValue("itemId", id);
                 commentCmd.Parameters.AddWithValue("revisionNumber", revisionNumber.Value);
                 commentCmd.Parameters.AddWithValue("comment", body.Comment!.Trim());
+                commentCmd.Parameters.AddWithValue("userId", user.Id);
                 await commentCmd.ExecuteNonQueryAsync();
+            }
+
+            // Historia (do panelu "Historia") — tylko rzeczywista zmiana, nie zapisujemy
+            // wywołań, które nadają ten sam status, co już jest ustawiony.
+            if (body.Status != currentStatus)
+            {
+                const string historySql = """
+                    INSERT INTO item_status_history (item_id, from_status, to_status, changed_by)
+                    VALUES (@itemId, @fromStatus, @toStatus, @userId);
+                    """;
+                await using var historyCmd = new NpgsqlCommand(historySql, conn);
+                historyCmd.Parameters.AddWithValue("itemId", id);
+                historyCmd.Parameters.AddWithValue("fromStatus", (object?)currentStatus ?? DBNull.Value);
+                historyCmd.Parameters.AddWithValue("toStatus", body.Status);
+                historyCmd.Parameters.AddWithValue("userId", user.Id);
+                await historyCmd.ExecuteNonQueryAsync();
             }
 
             return Results.Ok(new { status = body.Status, revisionNumber });
@@ -618,11 +660,16 @@ static class ItemEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
             const string sql = "UPDATE items SET owner_id = @ownerId, owner_locked = true WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("ownerId", user.Id);
             await cmd.ExecuteNonQueryAsync();
+
+            await LogOwnerHistoryAsync(conn, id, "locked", user.Id);
 
             return Results.Ok(new { ownerId = user.Id, ownerLocked = true });
         });
@@ -651,6 +698,9 @@ static class ItemEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
             // Zwolniony element nie ma właściciela — i tak może go edytować każdy, więc nie ma
             // sensu pamiętać, kto ostatnio go blokował. Nowego właściciela nadaje dopiero
             // kolejne "Zablokuj" (patrz endpoint /lock powyżej).
@@ -659,15 +709,24 @@ static class ItemEndpoints
             cmd.Parameters.AddWithValue("id", id);
             await cmd.ExecuteNonQueryAsync();
 
+            await LogOwnerHistoryAsync(conn, id, "released", user.Id);
+
             return Results.Ok(new { ownerId = (Guid?)null, ownerLocked = false });
         });
 
         // GET /api/items/{id}/revisions — historia komentarzy rewizji (tylko te, które mają
         // komentarz — rewizje bez komentarza nie mają tu wpisu).
-        app.MapGet("/api/items/{id:guid}/revisions", async (Guid id) =>
+        app.MapGet("/api/items/{id:guid}/revisions", async (Guid id, HttpContext ctx) =>
         {
+            var info = await GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
 
             const string sql = """
                 SELECT revision_number, comment, created_at
@@ -708,6 +767,9 @@ static class ItemEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
             const string sql = "UPDATE items SET show_in_tree = @value WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
@@ -734,12 +796,18 @@ static class ItemEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
             await using (var checkCmd = new NpgsqlCommand("SELECT 1 FROM projects WHERE id = @projectId;", conn))
             {
                 checkCmd.Parameters.AddWithValue("projectId", body.ProjectId);
                 if (await checkCmd.ExecuteScalarAsync() is null)
                     return Results.NotFound("Projekt docelowy nie istnieje.");
             }
+
+            if (!await HasProjectAccessAsync(conn, ctx, body.ProjectId))
+                return ProjectAccessForbidden();
 
             const string sql = "UPDATE items SET project_id = @projectId, show_in_tree = true WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -838,12 +906,12 @@ static class ItemEndpoints
         _ => false
     };
 
-    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked)?> GetItemTypeAndStatus(string connectionString, Guid id)
+    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked, Guid ProjectId)?> GetItemTypeAndStatus(string connectionString, Guid id)
     {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync();
 
-        const string sql = "SELECT item_type, status, owner_id, owner_locked FROM items WHERE id = @id;";
+        const string sql = "SELECT item_type, status, owner_id, owner_locked, project_id FROM items WHERE id = @id;";
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("id", id);
 
@@ -855,9 +923,29 @@ static class ItemEndpoints
             reader.GetString(0),
             reader.IsDBNull(1) ? null : reader.GetString(1),
             reader.IsDBNull(2) ? null : reader.GetGuid(2),
-            reader.GetBoolean(3)
+            reader.GetBoolean(3),
+            reader.GetGuid(4)
         );
     }
+
+    // Wspólne dla wszystkich endpointów operujących na elemencie/projekcie po ID — zwykły
+    // użytkownik musi być przypisany do projektu (project_users), administrator zawsze ma
+    // dostęp. Używane zarówno dla odczytu, jak i mutacji — nieprzypisany użytkownik nie
+    // powinien móc ani przeglądać, ani zmieniać niczego w projekcie, którego nie widzi.
+    internal static async Task<bool> HasProjectAccessAsync(NpgsqlConnection conn, HttpContext ctx, Guid projectId)
+    {
+        var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+        if (user.Role == "admin") return true;
+
+        await using var cmd = new NpgsqlCommand(
+            "SELECT 1 FROM project_users WHERE project_id = @projectId AND user_id = @userId;", conn);
+        cmd.Parameters.AddWithValue("projectId", projectId);
+        cmd.Parameters.AddWithValue("userId", user.Id);
+        return await cmd.ExecuteScalarAsync() is not null;
+    }
+
+    internal static IResult ProjectAccessForbidden() =>
+        Results.Text("Brak dostępu do tego projektu.", statusCode: StatusCodes.Status403Forbidden);
 
     // Właściciel (Właściciel/owner_id + owner_locked) — NIEZALEŻNE od statusu 'w_pracy'/IsLocked
     // powyżej. Dopóki element jest zablokowany, tylko owner_id może go edytować — nawet
@@ -871,6 +959,21 @@ static class ItemEndpoints
         "Ten element jest zablokowany przez innego użytkownika — tylko właściciel może go edytować.",
         statusCode: StatusCodes.Status403Forbidden);
 
+    // Wpis do panelu "Historia" — kto i kiedy zablokował (przejął na własność) albo zwolnił
+    // element (patrz /lock i /release powyżej).
+    private static async Task LogOwnerHistoryAsync(NpgsqlConnection conn, Guid itemId, string action, Guid userId)
+    {
+        const string sql = """
+            INSERT INTO item_owner_history (item_id, action, user_id)
+            VALUES (@itemId, @action, @userId);
+            """;
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("itemId", itemId);
+        cmd.Parameters.AddWithValue("action", action);
+        cmd.Parameters.AddWithValue("userId", userId);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
     // Wspólny insert dla duplikowania — używany zarówno przy wstawianiu kopii "zaraz pod
     // oryginałem" (rootPosition podany explicite) jak i przy zwykłym dopisaniu na koniec listy
     // korzeni projektu (rootPosition = null, wyliczane tu jako MAX+1).
@@ -881,11 +984,11 @@ static class ItemEndpoints
         // od razu, tak samo jak przy ręcznym tworzeniu Części/Złożenia; nie dziedziczy właściciela
         // oryginału.
         const string sql = """
-            INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position, owner_id, owner_locked)
+            INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by)
             SELECT @newId, src.project_id, src.item_type, src.file_name || ' (kopia)', src.properties,
                    nextval('item_number_seq'), 'w_pracy', 1, now(),
                    COALESCE(@rootPosition, (SELECT COALESCE(MAX(root_position), 0) + 1 FROM items WHERE project_id = src.project_id)),
-                   @ownerId, true
+                   @ownerId, true, @ownerId
             FROM items src
             WHERE src.id = @sourceId
             RETURNING item_number;

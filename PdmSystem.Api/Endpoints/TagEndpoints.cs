@@ -24,15 +24,22 @@ static class TagEndpoints
         // ============================================================
         // POST /api/items/{id}/tags   body: { "name": "do-przegladu" }
         // ============================================================
-        app.MapPost("/api/items/{id:guid}/tags", async (Guid id, TagRequest body) =>
+        app.MapPost("/api/items/{id:guid}/tags", async (Guid id, TagRequest body, HttpContext ctx) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest("Nazwa tagu nie może być pusta.");
+
+            var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
 
             var name = body.Name.Trim();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = """
                 INSERT INTO tags (name) VALUES (@name)
@@ -58,10 +65,17 @@ static class TagEndpoints
         // ============================================================
         // DELETE /api/items/{id}/tags/{tagName}
         // ============================================================
-        app.MapDelete("/api/items/{id:guid}/tags/{tagName}", async (Guid id, string tagName) =>
+        app.MapDelete("/api/items/{id:guid}/tags/{tagName}", async (Guid id, string tagName, HttpContext ctx) =>
         {
+            var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = """
                 DELETE FROM item_tags

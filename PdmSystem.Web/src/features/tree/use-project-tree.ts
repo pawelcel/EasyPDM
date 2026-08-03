@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { api } from "@/api/client"
 import type { Item, ItemRelation } from "@/api/types"
@@ -7,10 +7,14 @@ export function useProjectTree(projectId: string) {
   const [items, setItems] = useState<Item[]>([])
   const [relations, setRelations] = useState<ItemRelation[]>([])
   const [loading, setLoading] = useState(true)
+  // Tylko PIERWSZE wczytanie tego projektu ma pokazywać "loading" (drzewko puste/nieznane).
+  // Odświeżenia wywołane np. zapisaniem właściwości elementu mają zostawić stare drzewko
+  // widoczne, aż przyjdą nowe dane — inaczej drzewko migałoby na pusto przy każdej edycji.
+  const loadedProjectIdRef = useRef<string | null>(null)
 
   const refetch = useCallback(async () => {
     if (!projectId) return
-    setLoading(true)
+    if (loadedProjectIdRef.current !== projectId) setLoading(true)
     try {
       // Pobieramy WSZYSTKIE elementy (nie tylko z tego projektu) — Część/Złożenie może być
       // podpięte jako współdzielony komponent pod złożeniem w innym projekcie, więc do
@@ -22,6 +26,7 @@ export function useProjectTree(projectId: string) {
       ])
       setItems(allItems)
       setRelations(nextRelations)
+      loadedProjectIdRef.current = projectId
     } finally {
       setLoading(false)
     }

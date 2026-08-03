@@ -9,6 +9,7 @@ import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
+import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { useLanguage } from "@/i18n/use-language"
 
 type ProjectForm = {
@@ -81,14 +82,22 @@ function ProjectDetailPanel({
 
   return (
     <div>
-      <div className="mb-1 flex items-start justify-between gap-2">
-        <div className="text-[15px] font-semibold">{project.name}</div>
-        <div className="flex shrink-0 gap-1.5">
+      <div className="mb-3 flex flex-col gap-1.5 border-b pb-3">
+        <div className="flex gap-1.5">
           {onNavigateToProject && (
             <Button size="sm" variant="outline" onClick={onNavigateToProject}>
               {t("project.goToProject")}
             </Button>
           )}
+          <DocumentationDialog
+            trigger={
+              <Button size="sm" variant="outline">
+                {t("documentation.button")}
+              </Button>
+            }
+            fetchExtensions={() => api.getProjectDocumentationExtensions(project.id)}
+            buildDownloadUrl={(extensions) => api.projectDocumentationUrl(project.id, extensions)}
+          />
           {isAdmin && (
             <Button size="sm" variant="destructive" onClick={() => setConfirmingDelete(true)}>
               {t("project.deleteButton")}
@@ -96,6 +105,8 @@ function ProjectDetailPanel({
           )}
         </div>
       </div>
+
+      <div className="text-[15px] font-semibold">{project.name}</div>
       <div className="text-[12.5px] text-muted-foreground">
         {t("project.subtitle", {
           date: created,

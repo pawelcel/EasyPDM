@@ -67,15 +67,13 @@ CREATE TABLE items (
     modified_at         TIMESTAMPTZ,
     last_scanned_at     TIMESTAMPTZ,            -- zostaje na przyszłość: wypełni to skaner/wtyczka CAD, nie wypełniane przy ręcznym dodaniu
     properties          JSONB DEFAULT '{}',
-    current_revision_id UUID,                   -- FK dodane niżej (cykliczna referencja)
-    checked_out_by      UUID REFERENCES users(id),
-    checked_out_at      TIMESTAMPTZ,
     show_in_tree        BOOLEAN NOT NULL DEFAULT true,  -- dla elementów bez rodzica: czy pokazywać jako korzeń w drzewku
     status              TEXT CHECK (status IN ('w_pracy', 'sprawdzany', 'wydany')),  -- tylko dla part/assembly
     revision_number     INTEGER,                    -- tylko dla part/assembly, rośnie przy przejściu wydany -> w_pracy
     root_position       INTEGER NOT NULL DEFAULT 1,  -- kolejność wśród korzeni tego samego projektu (przeciąganie w drzewku)
     owner_id            UUID REFERENCES users(id) ON DELETE SET NULL,  -- właściciel part/assembly — patrz owner_locked
-    owner_locked        BOOLEAN NOT NULL DEFAULT false  -- gdy true, tylko owner_id może edytować (nawet admin nie omija)
+    owner_locked        BOOLEAN NOT NULL DEFAULT false,  -- gdy true, tylko owner_id może edytować (nawet admin nie omija)
+    created_by          UUID REFERENCES users(id) ON DELETE SET NULL  -- kto utworzył element (niezmienne, w odróżnieniu od owner_id)
 );
 
 CREATE SEQUENCE item_number_seq START 1;
@@ -84,57 +82,6 @@ GRANT USAGE, SELECT ON SEQUENCE item_number_seq TO pdm_user;
 CREATE INDEX idx_items_properties ON items USING GIN (properties);
 CREATE INDEX idx_items_file_type ON items (file_type);
 CREATE INDEX idx_items_project ON items (project_id);
-
--- ============================================================
--- Rewizje
--- ============================================================
-CREATE TYPE item_status AS ENUM ('w_pracy', 'w_rewizji', 'zwolniony');
-
-CREATE TABLE item_revisions (
-    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_id        UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    revision_label TEXT NOT NULL,
-    status         item_status NOT NULL DEFAULT 'w_pracy',
-    file_hash      TEXT,
-    snapshot_path  TEXT,
-    comment        TEXT,
-    created_by     UUID REFERENCES users(id),
-    created_at     TIMESTAMPTZ DEFAULT now(),
-    UNIQUE (item_id, revision_label)
-);
-
-ALTER TABLE items
-    ADD CONSTRAINT fk_items_current_revision
-    FOREIGN KEY (current_revision_id) REFERENCES item_revisions(id);
-
--- ============================================================
--- Historia checkout/checkin (audyt)
--- ============================================================
-CREATE TABLE checkout_history (
-    id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_id                UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    user_id                UUID NOT NULL REFERENCES users(id),
-    checked_out_at         TIMESTAMPTZ NOT NULL,
-    checked_in_at          TIMESTAMPTZ,
-    resulting_revision_id  UUID REFERENCES item_revisions(id)
-);
-
--- ============================================================
--- Definicje właściwości (opcjonalne, dla porządku/walidacji)
--- ============================================================
-CREATE TABLE property_definitions (
-    key          TEXT PRIMARY KEY,
-    display_name TEXT NOT NULL,
-    data_type    TEXT NOT NULL,   -- text, number, enum, date
-    enum_values  TEXT[]
-);
-
--- Kilka przykładowych definicji na start
-INSERT INTO property_definitions (key, display_name, data_type, enum_values) VALUES
-    ('material', 'Materiał', 'enum', ARRAY['Stal S235', 'Stal nierdzewna 304', 'Aluminium 6061', 'Tworzywo POM']),
-    ('mass', 'Masa [kg]', 'number', NULL),
-    ('supplier', 'Dostawca', 'text', NULL),
-    ('rodzaj', 'Rodzaj', 'enum', ARRAY['Zakupowa', 'Wykonywana']);
 
 -- ============================================================
 -- Tagi
@@ -217,8 +164,52 @@ CREATE TABLE item_revision_comments (
     revision_number INTEGER NOT NULL,
     comment         TEXT NOT NULL,
     created_at      TIMESTAMPTZ DEFAULT now(),
+    created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
     PRIMARY KEY (item_id, revision_number)
 );
+
+-- ============================================================
+-- Historia zmian statusu Części/Złożenia (kto/kiedy/z-na) — razem z created_by na items
+-- i item_revision_comments daje pełną historię wyświetlaną na dole panelu właściwości.
+-- ============================================================
+CREATE TABLE item_status_history (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id     UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    from_status TEXT,
+    to_status   TEXT NOT NULL,
+    changed_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+    changed_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_item_status_history_item ON item_status_history (item_id);
+GRANT SELECT, INSERT ON item_status_history TO pdm_user;
+
+-- Historia dodawania/usuwania załączników — osobna tabela, bo usunięty załącznik znika
+-- z item_attachments, więc samo to nie wystarczy do zachowania śladu kto/kiedy go usunął.
+CREATE TABLE item_attachment_history (
+    id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id   UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL,
+    action    TEXT NOT NULL CHECK (action IN ('added', 'removed')),
+    user_id   UUID REFERENCES users(id) ON DELETE SET NULL,
+    at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_item_attachment_history_item ON item_attachment_history (item_id);
+GRANT SELECT, INSERT ON item_attachment_history TO pdm_user;
+
+-- Historia blokady/zwolnienia właściciela — kto i kiedy zablokował (przejął na własność)
+-- albo zwolnił element.
+CREATE TABLE item_owner_history (
+    id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    action  TEXT NOT NULL CHECK (action IN ('locked', 'released')),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_item_owner_history_item ON item_owner_history (item_id);
+GRANT SELECT, INSERT ON item_owner_history TO pdm_user;
 
 -- ============================================================
 -- Zapisane filtry widoku "Cała baza" — każdy użytkownik zapisuje własne zestawy filtrów

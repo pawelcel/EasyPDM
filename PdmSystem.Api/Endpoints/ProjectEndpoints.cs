@@ -42,7 +42,7 @@ static class ProjectEndpoints
         // POST /api/projects   body: { name, description?, client?, startDate?, endDate? }
         app.MapPost("/api/projects", async (HttpContext ctx, ProjectRequest body) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest("Nazwa projektu nie może być pusta.");
@@ -77,7 +77,7 @@ static class ProjectEndpoints
         // PATCH /api/projects/{id}   body: { name, description?, client?, startDate?, endDate? }
         app.MapPatch("/api/projects/{id:guid}", async (Guid id, HttpContext ctx, ProjectRequest body) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest("Nazwa projektu nie może być pusta.");
@@ -125,7 +125,7 @@ static class ProjectEndpoints
         // ani tam (znane, istniejące ograniczenie, nie nowe).
         app.MapDelete("/api/projects/{id:guid}", async (Guid id, HttpContext ctx) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
@@ -167,8 +167,6 @@ static class ProjectEndpoints
         createdAt = reader.GetDateTime(6),
         itemCount = itemCount ?? reader.GetInt64(7)
     };
-
-    private static bool IsAdmin(HttpContext ctx) => (ctx.Items["CurrentUser"] as CurrentUser)?.Role == "admin";
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }

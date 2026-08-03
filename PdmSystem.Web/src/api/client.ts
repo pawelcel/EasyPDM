@@ -2,6 +2,7 @@ import type {
   Attachment,
   BomEntry,
   CurrentUser,
+  HistoryEntry,
   Item,
   ItemRelation,
   ItemStatus,
@@ -182,6 +183,9 @@ export const api = {
   getRevisionComments: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/revisions`).then((r) => handleResponse<RevisionComment[]>(r)),
 
+  getItemHistory: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/history`).then((r) => handleResponse<HistoryEntry[]>(r)),
+
   lockItem: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/lock`, { method: "POST" }).then((r) =>
       handleResponse<{ ownerId: string; ownerLocked: boolean }>(r)
@@ -258,6 +262,18 @@ export const api = {
   bomCsvUrl: (itemId: string) => `${BASE}/items/${itemId}/bom/csv`,
 
   bomAggregatedCsvUrl: (itemId: string) => `${BASE}/items/${itemId}/bom/aggregated-csv`,
+
+  getItemDocumentationExtensions: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/documentation/extensions`).then((r) => handleResponse<string[]>(r)),
+
+  itemDocumentationUrl: (itemId: string, extensions: string[]) =>
+    `${BASE}/items/${itemId}/documentation?${extensions.map((e) => `ext=${encodeURIComponent(e)}`).join("&")}`,
+
+  getProjectDocumentationExtensions: (projectId: string) =>
+    fetch(`${BASE}/projects/${projectId}/documentation/extensions`).then((r) => handleResponse<string[]>(r)),
+
+  projectDocumentationUrl: (projectId: string, extensions: string[]) =>
+    `${BASE}/projects/${projectId}/documentation?${extensions.map((e) => `ext=${encodeURIComponent(e)}`).join("&")}`,
 
   getMaterials: () => fetch(`${BASE}/materials`).then((r) => handleResponse<Material[]>(r)),
 

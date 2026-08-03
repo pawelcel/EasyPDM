@@ -38,6 +38,9 @@ static class PropertyEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             const string sql = """
                 UPDATE items SET properties = properties || @props::jsonb
                 WHERE id = @id;
@@ -69,6 +72,9 @@ static class PropertyEndpoints
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = "UPDATE items SET properties = properties - @key WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);

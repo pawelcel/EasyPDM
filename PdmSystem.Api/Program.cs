@@ -54,6 +54,8 @@ app.MapTagEndpoints(connectionString);
 app.MapPropertyEndpoints(connectionString);
 app.MapStructureEndpoints(connectionString);
 app.MapBomEndpoints(connectionString);
+app.MapDocumentationEndpoints(connectionString);
+app.MapHistoryEndpoints(connectionString);
 app.MapMaterialEndpoints(connectionString);
 app.MapManufacturerEndpoints(connectionString);
 app.MapSavedFilterEndpoints(connectionString);
