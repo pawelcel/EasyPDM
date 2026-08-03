@@ -1,0 +1,105 @@
+using Npgsql;
+
+// Tło sprawdzające co minutę, czy nadszedł czas na automatyczną kopię zapasową wg
+// harmonogramu w tabeli backup_schedule (Ustawienia -> Magazyn plików -> Automatyczna
+// kopia). Kopia trafia do osobnego katalogu (BackupRoot) jako ZIP — ta sama zawartość
+// co ręczne GET /api/settings/backup, tylko zapisana na dysku zamiast wysłana do
+// przeglądarki. Stare automatyczne kopie ponad limit (schedule.RetentionCount, ustawiany
+// w Ustawieniach) są kasowane, żeby katalog nie rósł bez końca.
+class ScheduledBackupService(
+    string connectionString, StorageSettings storage, string backupRoot, ILogger logger)
+{
+    // Uruchamiane ręcznie z Program.cs (nie przez DI/IHostedService — "app" jest tam budowane
+    // przed rejestracją jakichkolwiek usług), z tokenem powiązanym z zamykaniem aplikacji
+    // (app.Lifetime.ApplicationStopping).
+    public async Task RunAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await CheckAndRunAsync(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Automatyczna kopia zapasowa: nieoczekiwany błąd podczas sprawdzania harmonogramu.");
+            }
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    private async Task CheckAndRunAsync(CancellationToken stoppingToken)
+    {
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync(stoppingToken);
+
+        var schedule = await SettingsEndpoints.GetBackupScheduleAsync(conn);
+        if (!schedule.Enabled)
+            return;
+
+        var now = DateTime.Now;
+
+        // Niezależnie od częstotliwości: nie uruchamiaj drugi raz tego samego dnia (jedno
+        // uruchomienie dziennie to i tak najczęstszy dopuszczalny wybór — "codziennie").
+        if (schedule.LastRunAt is not null && schedule.LastRunAt.Value.Date == now.Date)
+            return;
+
+        if (now.Hour != schedule.Hour || now.Minute != schedule.Minute)
+            return;
+
+        var dueToday = schedule.Frequency switch
+        {
+            "daily" => true,
+            "weekly" => (int)now.DayOfWeek == schedule.DayOfWeek,
+            "monthly" => now.Day == Math.Min(schedule.DayOfMonth ?? 1, DateTime.DaysInMonth(now.Year, now.Month)),
+            _ => false
+        };
+        if (!dueToday)
+            return;
+
+        logger.LogInformation("Automatyczna kopia zapasowa: uruchamiam ({Frequency}).", schedule.Frequency);
+        try
+        {
+            var bytes = await SettingsEndpoints.CreateBackupZipAsync(connectionString, storage);
+
+            Directory.CreateDirectory(backupRoot);
+            var fileName = $"pdm-auto-backup-{now:yyyy-MM-dd_HHmm}.zip";
+            await File.WriteAllBytesAsync(Path.Combine(backupRoot, fileName), bytes, stoppingToken);
+
+            PruneOldBackups(schedule.RetentionCount);
+
+            const string sql = "UPDATE backup_schedule SET last_run_at = @now WHERE id = true;";
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("now", now);
+            await cmd.ExecuteNonQueryAsync(stoppingToken);
+
+            logger.LogInformation("Automatyczna kopia zapasowa: zapisano {FileName}.", fileName);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Automatyczna kopia zapasowa: nie udało się jej wykonać.");
+        }
+    }
+
+    private void PruneOldBackups(int retentionCount)
+    {
+        if (!Directory.Exists(backupRoot))
+            return;
+
+        var files = Directory.GetFiles(backupRoot, "pdm-auto-backup-*.zip")
+            .OrderByDescending(f => f)
+            .Skip(retentionCount);
+
+        foreach (var file in files)
+        {
+            try { File.Delete(file); } catch (IOException) { }
+        }
+    }
+}

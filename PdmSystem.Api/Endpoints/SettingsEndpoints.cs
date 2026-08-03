@@ -98,67 +98,71 @@ static class SettingsEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
-            var tempDir = Path.Combine(Path.GetTempPath(), $"pdm_backup_{Guid.NewGuid():N}");
-            Directory.CreateDirectory(tempDir);
+            byte[] bytes;
             try
             {
-                var dumpPath = Path.Combine(tempDir, "database.dump");
-                var csb = new NpgsqlConnectionStringBuilder(connectionString);
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "pg_dump",
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                };
-                psi.ArgumentList.Add("-h");
-                psi.ArgumentList.Add(csb.Host ?? "localhost");
-                psi.ArgumentList.Add("-p");
-                psi.ArgumentList.Add((csb.Port == 0 ? 5432 : csb.Port).ToString());
-                psi.ArgumentList.Add("-U");
-                psi.ArgumentList.Add(csb.Username ?? "");
-                psi.ArgumentList.Add("-d");
-                psi.ArgumentList.Add(csb.Database ?? "");
-                psi.ArgumentList.Add("-F");
-                psi.ArgumentList.Add("c");
-                // --no-owner: kto odtworzy bazę (patrz pg_restore niżej) i tak będzie
-                // właścicielem nowo tworzonych tabel. GRANT-y (np. dla pdm_user) NIE są tu
-                // pomijane — to nie są uprawnienia domyślne, więc bez nich po restore appka
-                // straciłaby dostęp do własnych tabel.
-                psi.ArgumentList.Add("--no-owner");
-                psi.ArgumentList.Add("-f");
-                psi.ArgumentList.Add(dumpPath);
-                psi.Environment["PGPASSWORD"] = csb.Password ?? "";
-
-                using var process = Process.Start(psi)
-                    ?? throw new InvalidOperationException("Nie udało się uruchomić pg_dump.");
-                var stderr = await process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
-                if (process.ExitCode != 0)
-                    return Results.Problem($"pg_dump zakończył się błędem: {stderr}");
-
-                var zipPath = Path.Combine(tempDir, "backup.zip");
-                using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
-                {
-                    zip.CreateEntryFromFile(dumpPath, "database.dump");
-                    if (Directory.Exists(storage.Path))
-                    {
-                        foreach (var file in Directory.EnumerateFiles(storage.Path, "*", SearchOption.AllDirectories))
-                        {
-                            var relative = Path.GetRelativePath(storage.Path, file).Replace('\\', '/');
-                            zip.CreateEntryFromFile(file, $"storage/{relative}");
-                        }
-                    }
-                }
-
-                var bytes = await File.ReadAllBytesAsync(zipPath);
-                var fileName = $"pdm-backup-{DateTime.Now:yyyy-MM-dd_HHmm}.zip";
-                return Results.File(bytes, "application/zip", fileName);
+                bytes = await CreateBackupZipAsync(connectionString, storage);
             }
-            finally
+            catch (BackupFailedException ex)
             {
-                try { Directory.Delete(tempDir, recursive: true); } catch (IOException) { }
+                return Results.Problem(ex.Message);
             }
+
+            var fileName = $"pdm-backup-{DateTime.Now:yyyy-MM-dd_HHmm}.zip";
+            return Results.File(bytes, "application/zip", fileName);
+        });
+
+        // GET /api/settings/backup-schedule — bieżący harmonogram automatycznej kopii zapasowej.
+        app.MapGet("/api/settings/backup-schedule", async (HttpContext ctx) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            return Results.Ok(await GetBackupScheduleAsync(conn));
+        });
+
+        // PATCH /api/settings/backup-schedule   body: { enabled, frequency, dayOfWeek, dayOfMonth, hour, minute }
+        app.MapPatch("/api/settings/backup-schedule", async (HttpContext ctx, BackupScheduleRequest body) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            if (body.Frequency != "daily" && body.Frequency != "weekly" && body.Frequency != "monthly")
+                return Results.BadRequest("Nieprawidłowa częstotliwość — dozwolone: 'daily', 'weekly', 'monthly'.");
+            if (body.Frequency == "weekly" && (body.DayOfWeek is null || body.DayOfWeek is < 0 or > 6))
+                return Results.BadRequest("Dla częstotliwości 'weekly' wymagany jest 'dayOfWeek' w zakresie 0-6.");
+            if (body.Frequency == "monthly" && (body.DayOfMonth is null || body.DayOfMonth is < 1 or > 31))
+                return Results.BadRequest("Dla częstotliwości 'monthly' wymagany jest 'dayOfMonth' w zakresie 1-31.");
+            if (body.Hour is < 0 or > 23)
+                return Results.BadRequest("Godzina musi być w zakresie 0-23.");
+            if (body.Minute is < 0 or > 59)
+                return Results.BadRequest("Minuta musi być w zakresie 0-59.");
+            if (body.RetentionCount is < 1 or > 365)
+                return Results.BadRequest("Liczba przechowywanych kopii musi być w zakresie 1-365.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string sql = """
+                UPDATE backup_schedule SET
+                    enabled = @enabled, frequency = @frequency,
+                    day_of_week = @dayOfWeek, day_of_month = @dayOfMonth,
+                    hour = @hour, minute = @minute, retention_count = @retentionCount
+                WHERE id = true;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("enabled", body.Enabled);
+            cmd.Parameters.AddWithValue("frequency", body.Frequency);
+            cmd.Parameters.AddWithValue("dayOfWeek", (object?)body.DayOfWeek ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("dayOfMonth", (object?)body.DayOfMonth ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("hour", body.Hour);
+            cmd.Parameters.AddWithValue("minute", body.Minute);
+            cmd.Parameters.AddWithValue("retentionCount", body.RetentionCount);
+            await cmd.ExecuteNonQueryAsync();
+
+            return Results.Ok(await GetBackupScheduleAsync(conn));
         });
 
         // POST /api/settings/restore   multipart/form-data: file (ZIP z GET /settings/backup)
@@ -268,6 +272,92 @@ static class SettingsEndpoints
         });
     }
 
+    // Wspólna logika pg_dump + spakowanie magazynu plików w ZIP — używana zarówno przez
+    // GET /api/settings/backup (pobranie ręczne, zwraca do przeglądarki), jak i przez
+    // ScheduledBackupService (kopia automatyczna wg harmonogramu, zapisywana na dysku).
+    internal static async Task<byte[]> CreateBackupZipAsync(string connectionString, StorageSettings storage)
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"pdm_backup_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var dumpPath = Path.Combine(tempDir, "database.dump");
+            var csb = new NpgsqlConnectionStringBuilder(connectionString);
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "pg_dump",
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            psi.ArgumentList.Add("-h");
+            psi.ArgumentList.Add(csb.Host ?? "localhost");
+            psi.ArgumentList.Add("-p");
+            psi.ArgumentList.Add((csb.Port == 0 ? 5432 : csb.Port).ToString());
+            psi.ArgumentList.Add("-U");
+            psi.ArgumentList.Add(csb.Username ?? "");
+            psi.ArgumentList.Add("-d");
+            psi.ArgumentList.Add(csb.Database ?? "");
+            psi.ArgumentList.Add("-F");
+            psi.ArgumentList.Add("c");
+            // --no-owner: kto odtworzy bazę (patrz pg_restore niżej) i tak będzie
+            // właścicielem nowo tworzonych tabel. GRANT-y (np. dla pdm_user) NIE są tu
+            // pomijane — to nie są uprawnienia domyślne, więc bez nich po restore appka
+            // straciłaby dostęp do własnych tabel.
+            psi.ArgumentList.Add("--no-owner");
+            psi.ArgumentList.Add("-f");
+            psi.ArgumentList.Add(dumpPath);
+            psi.Environment["PGPASSWORD"] = csb.Password ?? "";
+
+            using var process = Process.Start(psi)
+                ?? throw new InvalidOperationException("Nie udało się uruchomić pg_dump.");
+            var stderr = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0)
+                throw new BackupFailedException($"pg_dump zakończył się błędem: {stderr}");
+
+            var zipPath = Path.Combine(tempDir, "backup.zip");
+            using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+            {
+                zip.CreateEntryFromFile(dumpPath, "database.dump");
+                if (Directory.Exists(storage.Path))
+                {
+                    foreach (var file in Directory.EnumerateFiles(storage.Path, "*", SearchOption.AllDirectories))
+                    {
+                        var relative = Path.GetRelativePath(storage.Path, file).Replace('\\', '/');
+                        zip.CreateEntryFromFile(file, $"storage/{relative}");
+                    }
+                }
+            }
+
+            return await File.ReadAllBytesAsync(zipPath);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    internal static async Task<BackupSchedule> GetBackupScheduleAsync(NpgsqlConnection conn)
+    {
+        const string sql = """
+            SELECT enabled, frequency, day_of_week, day_of_month, hour, minute, last_run_at, retention_count
+            FROM backup_schedule WHERE id = true;
+            """;
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        await reader.ReadAsync();
+        return new BackupSchedule(
+            Enabled: reader.GetBoolean(0),
+            Frequency: reader.GetString(1),
+            DayOfWeek: reader.IsDBNull(2) ? null : reader.GetInt32(2),
+            DayOfMonth: reader.IsDBNull(3) ? null : reader.GetInt32(3),
+            Hour: reader.GetInt32(4),
+            Minute: reader.GetInt32(5),
+            LastRunAt: reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+            RetentionCount: reader.GetInt32(7));
+    }
+
     private static int CopyDirectoryRecursive(string sourceDir, string destDir)
     {
         var count = 0;
@@ -321,4 +411,15 @@ static class SettingsEndpoints
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }
 
+// Rzucany, gdy samo pg_dump zawiedzie (odróżniony od zwykłych wyjątków I/O, żeby
+// GET /api/settings/backup mógł zwrócić Results.Problem zamiast 500 z nieczytelnym stosem).
+class BackupFailedException(string message) : Exception(message);
+
 record MoveStorageRequest(string NewPath, bool MigrateExisting);
+
+record BackupSchedule(
+    bool Enabled, string Frequency, int? DayOfWeek, int? DayOfMonth, int Hour, int Minute, DateTime? LastRunAt,
+    int RetentionCount);
+
+record BackupScheduleRequest(
+    bool Enabled, string Frequency, int? DayOfWeek, int? DayOfMonth, int Hour, int Minute, int RetentionCount);

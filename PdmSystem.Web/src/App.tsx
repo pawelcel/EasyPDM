@@ -17,6 +17,7 @@ import { MaterialsView } from "@/features/materials/materials-view"
 import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
 import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
 import { LanguageSettingsView } from "@/features/settings/language-settings-view"
+import { LogsView } from "@/features/settings/logs-view"
 import { MyProjectsView } from "@/features/settings/my-projects-view"
 import { SettingsSidebar } from "@/features/settings/settings-sidebar"
 import { StorageSettingsView } from "@/features/settings/storage-settings-view"
@@ -69,7 +70,7 @@ function App() {
   // Ustawienia (Wygląd/Język) — gdyby zwykły użytkownik trafił tu z domyślnym
   // settingsSection="users", zamiast tego lądował na ekranie "Brak uprawnień".
   useEffect(() => {
-    if (!isAdmin && (settingsSection === "users" || settingsSection === "storage")) {
+    if (!isAdmin && (settingsSection === "users" || settingsSection === "storage" || settingsSection === "logs")) {
       setSettingsSection("appearance")
     }
   }, [isAdmin, settingsSection])
@@ -223,6 +224,10 @@ function App() {
           {view === "settings" &&
             settingsSection === "storage" &&
             (isAdmin ? <StorageSettingsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
+
+          {view === "settings" &&
+            settingsSection === "logs" &&
+            (isAdmin ? <LogsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
 
           {view === "settings" && settingsSection === "appearance" && <AppearanceSettingsView />}
 

@@ -211,6 +211,28 @@ CREATE TABLE item_owner_history (
 CREATE INDEX idx_item_owner_history_item ON item_owner_history (item_id);
 GRANT SELECT, INSERT ON item_owner_history TO pdm_user;
 
+-- Harmonogram automatycznej kopii zapasowej (Ustawienia -> Magazyn plików). Jeden
+-- wiersz-singleton wymuszony przez "id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id)".
+CREATE TABLE backup_schedule (
+    id            BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+    enabled       BOOLEAN NOT NULL DEFAULT false,
+    frequency     TEXT NOT NULL DEFAULT 'daily' CHECK (frequency IN ('daily', 'weekly', 'monthly')),
+    -- 0 = niedziela .. 6 = sobota (System.DayOfWeek), używane tylko gdy frequency = 'weekly'.
+    day_of_week   INT CHECK (day_of_week BETWEEN 0 AND 6),
+    -- 1..31, używane tylko gdy frequency = 'monthly'; w krótszych miesiącach przycinane do
+    -- ostatniego dnia miesiąca.
+    day_of_month  INT CHECK (day_of_month BETWEEN 1 AND 31),
+    hour          INT NOT NULL DEFAULT 2 CHECK (hour BETWEEN 0 AND 23),
+    minute        INT NOT NULL DEFAULT 0 CHECK (minute BETWEEN 0 AND 59),
+    last_run_at   TIMESTAMPTZ,
+    -- Ile ostatnich automatycznych kopii trzymać w katalogu backups/ — starsze są kasowane.
+    retention_count INT NOT NULL DEFAULT 14 CHECK (retention_count BETWEEN 1 AND 365)
+);
+
+INSERT INTO backup_schedule (id, day_of_week, day_of_month) VALUES (true, 0, 1);
+
+GRANT SELECT, INSERT, UPDATE ON backup_schedule TO pdm_user;
+
 -- ============================================================
 -- Zapisane filtry widoku "Cała baza" — każdy użytkownik zapisuje własne zestawy filtrów
 -- (wyszukiwanie, tag, typ rekordu, rodzaj części, producent) pod wybraną nazwą; zapis pod

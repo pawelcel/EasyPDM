@@ -227,6 +227,32 @@ export interface StorageInfo {
   totalSizeBytes: number
 }
 
+export interface LogFile {
+  date: string
+  sizeBytes: number
+}
+
+export interface LogContent {
+  lines: string[]
+  totalLines: number
+  truncated: boolean
+}
+
+export type BackupFrequency = "daily" | "weekly" | "monthly"
+
+export interface BackupSchedule {
+  enabled: boolean
+  frequency: BackupFrequency
+  // 0 = niedziela .. 6 = sobota, tylko dla frequency === "weekly".
+  dayOfWeek: number | null
+  // 1-31, tylko dla frequency === "monthly".
+  dayOfMonth: number | null
+  hour: number
+  minute: number
+  lastRunAt: string | null
+  retentionCount: number
+}
+
 // Zapisany zestaw filtrów widoku "Cała baza" — prywatny dla każdego użytkownika (serwer
 // zawsze bierze user_id z sesji, nigdy z ciała żądania). "filters" trzymane luźno — dokładny
 // kształt narzuca DatabaseFilters we features/items/database-filters.ts.

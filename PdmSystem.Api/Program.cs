@@ -16,6 +16,22 @@ Directory.CreateDirectory(storageRoot);
 var storage = new StorageSettings(storageRoot);
 string appSettingsPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.json");
 
+// Katalog na automatyczne kopie zapasowe (Ustawienia -> Magazyn plików -> Automatyczna kopia)
+// — celowo NIEZALEŻNY od StorageRoot: gdyby leżał wewnątrz magazynu plików, każda kolejna
+// automatyczna kopia pakowałaby też wszystkie poprzednie kopie (rosnąca w nieskończoność
+// zawartość ZIP-a) i zniekształcałaby statystyki plików pokazywane w Ustawieniach.
+string backupRoot = app.Configuration["BackupRoot"] ?? "backups";
+if (!Path.IsPathRooted(backupRoot))
+    backupRoot = Path.Combine(AppContext.BaseDirectory, backupRoot);
+
+// Katalog na logi programu (Ustawienia -> Logi). Podpięty pod ILoggerFactory od razu na
+// starcie, żeby przechwycić też komunikaty z samego rozruchu (np. EnsureDefaultAdminAsync
+// poniżej, komunikaty Microsoft.Hosting.Lifetime).
+string logRoot = app.Configuration["LogRoot"] ?? "logs";
+if (!Path.IsPathRooted(logRoot))
+    logRoot = Path.Combine(AppContext.BaseDirectory, logRoot);
+app.Services.GetRequiredService<ILoggerFactory>().AddProvider(new FileLoggerProvider(logRoot));
+
 await EnsureDefaultAdminAsync(connectionString);
 
 // Serwuje wwwroot/index.html pod adresem "/" oraz zbudowany frontend.
@@ -62,6 +78,12 @@ app.MapSavedFilterEndpoints(connectionString);
 app.MapAttachmentEndpoints(connectionString, storage);
 app.MapConfigEndpoints(storage);
 app.MapSettingsEndpoints(connectionString, storage, appSettingsPath);
+app.MapLogEndpoints(logRoot);
+
+// Bez rejestracji w DI (patrz komentarz w ScheduledBackupService.cs) — uruchamiane ręcznie,
+// z tokenem powiązanym z zamykaniem aplikacji, żeby pętla zatrzymała się razem z serwerem.
+_ = new ScheduledBackupService(connectionString, storage, backupRoot, app.Logger)
+    .RunAsync(app.Lifetime.ApplicationStopping);
 
 app.Run();
 
