@@ -64,12 +64,15 @@ static class StructureEndpoints
             if (!ItemEndpoints.IsChildTypeAllowed(parentInfo.Value.ItemType, childInfo.Value.ItemType))
                 return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
 
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, parentInfo.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
 
             // Zapobiega cyklowi: odrzuć, jeśli parentId jest już potomkiem childId
             // (czyli dodanie tej krawędzi zamknęłoby pętlę w strukturze).
@@ -122,12 +125,16 @@ static class StructureEndpoints
             var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
             if (parentInfo is null)
                 return Results.NotFound("Element nadrzędny nie istnieje.");
-            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
-                return ItemEndpoints.OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, parentInfo.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
 
             await using (var checkCmd = new NpgsqlCommand(
                 "SELECT 1 FROM item_relations WHERE parent_id = @parentId AND child_id != @childId AND position = @position;", conn))
@@ -157,12 +164,17 @@ static class StructureEndpoints
             var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
             if (parentInfo is null)
                 return Results.NotFound("Element nadrzędny nie istnieje.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, parentInfo.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
 
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
             await using var tx = await conn.BeginTransactionAsync();
 
             var existingIds = new List<Guid>();
@@ -202,12 +214,16 @@ static class StructureEndpoints
             var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
             if (parentInfo is null)
                 return Results.NotFound("Element nadrzędny nie istnieje.");
-            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
-                return ItemEndpoints.OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, parentInfo.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
 
             const string sql = "DELETE FROM item_relations WHERE parent_id = @parentId AND child_id = @childId;";
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -222,10 +238,14 @@ static class StructureEndpoints
         // To samo co /children/reorder, ale dla elementów bez rodzica (korzeni drzewka
         // w danym projekcie) — te nie mają wpisu w item_relations, więc kolejność trzyma
         // osobna kolumna items.root_position, przenumerowywana tu na 1..N.
-        app.MapPatch("/api/projects/{projectId:guid}/roots/reorder", async (Guid projectId, RootReorderRequest body) =>
+        app.MapPatch("/api/projects/{projectId:guid}/roots/reorder", async (Guid projectId, RootReorderRequest body, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             await using var tx = await conn.BeginTransactionAsync();
 
             var existingIds = new List<Guid>();

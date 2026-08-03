@@ -152,6 +152,10 @@ static class AuthEndpoints
 
         return new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3));
     }
+
+    // Współdzielone przez wszystkie endpointy, które chcą sprawdzić "czy to admin" — zamiast
+    // każdy plik miał swoją własną kopię tej samej jednolinijkowej metody.
+    public static bool IsAdmin(HttpContext ctx) => (ctx.Items["CurrentUser"] as CurrentUser)?.Role == "admin";
 }
 
 record CurrentUser(Guid Id, string Username, string DisplayName, string Role);

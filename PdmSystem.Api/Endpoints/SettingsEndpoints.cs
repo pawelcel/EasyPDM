@@ -14,7 +14,7 @@ static class SettingsEndpoints
         // GET /api/settings/storage — bieżąca lokalizacja magazynu + podstawowe statystyki.
         app.MapGet("/api/settings/storage", (HttpContext ctx) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             var path = storage.Path;
@@ -41,7 +41,7 @@ static class SettingsEndpoints
         // sukcesie kasuje stare pliki.
         app.MapPost("/api/settings/storage/move", async (HttpContext ctx, MoveStorageRequest body) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             if (string.IsNullOrWhiteSpace(body.NewPath))
@@ -95,7 +95,7 @@ static class SettingsEndpoints
         // GET /api/settings/backup — pg_dump bazy + magazyn plików spakowane w jeden ZIP.
         app.MapGet("/api/settings/backup", async (HttpContext ctx) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             var tempDir = Path.Combine(Path.GetTempPath(), $"pdm_backup_{Guid.NewGuid():N}");
@@ -169,7 +169,7 @@ static class SettingsEndpoints
         // dostały świeże połączenia zamiast (potencjalnie nieaktualnych) z cache'u.
         app.MapPost("/api/settings/restore", async (HttpContext ctx, HttpRequest request) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             if (!request.HasFormContentType)
@@ -317,8 +317,6 @@ static class SettingsEndpoints
         node["StorageRoot"] = newPath;
         await File.WriteAllTextAsync(appSettingsPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
-
-    private static bool IsAdmin(HttpContext ctx) => (ctx.Items["CurrentUser"] as CurrentUser)?.Role == "admin";
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }

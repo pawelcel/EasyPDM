@@ -34,6 +34,8 @@ import { AddNodeDialog } from "@/features/items/add-node-dialog"
 import { AddTagRow } from "@/features/tags/add-tag-row"
 import { AttachmentsPanel } from "@/features/items/attachments-panel"
 import { useAuth } from "@/features/auth/use-auth"
+import { DocumentationDialog } from "@/features/items/documentation-dialog"
+import { ItemHistoryPanel } from "@/features/items/item-history-panel"
 import { OwnerControl } from "@/features/items/owner-control"
 import { PartPropertyForm } from "@/features/items/part-property-form"
 import { PropertyEditor } from "@/features/items/property-editor"
@@ -78,15 +80,27 @@ function ItemDetailPanel({
 }) {
   const { t } = useLanguage()
   const { user } = useAuth()
-  const [duplicateError, setDuplicateError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const canDuplicate =
     (item.itemType === "part" || item.itemType === "assembly") && onDuplicated !== undefined
+  const canDownloadDocumentation = item.itemType === "part" || item.itemType === "assembly"
   // Niezależne od isLocked (status 'w_pracy') — dopóki właściciel ma tego elementu
   // zablokowanego, tylko on może edytować (nawet admin nie omija tego).
   const ownerEditable = user ? canEditOwnerLocked(item, user.id) : true
 
+  // ItemHistoryPanel odświeża się sam tylko przy zmianie itemId (wejście w inny element) —
+  // akcje, które dopisują nowy wpis do historii (status, blokada/zwolnienie, właściwości,
+  // załączniki), NIE zmieniają itemId, więc same z siebie nie odświeżyłyby panelu historii.
+  // Ten licznik przekazywany jest do ItemHistoryPanel jako dodatkowa zależność, żeby po
+  // każdej takiej akcji faktycznie doczytał świeże dane zamiast czekać na ponowne zaznaczenie.
+  const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0)
+  async function refreshAfterAction() {
+    setHistoryRefreshSignal((n) => n + 1)
+    await onItemsRefetch()
+  }
+
   async function handleDuplicate() {
-    setDuplicateError(null)
+    setActionError(null)
     try {
       const { id: newItemId } = await api.duplicateItem(
         item.id,
@@ -97,7 +111,20 @@ function ItemDetailPanel({
       await onItemsRefetch()
       await onDuplicated?.(newItemId)
     } catch (err) {
-      setDuplicateError(err instanceof Error ? err.message : t("item.duplicateFailed"))
+      setActionError(err instanceof Error ? err.message : t("item.duplicateFailed"))
+    }
+  }
+
+  // onRemoveFromStructure to funkcja przekazana z rodzica (project-tree-view.tsx) — jeśli
+  // backend ją odrzuci (np. element/rodzic zablokowany przez innego właściciela), rzuci
+  // błąd; łapiemy go tutaj, żeby przycisk nie "milczał" zamiast pokazać komunikat.
+  async function handleRemoveFromStructureClick() {
+    if (!onRemoveFromStructure) return
+    setActionError(null)
+    try {
+      await onRemoveFromStructure()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t("item.removeFromStructureFailed"))
     }
   }
   const attachedFiles = childEntries.filter((c) => c.item.itemType === "file").map((c) => c.item)
@@ -176,11 +203,11 @@ function ItemDetailPanel({
 
   return (
     <div>
-      {(onRemoveFromStructure || canDuplicate || onDeleteCompletely) && (
+      {(onRemoveFromStructure || canDuplicate || canDownloadDocumentation || onDeleteCompletely) && (
         <div className="mb-3 flex flex-col gap-1.5 border-b pb-3">
           <div className="flex gap-1.5">
             {onRemoveFromStructure && (
-              <Button size="sm" variant="outline" onClick={onRemoveFromStructure}>
+              <Button size="sm" variant="outline" onClick={handleRemoveFromStructureClick}>
                 {t("item.removeFromStructure")}
               </Button>
             )}
@@ -189,13 +216,24 @@ function ItemDetailPanel({
                 {t("item.duplicate")}
               </Button>
             )}
+            {canDownloadDocumentation && (
+              <DocumentationDialog
+                trigger={
+                  <Button size="sm" variant="outline">
+                    {t("documentation.button")}
+                  </Button>
+                }
+                fetchExtensions={() => api.getItemDocumentationExtensions(item.id)}
+                buildDownloadUrl={(extensions) => api.itemDocumentationUrl(item.id, extensions)}
+              />
+            )}
             {onDeleteCompletely && (
               <Button size="sm" variant="destructive" onClick={onDeleteCompletely}>
                 {t("item.deleteCompletely")}
               </Button>
             )}
           </div>
-          <FormError>{duplicateError}</FormError>
+          <FormError>{actionError}</FormError>
         </div>
       )}
 
@@ -211,8 +249,8 @@ function ItemDetailPanel({
 
       {(item.itemType === "part" || item.itemType === "assembly") && (
         <div className="mt-2">
-          <StatusControl item={item} disabled={!ownerEditable} onChanged={onItemsRefetch} />
-          <OwnerControl item={item} onChanged={onItemsRefetch} />
+          <StatusControl item={item} disabled={!ownerEditable} onChanged={refreshAfterAction} />
+          <OwnerControl item={item} onChanged={refreshAfterAction} />
         </div>
       )}
 
@@ -260,14 +298,14 @@ function ItemDetailPanel({
 
       <SectionLabel>{t("item.properties")}</SectionLabel>
       {item.itemType === "part" ? (
-        <PartPropertyForm item={item} onChanged={onItemsRefetch} />
+        <PartPropertyForm item={item} onChanged={refreshAfterAction} />
       ) : (
         <PropertyEditor
           itemId={item.id}
           properties={item.properties}
           locked={isLocked(item) || !ownerEditable}
           lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
-          onChanged={onItemsRefetch}
+          onChanged={refreshAfterAction}
         />
       )}
 
@@ -378,9 +416,13 @@ function ItemDetailPanel({
             itemId={item.id}
             locked={isLocked(item) || !ownerEditable}
             lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
-            onChanged={onItemsRefetch}
+            onChanged={refreshAfterAction}
           />
         </>
+      )}
+
+      {(item.itemType === "part" || item.itemType === "assembly") && (
+        <ItemHistoryPanel itemId={item.id} refreshSignal={historyRefreshSignal} />
       )}
     </div>
   )

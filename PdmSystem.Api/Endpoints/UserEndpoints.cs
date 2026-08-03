@@ -10,7 +10,7 @@ static class UserEndpoints
         // GET /api/users
         app.MapGet("/api/users", async (HttpContext ctx) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
@@ -39,7 +39,7 @@ static class UserEndpoints
         // POST /api/users   body: { username, password, displayName, email?, role }
         app.MapPost("/api/users", async (HttpContext ctx, CreateUserRequest body) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             if (string.IsNullOrWhiteSpace(body.Username))
@@ -82,7 +82,7 @@ static class UserEndpoints
         // PATCH /api/users/{id}   body: { displayName?, email?, role?, password? }
         app.MapPatch("/api/users/{id:guid}", async (Guid id, HttpContext ctx, UpdateUserRequest body) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (body.Role is not null && body.Role != "admin" && body.Role != "user")
                 return Results.BadRequest("Nieprawidłowa rola — dozwolone: 'admin', 'user'.");
@@ -119,7 +119,7 @@ static class UserEndpoints
         // DELETE /api/users/{id}
         app.MapDelete("/api/users/{id:guid}", async (Guid id, HttpContext ctx) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
@@ -135,8 +135,6 @@ static class UserEndpoints
             return affected == 0 ? Results.NotFound() : Results.Ok();
         });
     }
-
-    private static bool IsAdmin(HttpContext ctx) => (ctx.Items["CurrentUser"] as CurrentUser)?.Role == "admin";
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 

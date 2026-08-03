@@ -14,10 +14,17 @@ static class AttachmentEndpoints
     public static void MapAttachmentEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
     {
         // GET /api/items/{itemId}/attachments
-        app.MapGet("/api/items/{itemId:guid}/attachments", async (Guid itemId) =>
+        app.MapGet("/api/items/{itemId:guid}/attachments", async (Guid itemId, HttpContext ctx) =>
         {
+            var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
+            if (info is null)
+                return Results.NotFound();
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = """
                 SELECT id, file_name, file_size, uploaded_at
@@ -66,6 +73,12 @@ static class AttachmentEndpoints
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
 
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             var attachmentId = Guid.NewGuid();
             var extension = Path.GetExtension(file.FileName);
             var attachmentDir = Path.Combine(storage.Path, "attachments", itemId.ToString());
@@ -83,9 +96,6 @@ static class AttachmentEndpoints
             {
                 hash = Convert.ToHexString(await sha256.ComputeHashAsync(readStream));
             }
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
 
             const string insertSql = """
                 INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at)
@@ -107,6 +117,8 @@ static class AttachmentEndpoints
                 File.Delete(storedPath);
                 throw;
             }
+
+            await LogAttachmentHistoryAsync(conn, itemId, file.FileName, "added", user.Id);
 
             return Results.Created($"/api/attachments/{attachmentId}", new { id = attachmentId, fileName = file.FileName });
         });
@@ -149,6 +161,12 @@ static class AttachmentEndpoints
             if (!File.Exists(fullPath))
                 return Results.NotFound("Plik nie istnieje pod podaną ścieżką.");
 
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             var attachmentId = Guid.NewGuid();
             var fileName = Path.GetFileName(fullPath);
             var fileSize = new FileInfo(fullPath).Length;
@@ -159,9 +177,6 @@ static class AttachmentEndpoints
             {
                 hash = Convert.ToHexString(await sha256.ComputeHashAsync(readStream));
             }
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
 
             const string insertSql = """
                 INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at)
@@ -176,25 +191,39 @@ static class AttachmentEndpoints
             insertCmd.Parameters.AddWithValue("size", fileSize);
             await insertCmd.ExecuteNonQueryAsync();
 
+            await LogAttachmentHistoryAsync(conn, itemId, fileName, "added", user.Id);
+
             return Results.Created($"/api/attachments/{attachmentId}", new { id = attachmentId, fileName });
         });
 
         // GET /api/attachments/{id}/file — pobranie załącznika.
-        app.MapGet("/api/attachments/{id:guid}/file", async (Guid id) =>
+        app.MapGet("/api/attachments/{id:guid}/file", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            const string sql = "SELECT file_path, file_name FROM item_attachments WHERE id = @id;";
+            const string sql = """
+                SELECT ia.file_path, ia.file_name, i.project_id
+                FROM item_attachments ia JOIN items i ON i.id = ia.item_id
+                WHERE ia.id = @id;
+                """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
 
-            await using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync())
-                return Results.NotFound();
+            string path, fileName;
+            Guid projectId;
+            await using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                if (!await reader.ReadAsync())
+                    return Results.NotFound();
 
-            var path = reader.GetString(0);
-            var fileName = reader.GetString(1);
+                path = reader.GetString(0);
+                fileName = reader.GetString(1);
+                projectId = reader.GetGuid(2);
+            }
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId))
+                return ItemEndpoints.ProjectAccessForbidden();
 
             if (!File.Exists(path))
                 return Results.NotFound("Plik zniknął z magazynu na dysku serwera.");
@@ -209,9 +238,13 @@ static class AttachmentEndpoints
             await conn.OpenAsync();
 
             string? filePath = null;
+            Guid itemId;
+            string fileName;
+            Guid userId;
+            Guid projectId;
             await using (var selectCmd = new NpgsqlCommand(
                 """
-                SELECT ia.file_path, i.item_type, i.status, i.owner_id, i.owner_locked
+                SELECT ia.file_path, ia.item_id, ia.file_name, i.item_type, i.status, i.owner_id, i.owner_locked, i.project_id
                 FROM item_attachments ia JOIN items i ON i.id = ia.item_id WHERE ia.id = @id;
                 """, conn))
             {
@@ -221,17 +254,24 @@ static class AttachmentEndpoints
                     return Results.NotFound();
 
                 filePath = reader.GetString(0);
-                var itemType = reader.GetString(1);
-                var status = reader.IsDBNull(2) ? null : reader.GetString(2);
+                itemId = reader.GetGuid(1);
+                fileName = reader.GetString(2);
+                var itemType = reader.GetString(3);
+                var status = reader.IsDBNull(4) ? null : reader.GetString(4);
+                projectId = reader.GetGuid(7);
                 if (ItemEndpoints.IsLocked(itemType, status))
                     return Results.BadRequest("Załączniki można usuwać tylko w statusie 'W pracy'.");
 
-                var ownerId = reader.IsDBNull(3) ? (Guid?)null : reader.GetGuid(3);
-                var ownerLocked = reader.GetBoolean(4);
+                var ownerId = reader.IsDBNull(5) ? (Guid?)null : reader.GetGuid(5);
+                var ownerLocked = reader.GetBoolean(6);
                 var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+                userId = user.Id;
                 if (!ItemEndpoints.CanEditOwnerLocked(user.Id, ownerId, ownerLocked))
                     return ItemEndpoints.OwnerLockedForbidden();
             }
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId))
+                return ItemEndpoints.ProjectAccessForbidden();
 
             await using (var deleteCmd = new NpgsqlCommand("DELETE FROM item_attachments WHERE id = @id;", conn))
             {
@@ -239,10 +279,29 @@ static class AttachmentEndpoints
                 await deleteCmd.ExecuteNonQueryAsync();
             }
 
+            await LogAttachmentHistoryAsync(conn, itemId, fileName, "removed", userId);
+
             try { File.Delete(filePath); } catch (IOException) { /* magazyn i tak jest sierocy — nie blokujemy usunięcia rekordu */ }
 
             return Results.Ok();
         });
+    }
+
+    // Wpis do panelu "Historia" Części/Złożenia — osobna tabela, bo usunięty załącznik
+    // znika z item_attachments, więc samo to nie wystarczy do zachowania śladu kto/kiedy.
+    private static async Task LogAttachmentHistoryAsync(
+        NpgsqlConnection conn, Guid itemId, string fileName, string action, Guid userId)
+    {
+        const string sql = """
+            INSERT INTO item_attachment_history (item_id, file_name, action, user_id)
+            VALUES (@itemId, @fileName, @action, @userId);
+            """;
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("itemId", itemId);
+        cmd.Parameters.AddWithValue("fileName", fileName);
+        cmd.Parameters.AddWithValue("action", action);
+        cmd.Parameters.AddWithValue("userId", userId);
+        await cmd.ExecuteNonQueryAsync();
     }
 }
 

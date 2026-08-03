@@ -12,7 +12,7 @@ static class ProjectAccessEndpoints
         // użytkownicy po prawej) mogło przełączać zaznaczony projekt bez dodatkowych zapytań.
         app.MapGet("/api/project-users", async (HttpContext ctx) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
@@ -34,7 +34,7 @@ static class ProjectAccessEndpoints
         // POST /api/projects/{projectId}/users/{userId} — nadaje dostęp (idempotentne).
         app.MapPost("/api/projects/{projectId:guid}/users/{userId:guid}", async (Guid projectId, Guid userId, HttpContext ctx) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
@@ -56,7 +56,7 @@ static class ProjectAccessEndpoints
         // DELETE /api/projects/{projectId}/users/{userId} — odbiera dostęp.
         app.MapDelete("/api/projects/{projectId:guid}/users/{userId:guid}", async (Guid projectId, Guid userId, HttpContext ctx) =>
         {
-            if (!IsAdmin(ctx))
+            if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
@@ -71,8 +71,6 @@ static class ProjectAccessEndpoints
             return Results.Ok();
         });
     }
-
-    private static bool IsAdmin(HttpContext ctx) => (ctx.Items["CurrentUser"] as CurrentUser)?.Role == "admin";
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }
