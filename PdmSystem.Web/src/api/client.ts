@@ -1,5 +1,6 @@
 import type {
   Attachment,
+  BackupSchedule,
   BomEntry,
   CurrentUser,
   HistoryEntry,
@@ -7,6 +8,8 @@ import type {
   ItemRelation,
   ItemStatus,
   ItemType,
+  LogContent,
+  LogFile,
   ManagedUser,
   Manufacturer,
   ManufacturerDetail,
@@ -348,6 +351,16 @@ export const api = {
 
   backupUrl: () => `${BASE}/settings/backup`,
 
+  getBackupSchedule: () =>
+    fetch(`${BASE}/settings/backup-schedule`).then((r) => handleResponse<BackupSchedule>(r)),
+
+  updateBackupSchedule: (schedule: Omit<BackupSchedule, "lastRunAt">) =>
+    fetch(`${BASE}/settings/backup-schedule`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(schedule),
+    }).then((r) => handleResponse<BackupSchedule>(r)),
+
   restoreBackup: (file: File) => {
     const formData = new FormData()
     formData.append("file", file)
@@ -410,4 +423,13 @@ export const api = {
 
   deleteUser: (id: string) =>
     fetch(`${BASE}/users/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  getLogFiles: () => fetch(`${BASE}/settings/logs`).then((r) => handleResponse<LogFile[]>(r)),
+
+  getLogContent: (date: string, lines?: number) =>
+    fetch(`${BASE}/settings/logs/${date}${lines ? `?lines=${lines}` : ""}`).then((r) =>
+      handleResponse<LogContent>(r)
+    ),
+
+  logDownloadUrl: (date: string) => `${BASE}/settings/logs/${date}/download`,
 }

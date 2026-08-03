@@ -13,6 +13,7 @@ interface SettingsOption {
 const SETTINGS_OPTIONS: SettingsOption[] = [
   { id: "users", labelKey: "settings.users", adminOnly: true },
   { id: "storage", labelKey: "settings.storage", adminOnly: true },
+  { id: "logs", labelKey: "settings.logs", adminOnly: true },
   { id: "appearance", labelKey: "settings.appearance" },
   { id: "language", labelKey: "settings.language" },
 ]

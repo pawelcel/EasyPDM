@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import { api } from "@/api/client"
-import type { StorageInfo } from "@/api/types"
+import type { BackupFrequency, BackupSchedule, StorageInfo } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
@@ -16,8 +16,36 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { SectionLabel } from "@/components/ui/section-label"
+import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
+
+const FREQUENCY_OPTIONS: { value: BackupFrequency; labelKey: TranslationKey }[] = [
+  { value: "daily", labelKey: "backup.frequency.daily" },
+  { value: "weekly", labelKey: "backup.frequency.weekly" },
+  { value: "monthly", labelKey: "backup.frequency.monthly" },
+]
+
+const DAY_OF_WEEK_OPTIONS: { value: number; labelKey: TranslationKey }[] = [
+  { value: 1, labelKey: "backup.dayOfWeek.monday" },
+  { value: 2, labelKey: "backup.dayOfWeek.tuesday" },
+  { value: 3, labelKey: "backup.dayOfWeek.wednesday" },
+  { value: 4, labelKey: "backup.dayOfWeek.thursday" },
+  { value: 5, labelKey: "backup.dayOfWeek.friday" },
+  { value: 6, labelKey: "backup.dayOfWeek.saturday" },
+  { value: 0, labelKey: "backup.dayOfWeek.sunday" },
+]
+
+function pad2(n: number): string {
+  return n.toString().padStart(2, "0")
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -126,6 +154,8 @@ function StorageSettingsView() {
         </div>
 
         <RestoreSection />
+
+        <AutoBackupSection />
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={(next) => !moving && setConfirmOpen(next)}>
@@ -234,6 +264,176 @@ function RestoreSection() {
         onConfirm={performRestore}
         onCancel={() => setConfirmOpen(false)}
       />
+    </>
+  )
+}
+
+function AutoBackupSection() {
+  const { t } = useLanguage()
+  const [schedule, setSchedule] = useState<BackupSchedule | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    api.getBackupSchedule().then(setSchedule)
+  }, [])
+
+  async function save(next: BackupSchedule) {
+    setSchedule(next)
+    setSaving(true)
+    setError("")
+    setSaved(false)
+    try {
+      const result = await api.updateBackupSchedule(next)
+      setSchedule(result)
+      setSaved(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("backup.saveFailed"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!schedule) return null
+
+  const time = `${pad2(schedule.hour)}:${pad2(schedule.minute)}`
+
+  function updateTime(value: string) {
+    const [h, m] = value.split(":").map(Number)
+    if (Number.isNaN(h) || Number.isNaN(m)) return
+    save({ ...schedule!, hour: h, minute: m })
+  }
+
+  return (
+    <>
+      <SectionLabel>{t("backup.autoLabel")}</SectionLabel>
+      <div className="flex flex-col gap-3">
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={schedule.enabled}
+            onChange={(e) => save({ ...schedule, enabled: e.target.checked })}
+            disabled={saving}
+            className="size-3.5 shrink-0 accent-primary"
+          />
+          {t("backup.enableToggle")}
+        </label>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <Label>{t("backup.frequencyLabel")}</Label>
+            <Select
+              value={schedule.frequency}
+              onValueChange={(v) => {
+                const frequency = v as BackupFrequency
+                save({
+                  ...schedule,
+                  frequency,
+                  dayOfWeek: frequency === "weekly" ? (schedule.dayOfWeek ?? 1) : schedule.dayOfWeek,
+                  dayOfMonth: frequency === "monthly" ? (schedule.dayOfMonth ?? 1) : schedule.dayOfMonth,
+                })
+              }}
+            >
+              <SelectTrigger disabled={saving} className="min-w-36">
+                <SelectValue>
+                  {(v: string) =>
+                    t(FREQUENCY_OPTIONS.find((o) => o.value === v)!.labelKey)
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {FREQUENCY_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {t(o.labelKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {schedule.frequency === "weekly" && (
+            <div className="flex flex-col gap-1">
+              <Label>{t("backup.dayOfWeekLabel")}</Label>
+              <Select
+                value={String(schedule.dayOfWeek ?? 1)}
+                onValueChange={(v) => save({ ...schedule, dayOfWeek: Number(v) })}
+              >
+                <SelectTrigger disabled={saving} className="min-w-32">
+                  <SelectValue>
+                    {(v: string) =>
+                      t(DAY_OF_WEEK_OPTIONS.find((o) => o.value === Number(v))!.labelKey)
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {DAY_OF_WEEK_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={String(o.value)}>
+                      {t(o.labelKey)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {schedule.frequency === "monthly" && (
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="backup-day-of-month">{t("backup.dayOfMonthLabel")}</Label>
+              <Input
+                id="backup-day-of-month"
+                type="number"
+                min={1}
+                max={31}
+                value={schedule.dayOfMonth ?? 1}
+                disabled={saving}
+                className="w-20"
+                onChange={(e) => {
+                  const day = Number(e.target.value)
+                  if (day >= 1 && day <= 31) save({ ...schedule, dayOfMonth: day })
+                }}
+              />
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="backup-time">{t("backup.timeLabel")}</Label>
+            <Input
+              id="backup-time"
+              type="time"
+              value={time}
+              disabled={saving}
+              className="w-28"
+              onChange={(e) => updateTime(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="backup-retention">{t("backup.retentionLabel")}</Label>
+            <Input
+              id="backup-retention"
+              type="number"
+              min={1}
+              max={365}
+              value={schedule.retentionCount}
+              disabled={saving}
+              className="w-20"
+              onChange={(e) => {
+                const count = Number(e.target.value)
+                if (count >= 1 && count <= 365) save({ ...schedule, retentionCount: count })
+              }}
+            />
+          </div>
+        </div>
+
+        <Hint>
+          {schedule.lastRunAt
+            ? t("backup.lastRun", { when: new Date(schedule.lastRunAt).toLocaleString("pl-PL") })
+            : t("backup.neverRun")}
+        </Hint>
+        <FormError>{error}</FormError>
+        {saved && !error && <Hint>{t("backup.saved")}</Hint>}
+      </div>
     </>
   )
 }

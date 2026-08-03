@@ -15,14 +15,17 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`021` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`026` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
-  użytkownik, właściciel/blokada elementu, usunięcie martwego schematu rewizji/checkout.
+  użytkownik, właściciel/blokada elementu, usunięcie martwego schematu rewizji/checkout,
+  historia (status/rewizje/załączniki/blokada), harmonogram automatycznej kopii zapasowej.
 - **`PdmSystem.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
   po funkcjach w `Endpoints/` — pełna lista niżej w "Endpointy API". Serwuje też zbudowany
-  frontend ze swojego `wwwroot/`.
+  frontend ze swojego `wwwroot/`. Własny `FileLoggerProvider` (bez dodatkowego pakietu NuGet)
+  zapisuje logi programu do `logs/` (rotacja dzienna, 30 dni retencji), widoczne w
+  Ustawienia → Logi.
 - **`PdmSystem.Web/`** — frontend: React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui
   (komponenty na bazie Base UI, styl „base-nova”), i18n (pl/en/de), motyw jasny/ciemny.
 - **`PdmSystem.FreeCad/`** — makro `PdmUpload.FCMacro`: uruchamiane z poziomu FreeCAD,
@@ -102,7 +105,7 @@ Ustawienia → Użytkownicy; nieprzypisany projekt jest dla niego niewidoczny na
 struktury). Zwykły użytkownik może odpinać elementy ze struktury, ale nie usuwać ich
 całkowicie z bazy ani zarządzać kontami. System pilnuje, żeby zawsze zostawał co najmniej
 jeden administrator (nie da się usunąć ani zdegradować ostatniego). Ustawienia Języka i
-Wyglądu są dostępne dla każdego; Użytkownicy i Magazyn plików tylko dla administratora.
+Wyglądu są dostępne dla każdego; Użytkownicy, Magazyn plików i Logi tylko dla administratora.
 
 Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
 **`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
@@ -144,6 +147,8 @@ po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | zapisane zestawy filtrów widoku „Cała baza” (prywatne per użytkownik) |
 | GET | `/api/config` | lokalizacja magazynu plików (do użytku np. przez makro FreeCAD) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | lokalizacja/statystyki magazynu, przeniesienie, backup (pg_dump + pliki w ZIP), przywrócenie z backupu — **tylko administrator** |
+| GET/PATCH | `/api/settings/backup-schedule` | harmonogram automatycznej kopii zapasowej (włącz/wyłącz, częstotliwość, dzień, godzina, liczba przechowywanych kopii) — **tylko administrator** |
+| GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | lista dni z zapisanym logiem, ostatnie N wierszy z danego dnia, pobranie pełnego pliku — **tylko administrator** |
 
 ## Jak uruchomić
 
@@ -185,11 +190,16 @@ Magazyn plików tylko dla administratora).
 1. **Brak walidacji rozmiaru/typu wgrywanego pliku i załącznika** — każdy plik przejdzie,
    niezależnie od rozszerzenia czy wielkości.
 2. **Magazyn plików (`storage/`) to zwykły folder na dysku serwera.** Backup/restore z
-   poziomu Ustawień pakuje `pg_dump` bazy razem z magazynem plików w jeden ZIP, ale nie ma
-   automatycznych/harmonogramowych kopii. Wersjonowanie pliku przy zmianie rewizji działa
-   dziś tylko w przepływie makra FreeCAD (`storage/components/`, jeden plik na rewizję,
-   zob. `PdmSystem.FreeCad/README.md`) — zwykłe załączniki dodawane z aplikacji webowej nie
-   mają automatycznego powiązania z numerem rewizji.
+   poziomu Ustawień pakuje `pg_dump` bazy razem z magazynem plików w jeden ZIP; można go
+   pobrać ręcznie albo włączyć automatyczną kopię (Ustawienia -> Magazyn plików ->
+   Automatyczna kopia zapasowa) z wyborem częstotliwości (codziennie/co tydzień/co miesiąc)
+   oraz dnia i godziny — sprawdzane co minutę przez `ScheduledBackupService` w tle, zapisywane
+   do osobnego katalogu `backups/` (niezależnego od `storage/`, żeby kopia nie pakowała samej
+   siebie), z konfigurowalną liczbą przechowywanych ostatnich kopii (domyślnie 14 — starsze
+   są automatycznie kasowane). Wersjonowanie pliku przy zmianie
+   rewizji działa dziś tylko w przepływie makra FreeCAD (`storage/components/`, jeden plik na
+   rewizję, zob. `PdmSystem.FreeCad/README.md`) — zwykłe załączniki dodawane z aplikacji
+   webowej nie mają automatycznego powiązania z numerem rewizji.
 3. **Nie każda operacja zapisuje “kto to zrobił”** — utworzenie elementu (`created_by`),
    zmiana statusu, komentarz do rewizji, dodanie/usunięcie załącznika i blokada/zwolnienie
    właściciela już to robią (widać w „Historii"), ale np. zmiana właściwości/nazwy/tagów
