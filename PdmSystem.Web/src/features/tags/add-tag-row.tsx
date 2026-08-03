@@ -2,9 +2,10 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 import { useLanguage } from "@/i18n/use-language"
 
-function AddTagRow({ onAdd }: { onAdd: (name: string) => void }) {
+function AddTagRow({ onAdd, className }: { onAdd: (name: string) => void; className?: string }) {
   const { t } = useLanguage()
   const [value, setValue] = useState("")
 
@@ -16,7 +17,7 @@ function AddTagRow({ onAdd }: { onAdd: (name: string) => void }) {
   }
 
   return (
-    <div className="mt-2 flex gap-1.5">
+    <div className={cn("flex gap-1.5", className)}>
       <Input
         value={value}
         onChange={(e) => setValue(e.target.value)}

@@ -35,15 +35,13 @@ const SETTINGS_OPTION: SidebarOption = { id: "settings", labelKey: "nav.settings
 function AppSidebar({
   activeId,
   onSelect,
-  showSettings = false,
 }: {
   activeId: string | null
   onSelect: (id: string) => void
-  showSettings?: boolean
 }) {
   const { t } = useLanguage()
   const [expanded, setExpanded] = useState(false)
-  const options = showSettings ? [...OPTIONS, SETTINGS_OPTION] : OPTIONS
+  const options = [...OPTIONS, SETTINGS_OPTION]
 
   return (
     <div

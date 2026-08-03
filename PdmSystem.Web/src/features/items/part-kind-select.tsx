@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/select"
 import { useLanguage } from "@/i18n/use-language"
 
-export type PartKindFilter = "all" | "Zakupowa" | "Wykonywana"
+export type PartKindFilter = "all" | "Zakupowa" | "Wykonywana" | "Normalia"
 
 function PartKindSelect({
   value,
@@ -22,6 +22,7 @@ function PartKindSelect({
   const labelFor = (v: PartKindFilter) => {
     if (v === "Zakupowa") return t("part.kindPurchased")
     if (v === "Wykonywana") return t("part.kindManufactured")
+    if (v === "Normalia") return t("part.kindStandard")
     return t("filter.allKinds")
   }
 
@@ -34,6 +35,7 @@ function PartKindSelect({
         <SelectItem value="all">{t("filter.allKinds")}</SelectItem>
         <SelectItem value="Wykonywana">{t("part.kindManufactured")}</SelectItem>
         <SelectItem value="Zakupowa">{t("part.kindPurchased")}</SelectItem>
+        <SelectItem value="Normalia">{t("part.kindStandard")}</SelectItem>
       </SelectContent>
     </Select>
   )

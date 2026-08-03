@@ -1,11 +1,21 @@
 <!doctype html>
-<html lang="pl" class="dark">
+<html lang="pl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PdmSystem — przeglądarka elementów CAD</title>
-    <script type="module" crossorigin src="/assets/index-aVifFpOb.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Dzxl01Tm.css">
+    <script>
+      // Ustawia klasę "dark" JESZCZE PRZED pierwszym renderem Reacta (ThemeProvider robi to
+      // samo już w JS-ie, ale dopiero po zamontowaniu) — bez tego przy starcie z zapisanym
+      // motywem jasnym byłoby widać krótkie mignięcie domyślnym ciemnym tłem.
+      (function () {
+        var stored = localStorage.getItem("pdm_theme")
+        var isDark = stored !== "light"
+        document.documentElement.classList.toggle("dark", isDark)
+      })()
+    </script>
+    <script type="module" crossorigin src="/assets/index-x0CE_5co.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CoBhDzCY.css">
   </head>
   <body>
     <div id="root"></div>

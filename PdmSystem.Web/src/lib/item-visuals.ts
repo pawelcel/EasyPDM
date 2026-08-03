@@ -1,4 +1,4 @@
-import { Box, Boxes, File, Folder, ShoppingCart, type LucideIcon } from "lucide-react"
+import { Bolt, Box, Boxes, File, Folder, ShoppingCart, type LucideIcon } from "lucide-react"
 
 import type { Item } from "@/api/types"
 
@@ -15,10 +15,13 @@ const STATUS_ICON_COLOR: Record<string, string> = {
   wydany: "text-green-400",
 }
 
-// Część zakupowa dostaje inną ikonkę niż wykonywana (koszyk zamiast zwykłego pudełka) —
-// Złożenie ma też opcjonalne "rodzaj", ale to rozróżnienie dotyczy wyłącznie Części.
+// "Rodzaj" Części dostaje inną ikonkę niż zwykłe pudełko — koszyk dla zakupowej, śrubka dla
+// Normalii. Złożenie ma też opcjonalne "rodzaj", ale to rozróżnienie dotyczy wyłącznie Części.
 export function itemIcon(item: Item): LucideIcon {
-  if (item.itemType === "part" && item.properties.rodzaj === "Zakupowa") return ShoppingCart
+  if (item.itemType === "part") {
+    if (item.properties.rodzaj === "Zakupowa") return ShoppingCart
+    if (item.properties.rodzaj === "Normalia") return Bolt
+  }
   return TYPE_ICON[item.itemType]
 }
 

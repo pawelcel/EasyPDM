@@ -14,8 +14,10 @@ import {
 import { FormError } from "@/components/ui/form-error"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useLanguage } from "@/i18n/use-language"
 
 function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void }) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -37,7 +39,7 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
   async function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) {
-      setError("Nazwa projektu jest wymagana.")
+      setError(t("project.newNameRequired"))
       return
     }
 
@@ -56,9 +58,9 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
       onCreated(project)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setError("Projekt o tej nazwie już istnieje.")
+        setError(t("project.nameConflict"))
       } else {
-        setError("Nie udało się utworzyć projektu.")
+        setError(t("project.createFailed"))
       }
     } finally {
       setSubmitting(false)
@@ -73,37 +75,37 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
         if (!next) reset()
       }}
     >
-      <DialogTrigger render={<Button>+ Projekt</Button>} />
+      <DialogTrigger render={<Button>{t("project.newButton")}</Button>} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nowy projekt</DialogTitle>
+          <DialogTitle>{t("project.newTitle")}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="new-project-name">Nazwa projektu</Label>
+          <Label htmlFor="new-project-name">{t("project.nameLabel")}</Label>
           <Input
             id="new-project-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Nazwa projektu"
+            placeholder={t("project.nameLabel")}
           />
-          <Label htmlFor="new-project-desc">Opis (opcjonalnie)</Label>
+          <Label htmlFor="new-project-desc">{t("project.descriptionOptional")}</Label>
           <Input
             id="new-project-desc"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Opis (opcjonalnie)"
+            placeholder={t("project.descriptionOptional")}
           />
-          <Label htmlFor="new-project-client">Klient (opcjonalnie)</Label>
+          <Label htmlFor="new-project-client">{t("project.clientOptional")}</Label>
           <Input
             id="new-project-client"
             value={client}
             onChange={(e) => setClient(e.target.value)}
-            placeholder="Klient (opcjonalnie)"
+            placeholder={t("project.clientOptional")}
           />
           <div className="flex gap-2">
             <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="new-project-start">Data rozpoczęcia</Label>
+              <Label htmlFor="new-project-start">{t("project.startDate")}</Label>
               <Input
                 id="new-project-start"
                 type="date"
@@ -112,7 +114,7 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
               />
             </div>
             <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="new-project-end">Data zakończenia</Label>
+              <Label htmlFor="new-project-end">{t("project.endDate")}</Label>
               <Input
                 id="new-project-end"
                 type="date"
@@ -126,10 +128,10 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Anuluj
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleCreate} disabled={submitting}>
-            Utwórz
+            {t("project.createButton")}
           </Button>
         </DialogFooter>
       </DialogContent>

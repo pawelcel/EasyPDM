@@ -9,13 +9,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useLanguage } from "@/i18n/use-language"
 
 function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "Potwierdź",
-  cancelLabel = "Anuluj",
+  confirmLabel,
+  cancelLabel,
   variant = "default",
   onConfirm,
   onCancel,
@@ -29,6 +30,8 @@ function ConfirmDialog({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const { t } = useLanguage()
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onCancel()}>
       <DialogContent>
@@ -38,10 +41,10 @@ function ConfirmDialog({
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
-            {cancelLabel}
+            {cancelLabel ?? t("common.cancel")}
           </Button>
           <Button variant={variant} onClick={onConfirm}>
-            {confirmLabel}
+            {confirmLabel ?? t("common.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -96,6 +96,14 @@ function PartPropertyForm({
         >
           {t("part.kindPurchased")}
         </Button>
+        <Button
+          size="sm"
+          variant={rodzaj === "Normalia" ? "default" : "outline"}
+          disabled={locked}
+          onClick={() => changeRodzaj("Normalia")}
+        >
+          {t("part.kindStandard")}
+        </Button>
       </div>
 
       <Label htmlFor="part-name">{t("common.name")}</Label>
@@ -125,6 +133,14 @@ function PartPropertyForm({
           <PropField label={t("part.orderNumber2")} propKey="orderNumber2" item={item} onSave={saveField} disabled={locked} />
           <PropField label={t("part.mass")} propKey="mass" item={item} onSave={saveField} type="number" disabled={locked} />
           <PriceRow item={item} onChanged={onChanged} />
+          <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
+        </>
+      )}
+
+      {rodzaj === "Normalia" && (
+        <>
+          <MaterialField item={item} onSave={saveField} disabled={locked} />
+          <PropField label={t("part.norm")} propKey="norm" item={item} onSave={saveField} disabled={locked} />
           <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
       )}

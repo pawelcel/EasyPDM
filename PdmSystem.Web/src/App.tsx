@@ -15,6 +15,7 @@ import { ItemList } from "@/features/items/item-list"
 import { useItems } from "@/features/items/use-items"
 import { MaterialsView } from "@/features/materials/materials-view"
 import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
+import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
 import { LanguageSettingsView } from "@/features/settings/language-settings-view"
 import { SettingsSidebar } from "@/features/settings/settings-sidebar"
 import { StorageSettingsView } from "@/features/settings/storage-settings-view"
@@ -63,6 +64,15 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
+  // "Użytkownicy"/"Magazyn plików" są dostępne tylko dla admina, ale każdy może wejść w
+  // Ustawienia (Wygląd/Język) — gdyby zwykły użytkownik trafił tu z domyślnym
+  // settingsSection="users", zamiast tego lądował na ekranie "Brak uprawnień".
+  useEffect(() => {
+    if (!isAdmin && (settingsSection === "users" || settingsSection === "storage")) {
+      setSettingsSection("appearance")
+    }
+  }, [isAdmin, settingsSection])
+
   async function refreshAfterMutation() {
     await refetchProjects()
     await refetchItems()
@@ -74,14 +84,10 @@ function App() {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <AppSidebar
-        activeId={view}
-        onSelect={(id) => setView(id as View)}
-        showSettings={isAdmin}
-      />
+      <AppSidebar activeId={view} onSelect={(id) => setView(id as View)} />
 
       {view === "settings" && (
-        <SettingsSidebar activeId={settingsSection} onSelect={setSettingsSection} />
+        <SettingsSidebar activeId={settingsSection} isAdmin={isAdmin} onSelect={setSettingsSection} />
       )}
 
       <div className="min-w-0 flex-1">
@@ -118,7 +124,7 @@ function App() {
               )}
               {selectedProject && (
                 <AddNodeDialog
-                  trigger={<Button>+ Element</Button>}
+                  trigger={<Button>{t("addNode.triggerButton")}</Button>}
                   projectId={selectedProject.id}
                   parentId={null}
                   parentType={null}
@@ -186,6 +192,9 @@ function App() {
               error={error}
               projects={projects}
               search={debouncedSearch}
+              tag={tag}
+              onSearchChange={setSearch}
+              onTagChange={setTag}
               isAdmin={isAdmin}
               onItemsRefetch={refetchItems}
               onTagsRefetch={refetchTags}
@@ -208,6 +217,8 @@ function App() {
           {view === "settings" &&
             settingsSection === "storage" &&
             (isAdmin ? <StorageSettingsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
+
+          {view === "settings" && settingsSection === "appearance" && <AppearanceSettingsView />}
 
           {view === "settings" && settingsSection === "language" && <LanguageSettingsView />}
         </main>

@@ -199,6 +199,116 @@ static class ItemEndpoints
             return Results.Created($"/api/items/{itemId}", new { id = itemId, itemNumber });
         });
 
+        // ============================================================
+        // POST /api/items/{id}/duplicate   body: { "parentId": "..."|null, "insertAfterOriginal": bool }
+        // Tworzy kopię Części/Złożenia: ten sam typ i właściwości, nowy numer (kolejny z
+        // item_number_seq), świeży status "w_pracy" i rewizja 1 (bez tagów i załączników
+        // oryginału). Bez tagów i załączników oryginału.
+        //
+        // "insertAfterOriginal" włącza umieszczenie kopii DOKŁADNIE pod oryginałem, na tym samym
+        // poziomie struktury (używane z widoku drzewka konkretnego projektu, gdzie znany jest
+        // kontekst — "parentId" to rodzic, pod którym użytkownik aktualnie ogląda oryginał):
+        //   - jeśli "parentId" wskazuje relację, która faktycznie istnieje (oryginał jest
+        //     dzieckiem tego rodzica) — kopia trafia jako nowe dziecko TEGO SAMEGO rodzica,
+        //     zaraz po oryginale (z tą samą ilością), a pozycje dalszych elementów przesuwają
+        //     się o 1;
+        //   - w przeciwnym razie (parentId=null, czyli oryginał jest korzeniem projektu) —
+        //     kopia trafia jako nowy korzeń zaraz po oryginale, a pozycje dalszych korzeni
+        //     przesuwają się o 1.
+        // Bez "insertAfterOriginal" (np. duplikowanie z widoku całej bazy, gdzie nie ma
+        // załadowanej struktury/relacji) kopia trafia po prostu na koniec listy korzeni projektu
+        // — nie ma jak wywnioskować "właściwego" miejsca bez tego kontekstu.
+        // ============================================================
+        app.MapPost("/api/items/{id:guid}/duplicate", async (Guid id, DuplicateItemRequest? body) =>
+        {
+            var info = await GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+            if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
+                return Results.BadRequest("Duplikować można tylko Części i Złożenia.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            await using var tx = await conn.BeginTransactionAsync();
+
+            var newId = Guid.NewGuid();
+
+            if (body?.InsertAfterOriginal is true && body.ParentId is not null)
+            {
+                (int Position, decimal Quantity)? relation = null;
+                await using (var relCmd = new NpgsqlCommand(
+                    "SELECT position, quantity FROM item_relations WHERE parent_id = @parentId AND child_id = @childId;", conn, tx))
+                {
+                    relCmd.Parameters.AddWithValue("parentId", body.ParentId.Value);
+                    relCmd.Parameters.AddWithValue("childId", id);
+                    await using var reader = await relCmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                        relation = (reader.GetInt32(0), reader.GetDecimal(1));
+                }
+
+                if (relation is not null)
+                {
+                    await using (var shiftCmd = new NpgsqlCommand(
+                        "UPDATE item_relations SET position = position + 1 WHERE parent_id = @parentId AND position > @position;", conn, tx))
+                    {
+                        shiftCmd.Parameters.AddWithValue("parentId", body.ParentId.Value);
+                        shiftCmd.Parameters.AddWithValue("position", relation.Value.Position);
+                        await shiftCmd.ExecuteNonQueryAsync();
+                    }
+
+                    var itemNumber = await InsertDuplicateRowAsync(conn, tx, newId, id, rootPosition: null);
+
+                    await using (var insertRelCmd = new NpgsqlCommand(
+                        """
+                        INSERT INTO item_relations (parent_id, child_id, quantity, position)
+                        VALUES (@parentId, @childId, @quantity, @position);
+                        """, conn, tx))
+                    {
+                        insertRelCmd.Parameters.AddWithValue("parentId", body.ParentId.Value);
+                        insertRelCmd.Parameters.AddWithValue("childId", newId);
+                        insertRelCmd.Parameters.AddWithValue("quantity", relation.Value.Quantity);
+                        insertRelCmd.Parameters.AddWithValue("position", relation.Value.Position + 1);
+                        await insertRelCmd.ExecuteNonQueryAsync();
+                    }
+
+                    await tx.CommitAsync();
+                    return Results.Created($"/api/items/{newId}", new { id = newId, itemNumber });
+                }
+                // Relacja nie istnieje (nieoczekiwane, ale defensywnie) — kopiujemy jak korzeń poniżej.
+            }
+
+            if (body?.InsertAfterOriginal is true)
+            {
+                Guid projectId;
+                int sourceRootPosition;
+                await using (var infoCmd = new NpgsqlCommand(
+                    "SELECT project_id, root_position FROM items WHERE id = @id;", conn, tx))
+                {
+                    infoCmd.Parameters.AddWithValue("id", id);
+                    await using var reader = await infoCmd.ExecuteReaderAsync();
+                    await reader.ReadAsync();
+                    projectId = reader.GetGuid(0);
+                    sourceRootPosition = reader.GetInt32(1);
+                }
+
+                await using (var shiftCmd = new NpgsqlCommand(
+                    "UPDATE items SET root_position = root_position + 1 WHERE project_id = @projectId AND root_position > @rootPosition;", conn, tx))
+                {
+                    shiftCmd.Parameters.AddWithValue("projectId", projectId);
+                    shiftCmd.Parameters.AddWithValue("rootPosition", sourceRootPosition);
+                    await shiftCmd.ExecuteNonQueryAsync();
+                }
+
+                var itemNumber = await InsertDuplicateRowAsync(conn, tx, newId, id, rootPosition: sourceRootPosition + 1);
+                await tx.CommitAsync();
+                return Results.Created($"/api/items/{newId}", new { id = newId, itemNumber });
+            }
+
+            var appendedItemNumber = await InsertDuplicateRowAsync(conn, tx, newId, id, rootPosition: null);
+            await tx.CommitAsync();
+            return Results.Created($"/api/items/{newId}", new { id = newId, itemNumber = appendedItemNumber });
+        });
+
         // GET /api/items/{id}/file — pobranie/podgląd samego pliku.
         app.MapGet("/api/items/{id:guid}/file", async (Guid id) =>
         {
@@ -610,6 +720,28 @@ static class ItemEndpoints
         return (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1));
     }
 
+    // Wspólny insert dla duplikowania — używany zarówno przy wstawianiu kopii "zaraz pod
+    // oryginałem" (rootPosition podany explicite) jak i przy zwykłym dopisaniu na koniec listy
+    // korzeni projektu (rootPosition = null, wyliczane tu jako MAX+1).
+    internal static async Task<int?> InsertDuplicateRowAsync(
+        NpgsqlConnection conn, NpgsqlTransaction tx, Guid newId, Guid sourceId, int? rootPosition)
+    {
+        const string sql = """
+            INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position)
+            SELECT @newId, src.project_id, src.item_type, src.file_name || ' (kopia)', src.properties,
+                   nextval('item_number_seq'), 'w_pracy', 1, now(),
+                   COALESCE(@rootPosition, (SELECT COALESCE(MAX(root_position), 0) + 1 FROM items WHERE project_id = src.project_id))
+            FROM items src
+            WHERE src.id = @sourceId
+            RETURNING item_number;
+            """;
+        await using var cmd = new NpgsqlCommand(sql, conn, tx);
+        cmd.Parameters.AddWithValue("newId", newId);
+        cmd.Parameters.AddWithValue("sourceId", sourceId);
+        cmd.Parameters.AddWithValue("rootPosition", (object?)rootPosition ?? DBNull.Value);
+        return (int?)await cmd.ExecuteScalarAsync();
+    }
+
     internal static async Task<Dictionary<Guid, List<string>>> LoadTagsForItems(string connectionString, List<Guid> ids)
     {
         var result = ids.ToDictionary(id => id, _ => new List<string>());
@@ -642,3 +774,4 @@ record VisibilityRequest(bool ShowInTree);
 record RenameRequest(string Name);
 record StatusRequest(string Status, string? Comment = null);
 record MoveToProjectRequest(Guid ProjectId);
+record DuplicateItemRequest(Guid? ParentId = null, bool InsertAfterOriginal = false);

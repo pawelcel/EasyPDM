@@ -179,6 +179,16 @@ export interface StorageInfo {
   totalSizeBytes: number
 }
 
+// Zapisany zestaw filtrów widoku "Cała baza" — prywatny dla każdego użytkownika (serwer
+// zawsze bierze user_id z sesji, nigdy z ciała żądania). "filters" trzymane luźno — dokładny
+// kształt narzuca DatabaseFilters we features/items/database-filters.ts.
+export interface SavedFilter {
+  id: string
+  name: string
+  filters: Record<string, unknown>
+  createdAt: string
+}
+
 // Załącznik (plik dograny "z zewnątrz", np. plik CAD) — w odróżnieniu od struktury
 // (item_relations) NIE jest osobnym elementem w drzewku, zarządzany tylko z panelu
 // właściwości po prawej stronie.

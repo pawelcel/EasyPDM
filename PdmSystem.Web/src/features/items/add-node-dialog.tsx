@@ -30,15 +30,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import type { TranslationKey } from "@/i18n/translations"
+import { useLanguage } from "@/i18n/use-language"
 
 type Mode = ItemType | "existing"
 
-const MODE_LABELS: Record<Mode, string> = {
-  folder: "Folder",
-  part: "Część",
-  assembly: "Złożenie",
-  file: "Inny plik",
-  existing: "Istniejący element",
+const MODE_LABEL_KEYS: Record<Mode, TranslationKey> = {
+  folder: "itemType.folder",
+  part: "itemType.part",
+  assembly: "itemType.assembly",
+  file: "addNode.modeFile",
+  existing: "addNode.modeExisting",
 }
 
 // Elementy o tej samej nazwie mogą pochodzić z różnych projektów — numer odróżnia je.
@@ -72,6 +74,7 @@ function AddNodeDialog({
   lockMode?: ItemType
   onCreated: () => void | Promise<void>
 }) {
+  const { t } = useLanguage()
   const availableModes = modesForParent(parentType)
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<Mode>(lockMode ?? availableModes[0] ?? "folder")
@@ -129,13 +132,19 @@ function AddNodeDialog({
 
   async function handleCreateContainer(itemType: "folder" | "part" | "assembly") {
     if (itemType === "part" && !rodzaj) {
-      setError("Wybierz rodzaj: Wykonywana albo Zakupowa.")
+      setError(
+        t("addNode.selectKindError", {
+          manufactured: t("part.kindManufactured"),
+          purchased: t("part.kindPurchased"),
+          standard: t("part.kindStandard"),
+        })
+      )
       return
     }
 
     const trimmed = name.trim()
     if (!trimmed) {
-      setError("Nazwa jest wymagana.")
+      setError(t("addNode.nameRequired"))
       return
     }
 
@@ -162,7 +171,7 @@ function AddNodeDialog({
       reset()
       await onCreated()
     } catch {
-      setError("Nie udało się utworzyć elementu.")
+      setError(t("addNode.createFailed"))
     } finally {
       setSubmitting(false)
     }
@@ -171,7 +180,7 @@ function AddNodeDialog({
   async function handleUploadFile() {
     const trimmedName = name.trim()
     if (!file && !trimmedName) {
-      setError("Podaj plik albo przynajmniej nazwę — plik można dograć później.")
+      setError(t("addNode.fileOrNameRequired"))
       return
     }
 
@@ -181,7 +190,7 @@ function AddNodeDialog({
       try {
         parsedProps = JSON.parse(trimmedProps)
       } catch {
-        setError('Pole właściwości musi być poprawnym JSON-em, np. {"material":"Stal S235"}')
+        setError(t("addNode.invalidJson"))
         return
       }
     }
@@ -207,7 +216,7 @@ function AddNodeDialog({
       reset()
       await onCreated()
     } catch {
-      setError("Nie udało się dodać elementu.")
+      setError(t("addNode.addFailed"))
     } finally {
       setSubmitting(false)
     }
@@ -215,7 +224,7 @@ function AddNodeDialog({
 
   async function handleLinkExisting() {
     if (!childId) {
-      setError("Wybierz element.")
+      setError(t("addNode.selectItemRequired"))
       return
     }
 
@@ -225,7 +234,7 @@ function AddNodeDialog({
       if (parentId) {
         const qty = Number(quantity)
         if (!Number.isFinite(qty) || qty <= 0) {
-          setError("Ilość musi być liczbą większą od zera.")
+          setError(t("addNode.quantityInvalid"))
           setSubmitting(false)
           return
         }
@@ -244,7 +253,7 @@ function AddNodeDialog({
       reset()
       await onCreated()
     } catch {
-      setError("Nie udało się dodać elementu.")
+      setError(t("addNode.addFailed"))
     } finally {
       setSubmitting(false)
     }
@@ -268,7 +277,7 @@ function AddNodeDialog({
       <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{lockMode === "file" ? "Wgraj plik" : "Dodaj element"}</DialogTitle>
+          <DialogTitle>{lockMode === "file" ? t("item.uploadFile") : t("addNode.title")}</DialogTitle>
         </DialogHeader>
 
         {!lockMode && (
@@ -284,7 +293,7 @@ function AddNodeDialog({
                   setError("")
                 }}
               >
-                {MODE_LABELS[m]}
+                {t(MODE_LABEL_KEYS[m])}
               </Button>
             ))}
           </div>
@@ -292,7 +301,7 @@ function AddNodeDialog({
 
         {mode === "part" && (
           <div className="flex flex-col gap-2">
-            <Label>Rodzaj</Label>
+            <Label>{t("part.kind")}</Label>
             <div className="flex gap-1.5">
               <Button
                 type="button"
@@ -300,7 +309,7 @@ function AddNodeDialog({
                 variant={rodzaj === "Wykonywana" ? "default" : "outline"}
                 onClick={() => setRodzaj("Wykonywana")}
               >
-                Wykonywana
+                {t("part.kindManufactured")}
               </Button>
               <Button
                 type="button"
@@ -308,10 +317,18 @@ function AddNodeDialog({
                 variant={rodzaj === "Zakupowa" ? "default" : "outline"}
                 onClick={() => setRodzaj("Zakupowa")}
               >
-                Zakupowa
+                {t("part.kindPurchased")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={rodzaj === "Normalia" ? "default" : "outline"}
+                onClick={() => setRodzaj("Normalia")}
+              >
+                {t("part.kindStandard")}
               </Button>
             </div>
-            <Label htmlFor="node-name">Nazwa</Label>
+            <Label htmlFor="node-name">{t("common.name")}</Label>
             <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} />
             <FormError>{error}</FormError>
           </div>
@@ -319,19 +336,19 @@ function AddNodeDialog({
 
         {(mode === "folder" || mode === "assembly") && (
           <div className="flex flex-col gap-2">
-            <Label htmlFor="node-name">Nazwa</Label>
+            <Label htmlFor="node-name">{t("common.name")}</Label>
             <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} />
 
             {mode === "assembly" && (
               <>
-                <Label htmlFor="node-material">Materiał (opcjonalnie)</Label>
+                <Label htmlFor="node-material">{t("addNode.materialOptional")}</Label>
                 <Input
                   id="node-material"
                   value={material}
                   onChange={(e) => setMaterial(e.target.value)}
-                  placeholder="np. Stal S235"
+                  placeholder={t("material.namePlaceholder")}
                 />
-                <Label htmlFor="node-mass">Masa [kg] (opcjonalnie)</Label>
+                <Label htmlFor="node-mass">{t("addNode.massOptional")}</Label>
                 <Input
                   id="node-mass"
                   type="number"
@@ -340,19 +357,18 @@ function AddNodeDialog({
                   onChange={(e) => setMass(e.target.value)}
                   className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
-                <Label>Rodzaj (opcjonalnie)</Label>
+                <Label>{t("addNode.kindOptional")}</Label>
                 <Select value={rodzaj || "none"} onValueChange={(v) => setRodzaj(v === "none" ? "" : (v as string))}>
                   <SelectTrigger className="w-full">
                     <SelectValue>
-                      {(v: string) =>
-                        v === "none" || !v ? "Nie wybrano" : v
-                      }
+                      {(v: string) => (v === "none" || !v ? t("addNode.noneSelected") : v)}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Nie wybrano</SelectItem>
-                    <SelectItem value="Zakupowa">Zakupowa</SelectItem>
-                    <SelectItem value="Wykonywana">Wykonywana</SelectItem>
+                    <SelectItem value="none">{t("addNode.noneSelected")}</SelectItem>
+                    <SelectItem value="Zakupowa">{t("part.kindPurchased")}</SelectItem>
+                    <SelectItem value="Wykonywana">{t("part.kindManufactured")}</SelectItem>
+                    <SelectItem value="Normalia">{t("part.kindStandard")}</SelectItem>
                   </SelectContent>
                 </Select>
               </>
@@ -363,7 +379,7 @@ function AddNodeDialog({
 
         {mode === "file" && (
           <div className="flex flex-col gap-2">
-            <Label htmlFor="node-file">Plik (opcjonalnie — można dograć później)</Label>
+            <Label htmlFor="node-file">{t("addNode.fileOptional")}</Label>
             <Input
               id="node-file"
               type="file"
@@ -371,21 +387,21 @@ function AddNodeDialog({
             />
             {!file && (
               <>
-                <Label htmlFor="node-file-name">Nazwa (jeśli bez pliku)</Label>
+                <Label htmlFor="node-file-name">{t("addNode.nameIfNoFile")}</Label>
                 <Input
                   id="node-file-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="np. Karta katalogowa"
+                  placeholder={t("addNode.fileNamePlaceholder")}
                 />
               </>
             )}
-            <Label htmlFor="node-props">Właściwości JSON (opcjonalnie)</Label>
+            <Label htmlFor="node-props">{t("addNode.propertiesJsonOptional")}</Label>
             <Input
               id="node-props"
               value={propsText}
               onChange={(e) => setPropsText(e.target.value)}
-              placeholder='np. {"material":"Stal S235"}'
+              placeholder={t("addNode.propertiesJsonPlaceholder")}
             />
             <FormError>{error}</FormError>
           </div>
@@ -394,22 +410,15 @@ function AddNodeDialog({
         {mode === "existing" && (
           <div className="flex flex-col gap-2">
             {parentId ? (
-              <Hint>
-                Część lub Złożenie z całej bazy — ten sam komponent można wykorzystać w wielu
-                złożeniach, także z innych projektów.
-              </Hint>
+              <Hint>{t("addNode.existingHintWithParent")}</Hint>
             ) : (
-              <Hint>
-                Część lub Złożenie z całej bazy — element z innego projektu zostanie do niego
-                przeniesiony jako widoczny korzeń; odpięty wcześniej element tego projektu
-                zostanie po prostu przywrócony.
-              </Hint>
+              <Hint>{t("addNode.existingHintNoParent")}</Hint>
             )}
             {candidates.length === 0 ? (
-              <Hint>Brak Części/Złożeń w bazie.</Hint>
+              <Hint>{t("addNode.noCandidates")}</Hint>
             ) : (
               <>
-                <Label>Element</Label>
+                <Label>{t("addNode.elementLabel")}</Label>
                 <Combobox
                   items={candidates.map((c) => c.id)}
                   value={childId || null}
@@ -418,9 +427,9 @@ function AddNodeDialog({
                     candidateLabel(candidates.find((c) => c.id === id)) ?? ""
                   }
                 >
-                  <ComboboxInput placeholder="Wpisz nazwę, żeby wyszukać…" />
+                  <ComboboxInput placeholder={t("part.searchPlaceholder")} />
                   <ComboboxContent>
-                    <ComboboxEmpty>Brak pasujących elementów.</ComboboxEmpty>
+                    <ComboboxEmpty>{t("addNode.noMatchingItems")}</ComboboxEmpty>
                     <ComboboxList>
                       {(id: string) => (
                         <ComboboxItem key={id} value={id}>
@@ -432,7 +441,7 @@ function AddNodeDialog({
                 </Combobox>
                 {parentId && (
                   <>
-                    <Label htmlFor="node-quantity">Ilość</Label>
+                    <Label htmlFor="node-quantity">{t("common.quantity")}</Label>
                     <Input
                       id="node-quantity"
                       type="number"
@@ -451,10 +460,10 @@ function AddNodeDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Anuluj
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Zapisywanie…" : "Dodaj"}
+            {submitting ? t("common.saving") : t("common.add")}
           </Button>
         </DialogFooter>
       </DialogContent>

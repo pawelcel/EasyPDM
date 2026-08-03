@@ -12,6 +12,7 @@ import type {
   Material,
   Project,
   RevisionComment,
+  SavedFilter,
   StorageInfo,
   Tag,
   UserRole,
@@ -126,6 +127,15 @@ export const api = {
     fetch(`${BASE}/items/${itemId}`, { method: "DELETE" }).then((r) =>
       handleResponse<{ deletedCount: number }>(r)
     ),
+
+  duplicateItem: (
+    itemId: string,
+    structure?: { parentId: string | null; insertAfterOriginal: true }
+  ) =>
+    fetch(
+      `${BASE}/items/${itemId}/duplicate`,
+      json(structure ?? { parentId: null, insertAfterOriginal: false })
+    ).then((r) => handleResponse<{ id: string; itemNumber: number | null }>(r)),
 
   setShowInTree: (itemId: string, showInTree: boolean) =>
     fetch(`${BASE}/items/${itemId}/visibility`, {
@@ -277,6 +287,17 @@ export const api = {
     fetch(`${BASE}/manufacturers/${manufacturerId}/contacts/${contactId}`, {
       method: "DELETE",
     }).then((r) => handleResponse<void>(r)),
+
+  getSavedFilters: () =>
+    fetch(`${BASE}/saved-filters`).then((r) => handleResponse<SavedFilter[]>(r)),
+
+  saveFilter: (name: string, filters: Record<string, unknown>) =>
+    fetch(`${BASE}/saved-filters`, json({ name, filters })).then((r) =>
+      handleResponse<SavedFilter>(r)
+    ),
+
+  deleteSavedFilter: (id: string) =>
+    fetch(`${BASE}/saved-filters/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
   getStorageInfo: () => fetch(`${BASE}/settings/storage`).then((r) => handleResponse<StorageInfo>(r)),
 
