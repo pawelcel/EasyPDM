@@ -24,6 +24,13 @@ export interface ManagedUser {
   role: UserRole
 }
 
+// Przypisanie użytkownika do projektu (project_users) — administrator zawsze widzi
+// wszystkie projekty niezależnie od tych przypisań; dotyczą tylko roli "user".
+export interface ProjectUserAssignment {
+  projectId: string
+  userId: string
+}
+
 export interface Project {
   id: string
   name: string
@@ -103,7 +110,24 @@ export interface Item {
   status: ItemStatus | null
   revisionNumber: number | null
   rootPosition: number
+  ownerId: string | null
+  ownerLocked: boolean
+  ownerDisplayName: string | null
   tags: string[]
+}
+
+// Właściciel (part/assembly) — dopóki ownerLocked=true, tylko ownerId może edytować
+// (nawet admin nie omija tego, patrz backend ItemEndpoints.CanEditOwnerLocked). Element
+// bez właściciela (ownerId=null, elementy sprzed tej funkcji) traktujemy jak zwolniony.
+export function isOwnerLocked(item: Pick<Item, "ownerId" | "ownerLocked">): boolean {
+  return item.ownerLocked && item.ownerId !== null
+}
+
+export function canEditOwnerLocked(
+  item: Pick<Item, "ownerId" | "ownerLocked">,
+  currentUserId: string
+): boolean {
+  return !isOwnerLocked(item) || item.ownerId === currentUserId
 }
 
 export type Tag = string

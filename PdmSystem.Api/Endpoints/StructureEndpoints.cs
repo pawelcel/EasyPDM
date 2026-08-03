@@ -7,8 +7,13 @@ static class StructureEndpoints
     {
         // GET /api/projects/{projectId}/relations — wszystkie relacje rodzic-dziecko
         // dla elementów należących do danego projektu (do zbudowania drzewka po stronie klienta).
-        app.MapGet("/api/projects/{projectId:guid}/relations", async (Guid projectId) =>
+        // Nieprzypisany zwykły użytkownik dostaje pustą listę (nie błąd) — z jego punktu widzenia
+        // projekt po prostu nie ma żadnej struktury do pokazania, spójnie z tym, że w ogóle nie
+        // widzi go na liście projektów (GET /api/projects).
+        app.MapGet("/api/projects/{projectId:guid}/relations", async (Guid projectId, HttpContext ctx) =>
         {
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
@@ -17,10 +22,15 @@ static class StructureEndpoints
                 FROM item_relations ir
                 JOIN items i ON i.id = ir.parent_id
                 WHERE i.project_id = @projectId
+                  AND (@isAdmin OR EXISTS (
+                        SELECT 1 FROM project_users pu WHERE pu.project_id = @projectId AND pu.user_id = @userId
+                  ))
                 ORDER BY ir.parent_id, ir.position;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("projectId", projectId);
+            cmd.Parameters.AddWithValue("isAdmin", user.Role == "admin");
+            cmd.Parameters.AddWithValue("userId", user.Id);
 
             var result = new List<object>();
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -40,7 +50,7 @@ static class StructureEndpoints
 
         // POST /api/items/{parentId}/children   body: { "childId": "...", "quantity": 1 }
         // Dodaje element jako podelement innego elementu (krawędź w strukturze złożenia).
-        app.MapPost("/api/items/{parentId:guid}/children", async (Guid parentId, ChildRelationRequest body) =>
+        app.MapPost("/api/items/{parentId:guid}/children", async (Guid parentId, ChildRelationRequest body, HttpContext ctx) =>
         {
             if (parentId == body.ChildId)
                 return Results.BadRequest("Element nie może być podelementem samego siebie.");
@@ -53,6 +63,10 @@ static class StructureEndpoints
                 return Results.NotFound("Element podrzędny nie istnieje.");
             if (!ItemEndpoints.IsChildTypeAllowed(parentInfo.Value.ItemType, childInfo.Value.ItemType))
                 return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -100,10 +114,17 @@ static class StructureEndpoints
         // dodatnią liczbą całkowitą i nie może powtarzać się wśród innych podelementów tego
         // samego rodzica (bez automatycznego przesuwania pozostałych — użytkownik musi wybrać
         // wolny numer, albo skorzystać z przeciągnięcia, które przenumerowuje całość).
-        app.MapPatch("/api/items/{parentId:guid}/children/{childId:guid}/position", async (Guid parentId, Guid childId, PositionRequest body) =>
+        app.MapPatch("/api/items/{parentId:guid}/children/{childId:guid}/position", async (Guid parentId, Guid childId, PositionRequest body, HttpContext ctx) =>
         {
             if (body.Position <= 0)
                 return Results.BadRequest("L.p. musi być liczbą całkowitą większą od zera.");
+
+            var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
+            if (parentInfo is null)
+                return Results.NotFound("Element nadrzędny nie istnieje.");
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -131,8 +152,15 @@ static class StructureEndpoints
         // PATCH /api/items/{parentId}/children/reorder   body: { "childIds": ["...", "...", ...] }
         // Przeciągnięcie podelementu w inne miejsce w UI — klient wysyła CAŁĄ nową kolejność
         // dzieci tego rodzica, a serwer przenumerowuje L.p. na 1..N w jednej transakcji.
-        app.MapPatch("/api/items/{parentId:guid}/children/reorder", async (Guid parentId, ReorderRequest body) =>
+        app.MapPatch("/api/items/{parentId:guid}/children/reorder", async (Guid parentId, ReorderRequest body, HttpContext ctx) =>
         {
+            var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
+            if (parentInfo is null)
+                return Results.NotFound("Element nadrzędny nie istnieje.");
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
             await using var tx = await conn.BeginTransactionAsync();
@@ -169,8 +197,15 @@ static class StructureEndpoints
         });
 
         // DELETE /api/items/{parentId}/children/{childId} — usuwa powiązanie (nie usuwa elementu).
-        app.MapDelete("/api/items/{parentId:guid}/children/{childId:guid}", async (Guid parentId, Guid childId) =>
+        app.MapDelete("/api/items/{parentId:guid}/children/{childId:guid}", async (Guid parentId, Guid childId, HttpContext ctx) =>
         {
+            var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
+            if (parentInfo is null)
+                return Results.NotFound("Element nadrzędny nie istnieje.");
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 

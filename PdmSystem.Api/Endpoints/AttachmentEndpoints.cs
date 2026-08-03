@@ -45,7 +45,7 @@ static class AttachmentEndpoints
         });
 
         // POST /api/items/{itemId}/attachments   multipart/form-data: file (wymagany)
-        app.MapPost("/api/items/{itemId:guid}/attachments", async (Guid itemId, HttpRequest request) =>
+        app.MapPost("/api/items/{itemId:guid}/attachments", async (Guid itemId, HttpRequest request, HttpContext ctx) =>
         {
             if (!request.HasFormContentType)
                 return Results.BadRequest("Oczekiwano danych multipart/form-data.");
@@ -62,6 +62,9 @@ static class AttachmentEndpoints
                 return Results.BadRequest("Ten typ elementu nie przyjmuje załączników.");
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
                 return Results.BadRequest("Załączniki można dodawać tylko w statusie 'W pracy'.");
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
 
             var attachmentId = Guid.NewGuid();
             var extension = Path.GetExtension(file.FileName);
@@ -115,7 +118,7 @@ static class AttachmentEndpoints
         // przez HTTP. Ze względu na brak autoryzacji w API akceptowane są WYŁĄCZNIE ścieżki
         // leżące wewnątrz skonfigurowanego StorageRoot — inaczej dowolny wywołujący mógłby
         // "podpiąć" jako załącznik dowolny plik z dysku serwera.
-        app.MapPost("/api/items/{itemId:guid}/attachments/register", async (Guid itemId, RegisterAttachmentRequest body) =>
+        app.MapPost("/api/items/{itemId:guid}/attachments/register", async (Guid itemId, RegisterAttachmentRequest body, HttpContext ctx) =>
         {
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
@@ -124,6 +127,9 @@ static class AttachmentEndpoints
                 return Results.BadRequest("Ten typ elementu nie przyjmuje załączników.");
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
                 return Results.BadRequest("Załączniki można dodawać tylko w statusie 'W pracy'.");
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
 
             string fullPath;
             string storageRootFull;
@@ -197,14 +203,17 @@ static class AttachmentEndpoints
         });
 
         // DELETE /api/attachments/{id}
-        app.MapDelete("/api/attachments/{id:guid}", async (Guid id) =>
+        app.MapDelete("/api/attachments/{id:guid}", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
             string? filePath = null;
             await using (var selectCmd = new NpgsqlCommand(
-                "SELECT ia.file_path, i.item_type, i.status FROM item_attachments ia JOIN items i ON i.id = ia.item_id WHERE ia.id = @id;", conn))
+                """
+                SELECT ia.file_path, i.item_type, i.status, i.owner_id, i.owner_locked
+                FROM item_attachments ia JOIN items i ON i.id = ia.item_id WHERE ia.id = @id;
+                """, conn))
             {
                 selectCmd.Parameters.AddWithValue("id", id);
                 await using var reader = await selectCmd.ExecuteReaderAsync();
@@ -216,6 +225,12 @@ static class AttachmentEndpoints
                 var status = reader.IsDBNull(2) ? null : reader.GetString(2);
                 if (ItemEndpoints.IsLocked(itemType, status))
                     return Results.BadRequest("Załączniki można usuwać tylko w statusie 'W pracy'.");
+
+                var ownerId = reader.IsDBNull(3) ? (Guid?)null : reader.GetGuid(3);
+                var ownerLocked = reader.GetBoolean(4);
+                var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+                if (!ItemEndpoints.CanEditOwnerLocked(user.Id, ownerId, ownerLocked))
+                    return ItemEndpoints.OwnerLockedForbidden();
             }
 
             await using (var deleteCmd = new NpgsqlCommand("DELETE FROM item_attachments WHERE id = @id;", conn))

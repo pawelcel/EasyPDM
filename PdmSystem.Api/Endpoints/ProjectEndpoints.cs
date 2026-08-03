@@ -7,9 +7,14 @@ static class ProjectEndpoints
 {
     public static void MapProjectEndpoints(this WebApplication app, string connectionString)
     {
-        // GET /api/projects — lista projektów z liczbą elementów w każdym.
-        app.MapGet("/api/projects", async () =>
+        // GET /api/projects — lista projektów z liczbą elementów w każdym. Administrator widzi
+        // wszystkie; zwykły użytkownik tylko te, do których został przypisany (project_users) —
+        // nieprzypisany projekt jest dla niego tak, jakby nie istniał (nie pojawia się na liście,
+        // więc nie da się go wybrać ani przejrzeć jego struktury przez UI).
+        app.MapGet("/api/projects", async (HttpContext ctx) =>
         {
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
@@ -18,10 +23,15 @@ static class ProjectEndpoints
                        p.created_at, COUNT(i.id) AS item_count
                 FROM projects p
                 LEFT JOIN items i ON i.project_id = p.id
+                WHERE @isAdmin OR EXISTS (
+                    SELECT 1 FROM project_users pu WHERE pu.project_id = p.id AND pu.user_id = @userId
+                )
                 GROUP BY p.id
                 ORDER BY p.name;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("isAdmin", user.Role == "admin");
+            cmd.Parameters.AddWithValue("userId", user.Id);
             var result = new List<object>();
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())

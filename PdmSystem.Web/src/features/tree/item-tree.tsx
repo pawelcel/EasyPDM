@@ -23,8 +23,9 @@ import { api } from "@/api/client"
 import { itemDisplayLabel, type Item } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { iconColorClass, itemIcon } from "@/lib/item-visuals"
+import { iconColorClass, itemIcon, ownerLockVisual } from "@/lib/item-visuals"
 import { AddNodeDialog } from "@/features/items/add-node-dialog"
+import { useAuth } from "@/features/auth/use-auth"
 import type { useProjectTree } from "@/features/tree/use-project-tree"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -186,10 +187,12 @@ function TreeNode({
   onToggleSelect: (id: string) => void
 }) {
   const { t } = useLanguage()
+  const { user } = useAuth()
   const [expanded, setExpanded] = useState(true)
   const children = childrenOf(item.id)
   const hasChildren = children.length > 0
   const TypeIcon = itemIcon(item)
+  const lockVisual = ownerLockVisual(item, user?.id)
   const checked = selectedIds.has(item.id)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -258,6 +261,12 @@ function TreeNode({
         </button>
 
         <TypeIcon className={cn("size-3.5 shrink-0", iconColorClass(item))} />
+        {lockVisual && (
+          <lockVisual.Icon
+            className={cn("size-3 shrink-0", lockVisual.colorClass)}
+            aria-label={t("item.ownerLockIconAria")}
+          />
+        )}
 
         <button
           type="button"

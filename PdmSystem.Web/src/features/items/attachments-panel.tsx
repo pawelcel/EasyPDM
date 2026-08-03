@@ -19,10 +19,12 @@ function formatSize(size: number | null): string {
 function AttachmentsPanel({
   itemId,
   locked = false,
+  lockedHint,
   onChanged,
 }: {
   itemId: string
   locked?: boolean
+  lockedHint?: string
   onChanged?: () => void | Promise<void>
 }) {
   const { t } = useLanguage()
@@ -72,7 +74,7 @@ function AttachmentsPanel({
 
   return (
     <div>
-      {locked && <Hint>{t("item.attachmentsLockedHint")}</Hint>}
+      {locked && <Hint>{lockedHint ?? t("item.attachmentsLockedHint")}</Hint>}
       {error && <p className="text-[12.5px] text-destructive">{error}</p>}
 
       {attachments.length > 0 ? (

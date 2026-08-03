@@ -128,7 +128,7 @@ static class ItemEndpoints
         // to kontenery bez własnego pliku; "file" utworzony tędy to plik "na razie bez zawartości"
         // (można ją dograć później przez POST /api/projects/{projectId}/items z parentId).
         // Część i Złożenie dostają automatycznie kolejny item_number (to pozycje BOM).
-        app.MapPost("/api/projects/{projectId:guid}/nodes", async (Guid projectId, CreateNodeRequest body) =>
+        app.MapPost("/api/projects/{projectId:guid}/nodes", async (Guid projectId, CreateNodeRequest body, HttpContext ctx) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest("Nazwa jest wymagana.");
@@ -145,6 +145,17 @@ static class ItemEndpoints
                     return Results.NotFound("Projekt nie istnieje.");
             }
 
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (user.Role != "admin")
+            {
+                await using var accessCmd = new NpgsqlCommand(
+                    "SELECT 1 FROM project_users WHERE project_id = @projectId AND user_id = @userId;", conn);
+                accessCmd.Parameters.AddWithValue("projectId", projectId);
+                accessCmd.Parameters.AddWithValue("userId", user.Id);
+                if (await accessCmd.ExecuteScalarAsync() is null)
+                    return Results.Text("Brak dostępu do tego projektu.", statusCode: StatusCodes.Status403Forbidden);
+            }
+
             if (body.ParentId is not null)
             {
                 var parentInfo = await GetItemTypeAndStatus(connectionString, body.ParentId.Value);
@@ -158,14 +169,16 @@ static class ItemEndpoints
             var propertiesJson = body.Properties.HasValue ? body.Properties.Value.GetRawText() : "{}";
 
             const string insertSql = """
-                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position)
+                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position, owner_id, owner_locked)
                 VALUES (
                     @id, @projectId, @itemType, @name, @props::jsonb,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN nextval('item_number_seq') ELSE NULL END,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN 'w_pracy' ELSE NULL END,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN 1 ELSE NULL END,
                     now(),
-                    COALESCE((SELECT MAX(root_position) FROM items WHERE project_id = @projectId), 0) + 1
+                    COALESCE((SELECT MAX(root_position) FROM items WHERE project_id = @projectId), 0) + 1,
+                    CASE WHEN @itemType IN ('part', 'assembly') THEN @ownerId ELSE NULL END,
+                    @itemType IN ('part', 'assembly')
                 )
                 RETURNING item_number;
                 """;
@@ -175,6 +188,7 @@ static class ItemEndpoints
             insertCmd.Parameters.AddWithValue("itemType", body.ItemType);
             insertCmd.Parameters.AddWithValue("name", body.Name.Trim());
             insertCmd.Parameters.AddWithValue("props", propertiesJson);
+            insertCmd.Parameters.AddWithValue("ownerId", user.Id);
 
             await using var reader = await insertCmd.ExecuteReaderAsync();
             await reader.ReadAsync();
@@ -219,13 +233,14 @@ static class ItemEndpoints
         // załadowanej struktury/relacji) kopia trafia po prostu na koniec listy korzeni projektu
         // — nie ma jak wywnioskować "właściwego" miejsca bez tego kontekstu.
         // ============================================================
-        app.MapPost("/api/items/{id:guid}/duplicate", async (Guid id, DuplicateItemRequest? body) =>
+        app.MapPost("/api/items/{id:guid}/duplicate", async (Guid id, DuplicateItemRequest? body, HttpContext ctx) =>
         {
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
                 return Results.NotFound();
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
                 return Results.BadRequest("Duplikować można tylko Części i Złożenia.");
+            var currentUser = (CurrentUser)ctx.Items["CurrentUser"]!;
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -256,7 +271,7 @@ static class ItemEndpoints
                         await shiftCmd.ExecuteNonQueryAsync();
                     }
 
-                    var itemNumber = await InsertDuplicateRowAsync(conn, tx, newId, id, rootPosition: null);
+                    var itemNumber = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null);
 
                     await using (var insertRelCmd = new NpgsqlCommand(
                         """
@@ -299,12 +314,12 @@ static class ItemEndpoints
                     await shiftCmd.ExecuteNonQueryAsync();
                 }
 
-                var itemNumber = await InsertDuplicateRowAsync(conn, tx, newId, id, rootPosition: sourceRootPosition + 1);
+                var itemNumber = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: sourceRootPosition + 1);
                 await tx.CommitAsync();
                 return Results.Created($"/api/items/{newId}", new { id = newId, itemNumber });
             }
 
-            var appendedItemNumber = await InsertDuplicateRowAsync(conn, tx, newId, id, rootPosition: null);
+            var appendedItemNumber = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null);
             await tx.CommitAsync();
             return Results.Created($"/api/items/{newId}", new { id = newId, itemNumber = appendedItemNumber });
         });
@@ -338,16 +353,22 @@ static class ItemEndpoints
         // ============================================================
         // GET /api/items?search=&tag=&projectId=
         // Lista elementów z opcjonalnym filtrem po nazwie/właściwościach, tagu i projekcie.
+        // Zwykły użytkownik widzi tylko elementy z projektów, do których został przypisany
+        // (project_users) — spójnie z tym, że w ogóle nie widzi nieprzypisanych projektów.
         // ============================================================
-        app.MapGet("/api/items", async (string? search, string? tag, Guid? projectId) =>
+        app.MapGet("/api/items", async (string? search, string? tag, Guid? projectId, HttpContext ctx) =>
         {
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
             const string sql = """
                 SELECT i.id, i.project_id, i.file_name, i.file_type, i.file_path, i.properties, i.modified_at,
-                       i.item_type, i.item_number, i.show_in_tree, i.status, i.revision_number, i.root_position
+                       i.item_type, i.item_number, i.show_in_tree, i.status, i.revision_number, i.root_position,
+                       i.owner_id, i.owner_locked, u.display_name
                 FROM items i
+                LEFT JOIN users u ON u.id = i.owner_id
                 WHERE (@search::text IS NULL OR i.file_name ILIKE '%' || @search || '%'
                                                OR i.properties::text ILIKE '%' || @search || '%'
                                                OR i.item_number::text ILIKE '%' || @search || '%')
@@ -356,6 +377,9 @@ static class ItemEndpoints
                         JOIN tags t ON t.id = it.tag_id
                         WHERE it.item_id = i.id AND t.name = @tag))
                   AND (@projectId::uuid IS NULL OR i.project_id = @projectId)
+                  AND (@isAdmin OR EXISTS (
+                        SELECT 1 FROM project_users pu WHERE pu.project_id = i.project_id AND pu.user_id = @userId
+                  ))
                 ORDER BY i.file_name;
                 """;
 
@@ -363,6 +387,8 @@ static class ItemEndpoints
             cmd.Parameters.AddWithValue("search", (object?)search ?? DBNull.Value);
             cmd.Parameters.AddWithValue("tag", (object?)tag ?? DBNull.Value);
             cmd.Parameters.AddWithValue("projectId", (object?)projectId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("isAdmin", user.Role == "admin");
+            cmd.Parameters.AddWithValue("userId", user.Id);
 
             var items = new List<Dictionary<string, object?>>();
             var ids = new List<Guid>();
@@ -388,6 +414,9 @@ static class ItemEndpoints
                         ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
                         ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
                         ["rootPosition"] = reader.GetInt32(12),
+                        ["ownerId"] = reader.IsDBNull(13) ? null : reader.GetGuid(13),
+                        ["ownerLocked"] = reader.GetBoolean(14),
+                        ["ownerDisplayName"] = reader.IsDBNull(15) ? null : reader.GetString(15),
                         ["tags"] = new List<string>()
                     });
                 }
@@ -416,9 +445,12 @@ static class ItemEndpoints
             await conn.OpenAsync();
 
             const string sql = """
-                SELECT id, project_id, file_name, file_type, file_path, properties, modified_at,
-                       item_type, item_number, show_in_tree, status, revision_number, root_position
-                FROM items WHERE id = @id;
+                SELECT i.id, i.project_id, i.file_name, i.file_type, i.file_path, i.properties, i.modified_at,
+                       i.item_type, i.item_number, i.show_in_tree, i.status, i.revision_number, i.root_position,
+                       i.owner_id, i.owner_locked, u.display_name
+                FROM items i
+                LEFT JOIN users u ON u.id = i.owner_id
+                WHERE i.id = @id;
                 """;
 
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -445,6 +477,9 @@ static class ItemEndpoints
                 ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
                 ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
                 ["rootPosition"] = reader.GetInt32(12),
+                ["ownerId"] = reader.IsDBNull(13) ? null : reader.GetGuid(13),
+                ["ownerLocked"] = reader.GetBoolean(14),
+                ["ownerDisplayName"] = reader.IsDBNull(15) ? null : reader.GetString(15),
                 ["tags"] = tagsByItem.TryGetValue(id, out var t) ? t : new List<string>()
             };
 
@@ -454,7 +489,7 @@ static class ItemEndpoints
         // ============================================================
         // PATCH /api/items/{id}/name   body: { "name": "Nowa nazwa" }
         // ============================================================
-        app.MapPatch("/api/items/{id:guid}/name", async (Guid id, RenameRequest body) =>
+        app.MapPatch("/api/items/{id:guid}/name", async (Guid id, RenameRequest body, HttpContext ctx) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest("Nazwa nie może być pusta.");
@@ -464,6 +499,9 @@ static class ItemEndpoints
                 return Results.NotFound();
             if (IsLocked(info.Value.ItemType, info.Value.Status))
                 return Results.BadRequest("Nazwę można zmieniać tylko w statusie 'W pracy'.");
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -487,7 +525,7 @@ static class ItemEndpoints
         // się zmieniło w nowej rewizji; tworzony zarówno z aplikacji webowej, jak i z makra
         // FreeCAD. Jest opcjonalny — puste/brak pola nic nie zapisuje.
         // ============================================================
-        app.MapPatch("/api/items/{id:guid}/status", async (Guid id, StatusRequest body) =>
+        app.MapPatch("/api/items/{id:guid}/status", async (Guid id, StatusRequest body, HttpContext ctx) =>
         {
             if (body.Status != "w_pracy" && body.Status != "sprawdzany" && body.Status != "wydany")
                 return Results.BadRequest("Nieprawidłowy status — dozwolone: 'w_pracy', 'sprawdzany', 'wydany'.");
@@ -495,10 +533,15 @@ static class ItemEndpoints
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
                 return Results.NotFound();
-            var (itemType, currentStatus) = info.Value;
+            var itemType = info.Value.ItemType;
+            var currentStatus = info.Value.Status;
 
             if (itemType != "part" && itemType != "assembly")
                 return Results.BadRequest("Status dotyczy tylko Części i Złożeń.");
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return OwnerLockedForbidden();
 
             bool isValidTransition = body.Status == currentStatus || (currentStatus, body.Status) switch
             {
@@ -517,9 +560,19 @@ static class ItemEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
+            // Wydany element nie może mieć właściciela ani być zablokowany — zawsze jest zwolniony
+            // (patrz też /lock i /release, które odrzucają próby zmiany blokady w tym statusie).
             string sql = bumpRevision
-                ? "UPDATE items SET status = @status, revision_number = COALESCE(revision_number, 0) + 1 WHERE id = @id RETURNING revision_number;"
-                : "UPDATE items SET status = @status WHERE id = @id RETURNING revision_number;";
+                ? """
+                  UPDATE items SET status = @status, revision_number = COALESCE(revision_number, 0) + 1
+                  WHERE id = @id RETURNING revision_number;
+                  """
+                : """
+                  UPDATE items SET status = @status,
+                         owner_id = CASE WHEN @status = 'wydany' THEN NULL ELSE owner_id END,
+                         owner_locked = CASE WHEN @status = 'wydany' THEN false ELSE owner_locked END
+                  WHERE id = @id RETURNING revision_number;
+                  """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("status", body.Status);
@@ -540,6 +593,73 @@ static class ItemEndpoints
             }
 
             return Results.Ok(new { status = body.Status, revisionNumber });
+        });
+
+        // ============================================================
+        // POST /api/items/{id}/lock — "Zablokuj". Dostępne dla KAŻDEGO, ale tylko gdy element
+        // jest aktualnie zwolniony — zablokowanie ustawia wywołującego jako nowego właściciela.
+        // Jeśli element jest już zablokowany przez kogoś innego, odrzucamy (nawet admin nie
+        // może "przejąć" cudzej blokady tędy).
+        // ============================================================
+        app.MapPost("/api/items/{id:guid}/lock", async (Guid id, HttpContext ctx) =>
+        {
+            var info = await GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+            if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
+                return Results.BadRequest("Właściciela/blokadę mają tylko Części i Złożenia.");
+            if (info.Value.Status == "wydany")
+                return Results.BadRequest("Wydanych elementów nie można blokować — są zawsze zwolnione.");
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (IsOwnerLocked(info.Value.OwnerId, info.Value.OwnerLocked) && info.Value.OwnerId != user.Id)
+                return OwnerLockedForbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string sql = "UPDATE items SET owner_id = @ownerId, owner_locked = true WHERE id = @id;";
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("ownerId", user.Id);
+            await cmd.ExecuteNonQueryAsync();
+
+            return Results.Ok(new { ownerId = user.Id, ownerLocked = true });
+        });
+
+        // ============================================================
+        // POST /api/items/{id}/release — "Zwolnij". Tylko AKTUALNY właściciel może zwolnić
+        // zablokowany element — nawet administrator nie omija tego.
+        // ============================================================
+        app.MapPost("/api/items/{id:guid}/release", async (Guid id, HttpContext ctx) =>
+        {
+            var info = await GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+            if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
+                return Results.BadRequest("Właściciela/blokadę mają tylko Części i Złożenia.");
+            if (info.Value.Status == "wydany")
+                return Results.BadRequest("Wydane elementy są zawsze zwolnione.");
+            if (!IsOwnerLocked(info.Value.OwnerId, info.Value.OwnerLocked))
+                return Results.BadRequest("Element nie jest zablokowany.");
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (info.Value.OwnerId != user.Id)
+                return Results.Text(
+                    "Tylko właściciel może zwolnić ten element.", statusCode: StatusCodes.Status403Forbidden);
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            // Zwolniony element nie ma właściciela — i tak może go edytować każdy, więc nie ma
+            // sensu pamiętać, kto ostatnio go blokował. Nowego właściciela nadaje dopiero
+            // kolejne "Zablokuj" (patrz endpoint /lock powyżej).
+            const string sql = "UPDATE items SET owner_id = NULL, owner_locked = false WHERE id = @id;";
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", id);
+            await cmd.ExecuteNonQueryAsync();
+
+            return Results.Ok(new { ownerId = (Guid?)null, ownerLocked = false });
         });
 
         // GET /api/items/{id}/revisions — historia komentarzy rewizji (tylko te, które mają
@@ -576,8 +696,15 @@ static class ItemEndpoints
         // PATCH /api/items/{id}/visibility   body: { "showInTree": false }
         // Element bez rodzica nie ma relacji do odpięcia — "usuń ze struktury" oznacza wtedy:
         // zostań w projekcie, ale przestań się pokazywać jako korzeń w drzewku.
-        app.MapPatch("/api/items/{id:guid}/visibility", async (Guid id, VisibilityRequest body) =>
+        app.MapPatch("/api/items/{id:guid}/visibility", async (Guid id, VisibilityRequest body, HttpContext ctx) =>
         {
+            var info = await GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return OwnerLockedForbidden();
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
@@ -595,8 +722,15 @@ static class ItemEndpoints
         // gdy dodajemy "Istniejący element" z całej bazy na poziomie głównym (bez rodzica) projektu,
         // do którego element jeszcze nie należy. Zagnieżdżone odwołania w item_relations (element
         // jako komponent BOM w innych złożeniach) zostają nienaruszone niezależnie od project_id.
-        app.MapPatch("/api/items/{id:guid}/project", async (Guid id, MoveToProjectRequest body) =>
+        app.MapPatch("/api/items/{id:guid}/project", async (Guid id, MoveToProjectRequest body, HttpContext ctx) =>
         {
+            var info = await GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return OwnerLockedForbidden();
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
@@ -704,12 +838,12 @@ static class ItemEndpoints
         _ => false
     };
 
-    internal static async Task<(string ItemType, string? Status)?> GetItemTypeAndStatus(string connectionString, Guid id)
+    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked)?> GetItemTypeAndStatus(string connectionString, Guid id)
     {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync();
 
-        const string sql = "SELECT item_type, status FROM items WHERE id = @id;";
+        const string sql = "SELECT item_type, status, owner_id, owner_locked FROM items WHERE id = @id;";
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("id", id);
 
@@ -717,20 +851,41 @@ static class ItemEndpoints
         if (!await reader.ReadAsync())
             return null;
 
-        return (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1));
+        return (
+            reader.GetString(0),
+            reader.IsDBNull(1) ? null : reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetGuid(2),
+            reader.GetBoolean(3)
+        );
     }
+
+    // Właściciel (Właściciel/owner_id + owner_locked) — NIEZALEŻNE od statusu 'w_pracy'/IsLocked
+    // powyżej. Dopóki element jest zablokowany, tylko owner_id może go edytować — nawet
+    // administrator nie omija tej blokady (w odróżnieniu od każdej innej reguły w tym API).
+    internal static bool IsOwnerLocked(Guid? ownerId, bool ownerLocked) => ownerLocked && ownerId is not null;
+
+    internal static bool CanEditOwnerLocked(Guid currentUserId, Guid? ownerId, bool ownerLocked) =>
+        !IsOwnerLocked(ownerId, ownerLocked) || ownerId == currentUserId;
+
+    internal static IResult OwnerLockedForbidden() => Results.Text(
+        "Ten element jest zablokowany przez innego użytkownika — tylko właściciel może go edytować.",
+        statusCode: StatusCodes.Status403Forbidden);
 
     // Wspólny insert dla duplikowania — używany zarówno przy wstawianiu kopii "zaraz pod
     // oryginałem" (rootPosition podany explicite) jak i przy zwykłym dopisaniu na koniec listy
     // korzeni projektu (rootPosition = null, wyliczane tu jako MAX+1).
     internal static async Task<int?> InsertDuplicateRowAsync(
-        NpgsqlConnection conn, NpgsqlTransaction tx, Guid newId, Guid sourceId, int? rootPosition)
+        NpgsqlConnection conn, NpgsqlTransaction tx, Guid newId, Guid sourceId, Guid ownerId, int? rootPosition)
     {
+        // Kopia to NOWY rekord — dostaje własnego właściciela (osobę duplikującą), zablokowanego
+        // od razu, tak samo jak przy ręcznym tworzeniu Części/Złożenia; nie dziedziczy właściciela
+        // oryginału.
         const string sql = """
-            INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position)
+            INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, status, revision_number, modified_at, root_position, owner_id, owner_locked)
             SELECT @newId, src.project_id, src.item_type, src.file_name || ' (kopia)', src.properties,
                    nextval('item_number_seq'), 'w_pracy', 1, now(),
-                   COALESCE(@rootPosition, (SELECT COALESCE(MAX(root_position), 0) + 1 FROM items WHERE project_id = src.project_id))
+                   COALESCE(@rootPosition, (SELECT COALESCE(MAX(root_position), 0) + 1 FROM items WHERE project_id = src.project_id)),
+                   @ownerId, true
             FROM items src
             WHERE src.id = @sourceId
             RETURNING item_number;
@@ -738,6 +893,7 @@ static class ItemEndpoints
         await using var cmd = new NpgsqlCommand(sql, conn, tx);
         cmd.Parameters.AddWithValue("newId", newId);
         cmd.Parameters.AddWithValue("sourceId", sourceId);
+        cmd.Parameters.AddWithValue("ownerId", ownerId);
         cmd.Parameters.AddWithValue("rootPosition", (object?)rootPosition ?? DBNull.Value);
         return (int?)await cmd.ExecuteScalarAsync();
     }

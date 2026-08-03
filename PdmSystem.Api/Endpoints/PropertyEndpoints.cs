@@ -15,7 +15,7 @@ static class PropertyEndpoints
         // ============================================================
         // PATCH /api/items/{id}/properties   body: { "material": "Stal S235", "supplier": "..." }
         // ============================================================
-        app.MapPatch("/api/items/{id:guid}/properties", async (Guid id, JsonElement body) =>
+        app.MapPatch("/api/items/{id:guid}/properties", async (Guid id, JsonElement body, HttpContext ctx) =>
         {
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
             if (info is null)
@@ -30,6 +30,10 @@ static class PropertyEndpoints
                             "Właściwości można zmieniać tylko w statusie 'W pracy' (wyjątek: cena, waluta, brutto/netto).");
                 }
             }
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -49,7 +53,7 @@ static class PropertyEndpoints
         // ============================================================
         // DELETE /api/items/{id}/properties/{key}
         // ============================================================
-        app.MapDelete("/api/items/{id:guid}/properties/{key}", async (Guid id, string key) =>
+        app.MapDelete("/api/items/{id:guid}/properties/{key}", async (Guid id, string key, HttpContext ctx) =>
         {
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
             if (info is null)
@@ -58,6 +62,10 @@ static class PropertyEndpoints
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status) && !AlwaysEditableKeys.Contains(key))
                 return Results.BadRequest(
                     "Właściwości można zmieniać tylko w statusie 'W pracy' (wyjątek: cena, waluta, brutto/netto).");
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();

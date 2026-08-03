@@ -38,6 +38,17 @@ CREATE TABLE projects (
     created_at  TIMESTAMPTZ DEFAULT now()
 );
 
+-- Przypisania użytkowników do projektów — zwykły użytkownik ("user") widzi i może
+-- przeglądać strukturę tylko przypisanych projektów; administrator zawsze widzi wszystko
+-- (sprawdzane w kodzie aplikacji, nie tutaj).
+CREATE TABLE project_users (
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (project_id, user_id)
+);
+
+GRANT SELECT, INSERT, DELETE ON project_users TO pdm_user;
+
 -- ============================================================
 -- Elementy (pliki CAD i powiązane dokumenty)
 -- ============================================================
@@ -62,7 +73,9 @@ CREATE TABLE items (
     show_in_tree        BOOLEAN NOT NULL DEFAULT true,  -- dla elementów bez rodzica: czy pokazywać jako korzeń w drzewku
     status              TEXT CHECK (status IN ('w_pracy', 'sprawdzany', 'wydany')),  -- tylko dla part/assembly
     revision_number     INTEGER,                    -- tylko dla part/assembly, rośnie przy przejściu wydany -> w_pracy
-    root_position       INTEGER NOT NULL DEFAULT 1  -- kolejność wśród korzeni tego samego projektu (przeciąganie w drzewku)
+    root_position       INTEGER NOT NULL DEFAULT 1,  -- kolejność wśród korzeni tego samego projektu (przeciąganie w drzewku)
+    owner_id            UUID REFERENCES users(id) ON DELETE SET NULL,  -- właściciel part/assembly — patrz owner_locked
+    owner_locked        BOOLEAN NOT NULL DEFAULT false  -- gdy true, tylko owner_id może edytować (nawet admin nie omija)
 );
 
 CREATE SEQUENCE item_number_seq START 1;

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import { Info } from "lucide-react"
 
 import { api } from "@/api/client"
-import { isLocked, type Item, type ManufacturerDetail } from "@/api/types"
+import { canEditOwnerLocked, isLocked, type Item, type ManufacturerDetail } from "@/api/types"
+import { useAuth } from "@/features/auth/use-auth"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -48,8 +49,11 @@ function PartPropertyForm({
   onChanged: () => void | Promise<void>
 }) {
   const { t } = useLanguage()
+  const { user } = useAuth()
   const rodzaj = typeof item.properties.rodzaj === "string" ? item.properties.rodzaj : ""
-  const locked = isLocked(item)
+  const statusLocked = isLocked(item)
+  const ownerBlocked = user ? !canEditOwnerLocked(item, user.id) : false
+  const locked = statusLocked || ownerBlocked
 
   const [name, setName] = useState(item.fileName)
   useEffect(() => setName(item.fileName), [item.fileName])
@@ -76,7 +80,8 @@ function PartPropertyForm({
 
   return (
     <div className="flex flex-col gap-2">
-      {locked && <Hint>{t("part.lockedHint")}</Hint>}
+      {statusLocked && <Hint>{t("part.lockedHint")}</Hint>}
+      {ownerBlocked && !statusLocked && <Hint>{t("item.ownerLockedHint")}</Hint>}
 
       <Label>{t("part.kind")}</Label>
       <div className="flex gap-1.5">
@@ -103,6 +108,14 @@ function PartPropertyForm({
           onClick={() => changeRodzaj("Normalia")}
         >
           {t("part.kindStandard")}
+        </Button>
+        <Button
+          size="sm"
+          variant={rodzaj === "Klienta" ? "default" : "outline"}
+          disabled={locked}
+          onClick={() => changeRodzaj("Klienta")}
+        >
+          {t("part.kindClient")}
         </Button>
       </div>
 
@@ -143,6 +156,10 @@ function PartPropertyForm({
           <PropField label={t("part.norm")} propKey="norm" item={item} onSave={saveField} disabled={locked} />
           <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
+      )}
+
+      {rodzaj === "Klienta" && (
+        <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
       )}
 
       {!rodzaj && <Hint>{t("part.selectKindHint")}</Hint>}

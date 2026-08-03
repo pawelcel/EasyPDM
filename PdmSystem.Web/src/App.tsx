@@ -17,6 +17,7 @@ import { MaterialsView } from "@/features/materials/materials-view"
 import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
 import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
 import { LanguageSettingsView } from "@/features/settings/language-settings-view"
+import { MyProjectsView } from "@/features/settings/my-projects-view"
 import { SettingsSidebar } from "@/features/settings/settings-sidebar"
 import { StorageSettingsView } from "@/features/settings/storage-settings-view"
 import { TagFilterSelect } from "@/features/tags/tag-filter-select"
@@ -87,7 +88,12 @@ function App() {
       <AppSidebar activeId={view} onSelect={(id) => setView(id as View)} />
 
       {view === "settings" && (
-        <SettingsSidebar activeId={settingsSection} isAdmin={isAdmin} onSelect={setSettingsSection} />
+        <SettingsSidebar
+          activeId={settingsSection}
+          isAdmin={isAdmin}
+          myLabel={user.displayName}
+          onSelect={setSettingsSection}
+        />
       )}
 
       <div className="min-w-0 flex-1">
@@ -221,6 +227,10 @@ function App() {
           {view === "settings" && settingsSection === "appearance" && <AppearanceSettingsView />}
 
           {view === "settings" && settingsSection === "language" && <LanguageSettingsView />}
+
+          {view === "settings" && settingsSection === "myProjects" && (
+            <MyProjectsView displayName={user.displayName} projects={projects} />
+          )}
         </main>
       </div>
     </div>
