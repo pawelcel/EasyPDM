@@ -36,12 +36,19 @@ DB_USER=pdm_user
 echo "== 1/6: PostgreSQL =="
 if command -v pacman >/dev/null 2>&1; then
     PKG_INSTALL="pacman -S --needed --noconfirm"
+    PG_PACKAGE="postgresql"
 elif command -v apt-get >/dev/null 2>&1; then
     PKG_INSTALL="apt-get install -y"
+    PG_PACKAGE="postgresql"
 elif command -v dnf >/dev/null 2>&1; then
     PKG_INSTALL="dnf install -y"
+    # Na Fedorze/RHEL pakiet "postgresql" to WYŁĄCZNIE narzędzia klienckie (psql) — serwer
+    # (postmaster, jednostka systemd, postgresql-setup) jest w osobnym "postgresql-server",
+    # który i tak ciągnie "postgresql" jako zależność.
+    PG_PACKAGE="postgresql-server"
 else
     PKG_INSTALL=""
+    PG_PACKAGE=""
 fi
 
 if ! command -v psql >/dev/null 2>&1; then
@@ -49,8 +56,8 @@ if ! command -v psql >/dev/null 2>&1; then
         echo "Nie rozpoznano menedżera pakietów — zainstaluj PostgreSQL ręcznie i uruchom ponownie ten skrypt." >&2
         exit 1
     fi
-    echo "Instaluję PostgreSQL ($PKG_INSTALL postgresql)..."
-    $PKG_INSTALL postgresql
+    echo "Instaluję PostgreSQL ($PKG_INSTALL $PG_PACKAGE)..."
+    $PKG_INSTALL $PG_PACKAGE
 fi
 
 # W odróżnieniu od Debiana/Fedory, pakiet PostgreSQL na Arch NIE inicjalizuje klastra

@@ -240,9 +240,34 @@ static class SettingsEndpoints
 
                 // pg_restore nie jest tu uruchamiany w jednej transakcji — pojedyncze,
                 // nieszkodliwe błędy (np. brak uprawnień do rozszerzenia, które i tak już
-                // istnieje) nie przerywają reszty odtwarzania, więc niezerowy kod zwracamy
-                // jako ostrzeżenie, a nie twardy błąd blokujący dalsze kroki.
+                // istnieje) mogą dać niezerowy ExitCode mimo poprawnie odtworzonych danych,
+                // więc sam kod wyjścia nie jest wiarygodnym sygnałem sukcesu/porażki. Zamiast
+                // tego sprawdzamy, czy baza faktycznie ma podstawową, oczekiwaną strukturę
+                // (tabelę users) — dopiero jeśli to się uda, ruszamy (i potencjalnie kasujemy)
+                // magazyn plików. Jeśli restore naprawdę zawiódł, ten sanity-check to wykryje
+                // i magazyn zostaje nietknięty.
                 NpgsqlConnection.ClearAllPools();
+
+                bool databaseLooksRestored;
+                try
+                {
+                    await using var checkConn = new NpgsqlConnection(connectionString);
+                    await checkConn.OpenAsync();
+                    await using var checkCmd = new NpgsqlCommand("SELECT COUNT(*) FROM users;", checkConn);
+                    await checkCmd.ExecuteScalarAsync();
+                    databaseLooksRestored = true;
+                }
+                catch (NpgsqlException)
+                {
+                    databaseLooksRestored = false;
+                }
+
+                if (!databaseLooksRestored)
+                {
+                    return Results.Problem(
+                        $"pg_restore najprawdopodobniej się nie powiódł (kod wyjścia {process.ExitCode}) — " +
+                        $"baza nie ma oczekiwanej struktury po przywróceniu. Magazyn plików NIE został ruszony.\n{stderr}");
+                }
 
                 var filesRestored = 0;
                 var storageBackupDir = Path.Combine(extractDir, "storage");

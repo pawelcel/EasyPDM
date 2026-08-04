@@ -52,6 +52,9 @@ function ItemList({
   const [manufacturer, setManufacturer] = useState("")
   const [selection, setSelection] = useState<Selection | null>(null)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [selectedItemChildren, setSelectedItemChildren] = useState<
+    { item: Item; quantity: number; position: number }[]
+  >([])
 
   // Filtr "rodzaj części" ma sens tylko dla Części, a "producent" tylko dla Części
   // zakupowych — zmiana filtra wyżej w hierarchii kasuje te niżej, żeby nie został
@@ -111,6 +114,9 @@ function ItemList({
           return true
         })
 
+  const selectedItem =
+    selection?.kind === "item" ? (visibleItems.find((i) => i.id === selection.id) ?? null) : null
+
   // Jeśli zaznaczony rekord zniknie z bieżącej, przefiltrowanej listy (zmiana filtra,
   // odświeżenie, usunięcie) — panel po prawej wraca do stanu "nic nie wybrano".
   useEffect(() => {
@@ -123,11 +129,35 @@ function ItemList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleItems, visibleProjects])
 
+  // W odróżnieniu od widoku projektu (project-tree-view.tsx), tu nie ma z góry załadowanego
+  // całego drzewka relacji — zaznaczony element może być z dowolnego projektu, więc bezpośrednie
+  // dzieci (do sekcji BOM/Pliki w ItemDetailPanel) dociągamy osobno, dopiero po zaznaczeniu.
+  useEffect(() => {
+    if (!selectedItem) {
+      setSelectedItemChildren([])
+      return
+    }
+    let cancelled = false
+    api
+      .getItemChildren(selectedItem.id)
+      .then((children) => {
+        if (!cancelled) setSelectedItemChildren(children)
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedItemChildren([])
+      })
+    return () => {
+      cancelled = true
+    }
+    // Zależność po id (nie po całym obiekcie) — visibleItems/selectedItem dostają nową
+    // referencję tablicy przy każdym re-renderze; refetch ma sens tylko przy realnej zmianie
+    // zaznaczenia, nie przy każdym niepowiązanym re-renderze listy.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItem?.id])
+
   if (loading) return <Hint>{t("common.loading")}</Hint>
   if (error) return <Hint>{t("database.loadError")}</Hint>
 
-  const selectedItem =
-    selection?.kind === "item" ? (visibleItems.find((i) => i.id === selection.id) ?? null) : null
   const selectedProject =
     selection?.kind === "project" ? (visibleProjects.find((p) => p.id === selection.id) ?? null) : null
   const deletingItem = confirmingDeleteId ? visibleItems.find((i) => i.id === confirmingDeleteId) : null
@@ -178,6 +208,7 @@ function ItemList({
                 key={selectedItem.id}
                 item={selectedItem}
                 projectName={projects.find((p) => p.id === selectedItem.projectId)?.name}
+                childEntries={selectedItemChildren}
                 onItemsRefetch={onItemsRefetch}
                 onTagsRefetch={onTagsRefetch}
                 onDeleteCompletely={isAdmin ? () => setConfirmingDeleteId(selectedItem.id) : undefined}

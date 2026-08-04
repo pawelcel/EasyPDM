@@ -27,6 +27,12 @@ COPY EasyPDM.Api/EasyPDM.Api.csproj EasyPDM.Api/
 RUN dotnet restore EasyPDM.Api/EasyPDM.Api.csproj
 
 COPY EasyPDM.Api EasyPDM.Api/
+# db/migrations/*.sql jest wbudowywane w EasyPDM.Api.dll jako EmbeddedResource przez
+# "..\db\migrations\*.sql" w EasyPDM.Api.csproj (rozwiązuje się do /src/db/migrations/
+# w tym kontekście budowy) — bez tego katalogu "dotnet publish" po cichu zbudowałby się
+# BEZ ani jednej migracji (glob na nieistniejący katalog nie jest błędem), więc obraz
+# Docker nigdy nie zastosowałby żadnej przyszłej migracji (zob. MigrationRunner.cs).
+COPY db db/
 # Zbudowany frontend z etapu 1 trafia do wwwroot/ PRZED publikacją, żeby "dotnet publish"
 # skopiował go razem z resztą (UseStaticFiles w Program.cs serwuje go z tego katalogu).
 COPY --from=frontend-build /src/EasyPDM.Api/wwwroot EasyPDM.Api/wwwroot/

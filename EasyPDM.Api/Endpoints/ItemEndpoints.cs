@@ -516,17 +516,18 @@ static class ItemEndpoints
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
                 return Results.NotFound();
-            if (IsLocked(info.Value.ItemType, info.Value.Status))
-                return Results.BadRequest("Nazwę można zmieniać tylko w statusie 'W pracy'.");
-            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
-                return OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
             if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
                 return ProjectAccessForbidden();
+
+            if (IsLocked(info.Value.ItemType, info.Value.Status))
+                return Results.BadRequest("Nazwę można zmieniać tylko w statusie 'W pracy'.");
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return OwnerLockedForbidden();
 
             const string sql = "UPDATE items SET file_name = @name WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -555,6 +556,13 @@ static class ItemEndpoints
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
                 return Results.NotFound();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
             var itemType = info.Value.ItemType;
             var currentStatus = info.Value.Status;
 
@@ -578,12 +586,6 @@ static class ItemEndpoints
                 return Results.BadRequest($"Nie można zmienić statusu z '{currentStatus}' na '{body.Status}'.");
 
             bool bumpRevision = currentStatus == "wydany" && body.Status == "w_pracy";
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
-
-            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ProjectAccessForbidden();
 
             // Wydany element nie może mieć właściciela ani być zablokowany — zawsze jest zwolniony
             // (patrz też /lock i /release, które odrzucają próby zmiany blokady w tym statusie).
@@ -648,6 +650,13 @@ static class ItemEndpoints
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
                 return Results.NotFound();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
                 return Results.BadRequest("Właściciela/blokadę mają tylko Części i Złożenia.");
             if (info.Value.Status == "wydany")
@@ -656,12 +665,6 @@ static class ItemEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (IsOwnerLocked(info.Value.OwnerId, info.Value.OwnerLocked) && info.Value.OwnerId != user.Id)
                 return OwnerLockedForbidden();
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
-
-            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ProjectAccessForbidden();
 
             const string sql = "UPDATE items SET owner_id = @ownerId, owner_locked = true WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -683,6 +686,13 @@ static class ItemEndpoints
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
                 return Results.NotFound();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
                 return Results.BadRequest("Właściciela/blokadę mają tylko Części i Złożenia.");
             if (info.Value.Status == "wydany")
@@ -694,12 +704,6 @@ static class ItemEndpoints
             if (info.Value.OwnerId != user.Id)
                 return Results.Text(
                     "Tylko właściciel może zwolnić ten element.", statusCode: StatusCodes.Status403Forbidden);
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
-
-            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ProjectAccessForbidden();
 
             // Zwolniony element nie ma właściciela — i tak może go edytować każdy, więc nie ma
             // sensu pamiętać, kto ostatnio go blokował. Nowego właściciela nadaje dopiero
@@ -760,15 +764,16 @@ static class ItemEndpoints
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
                 return Results.NotFound();
-            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
-                return OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
             if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
                 return ProjectAccessForbidden();
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return OwnerLockedForbidden();
 
             const string sql = "UPDATE items SET show_in_tree = @value WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -789,15 +794,16 @@ static class ItemEndpoints
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
                 return Results.NotFound();
-            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
-                return OwnerLockedForbidden();
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
             if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
                 return ProjectAccessForbidden();
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return OwnerLockedForbidden();
 
             await using (var checkCmd = new NpgsqlCommand("SELECT 1 FROM projects WHERE id = @projectId;", conn))
             {

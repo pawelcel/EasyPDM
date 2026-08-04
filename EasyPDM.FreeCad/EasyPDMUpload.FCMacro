@@ -550,8 +550,9 @@ def push_to_existing_item(doc, item_id, confirm_new_revision):
 
     item = api_get(f"/items/{item_id}")
     revision = item.get("revisionNumber") or 1
+    current_status = item.get("status")
 
-    if item.get("status") == "wydany":
+    if current_status == "wydany":
         comment = confirm_new_revision()
         if comment is None:
             return None
@@ -559,8 +560,39 @@ def push_to_existing_item(doc, item_id, confirm_new_revision):
             f"/items/{item_id}/status", {"status": "w_pracy", "comment": comment or None}
         )
         revision = (status_result or {}).get("revisionNumber") or (revision + 1)
+        status_changed = True
+    elif current_status is not None and current_status != "w_pracy":
+        # Każdy status poza "w_pracy" blokuje dogrywanie plików po stronie backendu
+        # (zob. ItemEndpoints.IsLocked) — nie tylko "wydany". Dla "sprawdzany" wystarczy
+        # wrócić do "w_pracy" bez pytania o nową rewizję: rewizję podnosi WYŁĄCZNIE
+        # przejście wydany -> w_pracy (zob. bumpRevision w PATCH /items/{id}/status),
+        # więc "sprawdzany" -> "w_pracy" nie jest nową rewizją i nie potrzebuje komentarza.
+        api_patch_json(f"/items/{item_id}/status", {"status": "w_pracy"})
+        status_changed = True
+    else:
+        status_changed = False
 
-    return _rename_and_upload(doc, item_id, item["itemNumber"], item["fileName"], revision)
+    try:
+        return _rename_and_upload(doc, item_id, item["itemNumber"], item["fileName"], revision)
+    except Exception as exc:
+        if status_changed:
+            # Status/rewizja zostały już podniesione na serwerze (musiały być, żeby dogranie
+            # pliku było w ogóle dozwolone) — skoro sama kopia/rejestracja pliku zawiodła,
+            # element PDM jest teraz w rozjechanym stanie: nowa rewizja/status w bazie, ale
+            # wciąż plik ze starej rewizji. Cofnięcie NIE jest tu bezpiecznie możliwe — backend
+            # nie zezwala na przejście "w_pracy" -> "wydany" wprost (zob. isValidTransition
+            # w ItemEndpoints.cs) — więc zamiast cichej/mylącej próby cofnięcia, głośno mówimy
+            # dokładnie co się stało i co zrobić ręcznie.
+            raise RuntimeError(
+                f"Status/rewizja elementu #{item.get('itemNumber')} zostały już zmienione na "
+                f"serwerze (rewizja {revision}, status 'w_pracy'), ale dogranie pliku się nie "
+                f"powiodło: {exc}\n\nElement w PDM ma teraz nową rewizję, lecz wciąż plik "
+                f"poprzedniej wersji — popraw to ręcznie w aplikacji webowej (dograj plik "
+                f"ponownie) albo spróbuj ponownie z tego makra."
+            ) from exc
+        raise
+
+
 
 
 class LoginDialog(QtWidgets.QDialog):
@@ -1279,51 +1311,62 @@ def process_assembly_tree(top_doc):
         matched = match_existing_item(doc, existing_items)
         if matched:
             doc_to_item_id[file_path] = matched["id"]
-            continue
-
-        dlg = NewComponentDialog(
-            file_path=file_path,
-            suggested_name=doc.Label,
-            suggested_is_assembly=file_path in has_children,
-            usage_hint=_usage_hint_for(file_path, edges),
-            projects=projects,
-            materials=materials,
-        )
-        if dlg.exec() != QtWidgets.QDialog.Accepted:
-            return [], True
-
-        project_id, item_type, name, properties = dlg.result_data()
-        try:
-            result = push_new_item_to_pdm(doc, project_id, item_type, name, properties)
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(
-                None, "PDM", f"Nie udało się wysłać {os.path.basename(file_path)}: {e}"
+        else:
+            dlg = NewComponentDialog(
+                file_path=file_path,
+                suggested_name=doc.Label,
+                suggested_is_assembly=file_path in has_children,
+                usage_hint=_usage_hint_for(file_path, edges),
+                projects=projects,
+                materials=materials,
             )
-            return [], True
-        doc_to_item_id[file_path] = result["itemId"]
+            if dlg.exec() != QtWidgets.QDialog.Accepted:
+                return [], True
 
-    edges_for_top = []
-    for parent_file, child_file, qty in edges:
-        child_item_id = doc_to_item_id.get(child_file)
-        if child_item_id is None:
-            continue
-        if parent_file == top_doc.FileName:
-            edges_for_top.append((child_item_id, qty))
-            continue
-        parent_item_id = doc_to_item_id.get(parent_file)
-        if parent_item_id is None:
-            continue
-        try:
-            api_post_json(
-                f"/items/{parent_item_id}/children", {"childId": child_item_id, "quantity": qty}
-            )
-        except Exception as e:
-            QtWidgets.QMessageBox.warning(
-                None,
-                "PDM",
-                f"Utworzono {os.path.basename(child_file)}, ale nie udało się podpiąć go "
-                f"pod {os.path.basename(parent_file)}: {e}",
-            )
+            project_id, item_type, name, properties = dlg.result_data()
+            try:
+                result = push_new_item_to_pdm(doc, project_id, item_type, name, properties)
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(
+                    None, "PDM", f"Nie udało się wysłać {os.path.basename(file_path)}: {e}"
+                )
+                return [], True
+            doc_to_item_id[file_path] = result["itemId"]
+
+        # Podpinamy relacje TERAZ, w TEJ SAMEJ iteracji w której file_path (jako rodzic)
+        # właśnie dostał swoje item_id — NIE w osobnej pętli po całkowitym zakończeniu
+        # tworzenia wszystkich komponentów. "order" gwarantuje dzieci przed rodzicami
+        # (zob. discover_component_tree), więc każde dziecko z "edges" ma tu już swoje
+        # item_id. Dzięki temu przerwanie w połowie (return wyżej, przy kolejnym pliku)
+        # zostawia już utworzone komponenty PRAWIDŁOWO POWIĄZANE między sobą, zamiast
+        # (jak wcześniej) kompletnie osieroconymi, bez żadnej struktury BOM.
+        for parent_file, child_file, qty in edges:
+            if parent_file != file_path:
+                continue
+            child_item_id = doc_to_item_id.get(child_file)
+            if child_item_id is None:
+                continue
+            try:
+                api_post_json(
+                    f"/items/{doc_to_item_id[file_path]}/children",
+                    {"childId": child_item_id, "quantity": qty},
+                )
+            except Exception as e:
+                QtWidgets.QMessageBox.warning(
+                    None,
+                    "PDM",
+                    f"Utworzono {os.path.basename(child_file)}, ale nie udało się podpiąć go "
+                    f"pod {os.path.basename(parent_file)}: {e}",
+                )
+
+    # Relacje, w których rodzicem jest top_doc SAMO W SOBIE, nie mogły zostać podpięte
+    # w pętli powyżej (top_doc celowo nie jest częścią "order" — nie ma jeszcze własnego
+    # item_id, o tym decyduje reszta run()) — zwracamy je do podpięcia przez wywołującego.
+    edges_for_top = [
+        (doc_to_item_id[child_file], qty)
+        for parent_file, child_file, qty in edges
+        if parent_file == top_doc.FileName and child_file in doc_to_item_id
+    ]
 
     return edges_for_top, False
 
