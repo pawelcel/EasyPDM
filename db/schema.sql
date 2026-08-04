@@ -248,3 +248,31 @@ CREATE TABLE saved_filters (
 );
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON saved_filters TO pdm_user;
+
+-- ============================================================
+-- Śledzenie zastosowanych migracji — od tej wersji PdmSystem.Api sam sprawdza tę tabelę
+-- przy starcie i automatycznie stosuje nowe pliki z db/migrations/ (zob. MigrationRunner.cs).
+-- Świeża instalacja (ten plik) jest już na bieżąco ze wszystkimi migracjami poniżej, więc
+-- z góry oznaczamy je jako zastosowane — inaczej program przy pierwszym starcie próbowałby
+-- wykonać je jeszcze raz.
+-- ============================================================
+CREATE TABLE schema_migrations (
+    filename   TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT ON schema_migrations TO pdm_user;
+
+INSERT INTO schema_migrations (filename) VALUES
+    ('002_add_projects.sql'), ('003_item_types.sql'), ('004_show_in_tree.sql'),
+    ('005_assembly_type.sql'), ('006_item_status.sql'), ('007_materials.sql'),
+    ('008_material_groups.sql'), ('009_item_attachments.sql'),
+    ('010_item_relations_position.sql'), ('011_item_revision_comments.sql'),
+    ('012_users_auth.sql'), ('013_project_properties.sql'),
+    ('014_items_project_cascade.sql'), ('015_material_subgroup.sql'),
+    ('016_root_position.sql'), ('017_manufacturers.sql'), ('018_saved_filters.sql'),
+    ('019_project_users.sql'), ('020_item_owner.sql'),
+    ('021_drop_dead_revision_schema.sql'), ('022_item_history.sql'),
+    ('023_attachment_history.sql'), ('024_owner_lock_history.sql'),
+    ('025_backup_schedule.sql'), ('026_backup_retention.sql'),
+    ('027_schema_migrations_tracking.sql');

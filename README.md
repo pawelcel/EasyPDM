@@ -15,12 +15,15 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`026` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`027` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
   użytkownik, właściciel/blokada elementu, usunięcie martwego schematu rewizji/checkout,
-  historia (status/rewizje/załączniki/blokada), harmonogram automatycznej kopii zapasowej.
+  historia (status/rewizje/załączniki/blokada), harmonogram automatycznej kopii zapasowej,
+  śledzenie zastosowanych migracji. Od migracji 027 pliki z tego folderu są wbudowane
+  w program (embedded resources) i stosowane **automatycznie przy każdym starcie** — zob.
+  `MigrationRunner.cs` i "Jak uruchomić" niżej — nie trzeba ich już odpalać ręcznie przez psql.
 - **`PdmSystem.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
   po funkcjach w `Endpoints/` — pełna lista niżej w "Endpointy API". Serwuje też zbudowany
   frontend ze swojego `wwwroot/`. Własny `FileLoggerProvider` (bez dodatkowego pakietu NuGet)
@@ -164,15 +167,18 @@ cp PdmSystem.Api/appsettings.Local.json.example PdmSystem.Api/appsettings.Local.
 # ...i wpisać tam prawdziwe ConnectionString/StorageRoot dla tej maszyny.
 ```
 
+Program **sam stosuje nowe migracje bazy przy każdym starcie** (wbudowane w plik
+wykonywalny jako embedded resources, śledzone w tabeli `schema_migrations` — zob.
+`MigrationRunner.cs`) — więc na już istniejącej, znanej bazie wystarczy zwyczajnie ją
+uruchomić, bez ręcznego dogania `db/migrations/`. Jedyny przypadek, kiedy trzeba coś zrobić
+ręcznie, to zupełnie **świeży, pusty** PostgreSQL — wtedy najpierw:
+
 ```bash
 # Jeśli nie istnieje jeszcze rola/baza (świeży PostgreSQL):
 sudo -u postgres psql -c "CREATE ROLE pdm_user LOGIN PASSWORD 'twoje-haslo';"
 sudo -u postgres createdb -O pdm_user pdm
 
-# Jeśli masz już bazę z poprzedniej wersji, dogoń wszystkie migracje po kolei:
-for f in db/migrations/*.sql; do psql -h localhost -U pdm_user -d pdm -f "$f"; done
-
-# Jeśli stawiasz od zera:
+# ...i podstawowy schemat (od tego miejsca program dogania resztę sam):
 psql -h localhost -U pdm_user -d pdm -f db/schema.sql
 
 # Backend (serwuje też zbudowany frontend z wwwroot/)
@@ -206,10 +212,12 @@ automatyczne kopie zapasowe i logi trzymane są na wolumenie `pdm-data` (`/data`
 kontenerze) — przetrwają przebudowanie obrazu przy aktualizacji. Po starcie:
 `http://localhost:5000`.
 
-Aktualizacja o nowe migracje (gdy się pojawią) na razie ręcznie:
-`docker compose exec -T postgres psql -U pdm_user -d pdm < db/migrations/XXX.sql`
-— `docker-entrypoint-initdb.d` odpala `schema.sql` TYLKO przy pierwszym, zupełnie pustym
-starcie wolumenu `pgdata`, nie przy każdym `docker compose up`.
+**Aktualizacja**: `git pull && docker compose up -d --build` — nowy obraz `api` dostaje nowy
+kod, kontener się odtwarza, a program **sam stosuje nowe migracje bazy przy starcie**
+(wbudowane w plik wykonywalny, śledzone w tabeli `schema_migrations` — zob.
+`MigrationRunner.cs`) — nic więcej nie trzeba robić ręcznie. `docker-entrypoint-initdb.d`
+z `schema.sql` odpala się TYLKO przy pierwszym, zupełnie pustym starcie wolumenu `pgdata`
+(świeża instalacja); przy aktualizacji nie jest w ogóle dotykany, bo wolumen już istnieje.
 
 ### Linux — instalacja natywna jako usługa systemd (bez Dockera)
 
@@ -232,9 +240,11 @@ nieuprzywilejowane konto systemowe `pdmsystem`, i instaluje usługę systemd
 Logi). Odinstalowanie: `sudo ./uninstall-linux.sh` (celowo NIE rusza samej bazy danych ani
 PostgreSQL — o tym decyduje się ręcznie, żeby nie skasować danych przez pomyłkę).
 
-Aktualizacja istniejącej instalacji: dogoń nowe pliki z `db/migrations/` ręcznie (tak samo
-jak przy Dockerze), potem `sudo ./install-linux.sh` ponownie — wykrywa istniejącą bazę
-i konto, przebudowuje tylko aplikację.
+**Aktualizacja**: `git pull`, potem `sudo ./install-linux.sh` ponownie — wykrywa istniejącą
+bazę/konto (pomija ich zakładanie), przebudowuje i podmienia tylko aplikację, jawnie
+**restartuje usługę** (`systemctl restart`, nie tylko `enable --now`, które na już
+uruchomionej usłudze nic by nie zrobiło). Nowe migracje bazy program stosuje sam
+automatycznie przy starcie — nic dodatkowego nie trzeba robić ręcznie.
 
 > Skrypt buduje ze źródeł tego repozytorium (jak `run.sh`, tylko jako trwała usługa
 > zamiast procesu na pierwszym planie) — nie ma (jeszcze) osobnego, gotowego wydania
@@ -264,6 +274,12 @@ tle), pyta o hasło superużytkownika `postgres` (jednorazowo, do założenia w�
 (autostart, działa w tle bez okna konsoli) i tworzy skrót otwierający
 `http://localhost:5000`. Odinstalowanie zatrzymuje i usuwa usługę (standardowy deinstalator
 Inno Setup) — tak samo jak na Linuksie, celowo nie rusza samej bazy danych.
+
+**Aktualizacja**: zbuduj nowy `PdmSystemSetup.exe` (jak wyżej) i uruchom go ponownie —
+`PrepareToInstall` w skrypcie `.iss` zatrzymuje usługę PRZED podmianą plików (inaczej
+Windows zablokowałby nadpisanie działającego `.exe`), instalator wykrywa istniejącą
+rolę/bazę (pomija zakładanie schematu) i istniejącą usługę (uruchamia ją z powrotem zamiast
+rejestrować od nowa). Nowe migracje bazy program stosuje sam automatycznie przy starcie.
 
 > **To jedyna z trzech ścieżek, której w ogóle nie dało się niczego zweryfikować w tym
 > środowisku** (Linux, bez dostępu do Windows/Wine/Inno Setup Compiler) — poza samym

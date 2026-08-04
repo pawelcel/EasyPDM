@@ -13,6 +13,10 @@
 # Wymaga zainstalowanych: .NET 10 SDK, Node.js/npm (potrzebne tylko na czas budowy —
 # gotowa usługa ich już nie potrzebuje, publikowany jest self-contained plik wykonywalny).
 #
+# Aktualizacja: uruchom ten sam skrypt ponownie z zaktualizowanego checkoutu repo — wykrywa
+# istniejącą bazę/konto, przebudowuje i podmienia tylko aplikację, restartuje usługę. Nowe
+# migracje bazy program stosuje sam automatycznie przy starcie (nic nie trzeba robić ręcznie).
+#
 # Odinstalowanie: sudo ./uninstall-linux.sh
 set -euo pipefail
 
@@ -87,8 +91,8 @@ if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_N
     echo "Zakładam schemat bazy (db/schema.sql)..."
     PGPASSWORD="${DB_PASSWORD}" psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -f "${REPO_ROOT}/db/schema.sql"
 else
-    echo "Baza '${DB_NAME}' już istnieje — pomijam zakładanie schematu. Jeśli aktualizujesz"
-    echo "istniejącą instalację, dogoń ręcznie nowe pliki z db/migrations/ (zob. README.md)."
+    echo "Baza '${DB_NAME}' już istnieje — pomijam zakładanie schematu (aktualizacja istniejącej"
+    echo "instalacji). Nowe migracje program zastosuje sam automatycznie przy starcie."
 fi
 
 echo "== 3/6: Budowa aplikacji =="
@@ -166,10 +170,16 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable --now pdmsystem
+systemctl enable pdmsystem
+# "restart", nie "start" — przy AKTUALIZACJI usługa zwykle już działa (poprzednia wersja),
+# a "systemctl start" na już uruchomionej usłudze nic by nie zrobił, więc stary proces
+# zostałby ze starym plikiem wykonywalnym mimo podmienionych plików w /opt/pdmsystem.
+systemctl restart pdmsystem
 
 echo "== 6/6: Gotowe =="
 echo "PdmSystem działa pod http://localhost:5000"
+echo "Migracje bazy (jeśli jakieś nowe) program stosuje sam przy starcie — nic dodatkowego"
+echo "nie trzeba robić ręcznie."
 echo "Pierwsze logowanie: admin / admin — zmień hasło od razu po zalogowaniu."
 echo "Status usługi:   systemctl status pdmsystem"
 echo "Logi na żywo:    journalctl -u pdmsystem -f"

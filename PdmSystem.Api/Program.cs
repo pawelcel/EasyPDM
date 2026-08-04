@@ -40,6 +40,11 @@ if (!Path.IsPathRooted(logRoot))
     logRoot = Path.Combine(AppContext.BaseDirectory, logRoot);
 app.Services.GetRequiredService<ILoggerFactory>().AddProvider(new FileLoggerProvider(logRoot));
 
+// Stosuje wszystkie jeszcze nie zastosowane migracje (db/migrations/, wbudowane w plik
+// wykonywalny) PRZED czymkolwiek innym, co dotyka bazy — dzięki temu aktualizacja programu
+// (Docker/Linux/Windows) sprowadza się do podmiany plików i restartu.
+await MigrationRunner.ApplyPendingMigrationsAsync(connectionString, app.Logger);
+
 await EnsureDefaultAdminAsync(connectionString);
 
 // Serwuje wwwroot/index.html pod adresem "/" oraz zbudowany frontend.
