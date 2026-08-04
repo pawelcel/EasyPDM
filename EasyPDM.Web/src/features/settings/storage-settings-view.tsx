@@ -67,6 +67,7 @@ function StorageSettingsView() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [moving, setMoving] = useState(false)
   const [result, setResult] = useState("")
+  const [loadError, setLoadError] = useState(false)
 
   async function refetch() {
     const data = await api.getStorageInfo()
@@ -75,7 +76,7 @@ function StorageSettingsView() {
   }
 
   useEffect(() => {
-    refetch()
+    refetch().catch(() => setLoadError(true))
   }, [])
 
   function requestMove() {
@@ -111,6 +112,15 @@ function StorageSettingsView() {
     } finally {
       setMoving(false)
     }
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">{t("settings.storage")}</h2>
+        <Hint>{t("database.loadError")}</Hint>
+      </div>
+    )
   }
 
   if (!info) return null
@@ -274,12 +284,18 @@ function AutoBackupSection() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [saved, setSaved] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
-    api.getBackupSchedule().then(setSchedule)
+    api.getBackupSchedule().then(setSchedule).catch(() => setLoadError(true))
   }, [])
 
   async function save(next: BackupSchedule) {
+    // Zmiana pokazuje się w formularzu OD RAZU (optymistycznie), ale jeśli zapis się nie
+    // powiedzie, wracamy do poprzedniego stanu — inaczej pole pokazywałoby wartość, której
+    // serwer nigdy nie zaakceptował, i mogłaby "przy okazji" zapisać się dopiero przy
+    // kolejnej, niepowiązanej zmianie.
+    const previous = schedule
     setSchedule(next)
     setSaving(true)
     setError("")
@@ -289,11 +305,14 @@ function AutoBackupSection() {
       setSchedule(result)
       setSaved(true)
     } catch (err) {
+      setSchedule(previous)
       setError(err instanceof Error ? err.message : t("backup.saveFailed"))
     } finally {
       setSaving(false)
     }
   }
+
+  if (loadError) return <Hint>{t("database.loadError")}</Hint>
 
   if (!schedule) return null
 

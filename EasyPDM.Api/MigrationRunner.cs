@@ -14,10 +14,24 @@ static class MigrationRunner
     // Assembly.GetManifestResourceNames() na realnie zbudowanym DLL-u.
     private const string ResourcePrefix = "EasyPDM.Api.Migrations.";
 
+    // Dowolna stała liczba — advisory lock w PostgreSQL to tylko numeryczny klucz, nie musi
+    // nic znaczyć poza tym, że jest unikalny w obrębie tej aplikacji i stały między wersjami.
+    private const long AdvisoryLockKey = 875_142_001;
+
     public static async Task ApplyPendingMigrationsAsync(string connectionString, ILogger logger)
     {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync();
+
+        // Blokada na poziomie SESJI PostgreSQL — chroni przed dwiema instancjami programu
+        // (np. rolling restart, albo przypadkowe podwójne uruchomienie) próbującymi
+        // zastosować tę samą migrację naraz. Zwalniana automatycznie przy zamknięciu tego
+        // połączenia (koniec tej metody), więc nie trzeba jej ręcznie odblokowywać.
+        await using (var lockCmd = new NpgsqlCommand("SELECT pg_advisory_lock(@key);", conn))
+        {
+            lockCmd.Parameters.AddWithValue("key", AdvisoryLockKey);
+            await lockCmd.ExecuteNonQueryAsync();
+        }
 
         // Samonaprawiające się — działa też na instalacjach sprzed wprowadzenia tego
         // mechanizmu (migracja 027 tworzy tę samą tabelę, ale istniejąca baza mogła jej
@@ -82,19 +96,41 @@ static class MigrationRunner
 
             logger.LogInformation("MigrationRunner: stosuję {FileName}...", fileName);
 
-            // Każdy plik migracji sam zarządza własną transakcją (BEGIN;...COMMIT;) — nie
-            // owijamy tego dodatkowo transakcją ADO.NET, żeby uniknąć zagnieżdżenia.
-            await using (var stream = assembly.GetManifestResourceStream(resourceName)
-                ?? throw new InvalidOperationException($"Brak zasobu {resourceName}."))
-            using (var streamReader = new StreamReader(stream))
+            try
             {
-                var sql = await streamReader.ReadToEndAsync();
-                await using var cmd = new NpgsqlCommand(sql, conn);
-                await cmd.ExecuteNonQueryAsync();
-            }
+                // Każdy plik migracji sam zarządza własną transakcją (BEGIN;...COMMIT;) — nie
+                // owijamy tego dodatkowo transakcją ADO.NET, żeby uniknąć zagnieżdżenia.
+                await using (var stream = assembly.GetManifestResourceStream(resourceName)
+                    ?? throw new InvalidOperationException($"Brak zasobu {resourceName}."))
+                using (var streamReader = new StreamReader(stream))
+                {
+                    var sql = await streamReader.ReadToEndAsync();
+                    await using var cmd = new NpgsqlCommand(sql, conn);
+                    await cmd.ExecuteNonQueryAsync();
+                }
 
-            await MarkAppliedAsync(conn, fileName);
-            logger.LogInformation("MigrationRunner: zastosowano {FileName}.", fileName);
+                await MarkAppliedAsync(conn, fileName);
+                logger.LogInformation("MigrationRunner: zastosowano {FileName}.", fileName);
+            }
+            catch (Exception ex)
+            {
+                // Program CELOWO nie startuje dalej na niespójnym schemacie (rzucamy dalej) —
+                // ale zamiast surowego wyjątku Npgsql, zostawiamy jasną wskazówkę. Jeśli
+                // migracja NIE jest idempotentna (np. ADD COLUMN bez IF NOT EXISTS) i proces
+                // padł PO faktycznym COMMIT tej migracji, ale PRZED zapisaniem postępu do
+                // schema_migrations, kolejny start powtórzy TĘ SAMĄ migrację i dostanie ten
+                // sam błąd w pętli — trzeba wtedy ręcznie sprawdzić, czy zmiana z tego pliku
+                // faktycznie już jest w bazie, i jeśli tak, ręcznie dopisać wiersz do
+                // schema_migrations zamiast próbować wykonać SQL drugi raz.
+                logger.LogError(ex,
+                    "MigrationRunner: migracja {FileName} zakończyła się błędem — program NIE " +
+                    "wystartuje z potencjalnie niespójnym schematem. Jeśli zmiana z tego pliku " +
+                    "faktycznie już jest w bazie (proces mógł paść PO wykonaniu, PRZED zapisaniem " +
+                    "postępu), sprawdź ręcznie i dopisz wiersz do schema_migrations zamiast " +
+                    "ponawiać ten sam SQL.",
+                    fileName);
+                throw;
+            }
         }
     }
 

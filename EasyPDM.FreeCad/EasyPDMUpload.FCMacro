@@ -438,13 +438,20 @@ def match_existing_item(doc, existing_items):
     w obrębie BIEŻĄCEJ sesji FreeCAD albo jeśli plik został ręcznie zapisany po
     zmianie etykiety — sama zmiana etykiety po wysłaniu NIE jest zapisywana na dysk
     (zob. komentarz w _rename_and_upload), więc ponowne otwarcie pliku w NOWEJ sesji
-    FreeCAD bez wcześniejszego ręcznego zapisu pokaże oryginalną etykietę."""
+    FreeCAD bez wcześniejszego ręcznego zapisu pokaże oryginalną etykietę.
+
+    Samo dopasowanie numeru NIE wystarcza: użytkownik mógł nazywać swoje pliki wg
+    WŁASNEJ konwencji "numer (nazwa)" jeszcze zanim kiedykolwiek użył tego makra — bez
+    dodatkowego sprawdzenia nazwy makro po cichu podpięłoby dokument pod zupełnie
+    NIEPOWIĄZANY, istniejący element PDM o tym samym numerze. Dlatego wymagamy zgodności
+    OBU: numeru ORAZ nazwy (części w nawiasie) z fileName dopasowanego elementu."""
     m = _REVISION_NAME_PATTERN.match(doc.Label)
     if not m:
         return None
     item_number = int(m.group(1))
+    label_name = m.group(2).strip().lower()
     for it in existing_items:
-        if it.get("itemNumber") == item_number:
+        if it.get("itemNumber") == item_number and it.get("fileName", "").strip().lower() == label_name:
             return it
     return None
 
@@ -484,8 +491,7 @@ def _rename_and_upload(doc, item_id, item_number, name, revision):
     ext = os.path.splitext(doc.FileName)[1]
     name_prefix = f"{item_number} ({sanitize_filename(name)})"
     new_filename = f"{name_prefix}.{revision_label(revision)}{ext}"
-
-    doc.Label = f"{item_number} ({name}).{revision_label(revision)}"
+    new_label = f"{item_number} ({name}).{revision_label(revision)}"
 
     storage_root = get_storage_root()
     target_path = None
@@ -510,10 +516,25 @@ def _rename_and_upload(doc, item_id, item_number, name, revision):
             existing = []
         already_registered = any(a["fileName"] == new_filename for a in existing or [])
         if not already_registered:
-            api_register_attachment(item_id, target_path)
+            try:
+                api_register_attachment(item_id, target_path)
+            except Exception:
+                # Rejestracja zawiodła — bez sprzątania kopia w storage/components/ zostałaby
+                # osierocona: nigdy niezarejestrowana jako załącznik, zajmuje miejsce na dysku
+                # serwera bez żadnego odpowiadającego jej wpisu w bazie.
+                try:
+                    os.remove(target_path)
+                except OSError:
+                    pass
+                raise
+        # Etykieta dokumentu zmienia się DOPIERO PO potwierdzonym sukcesie kopii/rejestracji —
+        # wcześniej (przed tym momentem) żadna zmiana na serwerze jeszcze się nie powiodła,
+        # więc etykieta w FreeCAD nie powinna sugerować, że wysyłka już się udała.
+        doc.Label = new_label
         return {"itemId": item_id, "itemNumber": item_number, "newPath": target_path}
 
     api_upload_file(f"/items/{item_id}/attachments", doc.FileName, override_filename=new_filename)
+    doc.Label = new_label
     return {"itemId": item_id, "itemNumber": item_number, "newPath": doc.FileName}
 
 
@@ -1393,7 +1414,11 @@ def run():
         if not doc.FileName:
             return  # użytkownik anulował zapis
     else:
-        doc.save()
+        try:
+            doc.save()
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się zapisać dokumentu: {e}")
+            return
 
     # Krok 1a: wykryj i (opcjonalnie) wyślij złożenie rekurencyjnie — części/pod-złożenia
     # znalezione przez App::Link, w kolejności liście-najpierw.

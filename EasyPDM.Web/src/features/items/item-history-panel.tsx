@@ -24,7 +24,21 @@ function ItemHistoryPanel({
   const [entries, setEntries] = useState<HistoryEntry[]>([])
 
   useEffect(() => {
-    api.getItemHistory(itemId).then(setEntries).catch(() => setEntries([]))
+    // Dwie akcje wykonane szybko po sobie (np. blokada, zaraz potem zmiana właściwości)
+    // odpalają dwa równoległe GET-y — bez tego flagą starsze (wolniejsze) żądanie mogłoby
+    // odpowiedzieć PO nowszym i nadpisać świeże dane nieaktualną listą.
+    let cancelled = false
+    api
+      .getItemHistory(itemId)
+      .then((result) => {
+        if (!cancelled) setEntries(result)
+      })
+      .catch(() => {
+        if (!cancelled) setEntries([])
+      })
+    return () => {
+      cancelled = true
+    }
   }, [itemId, refreshSignal])
 
   function statusLabel(status: ItemStatus | null): string {
