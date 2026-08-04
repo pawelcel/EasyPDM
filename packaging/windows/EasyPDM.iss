@@ -66,6 +66,12 @@ Name: "{group}\{#MyAppName}"; Filename: "{win}\explorer.exe"; Parameters: "http:
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{win}\explorer.exe"; Parameters: "http://localhost:5000"; IconFilename: "{app}\{#MyAppExeName}"
 
 [Code]
+const
+  // Inno Setup Pascal Script nie pozwala na sekcję "const" zadeklarowaną LOKALNIE wewnątrz
+  // funkcji (błąd kompilacji "'BEGIN' expected") — dlatego to stała globalna, nie lokalna
+  // wewnątrz GenerateRandomPassword, gdzie jest jedynym użyciem.
+  RandomPasswordChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
 var
   PostgresPasswordPage: TInputQueryWizardPage;
   PsqlPath: String;
@@ -108,14 +114,12 @@ begin
 end;
 
 function GenerateRandomPassword(Len: Integer): String;
-const
-  Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 var
   I: Integer;
 begin
   Result := '';
   for I := 1 to Len do
-    Result := Result + Chars[Random(Length(Chars)) + 1];
+    Result := Result + RandomPasswordChars[Random(Length(RandomPasswordChars)) + 1];
 end;
 
 { Escapuje wartość do bezpiecznego użycia w "set "VAR=wartość"" wewnątrz pliku .bat. Forma
