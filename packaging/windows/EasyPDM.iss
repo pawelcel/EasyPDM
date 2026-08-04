@@ -75,6 +75,28 @@ const
 var
   PostgresPasswordPage: TInputQueryWizardPage;
   PsqlPath: String;
+  RandomSeedState: Longint;
+
+{ Inno Setup Pascal Script (RemObjects Pascal Script) nie ma ŻADNEGO udokumentowanego,
+  działającego sposobu na jawne zasianie swojego wbudowanego Random — ani "Randomize",
+  ani "RandSeed" nie istnieją jako identyfikatory (oba dały "Unknown identifier" w
+  prawdziwym kompilatorze). Zamiast polegać na nieznanym/niepewnym zachowaniu
+  wbudowanego Random (mógłby dawać identyczną sekwencję przy każdym uruchomieniu),
+  generujemy liczby własnym generatorem, jawnie zasianym z GetTickCount w
+  InitializeSetup. Stałe (mnożnik 8121, przyrost 28411, modulo 134456) to klasyczny,
+  "podręcznikowy" LCG dobrany specjalnie tak, by mieścić się w 32-bitowym Longint bez
+  przepełnienia przy mnożeniu. }
+function NextRandom(Range: Longint): Longint;
+begin
+  // GetTickCount (ziarno startowe) jest bez znaku, więc jako Longint może wyjść ujemny —
+  // a "mod" w Pascalu dla ujemnej liczby zwraca wynik z JEJ znakiem (np. -7 mod 3 = -1, nie
+  // 2), więc bez tej normalizacji RandomSeedState (i przez to Result) mogłoby zostać ujemne
+  // na stałe, dając potem ujemny indeks w RandomPasswordChars[...].
+  RandomSeedState := (RandomSeedState * 8121 + 28411) mod 134456;
+  if RandomSeedState < 0 then
+    RandomSeedState := RandomSeedState + 134456;
+  Result := RandomSeedState mod Range;
+end;
 
 { Szuka psql.exe w typowej lokalizacji instalatora EDB: C:\Program Files\PostgreSQL\<wersja>\bin\ .
   Zwraca pełną ścieżkę do najnowszej znalezionej wersji, albo pusty string, jeśli nic nie ma. }
@@ -119,7 +141,7 @@ var
 begin
   Result := '';
   for I := 1 to Len do
-    Result := Result + RandomPasswordChars[Random(Length(RandomPasswordChars)) + 1];
+    Result := Result + RandomPasswordChars[NextRandom(Length(RandomPasswordChars)) + 1];
 end;
 
 { Escapuje wartość do bezpiecznego użycia w "set "VAR=wartość"" wewnątrz pliku .bat. Forma
@@ -143,7 +165,7 @@ var
   BatchFile: String;
   ResultCode: Integer;
 begin
-  BatchFile := ExpandConstant('{tmp}\pdm_psql_' + IntToStr(Random(1000000)) + '.bat');
+  BatchFile := ExpandConstant('{tmp}\pdm_psql_' + IntToStr(NextRandom(1000000)) + '.bat');
   SaveStringToFile(BatchFile,
     '@echo off' + #13#10 +
     'set "PGPASSWORD=' + EscapeForBatch(PgPassword) + '"' + #13#10 +
@@ -166,7 +188,7 @@ begin
   { -tAc zwraca surowy wynik zapytania bez nagłówków — łapiemy go do pliku, bo Exec() samo
     w sobie nie oddaje stdout w Inno Setup. }
   OutFile := ExpandConstant('{tmp}\pdm_role_check.txt');
-  BatchFile := ExpandConstant('{tmp}\pdm_psql_check_' + IntToStr(Random(1000000)) + '.bat');
+  BatchFile := ExpandConstant('{tmp}\pdm_psql_check_' + IntToStr(NextRandom(1000000)) + '.bat');
   SaveStringToFile(BatchFile,
     '@echo off' + #13#10 +
     'set "PGPASSWORD=' + EscapeForBatch(PgPassword) + '"' + #13#10 +
@@ -193,7 +215,7 @@ var
   BatchFile: String;
 begin
   OutFile := ExpandConstant('{tmp}\pdm_db_check.txt');
-  BatchFile := ExpandConstant('{tmp}\pdm_psql_dbcheck_' + IntToStr(Random(1000000)) + '.bat');
+  BatchFile := ExpandConstant('{tmp}\pdm_psql_dbcheck_' + IntToStr(NextRandom(1000000)) + '.bat');
   SaveStringToFile(BatchFile,
     '@echo off' + #13#10 +
     'set "PGPASSWORD=' + EscapeForBatch(PgPassword) + '"' + #13#10 +
@@ -257,14 +279,10 @@ function InitializeSetup(): Boolean;
 var
   ResultCode: Integer;
 begin
-  { Bez tego generator liczb pseudolosowych Inno Setup zawsze startuje z tym samym
-    ziarnem — GenerateRandomPassword dawałoby DOKŁADNIE to samo hasło pdm_user przy
-    każdej instalacji z tego samego builda instalatora. Pascal Script (RemObjects
-    Pascal Script, w odróżnieniu od pełnego Delphi/Object Pascal) NIE ma wbudowanej
-    procedury "Randomize" (potwierdzone realnym kompilatorem: "Unknown identifier") —
-    RandSeed to globalna zmienna, z której faktycznie czyta Random, więc ręczne
-    ustawienie jej na aktualny czas systemowy (GetTickCount) daje ten sam efekt. }
-  RandSeed := GetTickCount;
+  { Zasiewa własny generator (NextRandom, zob. wyżej) aktualnym czasem systemowym —
+    bez tego GenerateRandomPassword dawałoby DOKŁADNIE to samo hasło pdm_user przy
+    każdej instalacji z tego samego builda instalatora. }
+  RandomSeedState := GetTickCount;
   PsqlPath := FindPsqlPath();
   if PsqlPath = '' then
   begin
