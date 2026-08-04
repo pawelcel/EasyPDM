@@ -259,8 +259,12 @@ var
 begin
   { Bez tego generator liczb pseudolosowych Inno Setup zawsze startuje z tym samym
     ziarnem — GenerateRandomPassword dawałoby DOKŁADNIE to samo hasło pdm_user przy
-    każdej instalacji z tego samego builda instalatora. }
-  Randomize;
+    każdej instalacji z tego samego builda instalatora. Pascal Script (RemObjects
+    Pascal Script, w odróżnieniu od pełnego Delphi/Object Pascal) NIE ma wbudowanej
+    procedury "Randomize" (potwierdzone realnym kompilatorem: "Unknown identifier") —
+    RandSeed to globalna zmienna, z której faktycznie czyta Random, więc ręczne
+    ustawienie jej na aktualny czas systemowy (GetTickCount) daje ten sam efekt. }
+  RandSeed := GetTickCount;
   PsqlPath := FindPsqlPath();
   if PsqlPath = '' then
   begin
