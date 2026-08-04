@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# Instaluje PdmSystem jako usługę systemd na TEJ maszynie (natywnie, bez Dockera):
+# PostgreSQL (jeśli jeszcze nie ma), baza danych, self-contained publish backendu razem
+# ze zbudowanym frontendem, dedykowane konto systemowe, usługa systemd z autostartem.
+#
+# Uruchom z katalogu repo, z sudo:
+#   sudo ./install-linux.sh
+#
+# Obsługiwane menedżery pakietów (do instalacji samego PostgreSQL): pacman (Arch/CachyOS),
+# apt (Debian/Ubuntu), dnf (Fedora/RHEL). Inna dystrybucja: zainstaluj PostgreSQL ręcznie
+# i uruchom ponownie ten skrypt — reszta kroków jest niezależna od dystrybucji.
+#
+# Wymaga zainstalowanych: .NET 10 SDK, Node.js/npm (potrzebne tylko na czas budowy —
+# gotowa usługa ich już nie potrzebuje, publikowany jest self-contained plik wykonywalny).
+#
+# Odinstalowanie: sudo ./uninstall-linux.sh
+set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Uruchom z sudo: sudo ./install-linux.sh" >&2
+    exit 1
+fi
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR=/opt/pdmsystem
+DATA_DIR=/var/lib/pdmsystem
+CONFIG_DIR=/etc/pdmsystem
+SERVICE_USER=pdmsystem
+DB_NAME=pdm
+DB_USER=pdm_user
+
+echo "== 1/6: PostgreSQL =="
+if command -v pacman >/dev/null 2>&1; then
+    PKG_INSTALL="pacman -S --needed --noconfirm"
+elif command -v apt-get >/dev/null 2>&1; then
+    PKG_INSTALL="apt-get install -y"
+elif command -v dnf >/dev/null 2>&1; then
+    PKG_INSTALL="dnf install -y"
+else
+    PKG_INSTALL=""
+fi
+
+if ! command -v psql >/dev/null 2>&1; then
+    if [ -z "$PKG_INSTALL" ]; then
+        echo "Nie rozpoznano menedżera pakietów — zainstaluj PostgreSQL ręcznie i uruchom ponownie ten skrypt." >&2
+        exit 1
+    fi
+    echo "Instaluję PostgreSQL ($PKG_INSTALL postgresql)..."
+    $PKG_INSTALL postgresql
+fi
+
+# W odróżnieniu od Debiana/Fedory, pakiet PostgreSQL na Arch NIE inicjalizuje klastra
+# automatycznie przy instalacji — trzeba to zrobić ręcznie, tylko raz.
+if command -v pacman >/dev/null 2>&1 && [ ! -s /var/lib/postgres/data/PG_VERSION ]; then
+    echo "Inicjalizuję klaster PostgreSQL (initdb)..."
+    install -d -o postgres -g postgres /var/lib/postgres/data
+    sudo -u postgres initdb -D /var/lib/postgres/data
+fi
+if command -v dnf >/dev/null 2>&1 && [ ! -s /var/lib/pgsql/data/PG_VERSION ]; then
+    echo "Inicjalizuję klaster PostgreSQL (postgresql-setup --initdb)..."
+    postgresql-setup --initdb
+fi
+
+systemctl enable --now postgresql
+# Krótkie oczekiwanie, aż serwer faktycznie zacznie przyjmować połączenia po świeżym starcie.
+for _ in $(seq 1 10); do
+    sudo -u postgres pg_isready >/dev/null 2>&1 && break
+    sleep 1
+done
+
+echo "== 2/6: Baza danych =="
+DB_PASSWORD="${PDM_DB_PASSWORD:-}"
+GENERATED_PASSWORD=0
+if [ -z "$DB_PASSWORD" ]; then
+    DB_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32)"
+    GENERATED_PASSWORD=1
+fi
+
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1; then
+    sudo -u postgres psql -c "CREATE ROLE ${DB_USER} LOGIN PASSWORD '${DB_PASSWORD}';"
+else
+    sudo -u postgres psql -c "ALTER ROLE ${DB_USER} PASSWORD '${DB_PASSWORD}';"
+fi
+
+if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+    sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+    echo "Zakładam schemat bazy (db/schema.sql)..."
+    PGPASSWORD="${DB_PASSWORD}" psql -h localhost -U "${DB_USER}" -d "${DB_NAME}" -f "${REPO_ROOT}/db/schema.sql"
+else
+    echo "Baza '${DB_NAME}' już istnieje — pomijam zakładanie schematu. Jeśli aktualizujesz"
+    echo "istniejącą instalację, dogoń ręcznie nowe pliki z db/migrations/ (zob. README.md)."
+fi
+
+echo "== 3/6: Budowa aplikacji =="
+if ! command -v dotnet >/dev/null 2>&1; then
+    echo "Brak .NET SDK w PATH — zainstaluj .NET 10 SDK i uruchom ponownie ten skrypt." >&2
+    exit 1
+fi
+if ! command -v npm >/dev/null 2>&1; then
+    echo "Brak npm w PATH — zainstaluj Node.js i uruchom ponownie ten skrypt." >&2
+    exit 1
+fi
+
+echo "Buduję frontend (npm run build)..."
+(cd "${REPO_ROOT}/PdmSystem.Web" && npm ci && npm run build)
+
+echo "Publikuję backend (self-contained, linux-x64)..."
+PUBLISH_DIR="${REPO_ROOT}/PdmSystem.Api/bin/publish-linux"
+rm -rf "${PUBLISH_DIR}"
+dotnet publish "${REPO_ROOT}/PdmSystem.Api" -c Release -r linux-x64 --self-contained true \
+    -p:PublishSingleFile=true -o "${PUBLISH_DIR}"
+
+echo "== 4/6: Konto systemowe i katalogi =="
+getent group "${SERVICE_USER}" >/dev/null || groupadd --system "${SERVICE_USER}"
+getent passwd "${SERVICE_USER}" >/dev/null || useradd --system --gid "${SERVICE_USER}" \
+    --home-dir "${DATA_DIR}" --shell /usr/sbin/nologin "${SERVICE_USER}"
+
+install -d -o "${SERVICE_USER}" -g "${SERVICE_USER}" \
+    "${DATA_DIR}" "${DATA_DIR}/storage" "${DATA_DIR}/backups" "${DATA_DIR}/logs"
+install -d "${CONFIG_DIR}"
+
+rm -rf "${APP_DIR}"
+install -d "${APP_DIR}"
+cp -r "${PUBLISH_DIR}/." "${APP_DIR}/"
+chown -R root:root "${APP_DIR}"
+chmod +x "${APP_DIR}/PdmSystem.Api"
+
+echo "== 5/6: Konfiguracja i usługa systemd =="
+# Sekrety (hasło do bazy) w osobnym pliku z ograniczonymi uprawnieniami — nie w samej
+# jednostce systemd w /etc/systemd/system/, która bywa czytelna dla wszystkich.
+cat > "${CONFIG_DIR}/pdmsystem.env" <<EOF
+ConnectionString=Host=localhost;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}
+StorageRoot=${DATA_DIR}/storage
+BackupRoot=${DATA_DIR}/backups
+LogRoot=${DATA_DIR}/logs
+ASPNETCORE_URLS=http://0.0.0.0:5000
+EOF
+chmod 600 "${CONFIG_DIR}/pdmsystem.env"
+chown root:root "${CONFIG_DIR}/pdmsystem.env"
+
+cat > /etc/systemd/system/pdmsystem.service <<EOF
+[Unit]
+Description=PdmSystem — lokalny serwer PDM
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=${SERVICE_USER}
+Group=${SERVICE_USER}
+# WorkingDirectory MUSI wskazywać katalog aplikacji — self-contained publish wyznacza
+# katalog główny (content root, więc i wwwroot/) z BIEŻĄCEGO katalogu roboczego procesu,
+# nie z lokalizacji samego pliku wykonywalnego.
+WorkingDirectory=${APP_DIR}
+EnvironmentFile=${CONFIG_DIR}/pdmsystem.env
+ExecStart=${APP_DIR}/PdmSystem.Api
+Restart=on-failure
+RestartSec=5
+ReadWritePaths=${DATA_DIR}
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now pdmsystem
+
+echo "== 6/6: Gotowe =="
+echo "PdmSystem działa pod http://localhost:5000"
+echo "Pierwsze logowanie: admin / admin — zmień hasło od razu po zalogowaniu."
+echo "Status usługi:   systemctl status pdmsystem"
+echo "Logi na żywo:    journalctl -u pdmsystem -f"
+if [ "$GENERATED_PASSWORD" -eq 1 ]; then
+    echo "Wygenerowane hasło do bazy danych zapisane w ${CONFIG_DIR}/pdmsystem.env (tylko root)."
+fi

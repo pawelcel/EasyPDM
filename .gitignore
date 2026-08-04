@@ -16,3 +16,13 @@ __pycache__/
 
 # Editor
 .vscode/
+
+# Docker — .env trzyma prawdziwe hasło do bazy, .env.example jest wzorem w repo
+.env
+
+# Lokalne dane dostępowe (hasło do bazy itd.) — appsettings.Local.json.example jest wzorem w repo
+PdmSystem.Api/appsettings.Local.json
+
+# Instalator Windows — publish/ i Output/ to wygenerowane artefakty budowy, nie kod
+packaging/windows/publish/
+packaging/windows/Output/

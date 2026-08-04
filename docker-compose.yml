@@ -1,0 +1,44 @@
+# Uruchomienie: skopiuj .env.example do .env, ustaw PDM_DB_PASSWORD, potem:
+#   docker compose up -d --build
+# Pierwsze logowanie: admin / admin (zob. README.md -> "Jak uruchomić").
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pdm_user
+      POSTGRES_PASSWORD: ${PDM_DB_PASSWORD:?Ustaw PDM_DB_PASSWORD w pliku .env (skopiuj z .env.example)}
+      POSTGRES_DB: pdm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Uruchamiane automatycznie przez oficjalny obraz postgres TYLKO przy zupełnie
+      # pustym wolumenie danych — czyli tylko przy pierwszym starcie. Kolejne migracje
+      # (db/migrations/*.sql, gdy się pojawią po aktualizacji) trzeba na razie zastosować
+      # ręcznie: docker compose exec -T postgres psql -U pdm_user -d pdm < db/migrations/xxx.sql
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pdm_user -d pdm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionString: Host=postgres;Port=5432;Database=pdm;Username=pdm_user;Password=${PDM_DB_PASSWORD:?Ustaw PDM_DB_PASSWORD w pliku .env (skopiuj z .env.example)}
+    ports:
+      - "5000:8080"
+    volumes:
+      # Magazyn plików + automatyczne kopie zapasowe + logi programu — wszystko, co
+      # PdmSystem.Api zapisuje poza bazą danych, w jednym miejscu na hoście.
+      - pdm-data:/data
+
+volumes:
+  pgdata:
+  pdm-data:

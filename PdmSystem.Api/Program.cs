@@ -1,6 +1,14 @@
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+// Lokalne, prawdziwe dane dostępowe (hasło do bazy itd.) trzymane POZA repozytorium —
+// appsettings.json ma tylko placeholder, appsettings.Local.json (gitignored) go nadpisuje.
+// Zob. appsettings.Local.json.example i "Jak uruchomić" w README.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+// Bezpieczne na każdej platformie: aktywuje się TYLKO, gdy proces faktycznie działa pod
+// Windows Service Control Manager (instalator Windows rejestruje go jako usługę) — na
+// Linux/macOS/Dockerze/zwykłym "dotnet run" to zwykły no-op.
+builder.Host.UseWindowsService();
 var app = builder.Build();
 
 string connectionString = app.Configuration["ConnectionString"]

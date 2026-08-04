@@ -1,0 +1,15 @@
+# Trzymaj kontekst budowy Dockera małym i szybkim — to samo, co .gitignore, plus rzeczy
+# specyficzne dla lokalnego uruchomienia, które i tak nie mają wpływu na obraz.
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/__pycache__/
+storage/
+backups/
+logs/
+.git/
+.vscode/
+.claude/
+PdmSystem.FreeCad/
+*.md
