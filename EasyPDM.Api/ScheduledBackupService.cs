@@ -9,6 +9,13 @@ using Npgsql;
 class ScheduledBackupService(
     string connectionString, StorageSettings storage, string backupRoot, ILogger logger)
 {
+    // Backup nie próbuje się TYLKO w dokładnie zaplanowanej minucie — jeśli ta jedna próba
+    // zawiedzie (np. chwilowy brak miejsca na dysku), bez retry kopia zostałaby całkowicie
+    // pominięta na resztę dnia (kolejna szansa dopiero jutro, bez żadnego powiadomienia poza
+    // logiem błędu). Ponawiamy więc co RetryInterval, aż do sukcesu albo końca dnia.
+    private static readonly TimeSpan RetryInterval = TimeSpan.FromMinutes(15);
+    private DateTime? _lastFailedAttemptAt;
+
     // Uruchamiane ręcznie z Program.cs (nie przez DI/IHostedService — "app" jest tam budowane
     // przed rejestracją jakichkolwiek usług), z tokenem powiązanym z zamykaniem aplikacji
     // (app.Lifetime.ApplicationStopping).
@@ -51,7 +58,12 @@ class ScheduledBackupService(
         if (schedule.LastRunAt is not null && schedule.LastRunAt.Value.Date == now.Date)
             return;
 
-        if (now.Hour != schedule.Hour || now.Minute != schedule.Minute)
+        // Od zaplanowanej minuty AŻ DO KOŃCA DNIA (nie tylko dokładnie w niej) — dzięki temu
+        // jednorazowy błąd w catch niżej nie pomija całego dnia, tylko czeka na retry.
+        var scheduledTimeToday = now.Date.AddHours(schedule.Hour).AddMinutes(schedule.Minute);
+        if (now < scheduledTimeToday)
+            return;
+        if (_lastFailedAttemptAt is not null && now - _lastFailedAttemptAt.Value < RetryInterval)
             return;
 
         var dueToday = schedule.Frequency switch
@@ -80,11 +92,15 @@ class ScheduledBackupService(
             cmd.Parameters.AddWithValue("now", now);
             await cmd.ExecuteNonQueryAsync(stoppingToken);
 
+            _lastFailedAttemptAt = null;
             logger.LogInformation("Automatyczna kopia zapasowa: zapisano {FileName}.", fileName);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Automatyczna kopia zapasowa: nie udało się jej wykonać.");
+            _lastFailedAttemptAt = now;
+            logger.LogError(ex,
+                "Automatyczna kopia zapasowa: nie udało się jej wykonać — ponowię próbę za {Minutes} min " +
+                "(o ile dzień się nie zmieni).", RetryInterval.TotalMinutes);
         }
     }
 

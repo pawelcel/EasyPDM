@@ -118,6 +118,17 @@ begin
     Result := Result + Chars[Random(Length(Chars)) + 1];
 end;
 
+{ Escapuje wartość do bezpiecznego użycia w "set "VAR=wartość"" wewnątrz pliku .bat. Forma
+  z cudzysłowem chroni przed większością metaznaków cmd.exe (&, |, <, >, ^, spacje), ale NIE
+  przed % — cmd.exe rozwija %coś% jako odwołanie do zmiennej środowiskowej NIEZALEŻNIE od
+  cudzysłowów, więc hasło zawierające np. "%PATH%" zostałoby po cichu podmienione realną
+  wartością PATH zamiast zostać dosłownym tekstem — podwojenie % temu zapobiega. }
+function EscapeForBatch(Value: String): String;
+begin
+  Result := Value;
+  StringChangeEx(Result, '%', '%%', True);
+end;
+
 { psql nie ma parametru na hasło podane wprost (poza .pgpass) — najprostszy niezawodny sposób
   na Windows to tymczasowy plik .bat, który najpierw ustawia PGPASSWORD, a potem woła psql.
   Zwraca True, jeśli psql zakończył się kodem 0. UWAGA: Args MUSI zawierać własne "-U <rola>"
@@ -131,7 +142,7 @@ begin
   BatchFile := ExpandConstant('{tmp}\pdm_psql_' + IntToStr(Random(1000000)) + '.bat');
   SaveStringToFile(BatchFile,
     '@echo off' + #13#10 +
-    'set PGPASSWORD=' + PgPassword + #13#10 +
+    'set "PGPASSWORD=' + EscapeForBatch(PgPassword) + '"' + #13#10 +
     '"' + PsqlPath + '" -h localhost ' + Args + #13#10,
     False);
   try
@@ -153,7 +164,7 @@ begin
   BatchFile := ExpandConstant('{tmp}\pdm_psql_check_' + IntToStr(Random(1000000)) + '.bat');
   SaveStringToFile(BatchFile,
     '@echo off' + #13#10 +
-    'set PGPASSWORD=' + PgPassword + #13#10 +
+    'set "PGPASSWORD=' + EscapeForBatch(PgPassword) + '"' + #13#10 +
     '"' + PsqlPath + '" -h localhost -U postgres -tAc ' +
     '"SELECT 1 FROM pg_roles WHERE rolname=''pdm_user''" > "' + OutFile + '"' + #13#10,
     False);
@@ -179,7 +190,7 @@ begin
   BatchFile := ExpandConstant('{tmp}\pdm_psql_dbcheck_' + IntToStr(Random(1000000)) + '.bat');
   SaveStringToFile(BatchFile,
     '@echo off' + #13#10 +
-    'set PGPASSWORD=' + PgPassword + #13#10 +
+    'set "PGPASSWORD=' + EscapeForBatch(PgPassword) + '"' + #13#10 +
     '"' + PsqlPath + '" -h localhost -U postgres -tAc ' +
     '"SELECT 1 FROM pg_database WHERE datname=''pdm''" > "' + OutFile + '"' + #13#10,
     False);

@@ -38,16 +38,30 @@ export function useProjectTree(projectId: string) {
 
   const itemsById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items])
 
+  // Zgrupowane raz per zmianę relations/itemsById (nie przy każdym wywołaniu childrenOf) —
+  // dzięki temu childrenOf(id) zwraca TĘ SAMĄ referencję tablicy między renderami, dopóki
+  // struktura faktycznie się nie zmieniła. Bez tego każde wywołanie (np. w JSX) budowało nową
+  // tablicę, co w ItemDetailPanel odpalało zbędny refetch zagłębionego BOM-u przy KAŻDYM,
+  // niepowiązanym re-renderze (np. włączeniu trybu zaznaczania w drzewku).
+  const childrenByParentId = useMemo(() => {
+    const map = new Map<string, { item: Item; quantity: number; position: number }[]>()
+    const sorted = [...relations].sort((a, b) => a.position - b.position)
+    for (const r of sorted) {
+      const item = itemsById.get(r.childId)
+      if (!item) continue
+      const entry = { item, quantity: r.quantity, position: r.position }
+      const list = map.get(r.parentId)
+      if (list) list.push(entry)
+      else map.set(r.parentId, [entry])
+    }
+    return map
+  }, [relations, itemsById])
+
+  const emptyChildren = useMemo(() => [], [])
+
   const childrenOf = useCallback(
-    (parentId: string) =>
-      relations
-        .filter((r) => r.parentId === parentId)
-        .sort((a, b) => a.position - b.position)
-        .map((r) => ({ item: itemsById.get(r.childId), quantity: r.quantity, position: r.position }))
-        .filter(
-          (c): c is { item: Item; quantity: number; position: number } => c.item !== undefined
-        ),
-    [relations, itemsById]
+    (parentId: string) => childrenByParentId.get(parentId) ?? emptyChildren,
+    [childrenByParentId, emptyChildren]
   )
 
   const childIds = useMemo(() => new Set(relations.map((r) => r.childId)), [relations])

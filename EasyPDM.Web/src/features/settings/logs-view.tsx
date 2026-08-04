@@ -53,12 +53,16 @@ function LogsView() {
   const [filter, setFilter] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
-    api.getLogFiles().then((result) => {
-      setFiles(result)
-      if (result.length > 0) setSelectedDate(result[0].date)
-    })
+    api
+      .getLogFiles()
+      .then((result) => {
+        setFiles(result)
+        if (result.length > 0) setSelectedDate(result[0].date)
+      })
+      .catch(() => setLoadError(true))
   }, [])
 
   async function loadContent(date: string) {
@@ -87,6 +91,15 @@ function LogsView() {
     const needle = filter.trim().toLowerCase()
     return lines.filter((line) => line.toLowerCase().includes(needle))
   }, [lines, filter])
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">{t("settings.logs")}</h2>
+        <Hint>{t("database.loadError")}</Hint>
+      </div>
+    )
+  }
 
   if (files === null) return null
 
