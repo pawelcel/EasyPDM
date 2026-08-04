@@ -158,7 +158,8 @@ end;
 
 function RoleExists(PgPassword: String): Boolean;
 var
-  OutFile, Output: String;
+  OutFile: String;
+  Output: AnsiString;
   ResultCode: Integer;
   BatchFile: String;
 begin
@@ -186,7 +187,8 @@ end;
 
 function DatabaseExists(PgPassword: String): Boolean;
 var
-  OutFile, Output: String;
+  OutFile: String;
+  Output: AnsiString;
   ResultCode: Integer;
   BatchFile: String;
 begin
