@@ -28,6 +28,7 @@ import { UsersView } from "@/features/users/users-view"
 import { WelcomeView } from "@/features/welcome/welcome-view"
 import { LanguageSelect } from "@/i18n/language-select"
 import { useLanguage } from "@/i18n/use-language"
+import { APP_VERSION } from "@/version"
 
 type View = "welcome" | "projects" | "database" | "materials" | "manufacturers" | "settings"
 
@@ -100,13 +101,16 @@ function App() {
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-10 border-b bg-background px-8 py-5">
           <div className="mb-3.5 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setView("welcome")}
-              className="text-xl font-semibold tracking-tight hover:text-primary"
-            >
-              EasyPDM
-            </button>
+            <div className="flex items-baseline gap-1.5">
+              <button
+                type="button"
+                onClick={() => setView("welcome")}
+                className="text-xl font-semibold tracking-tight hover:text-primary"
+              >
+                easyPDM
+              </button>
+              <span className="text-[12.5px] text-muted-foreground/60">v{APP_VERSION}</span>
+            </div>
             <div className="flex items-center gap-2.5 text-[13px] text-muted-foreground">
               <span>
                 {user.displayName} ({t(user.role === "admin" ? "app.role.admin" : "app.role.user")})
