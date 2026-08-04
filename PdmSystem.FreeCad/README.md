@@ -16,6 +16,18 @@ Adres API (domyślnie `http://localhost:5000/api`) jest zapamiętywany w prefere
 (`User parameter:BaseApp/PdmSystem`) po pierwszym uruchomieniu — można go zmienić w oknie
 dialogowym makra, w polu "Adres API".
 
+## Logowanie
+
+PdmSystem.Api wymaga zalogowania dla każdego wywołania poza samym logowaniem — makro więc
+też się loguje. Przy pierwszym uruchomieniu (albo gdy zapisana sesja wygasła lub została
+unieważniona) pojawia się okno logowania (nazwa użytkownika + hasło, te same konta co
+w aplikacji webowej). Token sesji trafia do tych samych preferencji FreeCAD co adres API,
+więc **kolejne uruchomienia makra — także po restarcie FreeCAD — NIE proszą o ponowne
+logowanie**, dopóki sesja jest ważna (30 dni, tak samo jak w aplikacji webowej). W głównym
+oknie "Wyślij do PDM" widać, kto jest zalogowany, i można się stamtąd **wylogować**
+(przycisk "Wyloguj") — unieważnia to sesję po stronie serwera i czyści lokalnie zapisany
+token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
+
 ## Co robi
 
 1. **Zapisuje aktywny dokument** — jeśli dokument nie miał jeszcze nadanej ścieżki na dysku,
@@ -25,9 +37,11 @@ dialogowym makra, w polu "Adres API".
      opcjonalnie element nadrzędny (Folder/Złożenie tego projektu — dokładnie te same
      reguły struktury co w aplikacji webowej: pod Częścią/Plikiem nie da się nic dodać),
      typ (Część/Złożenie), nazwa (domyślnie etykieta dokumentu), rodzaj i zależne od niego
-     pola — dla Części rodzaj jest wymagany (Wykonywana → Materiał; Zakupowa →
-     Producent/Numer zamówieniowy 1 i 2/Masa), dla Złożenia Materiał/Masa/Rodzaj są razem
-     opcjonalne — identycznie jak w aplikacji webowej.
+     pola — dla Części rodzaj jest wymagany: **Wykonywana** → Materiał, **Zakupowa** →
+     Producent/Numer zamówieniowy 1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** →
+     brak dodatkowych pól. Dla Złożenia rodzaj jest opcjonalny i ograniczony do
+     Wykonywana/Zakupowa/Normalia (bez "Klienta"), a Materiał/Masa są zawsze widoczne
+     niezależnie od wybranego rodzaju — identycznie jak w aplikacji webowej.
      **Automatyczne wykrycie istniejącego elementu**: makro sprawdza nazwę (przy otwarciu
      okna — na podstawie etykiety dokumentu — i na bieżąco przy wpisywaniu w polu "Nazwa")
      i jeśli w PDM istnieje już Część/Złożenie o dokładnie takiej nazwie, samo przełącza
@@ -68,12 +82,43 @@ dialogowym makra, w polu "Adres API".
    dogrywanie plików CAD z panelu właściwości w aplikacji webowej) — wtedy historia rewizji
    nie jest zachowywana. W obu przypadkach lokalny plik zostaje nienaruszony.
 
+## Automatyczne wykrywanie złożenia
+
+Jeśli aktywny dokument linkuje (`App::Link` — standardowy sposób budowania złożeń
+w workbenchu Assembly/Assembly4) do **innych, zapisanych plików `.FCStd`**, makro **przed**
+otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
+
+- **Wykrywanie**: przechodzi po obiektach dokumentu, znajduje `App::Link` wskazujące na
+  inne dokumenty i schodzi rekurencyjnie w głąb (pod-złożenie też może linkować dalej).
+  Ilość liczy z liczby odnośników do tego samego pliku — kilka osobnych linków i wzorce/
+  tablice linków (`ElementCount`) liczą się razem (np. 2 osobne śruby + wzorzec 2 sztuk tej
+  samej śruby = 4 w BOM-ie).
+- **Kolejność wysyłki**: liście najpierw (części bez dalszych linków), potem pod-złożenia,
+  na końcu główny dokument — żeby każdy komponent istniał w PDM, zanim zostanie podpięty
+  jako podelement.
+- **Już wysłane komponenty**: rozpoznawane po etykiecie w formacie `numer (nazwa).REWIZJA`
+  (ten sam format, który makro samo nadaje po wysłaniu) — jeśli taki numer istnieje w PDM,
+  komponent NIE jest tworzony ponownie, tylko podpinany do BOM-u z wyliczoną ilością.
+- **Nowe komponenty**: dla każdego jeszcze nie wysłanego pliku pokazuje się osobne, krótkie
+  okno (Projekt/Typ/Nazwa/Rodzaj i zależne od rodzaju pola — te same reguły co dla
+  pojedynczego nowego elementu, patrz wyżej); typ (Część/Złożenie) jest podpowiadany na
+  podstawie tego, czy dany plik sam ma dalsze linki.
+- Wybranie **"Nie"** na pytanie o automatyczne wysłanie wysyła TYLKO bieżący dokument,
+  dokładnie tak jak dotychczas (bez podelementów) — struktura BOM-u zostaje wtedy do
+  ręcznego uzupełnienia w aplikacji webowej, jak wcześniej.
+
 ## Ograniczenia pierwszej wersji
 
-- Obsługuje tylko **bieżący, pojedynczy dokument** — nie chodzi rekurencyjnie po
-  `App::Link`/złączach złożenia, żeby automatycznie zbudować cały BOM z podzespołów.
-  Każdą część złożenia trzeba na razie wysłać osobno, a powiązania w BOM-ie ustawić
-  w aplikacji webowej.
+- Automatyczne wykrywanie złożenia działa tylko dla odnośników do **zewnętrznych, zapisanych
+  plików** (`App::Link`) — nie dla złożeń trzymanych w jednym pliku jako kontenery
+  `App::Part` (te nie mają osobnych plików do wysłania osobno; trzeba je wtedy wysyłać
+  ręcznie, część po części, tak jak dotychczas).
+- Rozpoznanie "już wysłanego" komponentu opiera się na etykiecie dokumentu — makro samo ją
+  nadaje po wysłaniu, ale **nie zapisuje tej zmiany na dysk** (żeby nie ruszać pliku
+  użytkownika bez pytania), więc działa pewnie tylko w obrębie jednej sesji FreeCAD, chyba
+  że dokument zostanie potem ręcznie zapisany. W nowej sesji, dla pliku nigdy ręcznie nie
+  zapisanego po wysłaniu, makro zaproponuje utworzenie go w PDM jeszcze raz — trzeba to
+  wtedy przerwać/skorygować ręcznie.
 - **Kopiowanie/rejestrowanie pliku w `storage/` zakłada, że ten folder jest widoczny
   w systemie plików tej maszyny** — dziś klient (FreeCAD) i serwer (`PdmSystem.Api`)
   działają na tym samym dysku, więc to działa bez dodatkowej konfiguracji. Jeśli
@@ -81,10 +126,8 @@ dialogowym makra, w polu "Adres API".
   innej maszynie niż serwer), kopia trafia do PDM zwykłym uploadem HTTP — w tym trybie
   fallbackowym historia rewizji NIE jest zachowywana (każda wysyłka nadpisuje poprzednią
   kopię po stronie PDM). W obu trybach lokalny plik zawsze zostaje nienaruszony.
-- Brak logowania/autoryzacji — zakłada, że `PdmSystem.Api` jest dostępne bez
-  uwierzytelniania, tak jak reszta systemu dziś. Endpoint rejestracji akceptuje wyłącznie
-  ścieżki leżące wewnątrz skonfigurowanego magazynu (`StorageRoot`) — nie da się nim
-  "podpiąć" dowolnego pliku z dysku serwera.
+- Endpoint rejestracji akceptuje wyłącznie ścieżki leżące wewnątrz skonfigurowanego
+  magazynu (`StorageRoot`) — nie da się nim "podpiąć" dowolnego pliku z dysku serwera.
 - Zapisany dokument jest wysyłany w swoim aktualnym stanie — makro nie waliduje np. czy
   dokument ma otwarte niezapisane zmiany w innych powiązanych plikach.
 
@@ -92,6 +135,26 @@ dialogowym makra, w polu "Adres API".
 
 Logika (bez samego okna dialogowego) była testowana automatycznie przez `freecadcmd`
 przeciwko żywemu `PdmSystem.Api`:
+- **logowanie/sesja**: wywołanie API bez sesji odrzucone (401); złe hasło odrzucone zwykłym
+  błędem (token lokalny zostaje pusty); poprawne logowanie zapisuje token i wyświetlaną
+  nazwę użytkownika w preferencjach FreeCAD, kolejne wywołania API z tym tokenem działają;
+  wylogowanie czyści token/nazwę lokalnie ORAZ unieważnia sesję po stronie serwera (kolejne
+  wywołanie z tym samym, już unieważnionym tokenem znowu dostaje 401),
+- **cztery rodzaje Części** (Wykonywana/Zakupowa/Normalia/Klienta) w combo, z widocznością pól
+  zależną od wybranego rodzaju dokładnie jak w `PartPropertyForm` (sprawdzone na realnym oknie
+  `PdmUploadDialog`, wyświetlonym przez Qt w trybie `offscreen`); rodzaj Złożenia ograniczony
+  do trzech opcji bez "Klienta", z Materiałem/Masą zawsze widocznymi niezależnie od rodzaju;
+  utworzenie Części "Normalia" (z Materiałem i Normą) i "Klienta" (bez dodatkowych pól)
+  potwierdzone odczytem zapisanych właściwości z serwera,
+- **automatyczne wykrywanie złożenia** (trzypoziomowe drzewo: część linkowana 2× osobnymi
+  linkami + 1× wzorcem po 2 sztuki w głównym złożeniu, plus ta sama część jeszcze raz
+  wewnątrz osobnego pod-złożenia): wykryta kolejność wysyłki liście-najpierw, poprawnie
+  zsumowana ilość (2+2=4) dla części użytej wielokrotnie, poprawne krawędzie rodzic-dziecko
+  na wszystkich poziomach (w tym z pod-złożenia do jego własnej części) — potwierdzone
+  bezpośrednio przez `GET /api/projects/{projectId}/relations` po pełnym przebiegu
+  `process_assembly_tree` (z podmienionym oknem nowego komponentu, żeby dało się to
+  uruchomić bez GUI). Ponowne sprawdzenie w tej samej sesji rozpoznaje już wysłane
+  komponenty po etykiecie (bez tworzenia duplikatów).
 - utworzenie Części z materiałem, utworzenie Złożenia pod Folderem z powiązaniem w BOM-ie,
 - **plik zapisany poza magazynem (np. symulowany Pulpit) zostaje tam, gdzie był** — po
   wysyłce lokalny plik nadal istnieje pod tą samą ścieżką i nazwą, `doc.FileName` się nie

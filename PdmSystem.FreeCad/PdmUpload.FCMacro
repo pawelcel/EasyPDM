@@ -14,8 +14,11 @@ Co robi (w tej kolejności):
        istniejącego** — w drugim przypadku pozwala wpisać/wyszukać (Część/Złożenie
        z całej bazy, nie tylko bieżącego projektu — dokładnie jak w aplikacji webowej).
        Dla nowego rekordu: projekt PDM, element nadrzędny (opcjonalnie), typ
-       (Część/Złożenie), nazwa, rodzaj i zależne od niego pola (Materiał / Producent /
-       Numer zamówieniowy 1 i 2 / Masa).
+       (Część/Złożenie), nazwa, rodzaj (dla Części: Wykonywana/Zakupowa/Normalia/Klienta —
+       dla Złożenia opcjonalnie, bez "Klienta") i zależne od niego pola (Wykonywana:
+       Materiał; Zakupowa: Producent/Numer zamówieniowy 1 i 2/Masa; Normalia:
+       Materiał/Norma; Klienta: brak dodatkowych pól) — te same reguły co
+       PartPropertyForm/add-node-dialog w aplikacji webowej.
     2a. Dla istniejącego elementu ze statusem "wydany" (w tym statusie PDM nie pozwala
         dogrywać plików — sprawdzane też po stronie serwera): pyta, czy stworzyć nową
         rewizję. Odmowa → nic nie jest zapisywane. Zgoda → status zmienia się na
@@ -38,9 +41,42 @@ Co robi (w tej kolejności):
        nieosiągalny, kopia trafia przez zwykły upload HTTP (POST /api/items/{id}/attachments,
        ten sam mechanizm co dogrywanie plików CAD z panelu właściwości w aplikacji webowej).
 
+Automatyczne wykrywanie złożenia:
+    Jeśli aktywny dokument linkuje (App::Link — standardowy sposób budowania złożeń
+    w workbenchu Assembly/Assembly4) do INNYCH, zapisanych plików .FCStd, makro PRZED
+    otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie. Po zgodzie:
+    schodzi rekurencyjnie w głąb (pod-złożenia też mogą linkować dalej), dla każdego
+    jeszcze nie wysłanego komponentu pokazuje osobne, krótkie okno (typ/nazwa/rodzaj —
+    te same pola i reguły co dla nowego elementu), i wysyła wszystko w kolejności
+    LIŚCIE NAJPIERW, na końcu główny dokument, budując po drodze cały BOM (z ilością
+    odczytaną z liczby odnośników do tego samego pliku — pojedyncze linki i wzorce/
+    tablice linków liczą się razem). Komponent uznaje za "już wysłany", jeśli jego
+    etykieta pasuje do formatu "numer (nazwa).REWIZJA" (ten sam, który makro samo nadaje
+    po wysłaniu) I taki numer istnieje w PDM — wtedy tylko podpina go do BOM-u, bez
+    tworzenia duplikatu. "Nie" na to pytanie wysyła TYLKO bieżący dokument, dokładnie jak
+    dotychczas (bez podelementów).
+
+Logowanie:
+    PdmSystem.Api wymaga sesji (ciasteczko pdm_session) dla każdego wywołania poza
+    POST /api/auth/login — to samo makro więc też się loguje. Przy pierwszym uruchomieniu
+    (albo gdy zapisana sesja wygasła/została unieważniona) pojawia się okno logowania
+    (nazwa użytkownika + hasło); token sesji trafia do tych samych preferencji FreeCAD co
+    adres API (User parameter:BaseApp/PdmSystem), więc kolejne uruchomienia makra (także po
+    restarcie FreeCAD) NIE proszą o ponowne logowanie, dopóki sesja jest ważna (30 dni, tak
+    samo jak w aplikacji webowej). W głównym oknie "Wyślij do PDM" widać, kto jest zalogowany,
+    i można się stamtąd wylogować (przycisk "Wyloguj") — kolejne uruchomienie makra od razu
+    poprosi o ponowne zalogowanie.
+
 Ograniczenia (świadomie poza zakresem pierwszej wersji):
-    - Obsługuje tylko BIEŻĄCY, pojedynczy dokument — nie chodzi rekurencyjnie po
-      App::Link / złączach złożenia, żeby automatycznie zbudować cały BOM.
+    - Automatyczne wykrywanie złożenia działa tylko dla odnośników do ZEWNĘTRZNYCH,
+      zapisanych plików (App::Link) — nie dla złożeń trzymanych w jednym pliku jako
+      kontenery App::Part (te nie mają osobnych plików do wysłania osobno).
+    - Rozpoznanie "już wysłanego" komponentu opiera się na etykiecie dokumentu — makro
+      samo ją nadaje po wysłaniu, ale NIE zapisuje tej zmiany na dysk (żeby nie ruszać
+      pliku użytkownika bez pytania), więc działa pewnie tylko w obrębie JEDNEJ sesji
+      FreeCAD, chyba że dokument zostanie potem ręcznie zapisany. W nowej sesji, dla
+      pliku nigdy ręcznie nie zapisanego po wysłaniu, makro zaproponuje utworzenie go
+      w PDM jeszcze raz (duplikat) — trzeba to wtedy przerwać/skorygować ręcznie.
     - Kopiowanie/rejestrowanie pliku w folderze magazynu zakłada, że jest on widoczny
       w systemie plików tej maszyny (dziś: klient i serwer na tym samym dysku) — jeśli
       GET /api/config jest nieosiągalne albo ścieżka nie istnieje/nie da się do niej
@@ -48,8 +84,6 @@ Ograniczenia (świadomie poza zakresem pierwszej wersji):
       fallbackowym historia rewizji nie jest zachowywana (każda wysyłka nadpisuje
       poprzednią kopię po stronie PDM). W obu trybach lokalny plik zawsze zostaje
       nienaruszony w miejscu, gdzie go otwarto.
-    - Brak logowania/autoryzacji — zakłada, że PdmSystem.Api jest dostępne bez
-      uwierzytelniania (tak jak dziś działa cała reszta systemu).
     - Adres API zapisywany jest w preferencjach FreeCAD (User parameter:BaseApp/PdmSystem),
       domyślnie http://localhost:5000/api.
 """
@@ -75,6 +109,14 @@ except ImportError:
 
 PARAM_GROUP = "User parameter:BaseApp/PdmSystem"
 DEFAULT_BASE_URL = "http://localhost:5000/api"
+SESSION_COOKIE_NAME = "pdm_session"
+
+
+class AuthError(RuntimeError):
+    """Brak sesji albo sesja wygasła/została unieważniona — trzeba się (ponownie) zalogować.
+    Odróżniona od zwykłego RuntimeError, żeby ensure_logged_in() wiedziało kiedy pokazać
+    okno logowania, zamiast tylko wyświetlić czerwony komunikat błędu."""
+    pass
 
 # Dopasowuje własną konwencję nazewnictwa "numer (nazwa).REWIZJA" (nadawaną plikom/etykietom
 # przez to samo makro po wysłaniu do PDM) — np. "76 (RewizjaTest).C". Jeśli dokument został
@@ -91,6 +133,27 @@ def set_base_url(url):
     App.ParamGet(PARAM_GROUP).SetString("ApiBaseUrl", url.rstrip("/"))
 
 
+def get_session_token():
+    return App.ParamGet(PARAM_GROUP).GetString("SessionToken", "") or None
+
+
+def set_session_token(token):
+    App.ParamGet(PARAM_GROUP).SetString("SessionToken", token or "")
+
+
+def get_saved_username():
+    return App.ParamGet(PARAM_GROUP).GetString("SessionDisplayName", "") or None
+
+
+def set_saved_username(name):
+    App.ParamGet(PARAM_GROUP).SetString("SessionDisplayName", name or "")
+
+
+def _auth_headers():
+    token = get_session_token()
+    return {"Cookie": f"{SESSION_COOKIE_NAME}={token}"} if token else {}
+
+
 def _read_error_body(http_error):
     try:
         return http_error.read().decode("utf-8") or str(http_error)
@@ -98,29 +161,35 @@ def _read_error_body(http_error):
         return str(http_error)
 
 
+def _raise_for_http_error(e):
+    if e.code == 401:
+        raise AuthError(_read_error_body(e))
+    raise RuntimeError(_read_error_body(e))
+
+
 def api_get(path):
-    req = request.Request(get_base_url() + path, method="GET")
+    req = request.Request(get_base_url() + path, method="GET", headers=_auth_headers())
     try:
         with request.urlopen(req, timeout=10) as resp:
             body = resp.read().decode("utf-8")
             return json.loads(body) if body else None
     except error.HTTPError as e:
-        raise RuntimeError(_read_error_body(e))
+        _raise_for_http_error(e)
     except error.URLError as e:
         raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
 
 
 def api_post_json(path, payload):
     data = json.dumps(payload).encode("utf-8")
-    req = request.Request(
-        get_base_url() + path, data=data, method="POST", headers={"Content-Type": "application/json"}
-    )
+    headers = {"Content-Type": "application/json"}
+    headers.update(_auth_headers())
+    req = request.Request(get_base_url() + path, data=data, method="POST", headers=headers)
     try:
         with request.urlopen(req, timeout=15) as resp:
             body = resp.read().decode("utf-8")
             return json.loads(body) if body else None
     except error.HTTPError as e:
-        raise RuntimeError(_read_error_body(e))
+        _raise_for_http_error(e)
     except error.URLError as e:
         raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
 
@@ -140,33 +209,30 @@ def api_upload_file(path, file_path, field_name="file", override_filename=None):
     ]
     payload = b"".join(parts)
 
-    req = request.Request(
-        get_base_url() + path,
-        data=payload,
-        method="POST",
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-    )
+    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    headers.update(_auth_headers())
+    req = request.Request(get_base_url() + path, data=payload, method="POST", headers=headers)
     try:
         with request.urlopen(req, timeout=60) as resp:
             body = resp.read().decode("utf-8")
             return json.loads(body) if body else None
     except error.HTTPError as e:
-        raise RuntimeError(_read_error_body(e))
+        _raise_for_http_error(e)
     except error.URLError as e:
         raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
 
 
 def api_patch_json(path, payload):
     data = json.dumps(payload).encode("utf-8")
-    req = request.Request(
-        get_base_url() + path, data=data, method="PATCH", headers={"Content-Type": "application/json"}
-    )
+    headers = {"Content-Type": "application/json"}
+    headers.update(_auth_headers())
+    req = request.Request(get_base_url() + path, data=data, method="PATCH", headers=headers)
     try:
         with request.urlopen(req, timeout=15) as resp:
             body = resp.read().decode("utf-8")
             return json.loads(body) if body else None
     except error.HTTPError as e:
-        raise RuntimeError(_read_error_body(e))
+        _raise_for_http_error(e)
     except error.URLError as e:
         raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
 
@@ -177,9 +243,107 @@ def api_register_attachment(item_id, file_path):
     return api_post_json(f"/items/{item_id}/attachments/register", {"filePath": file_path})
 
 
+def api_login(username, password):
+    """Loguje się (POST /api/auth/login) i zapisuje token sesji w preferencjach FreeCAD —
+    ten sam mechanizm co ApiBaseUrl, więc logowanie przetrwa restart FreeCAD, dopóki sesja
+    jest ważna po stronie serwera (30 dni, tak samo jak w aplikacji webowej). Zwraca dict
+    użytkownika ({"username", "displayName", "role", ...}, tak jak POST /api/auth/login)."""
+    data = json.dumps({"username": username, "password": password}).encode("utf-8")
+    req = request.Request(
+        get_base_url() + "/auth/login", data=data, method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with request.urlopen(req, timeout=10) as resp:
+            body = resp.read().decode("utf-8")
+            user = json.loads(body) if body else {}
+            set_cookie_header = resp.headers.get("Set-Cookie", "")
+    except error.HTTPError as e:
+        raise RuntimeError(_read_error_body(e))
+    except error.URLError as e:
+        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+
+    token = None
+    for part in set_cookie_header.split(";"):
+        part = part.strip()
+        if part.startswith(f"{SESSION_COOKIE_NAME}="):
+            token = part[len(SESSION_COOKIE_NAME) + 1:]
+            break
+    if not token:
+        raise RuntimeError("Logowanie nie powiodło się — serwer nie zwrócił sesji.")
+
+    set_session_token(token)
+    set_saved_username(user.get("displayName") or user.get("username") or username)
+    return user
+
+
+def api_logout():
+    """Unieważnia sesję po stronie serwera (POST /api/auth/logout) i zawsze czyści też
+    lokalnie zapisany token — nawet jeśli wywołanie się nie powiedzie (np. brak połączenia),
+    użytkownik i tak przestaje być "zalogowany" z punktu widzenia tego makra, więc kolejne
+    uruchomienie poprosi o ponowne logowanie."""
+    token = get_session_token()
+    if token:
+        req = request.Request(
+            get_base_url() + "/auth/logout", method="POST", headers=_auth_headers()
+        )
+        try:
+            request.urlopen(req, timeout=10)
+        except Exception:
+            pass
+    set_session_token(None)
+    set_saved_username(None)
+
+
+def ensure_logged_in():
+    """Sprawdza, czy zapisana sesja jest jeszcze ważna (GET /api/auth/me); jeśli jej nie ma
+    albo wygasła/została unieważniona, pokazuje okno logowania. Zwraca True, jeśli po
+    wywołaniu tej funkcji jest aktywna sesja (można kontynuować), False jeśli użytkownik
+    anulował logowanie."""
+    if get_session_token():
+        try:
+            api_get("/auth/me")
+            return True
+        except AuthError:
+            set_session_token(None)  # token wygasł/nieważny — nie próbuj go już więcej
+        except Exception:
+            # Np. brak połączenia — nie blokujemy logowaniem na etapie samego sprawdzenia,
+            # błąd i tak wypłynie czytelnie przy pierwszym realnym wywołaniu API.
+            return True
+
+    dlg = LoginDialog()
+    return dlg.exec() == QtWidgets.QDialog.Accepted
+
+
 def sanitize_filename(name):
     cleaned = re.sub(r'[\\/:*?"<>|]+', "_", name).strip()
     return cleaned or "bez_nazwy"
+
+
+# Cztery rodzaje Części — dokładnie te same i w tej samej kolejności co PartKindSelect/
+# add-node-dialog w aplikacji webowej. Złożenie ma te same rodzaje minus "Klienta" (patrz
+# add-node-dialog.tsx — okno tworzenia złożenia nie oferuje tej opcji).
+PART_KINDS = ["Wykonywana", "Zakupowa", "Normalia", "Klienta"]
+ASSEMBLY_KINDS = ["Wykonywana", "Zakupowa", "Normalia"]
+
+
+def kind_field_visibility(is_part, rodzaj):
+    """Jedno źródło prawdy dla widoczności pól zależnych od typu/rodzaju — używane zarówno
+    przez PdmUploadDialog (tryb "nowy element"), jak i NewComponentDialog (automatyczne
+    wykrywanie złożenia), żeby te dwa miejsca nie mogły się rozjechać. Dokładnie te same
+    reguły co PartPropertyForm/add-node-dialog w aplikacji webowej: Wykonywana -> Materiał;
+    Zakupowa -> Producent/Numery zamówieniowe/Masa; Normalia -> Materiał/Norma; Klienta ->
+    brak dodatkowych pól. Złożenie: Materiał/Masa zawsze widoczne razem, niezależnie od
+    rodzaju; Norma dotyczy tylko Części."""
+    wykonywana = rodzaj == "Wykonywana"
+    zakupowa = rodzaj == "Zakupowa"
+    normalia = rodzaj == "Normalia"
+    return {
+        "material": (wykonywana or normalia) if is_part else True,
+        "mass": zakupowa if is_part else True,
+        "purchase": is_part and zakupowa,
+        "norm": is_part and normalia,
+    }
 
 
 def revision_label(n):
@@ -203,6 +367,97 @@ def get_storage_root():
         return config.get("storageRoot") if config else None
     except Exception:
         return None
+
+
+# ============================================================
+# Wykrywanie złożenia z App::Link (odnośniki do zewnętrznych, zapisanych plików .FCStd —
+# standardowy sposób budowania złożeń w workbenchu Assembly/Assembly4). Pozwala wysłać całe
+# drzewo złożenia jednym uruchomieniem makra: najpierw wszystkie części/pod-złożenia
+# (liście najpierw), na końcu główny dokument.
+# ============================================================
+def _iter_external_link_targets(doc):
+    """Zwraca dict {ścieżka_pliku: [freecad_document, łączna_ilość]} dla wszystkich
+    App::Link w `doc` wskazujących na INNY, już zapisany dokument (linki wewnątrz tego
+    samego dokumentu — np. wzorzec śrub w obrębie jednej części — są pomijane, bo nie mają
+    osobnego pliku do wysłania). Ilość to suma po WSZYSTKICH linkach do tego samego pliku:
+    zwykły (niearrayowy) App::Link ma ElementCount=0, co liczymy jako 1 sztukę; wzorzec/
+    tablica linków (ElementCount>0) liczy się jako tyle sztuk, ile wskazuje ElementCount."""
+    result = {}
+    for obj in doc.Objects:
+        if obj.TypeId != "App::Link":
+            continue
+        linked = getattr(obj, "LinkedObject", None)
+        if linked is None:
+            continue
+        linked_doc = getattr(linked, "Document", None)
+        if linked_doc is None or not linked_doc.FileName or linked_doc.FileName == doc.FileName:
+            continue
+        qty = getattr(obj, "ElementCount", 0) or 1
+        qty = max(int(qty), 1)
+        key = linked_doc.FileName
+        if key not in result:
+            result[key] = [linked_doc, 0]
+        result[key][1] += qty
+    return result
+
+
+def discover_component_tree(top_doc):
+    """Rekurencyjnie schodzi po App::Link dokumentu `top_doc` (i dalej w głąb, jeśli
+    linkowany dokument sam ma dalsze linki). Zwraca:
+        order — lista ścieżek plików odkrytych komponentów w kolejności "liście najpierw"
+                (dzieci przed rodzicami), BEZ samego top_doc,
+        docs  — dict {ścieżka_pliku: freecad_document} dla wszystkich odkrytych plików,
+        edges — lista (ścieżka_rodzica, ścieżka_dziecka, ilość) dla WSZYSTKICH par
+                rodzic-dziecko w drzewie, WŁĄCZNIE z tymi, gdzie rodzicem jest top_doc.
+    `visited` chroni przed nieskończoną rekurencją, gdyby (nietypowo) powstał cykl."""
+    order = []
+    docs = {}
+    edges = []
+    visited = set()
+
+    def visit(doc):
+        if doc.FileName in visited:
+            return
+        visited.add(doc.FileName)
+        for child_doc, qty in _iter_external_link_targets(doc).values():
+            visit(child_doc)
+            edges.append((doc.FileName, child_doc.FileName, qty))
+        if doc.FileName != top_doc.FileName:
+            docs[doc.FileName] = doc
+            order.append(doc.FileName)
+
+    visit(top_doc)
+    return order, docs, edges
+
+
+def match_existing_item(doc, existing_items):
+    """Sprawdza, czy etykieta dokumentu wygląda jak "numer (nazwa).REWIZJA" — format,
+    który to samo makro nadaje PO wysłaniu (zob. _rename_and_upload) — i jeśli tak, czy
+    taki numer faktycznie istnieje w PDM. Zwraca dopasowany wpis (jak z GET /api/items)
+    albo None, jeśli dokument trzeba dopiero utworzyć. Uwaga: to dopasowanie działa tylko
+    w obrębie BIEŻĄCEJ sesji FreeCAD albo jeśli plik został ręcznie zapisany po
+    zmianie etykiety — sama zmiana etykiety po wysłaniu NIE jest zapisywana na dysk
+    (zob. komentarz w _rename_and_upload), więc ponowne otwarcie pliku w NOWEJ sesji
+    FreeCAD bez wcześniejszego ręcznego zapisu pokaże oryginalną etykietę."""
+    m = _REVISION_NAME_PATTERN.match(doc.Label)
+    if not m:
+        return None
+    item_number = int(m.group(1))
+    for it in existing_items:
+        if it.get("itemNumber") == item_number:
+            return it
+    return None
+
+
+def _usage_hint_for(file_path, edges):
+    """Czytelny opis "używane Nx w pliku Y" do okna nowego komponentu — komponent może być
+    używany w kilku miejscach drzewa naraz (współdzielona część)."""
+    parts = [
+        f"{qty}× w {os.path.basename(parent)}"
+        for parent, child, qty in edges
+        if child == file_path
+    ]
+    return "Używane: " + ", ".join(parts) if parts else ""
 
 
 def _rename_and_upload(doc, item_id, item_number, name, revision):
@@ -308,6 +563,59 @@ def push_to_existing_item(doc, item_id, confirm_new_revision):
     return _rename_and_upload(doc, item_id, item["itemNumber"], item["fileName"], revision)
 
 
+class LoginDialog(QtWidgets.QDialog):
+    """Logowanie do PdmSystem — pokazywane przez ensure_logged_in(), gdy nie ma jeszcze
+    zapisanej sesji albo poprzednia wygasła/została unieważniona."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Logowanie do PDM")
+        self.setMinimumWidth(360)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        form = QtWidgets.QFormLayout()
+        layout.addLayout(form)
+
+        self.server_edit = QtWidgets.QLineEdit(get_base_url())
+        form.addRow("Adres API:", self.server_edit)
+
+        self.username_edit = QtWidgets.QLineEdit()
+        form.addRow("Nazwa użytkownika:", self.username_edit)
+
+        self.password_edit = QtWidgets.QLineEdit()
+        self.password_edit.setEchoMode(QtWidgets.QLineEdit.Password)
+        form.addRow("Hasło:", self.password_edit)
+
+        self.error_label = QtWidgets.QLabel("")
+        self.error_label.setStyleSheet("color: #c0392b;")
+        self.error_label.setWordWrap(True)
+        layout.addWidget(self.error_label)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText("Zaloguj")
+        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText("Anuluj")
+        buttons.accepted.connect(self._try_login)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _try_login(self):
+        self.error_label.setText("")
+        set_base_url(self.server_edit.text().strip())
+        username = self.username_edit.text().strip()
+        password = self.password_edit.text()
+        if not username or not password:
+            self.error_label.setText("Podaj nazwę użytkownika i hasło.")
+            return
+        try:
+            api_login(username, password)
+        except Exception as e:
+            self.error_label.setText(str(e))
+            return
+        self.accept()
+
+
 class NewRevisionDialog(QtWidgets.QDialog):
     """Pytanie o stworzenie nowej rewizji elementu o statusie "Wydany", z opcjonalnym
     komentarzem opisującym zmianę — ta sama treść, którą zapisuje aplikacja webowa."""
@@ -345,6 +653,185 @@ class NewRevisionDialog(QtWidgets.QDialog):
         return self.comment_edit.toPlainText().strip()
 
 
+class NewComponentDialog(QtWidgets.QDialog):
+    """Zbiera dane dla JEDNEGO automatycznie wykrytego, jeszcze nie istniejącego w PDM
+    komponentu złożenia (część albo pod-złożenie) — pokazywane raz na każdy taki komponent,
+    w kolejności "liście najpierw", zanim zostanie przetworzony plik, który go używa.
+    Pola i ich widoczność to dokładnie ta sama logika co w PdmUploadDialog (tryb "nowy
+    element"), tylko bez wyboru trybu/elementu nadrzędnego — te są tu z góry przesądzone
+    (zawsze "nowy", rodzic dopina się automatycznie po utworzeniu)."""
+
+    def __init__(self, file_path, suggested_name, suggested_is_assembly, usage_hint, projects, materials, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Nowy komponent złożenia")
+        self.setMinimumWidth(440)
+
+        outer = QtWidgets.QVBoxLayout(self)
+
+        header_text = f"<b>{os.path.basename(file_path)}</b>"
+        if usage_hint:
+            header_text += f"<br>{usage_hint}"
+        header = QtWidgets.QLabel(header_text)
+        header.setWordWrap(True)
+        outer.addWidget(header)
+
+        form = QtWidgets.QFormLayout()
+        outer.addLayout(form)
+
+        self.project_combo = QtWidgets.QComboBox()
+        for p in projects:
+            self.project_combo.addItem(p["name"], p["id"])
+        form.addRow("Projekt:", self.project_combo)
+
+        self.type_combo = QtWidgets.QComboBox()
+        self.type_combo.addItems(["Część", "Złożenie"])
+        self.type_combo.setCurrentIndex(1 if suggested_is_assembly else 0)
+        self.type_combo.currentIndexChanged.connect(self.on_type_changed)
+        form.addRow("Typ:", self.type_combo)
+
+        self.name_edit = QtWidgets.QLineEdit(suggested_name)
+        form.addRow("Nazwa:", self.name_edit)
+
+        self.rodzaj_combo = QtWidgets.QComboBox()
+        self.rodzaj_combo.currentIndexChanged.connect(self.on_rodzaj_changed)
+        form.addRow("Rodzaj:", self.rodzaj_combo)
+
+        self.material_label = QtWidgets.QLabel("Materiał:")
+        self.material_combo = QtWidgets.QComboBox()
+        self.material_combo.setEditable(True)
+        self.material_combo.addItem("", "")
+        for m in materials:
+            self.material_combo.addItem(m["name"], m["name"])
+        form.addRow(self.material_label, self.material_combo)
+
+        self.mass_label = QtWidgets.QLabel("Masa [kg]:")
+        self.mass_edit = QtWidgets.QLineEdit()
+        form.addRow(self.mass_label, self.mass_edit)
+
+        self.manufacturer_label = QtWidgets.QLabel("Producent:")
+        self.manufacturer_edit = QtWidgets.QLineEdit()
+        form.addRow(self.manufacturer_label, self.manufacturer_edit)
+
+        self.order1_label = QtWidgets.QLabel("Numer zamówieniowy 1:")
+        self.order1_edit = QtWidgets.QLineEdit()
+        form.addRow(self.order1_label, self.order1_edit)
+
+        self.order2_label = QtWidgets.QLabel("Numer zamówieniowy 2:")
+        self.order2_edit = QtWidgets.QLineEdit()
+        form.addRow(self.order2_label, self.order2_edit)
+
+        self.norm_label = QtWidgets.QLabel("Norma:")
+        self.norm_edit = QtWidgets.QLineEdit()
+        form.addRow(self.norm_label, self.norm_edit)
+
+        self.error_label = QtWidgets.QLabel("")
+        self.error_label.setStyleSheet("color: #c0392b;")
+        self.error_label.setWordWrap(True)
+        outer.addWidget(self.error_label)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        buttons.accepted.connect(self._try_accept)
+        buttons.rejected.connect(self.reject)
+        outer.addWidget(buttons)
+
+        self.on_type_changed()
+
+    def on_type_changed(self):
+        is_part = self.type_combo.currentText() == "Część"
+        self.rodzaj_combo.blockSignals(True)
+        self.rodzaj_combo.clear()
+        if is_part:
+            self.rodzaj_combo.addItems(PART_KINDS)
+        else:
+            self.rodzaj_combo.addItem("(nie wybrano)", "")
+            for k in ASSEMBLY_KINDS:
+                self.rodzaj_combo.addItem(k, k)
+        self.rodzaj_combo.blockSignals(False)
+        self.on_rodzaj_changed()
+
+    def on_rodzaj_changed(self):
+        is_part = self.type_combo.currentText() == "Część"
+        rodzaj = self.rodzaj_combo.currentText()
+        vis = kind_field_visibility(is_part, rodzaj)
+
+        for w in (self.material_label, self.material_combo):
+            w.setVisible(vis["material"])
+        for w in (self.mass_label, self.mass_edit):
+            w.setVisible(vis["mass"])
+        for w in (
+            self.manufacturer_label,
+            self.manufacturer_edit,
+            self.order1_label,
+            self.order1_edit,
+            self.order2_label,
+            self.order2_edit,
+        ):
+            w.setVisible(vis["purchase"])
+        for w in (self.norm_label, self.norm_edit):
+            w.setVisible(vis["norm"])
+
+    def _try_accept(self):
+        self.error_label.setText("")
+        if not self.project_combo.currentData():
+            self.error_label.setText("Wybierz projekt.")
+            return
+        if not self.name_edit.text().strip():
+            self.error_label.setText("Nazwa jest wymagana.")
+            return
+        is_part = self.type_combo.currentText() == "Część"
+        rodzaj = self.rodzaj_combo.currentText()
+        if is_part and rodzaj not in PART_KINDS:
+            self.error_label.setText(
+                "Dla Części wybierz rodzaj: Wykonywana, Zakupowa, Normalia albo Klienta."
+            )
+            return
+        self.accept()
+
+    def result_data(self):
+        """Zwraca (project_id, item_type, name, properties) — do przekazania do
+        push_new_item_to_pdm."""
+        is_part = self.type_combo.currentText() == "Część"
+        item_type = "part" if is_part else "assembly"
+        rodzaj = self.rodzaj_combo.currentText()
+        if rodzaj == "(nie wybrano)":
+            rodzaj = ""
+
+        properties = {}
+        if rodzaj:
+            properties["rodzaj"] = rodzaj
+        if self.material_combo.isVisible():
+            material = self.material_combo.currentText().strip()
+            if material:
+                properties["material"] = material
+        if self.mass_edit.isVisible():
+            mass = self.mass_edit.text().strip()
+            if mass:
+                properties["mass"] = mass
+        if self.manufacturer_edit.isVisible():
+            manufacturer = self.manufacturer_edit.text().strip()
+            if manufacturer:
+                properties["manufacturer"] = manufacturer
+            order1 = self.order1_edit.text().strip()
+            if order1:
+                properties["orderNumber"] = order1
+            order2 = self.order2_edit.text().strip()
+            if order2:
+                properties["orderNumber2"] = order2
+        if self.norm_edit.isVisible():
+            norm = self.norm_edit.text().strip()
+            if norm:
+                properties["norm"] = norm
+
+        return (
+            self.project_combo.currentData(),
+            item_type,
+            self.name_edit.text().strip(),
+            properties,
+        )
+
+
 class PdmUploadDialog(QtWidgets.QDialog):
     def __init__(self, doc, parent=None):
         super().__init__(parent)
@@ -362,6 +849,15 @@ class PdmUploadDialog(QtWidgets.QDialog):
 
         self.server_edit = QtWidgets.QLineEdit(get_base_url())
         top_form.addRow("Adres API:", self.server_edit)
+
+        account_row = QtWidgets.QHBoxLayout()
+        self.account_label = QtWidgets.QLabel(f"Zalogowano jako: {get_saved_username() or '?'}")
+        account_row.addWidget(self.account_label)
+        logout_btn = QtWidgets.QPushButton("Wyloguj")
+        logout_btn.clicked.connect(self.on_logout)
+        account_row.addWidget(logout_btn)
+        account_row.addStretch(1)
+        top_form.addRow("Konto:", account_row)
 
         reload_btn = QtWidgets.QPushButton("Odśwież listy z serwera")
         reload_btn.clicked.connect(self.reload_lists)
@@ -418,6 +914,10 @@ class PdmUploadDialog(QtWidgets.QDialog):
         self.order2_label = QtWidgets.QLabel("Numer zamówieniowy 2:")
         self.order2_edit = QtWidgets.QLineEdit()
         new_form.addRow(self.order2_label, self.order2_edit)
+
+        self.norm_label = QtWidgets.QLabel("Norma:")
+        self.norm_edit = QtWidgets.QLineEdit()
+        new_form.addRow(self.norm_label, self.norm_edit)
 
         # --- Tryb: istniejący element ------------------------------------
         self.existing_group = QtWidgets.QWidget()
@@ -490,6 +990,13 @@ class PdmUploadDialog(QtWidgets.QDialog):
             # wyszukiwanie do tej nazwy, ale wybór zostawiamy użytkownikowi.
             self.existing_combo.setCurrentIndex(-1)
             self.existing_combo.setEditText(name)
+
+    def on_logout(self):
+        api_logout()
+        QtWidgets.QMessageBox.information(
+            self, "PDM", "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie."
+        )
+        self.reject()
 
     # ------------------------------------------------------------------
     # Ładowanie danych z serwera
@@ -583,31 +1090,25 @@ class PdmUploadDialog(QtWidgets.QDialog):
         self.rodzaj_combo.blockSignals(True)
         self.rodzaj_combo.clear()
         if is_part:
-            self.rodzaj_combo.addItems(["Wykonywana", "Zakupowa"])
+            self.rodzaj_combo.addItems(PART_KINDS)
         else:
+            # Złożenie: rodzaj jest opcjonalny i nie ma "Klienta" (tak samo jak w oknie
+            # tworzenia złożenia w aplikacji webowej).
             self.rodzaj_combo.addItem("(nie wybrano)", "")
-            self.rodzaj_combo.addItem("Wykonywana", "Wykonywana")
-            self.rodzaj_combo.addItem("Zakupowa", "Zakupowa")
+            for k in ASSEMBLY_KINDS:
+                self.rodzaj_combo.addItem(k, k)
         self.rodzaj_combo.blockSignals(False)
         self.on_rodzaj_changed()
 
     def on_rodzaj_changed(self):
         is_part = self.type_combo.currentText() == "Część"
         rodzaj = self.rodzaj_combo.currentText()
-        wykonywana = rodzaj == "Wykonywana"
-        zakupowa = rodzaj == "Zakupowa"
-
-        # Część: pola zależne wyłącznie od rodzaju (dokładnie jak PartPropertyForm).
-        # Złożenie: Materiał/Masa zawsze widoczne razem, niezależnie od rodzaju
-        # (dokładnie jak formularz tworzenia złożenia w aplikacji webowej).
-        show_material = wykonywana if is_part else True
-        show_mass = zakupowa if is_part else True
-        show_purchase_fields = is_part and zakupowa
+        vis = kind_field_visibility(is_part, rodzaj)
 
         for w in (self.material_label, self.material_combo):
-            w.setVisible(show_material)
+            w.setVisible(vis["material"])
         for w in (self.mass_label, self.mass_edit):
-            w.setVisible(show_mass)
+            w.setVisible(vis["mass"])
         for w in (
             self.manufacturer_label,
             self.manufacturer_edit,
@@ -616,7 +1117,9 @@ class PdmUploadDialog(QtWidgets.QDialog):
             self.order2_label,
             self.order2_edit,
         ):
-            w.setVisible(show_purchase_fields)
+            w.setVisible(vis["purchase"])
+        for w in (self.norm_label, self.norm_edit):
+            w.setVisible(vis["norm"])
 
     # ------------------------------------------------------------------
     # Zapis
@@ -669,8 +1172,10 @@ class PdmUploadDialog(QtWidgets.QDialog):
             return
 
         rodzaj = self.rodzaj_combo.currentText()
-        if item_type == "part" and rodzaj not in ("Wykonywana", "Zakupowa"):
-            self.error_label.setText("Dla Części wybierz rodzaj: Wykonywana albo Zakupowa.")
+        if item_type == "part" and rodzaj not in PART_KINDS:
+            self.error_label.setText(
+                "Dla Części wybierz rodzaj: Wykonywana, Zakupowa, Normalia albo Klienta."
+            )
             return
         if rodzaj == "(nie wybrano)":
             rodzaj = ""
@@ -697,6 +1202,10 @@ class PdmUploadDialog(QtWidgets.QDialog):
             order2 = self.order2_edit.text().strip()
             if order2:
                 properties["orderNumber2"] = order2
+        if self.norm_edit.isVisible():
+            norm = self.norm_edit.text().strip()
+            if norm:
+                properties["norm"] = norm
 
         parent_id = self.parent_combo.currentData()
 
@@ -711,7 +1220,120 @@ class PdmUploadDialog(QtWidgets.QDialog):
         self.accept()
 
 
+def process_assembly_tree(top_doc):
+    """Wykrywa złożenie (App::Link do zewnętrznych plików, rekurencyjnie) i dla KAŻDEGO
+    nowego komponentu (jeszcze nie wysłanego do PDM — rozpoznawane po etykiecie
+    "numer (nazwa).REWIZJA", zob. match_existing_item) pokazuje NewComponentDialog, tworzy
+    go w PDM, po czym podpina relacje rodzic-dziecko (BOM) MIĘDZY odkrytymi komponentami.
+    Relacje, gdzie rodzicem jest top_doc, NIE są tu podpinane — top_doc jeszcze nie ma
+    swojego item_id w PDM (może to być nowy ALBO już istniejący element — o tym decyduje
+    reszta run() przez zwykły PdmUploadDialog); te relacje dopina run() po jego utworzeniu.
+
+    Zwraca (edges_for_top, cancelled):
+        edges_for_top — lista (child_item_id, quantity) do podpięcia pod element top_doc,
+        cancelled     — True, jeśli użytkownik przerwał w trakcie. Komponenty utworzone
+                        PRZED przerwaniem zostają w PDM (tak samo jak reszta makra nie
+                        cofa częściowo wykonanych kroków w razie błędu w połowie)."""
+    order, docs, edges = discover_component_tree(top_doc)
+    if not order:
+        return [], False
+
+    summary = "\n".join(f"- {os.path.basename(f)}" for f in order)
+    choice = QtWidgets.QMessageBox.question(
+        None,
+        "Wykryto złożenie",
+        f"Ten dokument linkuje do {len(order)} innych plików (części/pod-złożeń):\n\n"
+        f"{summary}\n\n"
+        "Wysłać je automatycznie razem z tym dokumentem (najpierw części/pod-złożenia, "
+        "na końcu ten dokument)?\n\n"
+        "\"Nie\" wyśle TYLKO ten dokument, tak jak dotychczas — bez podelementów.",
+        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel,
+        QtWidgets.QMessageBox.Yes,
+    )
+    if choice == QtWidgets.QMessageBox.Cancel:
+        return [], True
+    if choice == QtWidgets.QMessageBox.No:
+        return [], False
+
+    try:
+        existing_items = api_get("/items") or []
+    except Exception as e:
+        QtWidgets.QMessageBox.warning(None, "PDM", f"Nie udało się pobrać listy elementów: {e}")
+        existing_items = []
+    try:
+        projects = api_get("/projects") or []
+    except Exception as e:
+        QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się pobrać listy projektów: {e}")
+        return [], True
+    try:
+        materials = api_get("/materials") or []
+    except Exception:
+        materials = []
+
+    # Pliki, które same mają dalsze zewnętrzne linki -> podpowiadamy w oknie typ "Złożenie".
+    has_children = {parent for parent, _child, _qty in edges}
+
+    doc_to_item_id = {}
+    for file_path in order:
+        doc = docs[file_path]
+        matched = match_existing_item(doc, existing_items)
+        if matched:
+            doc_to_item_id[file_path] = matched["id"]
+            continue
+
+        dlg = NewComponentDialog(
+            file_path=file_path,
+            suggested_name=doc.Label,
+            suggested_is_assembly=file_path in has_children,
+            usage_hint=_usage_hint_for(file_path, edges),
+            projects=projects,
+            materials=materials,
+        )
+        if dlg.exec() != QtWidgets.QDialog.Accepted:
+            return [], True
+
+        project_id, item_type, name, properties = dlg.result_data()
+        try:
+            result = push_new_item_to_pdm(doc, project_id, item_type, name, properties)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                None, "PDM", f"Nie udało się wysłać {os.path.basename(file_path)}: {e}"
+            )
+            return [], True
+        doc_to_item_id[file_path] = result["itemId"]
+
+    edges_for_top = []
+    for parent_file, child_file, qty in edges:
+        child_item_id = doc_to_item_id.get(child_file)
+        if child_item_id is None:
+            continue
+        if parent_file == top_doc.FileName:
+            edges_for_top.append((child_item_id, qty))
+            continue
+        parent_item_id = doc_to_item_id.get(parent_file)
+        if parent_item_id is None:
+            continue
+        try:
+            api_post_json(
+                f"/items/{parent_item_id}/children", {"childId": child_item_id, "quantity": qty}
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(
+                None,
+                "PDM",
+                f"Utworzono {os.path.basename(child_file)}, ale nie udało się podpiąć go "
+                f"pod {os.path.basename(parent_file)}: {e}",
+            )
+
+    return edges_for_top, False
+
+
 def run():
+    # Krok 0: upewnij się, że jest aktywna sesja — PdmSystem.Api wymaga jej dla każdego
+    # wywołania poza samym logowaniem.
+    if not ensure_logged_in():
+        return  # użytkownik anulował logowanie
+
     doc = App.ActiveDocument
     if doc is None:
         QtWidgets.QMessageBox.warning(None, "PDM", "Brak otwartego dokumentu.")
@@ -730,6 +1352,13 @@ def run():
     else:
         doc.save()
 
+    # Krok 1a: wykryj i (opcjonalnie) wyślij złożenie rekurencyjnie — części/pod-złożenia
+    # znalezione przez App::Link, w kolejności liście-najpierw.
+    edges_for_top, cancelled = process_assembly_tree(doc)
+    if cancelled:
+        QtWidgets.QMessageBox.information(None, "PDM", "Przerwano — anulowano wysyłkę.")
+        return
+
     # Krok 2: uzupełnienie danych w oknie dialogowym (tworzy element + dogrywa plik + zmienia nazwę).
     dialog = PdmUploadDialog(doc)
     if dialog.exec() != QtWidgets.QDialog.Accepted:
@@ -741,10 +1370,25 @@ def run():
         return
 
     info = dialog.result_info
+
+    # Krok 3: podepnij pod TEN element podelementy odkryte w kroku 1a (BOM) — dopiero teraz
+    # znamy jego item_id, niezależnie od tego, czy był nowy, czy już istniał w PDM.
+    for child_item_id, qty in edges_for_top:
+        try:
+            api_post_json(
+                f"/items/{info['itemId']}/children", {"childId": child_item_id, "quantity": qty}
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(
+                None, "PDM", f"Nie udało się podpiąć jednego z podelementów pod główny element: {e}"
+            )
+
     QtWidgets.QMessageBox.information(
         None,
         "PDM",
-        f"Wysłano do PDM jako {info['itemNumber']}.\n"
+        f"Wysłano do PDM jako {info['itemNumber']}"
+        + (f" razem z {len(edges_for_top)} podelementami" if edges_for_top else "")
+        + ".\n"
         f"Kopia w magazynie PDM:\n{info['newPath']}\n\n"
         f"Lokalny plik pozostał bez zmian:\n{doc.FileName}",
     )
