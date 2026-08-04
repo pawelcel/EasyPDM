@@ -32,6 +32,9 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   zapisuje aktywny dokument, pyta o dane (projekt, typ, rodzaj, materiał/producent/numery
   zamówieniowe...), tworzy Część/Złożenie w PDM, dogrywa plik jako załącznik i zmienia
   nazwę lokalnego pliku na `numer (nazwa)`. Szczegóły w `PdmSystem.FreeCad/README.md`.
+- **`Dockerfile`/`docker-compose.yml`**, **`install-linux.sh`/`uninstall-linux.sh`** i
+  **`packaging/windows/`** (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez
+  ręcznego składania z osobna backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
 
 ### Model danych — elementy i struktura
 
@@ -152,7 +155,20 @@ po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
 
 ## Jak uruchomić
 
+Backend czyta prawdziwe dane dostępowe (hasło do bazy, ścieżka magazynu) z
+`PdmSystem.Api/appsettings.Local.json` — **plik NIE jest w repozytorium** (gitignored, bo
+zawiera hasło), więc na nowym klonie trzeba go założyć z wzoru:
+
 ```bash
+cp PdmSystem.Api/appsettings.Local.json.example PdmSystem.Api/appsettings.Local.json
+# ...i wpisać tam prawdziwe ConnectionString/StorageRoot dla tej maszyny.
+```
+
+```bash
+# Jeśli nie istnieje jeszcze rola/baza (świeży PostgreSQL):
+sudo -u postgres psql -c "CREATE ROLE pdm_user LOGIN PASSWORD 'twoje-haslo';"
+sudo -u postgres createdb -O pdm_user pdm
+
 # Jeśli masz już bazę z poprzedniej wersji, dogoń wszystkie migracje po kolei:
 for f in db/migrations/*.sql; do psql -h localhost -U pdm_user -d pdm -f "$f"; done
 
@@ -174,6 +190,93 @@ npm run dev      # http://localhost:5173
 
 Do wdrożenia: `npm run build` w `PdmSystem.Web/` nadpisuje `PdmSystem.Api/wwwroot/` —
 `dotnet run` serwuje wynik pod `http://localhost:5000` bez dodatkowej konfiguracji.
+
+### Docker (zalecane do wdrożenia serwerowego)
+
+```bash
+cp .env.example .env      # ustaw prawdziwe PDM_DB_PASSWORD
+docker compose up -d --build
+```
+
+Uruchamia dwa kontenery: `postgres` (obraz `postgres:18`, dane na wolumenie `pgdata`, schemat
+z `db/schema.sql` zakładany automatycznie przy pustym wolumenie) i `api` (budowany z
+`Dockerfile` w korzeniu repo — buduje frontend, publikuje backend, doinstalowuje
+`postgresql-client-18` dla funkcji backup/restore w Ustawieniach). Magazyn plików,
+automatyczne kopie zapasowe i logi trzymane są na wolumenie `pdm-data` (`/data` w
+kontenerze) — przetrwają przebudowanie obrazu przy aktualizacji. Po starcie:
+`http://localhost:5000`.
+
+Aktualizacja o nowe migracje (gdy się pojawią) na razie ręcznie:
+`docker compose exec -T postgres psql -U pdm_user -d pdm < db/migrations/XXX.sql`
+— `docker-entrypoint-initdb.d` odpala `schema.sql` TYLKO przy pierwszym, zupełnie pustym
+starcie wolumenu `pgdata`, nie przy każdym `docker compose up`.
+
+### Linux — instalacja natywna jako usługa systemd (bez Dockera)
+
+```bash
+sudo ./install-linux.sh
+```
+
+Jeden skrypt: instaluje PostgreSQL, jeśli go jeszcze nie ma (rozpoznaje `pacman`/`apt`/`dnf`
+— na Arch/CachyOS dodatkowo sam inicjalizuje klaster, bo tamtejszy pakiet, w odróżnieniu od
+Debiana/Fedory, nie robi tego automatycznie), zakłada rolę i bazę `pdm` (generuje losowe
+hasło, jeśli nie podasz własnego przez `PDM_DB_PASSWORD=... sudo -E ./install-linux.sh`),
+buduje frontend i publikuje backend jako **self-contained pojedynczy plik wykonywalny**
+(`dotnet publish -r linux-x64 --self-contained -p:PublishSingleFile=true` — gotowa usługa
+NIE wymaga już zainstalowanego .NET-a, tylko sam czas budowy), zakłada dedykowane,
+nieuprzywilejowane konto systemowe `pdmsystem`, i instaluje usługę systemd
+(`pdmsystem.service`, autostart, `ProtectSystem=strict` + `ReadWritePaths` ograniczone do
+`/var/lib/pdmsystem` — usługa nie może pisać nigdzie indziej w systemie). Po instalacji:
+`http://localhost:5000`, status przez `systemctl status pdmsystem`, logi na żywo przez
+`journalctl -u pdmsystem -f` (niezależnie od własnego dziennika aplikacji w Ustawienia ->
+Logi). Odinstalowanie: `sudo ./uninstall-linux.sh` (celowo NIE rusza samej bazy danych ani
+PostgreSQL — o tym decyduje się ręcznie, żeby nie skasować danych przez pomyłkę).
+
+Aktualizacja istniejącej instalacji: dogoń nowe pliki z `db/migrations/` ręcznie (tak samo
+jak przy Dockerze), potem `sudo ./install-linux.sh` ponownie — wykrywa istniejącą bazę
+i konto, przebudowuje tylko aplikację.
+
+> Skrypt buduje ze źródeł tego repozytorium (jak `run.sh`, tylko jako trwała usługa
+> zamiast procesu na pierwszym planie) — nie ma (jeszcze) osobnego, gotowego wydania
+> binarnego do pobrania. Sam self-contained publikowany plik wykonywalny był realnie
+> uruchomiony i sprawdzony (serwuje frontend, loguje), a treść jednostki systemd
+> zweryfikowana przez `systemd-analyze verify`; pełny przebieg skryptu (tworzenie
+> roli/bazy/konta systemowego przez `sudo`) nie był jeszcze wykonany end-to-end — przy
+> pierwszym uruchomieniu obserwuj wyjście i zgłoś, jeśli coś nie zagra.
+
+### Windows — instalator (`.exe`, Inno Setup)
+
+Wymaga zbudowania na maszynie z Windows (.NET 10 SDK + Node.js + [Inno Setup
+Compiler](https://jrsoftware.org/isinfo.php)):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
+iscc packaging\windows\PdmSystem.iss
+```
+
+Powstaje `packaging\windows\Output\PdmSystemSetup.exe`. Instalator: sprawdza, czy
+PostgreSQL jest już zainstalowany (jeśli nie — kieruje na stronę pobierania i przerywa,
+świadomie NIE próbuje cicho doinstalować kilkusetmegabajtowego instalatora PostgreSQL w
+tle), pyta o hasło superużytkownika `postgres` (jednorazowo, do założenia własnej roli
+`pdm_user` i bazy `pdm` — samo hasło nigdzie nie jest zapisywane), zakłada schemat, zapisuje
+`appsettings.Production.json` z resztą ustawień (magazyn/kopie/logi w
+`%ProgramData%\PdmSystem`), rejestruje `PdmSystem.Api.exe` jako **usługę Windows**
+(autostart, działa w tle bez okna konsoli) i tworzy skrót otwierający
+`http://localhost:5000`. Odinstalowanie zatrzymuje i usuwa usługę (standardowy deinstalator
+Inno Setup) — tak samo jak na Linuksie, celowo nie rusza samej bazy danych.
+
+> **To jedyna z trzech ścieżek, której w ogóle nie dało się niczego zweryfikować w tym
+> środowisku** (Linux, bez dostępu do Windows/Wine/Inno Setup Compiler) — poza samym
+> cross-kompilowaniem self-contained `.exe` z Linuksa (`dotnet publish -r win-x64`), co
+> zadziałało. Skrypt `.iss` napisany starannie wg udokumentowanych wzorców Inno Setup
+> (m.in. hasło do PostgreSQL przez tymczasowy plik `.bat`, bo `Exec()` nie ma wprost
+> parametru na zmienne środowiskowe), z dwoma realnymi błędami złapanymi i poprawionymi
+> przy ręcznym przeglądzie kodu (brakująca deklaracja zmiennej, zduplikowana flaga `-U`
+> w wywołaniu `psql`) — ale bez kompilatora nie da się wykluczyć kolejnych. Traktuj to jako
+> solidny punkt startowy do wypróbowania na prawdziwym Windows, nie jako gotowe,
+> zweryfikowane wydanie.
+> Wymaga do budowy: potrzebny jest fizyczny/wirtualny Windows z zainstalowanym Inno Setup
+> Compiler — sam plik `.iss` niczego nie instaluje bez tego kroku.
 
 Pierwsze logowanie: **`admin` / `admin`** (konto zakładane automatycznie, jeśli tabela
 `users` jest pusta — zob. "Logowanie, role i dostęp do projektów" wyżej). Zmień hasło od
@@ -204,6 +307,15 @@ Magazyn plików tylko dla administratora).
    zmiana statusu, komentarz do rewizji, dodanie/usunięcie załącznika i blokada/zwolnienie
    właściciela już to robią (widać w „Historii"), ale np. zmiana właściwości/nazwy/tagów
    nie zapisuje autora.
+4. **W Dockerze „Zmień lokalizację” magazynu plików (Ustawienia -> Magazyn plików) nie
+   przetrwa przebudowania obrazu** — ta operacja zapisuje nową ścieżkę do
+   `appsettings.json` wewnątrz kontenera `api` (poza wolumenem `pdm-data`), więc po
+   `docker compose up --build` wraca do wartości ze zmiennej środowiskowej `StorageRoot`
+   ustawionej w `Dockerfile`. Sama zmiana lokalizacji API działa poprawnie w trakcie życia
+   kontenera — problem dotyczy tylko trwałości tego ustawienia między przebudowaniami.
+   Migracje bazy (`db/migrations/`) po aktualizacji trzeba na razie stosować ręcznie —
+   `docker-entrypoint-initdb.d` zakłada schemat tylko przy pierwszym, pustym starcie
+   wolumenu `pgdata` (zob. „Docker" w sekcji „Jak uruchomić").
 
 ## Następne kroki (proponowana kolejność)
 

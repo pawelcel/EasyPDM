@@ -9,6 +9,11 @@
 
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="8.0.3" />
+    <!-- UseWindowsService() w Program.cs jest bezpieczne na każdej platformie (aktywuje się
+         tylko, gdy proces faktycznie działa pod Windows Service Control Manager) — potrzebne
+         wyłącznie dla instalatora Windows (zob. packaging/windows/), nie zmienia niczego przy
+         zwykłym "dotnet run"/systemd/Dockerze. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
   </ItemGroup>
 
 </Project>

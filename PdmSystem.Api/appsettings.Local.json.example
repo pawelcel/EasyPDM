@@ -1,0 +1,4 @@
+{
+  "ConnectionString": "Host=localhost;Port=5432;Database=pdm;Username=pdm_user;Password=ZMIEN_TO",
+  "StorageRoot": "/absolutna/sciezka/do/magazynu/plikow"
+}
