@@ -65,6 +65,13 @@ static class AttachmentEndpoints
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
                 return Results.NotFound("Element nie istnieje.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             if (!AcceptsAttachments(info.Value.ItemType))
                 return Results.BadRequest("Ten typ elementu nie przyjmuje załączników.");
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
@@ -72,12 +79,6 @@ static class AttachmentEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
-
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             var attachmentId = Guid.NewGuid();
             var extension = Path.GetExtension(file.FileName);
@@ -135,6 +136,13 @@ static class AttachmentEndpoints
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
                 return Results.NotFound("Element nie istnieje.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             if (!AcceptsAttachments(info.Value.ItemType))
                 return Results.BadRequest("Ten typ elementu nie przyjmuje załączników.");
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
@@ -160,12 +168,6 @@ static class AttachmentEndpoints
 
             if (!File.Exists(fullPath))
                 return Results.NotFound("Plik nie istnieje pod podaną ścieżką.");
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
-
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             var attachmentId = Guid.NewGuid();
             var fileName = Path.GetFileName(fullPath);
@@ -237,10 +239,13 @@ static class AttachmentEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            string? filePath = null;
+            string filePath;
             Guid itemId;
             string fileName;
-            Guid userId;
+            string itemType;
+            string? status;
+            Guid? ownerId;
+            bool ownerLocked;
             Guid projectId;
             await using (var selectCmd = new NpgsqlCommand(
                 """
@@ -256,22 +261,23 @@ static class AttachmentEndpoints
                 filePath = reader.GetString(0);
                 itemId = reader.GetGuid(1);
                 fileName = reader.GetString(2);
-                var itemType = reader.GetString(3);
-                var status = reader.IsDBNull(4) ? null : reader.GetString(4);
+                itemType = reader.GetString(3);
+                status = reader.IsDBNull(4) ? null : reader.GetString(4);
+                ownerId = reader.IsDBNull(5) ? (Guid?)null : reader.GetGuid(5);
+                ownerLocked = reader.GetBoolean(6);
                 projectId = reader.GetGuid(7);
-                if (ItemEndpoints.IsLocked(itemType, status))
-                    return Results.BadRequest("Załączniki można usuwać tylko w statusie 'W pracy'.");
-
-                var ownerId = reader.IsDBNull(5) ? (Guid?)null : reader.GetGuid(5);
-                var ownerLocked = reader.GetBoolean(6);
-                var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-                userId = user.Id;
-                if (!ItemEndpoints.CanEditOwnerLocked(user.Id, ownerId, ownerLocked))
-                    return ItemEndpoints.OwnerLockedForbidden();
             }
 
             if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId))
                 return ItemEndpoints.ProjectAccessForbidden();
+
+            if (ItemEndpoints.IsLocked(itemType, status))
+                return Results.BadRequest("Załączniki można usuwać tylko w statusie 'W pracy'.");
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, ownerId, ownerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
+            var userId = user.Id;
 
             await using (var deleteCmd = new NpgsqlCommand("DELETE FROM item_attachments WHERE id = @id;", conn))
             {

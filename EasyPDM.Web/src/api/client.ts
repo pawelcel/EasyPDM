@@ -228,6 +228,14 @@ export const api = {
       handleResponse<ItemRelation[]>(r)
     ),
 
+  // W odróżnieniu od getProjectRelations (całe drzewko jednego projektu naraz) — bezpośrednie
+  // dzieci JEDNEGO elementu jako pełne obiekty Item, do widoków bez wcześniej załadowanego
+  // drzewka relacji (np. "Cała baza", gdzie zaznaczony element może być z dowolnego projektu).
+  getItemChildren: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/children`).then((r) =>
+      handleResponse<{ item: Item; quantity: number; position: number }[]>(r)
+    ),
+
   addChild: (parentId: string, childId: string, quantity: number) =>
     fetch(`${BASE}/items/${parentId}/children`, json({ childId, quantity })).then((r) =>
       handleResponse<void>(r)

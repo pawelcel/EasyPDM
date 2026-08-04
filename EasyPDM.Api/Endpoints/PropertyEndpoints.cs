@@ -21,6 +21,12 @@ static class PropertyEndpoints
             if (info is null)
                 return Results.NotFound();
 
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
             {
                 foreach (var prop in body.EnumerateObject())
@@ -34,12 +40,6 @@ static class PropertyEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
-
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = """
                 UPDATE items SET properties = properties || @props::jsonb
@@ -62,6 +62,12 @@ static class PropertyEndpoints
             if (info is null)
                 return Results.NotFound();
 
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status) && !AlwaysEditableKeys.Contains(key))
                 return Results.BadRequest(
                     "Właściwości można zmieniać tylko w statusie 'W pracy' (wyjątek: cena, waluta, brutto/netto).");
@@ -69,12 +75,6 @@ static class PropertyEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
-
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
-
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = "UPDATE items SET properties = properties - @key WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);

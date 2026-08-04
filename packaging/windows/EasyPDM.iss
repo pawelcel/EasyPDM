@@ -169,6 +169,32 @@ begin
   end;
 end;
 
+function DatabaseExists(PgPassword: String): Boolean;
+var
+  OutFile, Output: String;
+  ResultCode: Integer;
+  BatchFile: String;
+begin
+  OutFile := ExpandConstant('{tmp}\pdm_db_check.txt');
+  BatchFile := ExpandConstant('{tmp}\pdm_psql_dbcheck_' + IntToStr(Random(1000000)) + '.bat');
+  SaveStringToFile(BatchFile,
+    '@echo off' + #13#10 +
+    'set PGPASSWORD=' + PgPassword + #13#10 +
+    '"' + PsqlPath + '" -h localhost -U postgres -tAc ' +
+    '"SELECT 1 FROM pg_database WHERE datname=''pdm''" > "' + OutFile + '"' + #13#10,
+    False);
+  try
+    Exec(BatchFile, '', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    if LoadStringFromFile(OutFile, Output) then
+      Result := Pos('1', Output) > 0
+    else
+      Result := False;
+  finally
+    DeleteFile(BatchFile);
+    DeleteFile(OutFile);
+  end;
+end;
+
 { "sc query" zwraca 0, jeśli usługa istnieje (niezależnie od tego, czy działa), a 1060
   ("nie istnieje taka usługa"), jeśli nie ma jej wcale. }
 function ServiceExists(): Boolean;
@@ -214,6 +240,10 @@ function InitializeSetup(): Boolean;
 var
   ResultCode: Integer;
 begin
+  { Bez tego generator liczb pseudolosowych Inno Setup zawsze startuje z tym samym
+    ziarnem — GenerateRandomPassword dawałoby DOKŁADNIE to samo hasło pdm_user przy
+    każdej instalacji z tego samego builda instalatora. }
+  Randomize;
   PsqlPath := FindPsqlPath();
   if PsqlPath = '' then
   begin
@@ -256,14 +286,20 @@ begin
   PgSuperPassword := PostgresPasswordPage.Values[0];
   PdmPassword := GenerateRandomPassword(32);
 
-  { Rola + baza — pomijane, jeśli instalator jest uruchamiany ponownie (aktualizacja) i już
-    istnieją; hasło pdm_user jest wtedy i tak nadpisywane, żeby appsettings zawsze się zgadzało
-    z tym, co faktycznie jest w bazie. }
+  { Rola — pomijana (tylko ALTER hasła), jeśli instalator jest uruchamiany ponownie
+    (aktualizacja) i rola już istnieje; hasło pdm_user jest wtedy i tak nadpisywane, żeby
+    appsettings zawsze się zgadzało z tym, co faktycznie jest w bazie. }
   if RoleExists(PgSuperPassword) then
     RunPsql(PgSuperPassword, '-U postgres -c "ALTER ROLE pdm_user PASSWORD ''' + PdmPassword + ''';" postgres')
   else
-  begin
     RunPsql(PgSuperPassword, '-U postgres -c "CREATE ROLE pdm_user LOGIN PASSWORD ''' + PdmPassword + ''';" postgres');
+
+  { Baza sprawdzana NIEZALEŻNIE od roli (nie w tej samej gałęzi if/else) — instalacja
+    przerwana wcześniej dokładnie między CREATE ROLE a CREATE DATABASE zostawiłaby rolę
+    bez bazy; gdyby to sprawdzenie było zagnieżdżone pod "if not RoleExists", taki stan
+    zostałby już NA ZAWSZE bez bazy/schematu przy każdym kolejnym uruchomieniu instalatora. }
+  if not DatabaseExists(PgSuperPassword) then
+  begin
     RunPsql(PgSuperPassword, '-U postgres -c "CREATE DATABASE pdm OWNER pdm_user;" postgres');
     RunPsql(PdmPassword, '-U pdm_user -f "' + ExpandConstant('{app}\db\schema.sql') + '" pdm');
   end;

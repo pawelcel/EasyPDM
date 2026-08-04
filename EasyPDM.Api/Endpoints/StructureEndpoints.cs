@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Npgsql;
 
 // RELACJE MIĘDZY ELEMENTAMI (BOM/złożenia — struktura projektu)
@@ -5,6 +6,84 @@ static class StructureEndpoints
 {
     public static void MapStructureEndpoints(this WebApplication app, string connectionString)
     {
+        // GET /api/items/{id}/children — bezpośrednie dzieci (item_relations, depth=1) tego
+        // elementu jako PEŁNE obiekty Item + quantity/position — dla widoków, które (w
+        // odróżnieniu od widoku jednego projektu) nie mają załadowanego całego drzewka
+        // relacji z góry, np. "Cała baza" (item-list.tsx), gdzie zaznaczony element może
+        // być z dowolnego projektu. Dziecko może formalnie należeć do INNEGO projektu niż
+        // rodzic (współdzielone komponenty) — dostęp sprawdzany jest tylko do projektu
+        // RODZICA, spójnie z resztą struktury (item_relations, BOM, dokumentacja).
+        app.MapGet("/api/items/{id:guid}/children", async (Guid id, HttpContext ctx) =>
+        {
+            var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
+            const string sql = """
+                SELECT i.id, i.project_id, i.file_name, i.file_type, i.file_path, i.properties, i.modified_at,
+                       i.item_type, i.item_number, i.show_in_tree, i.status, i.revision_number, i.root_position,
+                       i.owner_id, i.owner_locked, u.display_name, ir.quantity, ir.position
+                FROM item_relations ir
+                JOIN items i ON i.id = ir.child_id
+                LEFT JOIN users u ON u.id = i.owner_id
+                WHERE ir.parent_id = @id
+                ORDER BY ir.position;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", id);
+
+            var rows = new List<(Dictionary<string, object?> Item, decimal Quantity, int Position)>();
+            var childIds = new List<Guid>();
+            await using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var childId = reader.GetGuid(0);
+                    childIds.Add(childId);
+                    var itemDict = new Dictionary<string, object?>
+                    {
+                        ["id"] = childId,
+                        ["projectId"] = reader.GetGuid(1),
+                        ["fileName"] = reader.GetString(2),
+                        ["fileType"] = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        ["filePath"] = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        ["properties"] = JsonDocument.Parse(reader.GetFieldValue<string>(5)).RootElement,
+                        ["modifiedAt"] = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                        ["itemType"] = reader.GetString(7),
+                        ["itemNumber"] = reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                        ["showInTree"] = reader.GetBoolean(9),
+                        ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
+                        ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
+                        ["rootPosition"] = reader.GetInt32(12),
+                        ["ownerId"] = reader.IsDBNull(13) ? null : reader.GetGuid(13),
+                        ["ownerLocked"] = reader.GetBoolean(14),
+                        ["ownerDisplayName"] = reader.IsDBNull(15) ? null : reader.GetString(15),
+                        ["tags"] = new List<string>()
+                    };
+                    rows.Add((itemDict, reader.GetDecimal(16), reader.GetInt32(17)));
+                }
+            }
+
+            if (childIds.Count > 0)
+            {
+                var tagsByItem = await ItemEndpoints.LoadTagsForItems(connectionString, childIds);
+                foreach (var (itemDict, _, _) in rows)
+                {
+                    var childId = (Guid)itemDict["id"]!;
+                    itemDict["tags"] = tagsByItem.TryGetValue(childId, out var t) ? t : new List<string>();
+                }
+            }
+
+            var response = rows.Select(r => new { item = r.Item, quantity = r.Quantity, position = r.Position });
+            return Results.Ok(response);
+        });
+
         // GET /api/projects/{projectId}/relations — wszystkie relacje rodzic-dziecko
         // dla elementów należących do danego projektu (do zbudowania drzewka po stronie klienta).
         // Nieprzypisany zwykły użytkownik dostaje pustą listę (nie błąd) — z jego punktu widzenia
