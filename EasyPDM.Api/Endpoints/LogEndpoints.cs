@@ -1,7 +1,7 @@
 using System.Globalization;
 
 // Podgląd logów programu w Ustawieniach (tylko administrator) — czyta pliki zapisywane przez
-// FileLoggerProvider (logs/pdmsystem-yyyy-MM-dd.log). Wyłącznie do odczytu.
+// FileLoggerProvider (logs/easypdm-yyyy-MM-dd.log). Wyłącznie do odczytu.
 static class LogEndpoints
 {
     public static void MapLogEndpoints(this WebApplication app, string logRoot)
@@ -15,10 +15,10 @@ static class LogEndpoints
             if (!Directory.Exists(logRoot))
                 return Results.Ok(Array.Empty<object>());
 
-            var files = Directory.GetFiles(logRoot, "pdmsystem-*.log")
+            var files = Directory.GetFiles(logRoot, "easypdm-*.log")
                 .Select(f => new
                 {
-                    date = Path.GetFileNameWithoutExtension(f).Replace("pdmsystem-", ""),
+                    date = Path.GetFileNameWithoutExtension(f).Replace("easypdm-", ""),
                     sizeBytes = new FileInfo(f).Length
                 })
                 .OrderByDescending(f => f.date, StringComparer.Ordinal)
@@ -37,7 +37,7 @@ static class LogEndpoints
             if (!IsValidDate(date))
                 return Results.BadRequest("Nieprawidłowy format daty — oczekiwano yyyy-MM-dd.");
 
-            var path = Path.Combine(logRoot, $"pdmsystem-{date}.log");
+            var path = Path.Combine(logRoot, $"easypdm-{date}.log");
             if (!File.Exists(path))
                 return Results.NotFound();
 
@@ -57,11 +57,11 @@ static class LogEndpoints
             if (!IsValidDate(date))
                 return Results.BadRequest("Nieprawidłowy format daty — oczekiwano yyyy-MM-dd.");
 
-            var path = Path.Combine(logRoot, $"pdmsystem-{date}.log");
+            var path = Path.Combine(logRoot, $"easypdm-{date}.log");
             if (!File.Exists(path))
                 return Results.NotFound();
 
-            return Results.File(path, "text/plain; charset=utf-8", $"pdmsystem-{date}.log");
+            return Results.File(path, "text/plain; charset=utf-8", $"easypdm-{date}.log");
         });
     }
 

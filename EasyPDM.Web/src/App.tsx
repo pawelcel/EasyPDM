@@ -105,7 +105,7 @@ function App() {
               onClick={() => setView("welcome")}
               className="text-xl font-semibold tracking-tight hover:text-primary"
             >
-              PdmSystem
+              EasyPDM
             </button>
             <div className="flex items-center gap-2.5 text-[13px] text-muted-foreground">
               <span>

@@ -21,7 +21,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../PdmSystem.Api/wwwroot",
+    outDir: "../EasyPDM.Api/wwwroot",
     emptyOutDir: true,
   },
 })

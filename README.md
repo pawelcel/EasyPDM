@@ -1,15 +1,15 @@
-# PdmSystem — system PDM dla plików CAD
+# EasyPDM — system PDM dla plików CAD
 
 ## Status
 
 Ręczne tworzenie projektów i elementów przez aplikację webową (upload pliku wprost do
-magazynu API) albo przez makro FreeCAD (`PdmSystem.FreeCad/`), które woła to samo API.
-Wcześniejsze podejście ze skanowaniem dysku (`PdmSystem.Core`, `PdmSystem.Indexer`) zostało
+magazynu API) albo przez makro FreeCAD (`EasyPDM.FreeCad/`), które woła to samo API.
+Wcześniejsze podejście ze skanowaniem dysku (`EasyPDM.Core`, `EasyPDM.Indexer`) zostało
 usunięte z repo — było niezgodne ze schematem od migracji `002` i nigdy nieużywane przez
 `Api`.
 
-Frontend to osobna aplikacja **React 19 + Vite + TypeScript** (`PdmSystem.Web/`) budowana
-wprost do `PdmSystem.Api/wwwroot/`. Interfejs jest w pełni przetłumaczony (polski/angielski/
+Frontend to osobna aplikacja **React 19 + Vite + TypeScript** (`EasyPDM.Web/`) budowana
+wprost do `EasyPDM.Api/wwwroot/`. Interfejs jest w pełni przetłumaczony (polski/angielski/
 niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, PostgreSQL 18.
 
 ## Co tu jest
@@ -24,17 +24,17 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   śledzenie zastosowanych migracji. Od migracji 027 pliki z tego folderu są wbudowane
   w program (embedded resources) i stosowane **automatycznie przy każdym starcie** — zob.
   `MigrationRunner.cs` i "Jak uruchomić" niżej — nie trzeba ich już odpalać ręcznie przez psql.
-- **`PdmSystem.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
+- **`EasyPDM.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
   po funkcjach w `Endpoints/` — pełna lista niżej w "Endpointy API". Serwuje też zbudowany
   frontend ze swojego `wwwroot/`. Własny `FileLoggerProvider` (bez dodatkowego pakietu NuGet)
   zapisuje logi programu do `logs/` (rotacja dzienna, 30 dni retencji), widoczne w
   Ustawienia → Logi.
-- **`PdmSystem.Web/`** — frontend: React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui
+- **`EasyPDM.Web/`** — frontend: React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui
   (komponenty na bazie Base UI, styl „base-nova”), i18n (pl/en/de), motyw jasny/ciemny.
-- **`PdmSystem.FreeCad/`** — makro `PdmUpload.FCMacro`: uruchamiane z poziomu FreeCAD,
+- **`EasyPDM.FreeCad/`** — makro `EasyPDMUpload.FCMacro`: uruchamiane z poziomu FreeCAD,
   zapisuje aktywny dokument, pyta o dane (projekt, typ, rodzaj, materiał/producent/numery
   zamówieniowe...), tworzy Część/Złożenie w PDM, dogrywa plik jako załącznik i zmienia
-  nazwę lokalnego pliku na `numer (nazwa)`. Szczegóły w `PdmSystem.FreeCad/README.md`.
+  nazwę lokalnego pliku na `numer (nazwa)`. Szczegóły w `EasyPDM.FreeCad/README.md`.
 - **`Dockerfile`/`docker-compose.yml`**, **`install-linux.sh`/`uninstall-linux.sh`** i
   **`packaging/windows/`** (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez
   ręcznego składania z osobna backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
@@ -159,11 +159,11 @@ po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
 ## Jak uruchomić
 
 Backend czyta prawdziwe dane dostępowe (hasło do bazy, ścieżka magazynu) z
-`PdmSystem.Api/appsettings.Local.json` — **plik NIE jest w repozytorium** (gitignored, bo
+`EasyPDM.Api/appsettings.Local.json` — **plik NIE jest w repozytorium** (gitignored, bo
 zawiera hasło), więc na nowym klonie trzeba go założyć z wzoru:
 
 ```bash
-cp PdmSystem.Api/appsettings.Local.json.example PdmSystem.Api/appsettings.Local.json
+cp EasyPDM.Api/appsettings.Local.json.example EasyPDM.Api/appsettings.Local.json
 # ...i wpisać tam prawdziwe ConnectionString/StorageRoot dla tej maszyny.
 ```
 
@@ -182,19 +182,19 @@ sudo -u postgres createdb -O pdm_user pdm
 psql -h localhost -U pdm_user -d pdm -f db/schema.sql
 
 # Backend (serwuje też zbudowany frontend z wwwroot/)
-cd PdmSystem.Api
+cd EasyPDM.Api
 dotnet restore && dotnet build && dotnet run
 ```
 
 Frontend — do pracy nad UI z podglądem na żywo (proxy `/api` → `http://localhost:5000`):
 
 ```bash
-cd PdmSystem.Web
+cd EasyPDM.Web
 npm install
 npm run dev      # http://localhost:5173
 ```
 
-Do wdrożenia: `npm run build` w `PdmSystem.Web/` nadpisuje `PdmSystem.Api/wwwroot/` —
+Do wdrożenia: `npm run build` w `EasyPDM.Web/` nadpisuje `EasyPDM.Api/wwwroot/` —
 `dotnet run` serwuje wynik pod `http://localhost:5000` bez dodatkowej konfiguracji.
 
 ### Docker (zalecane do wdrożenia serwerowego)
@@ -232,11 +232,11 @@ hasło, jeśli nie podasz własnego przez `PDM_DB_PASSWORD=... sudo -E ./install
 buduje frontend i publikuje backend jako **self-contained pojedynczy plik wykonywalny**
 (`dotnet publish -r linux-x64 --self-contained -p:PublishSingleFile=true` — gotowa usługa
 NIE wymaga już zainstalowanego .NET-a, tylko sam czas budowy), zakłada dedykowane,
-nieuprzywilejowane konto systemowe `pdmsystem`, i instaluje usługę systemd
-(`pdmsystem.service`, autostart, `ProtectSystem=strict` + `ReadWritePaths` ograniczone do
-`/var/lib/pdmsystem` — usługa nie może pisać nigdzie indziej w systemie). Po instalacji:
-`http://localhost:5000`, status przez `systemctl status pdmsystem`, logi na żywo przez
-`journalctl -u pdmsystem -f` (niezależnie od własnego dziennika aplikacji w Ustawienia ->
+nieuprzywilejowane konto systemowe `easypdm`, i instaluje usługę systemd
+(`easypdm.service`, autostart, `ProtectSystem=strict` + `ReadWritePaths` ograniczone do
+`/var/lib/easypdm` — usługa nie może pisać nigdzie indziej w systemie). Po instalacji:
+`http://localhost:5000`, status przez `systemctl status easypdm`, logi na żywo przez
+`journalctl -u easypdm -f` (niezależnie od własnego dziennika aplikacji w Ustawienia ->
 Logi). Odinstalowanie: `sudo ./uninstall-linux.sh` (celowo NIE rusza samej bazy danych ani
 PostgreSQL — o tym decyduje się ręcznie, żeby nie skasować danych przez pomyłkę).
 
@@ -261,21 +261,21 @@ Compiler](https://jrsoftware.org/isinfo.php)):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
-iscc packaging\windows\PdmSystem.iss
+iscc packaging\windows\EasyPDM.iss
 ```
 
-Powstaje `packaging\windows\Output\PdmSystemSetup.exe`. Instalator: sprawdza, czy
+Powstaje `packaging\windows\Output\EasyPDMSetup.exe`. Instalator: sprawdza, czy
 PostgreSQL jest już zainstalowany (jeśli nie — kieruje na stronę pobierania i przerywa,
 świadomie NIE próbuje cicho doinstalować kilkusetmegabajtowego instalatora PostgreSQL w
 tle), pyta o hasło superużytkownika `postgres` (jednorazowo, do założenia własnej roli
 `pdm_user` i bazy `pdm` — samo hasło nigdzie nie jest zapisywane), zakłada schemat, zapisuje
 `appsettings.Production.json` z resztą ustawień (magazyn/kopie/logi w
-`%ProgramData%\PdmSystem`), rejestruje `PdmSystem.Api.exe` jako **usługę Windows**
+`%ProgramData%\EasyPDM`), rejestruje `EasyPDM.Api.exe` jako **usługę Windows**
 (autostart, działa w tle bez okna konsoli) i tworzy skrót otwierający
 `http://localhost:5000`. Odinstalowanie zatrzymuje i usuwa usługę (standardowy deinstalator
 Inno Setup) — tak samo jak na Linuksie, celowo nie rusza samej bazy danych.
 
-**Aktualizacja**: zbuduj nowy `PdmSystemSetup.exe` (jak wyżej) i uruchom go ponownie —
+**Aktualizacja**: zbuduj nowy `EasyPDMSetup.exe` (jak wyżej) i uruchom go ponownie —
 `PrepareToInstall` w skrypcie `.iss` zatrzymuje usługę PRZED podmianą plików (inaczej
 Windows zablokowałby nadpisanie działającego `.exe`), instalator wykrywa istniejącą
 rolę/bazę (pomija zakładanie schematu) i istniejącą usługę (uruchamia ją z powrotem zamiast
@@ -317,7 +317,7 @@ Magazyn plików tylko dla administratora).
    siebie), z konfigurowalną liczbą przechowywanych ostatnich kopii (domyślnie 14 — starsze
    są automatycznie kasowane). Wersjonowanie pliku przy zmianie
    rewizji działa dziś tylko w przepływie makra FreeCAD (`storage/components/`, jeden plik na
-   rewizję, zob. `PdmSystem.FreeCad/README.md`) — zwykłe załączniki dodawane z aplikacji
+   rewizję, zob. `EasyPDM.FreeCad/README.md`) — zwykłe załączniki dodawane z aplikacji
    webowej nie mają automatycznego powiązania z numerem rewizji.
 3. **Nie każda operacja zapisuje “kto to zrobił”** — utworzenie elementu (`created_by`),
    zmiana statusu, komentarz do rewizji, dodanie/usunięcie załącznika i blokada/zwolnienie

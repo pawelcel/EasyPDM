@@ -206,7 +206,7 @@ static class SettingsEndpoints
                 if (!File.Exists(dumpPath))
                 {
                     return Results.BadRequest(
-                        "Plik ZIP nie zawiera database.dump — to nie jest kopia zapasowa PdmSystem.");
+                        "Plik ZIP nie zawiera database.dump — to nie jest kopia zapasowa EasyPDM.");
                 }
 
                 var csb = new NpgsqlConnectionStringBuilder(connectionString);

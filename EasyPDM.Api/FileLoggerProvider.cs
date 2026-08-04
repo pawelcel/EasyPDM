@@ -6,7 +6,7 @@ using System.Globalization;
 // pod standardowy ILoggerFactory w Program.cs, więc automatycznie respektuje te same reguły
 // poziomu logowania co konsola (sekcja "Logging" w appsettings.json) i przechwytuje WSZYSTKO —
 // nasze własne komunikaty (np. ScheduledBackupService) oraz wewnętrzne logi ASP.NET Core.
-// Jeden plik dziennie (logs/pdmsystem-yyyy-MM-dd.log), widoczne w Ustawienia -> Logi (tylko
+// Jeden plik dziennie (logs/easypdm-yyyy-MM-dd.log), widoczne w Ustawienia -> Logi (tylko
 // administrator). Zapis pod prostym lockiem — skala tej aplikacji nie uzasadnia kolejki w tle.
 class FileLoggerProvider : ILoggerProvider
 {
@@ -28,7 +28,7 @@ class FileLoggerProvider : ILoggerProvider
 
     internal void Write(string line)
     {
-        var path = Path.Combine(logDirectory, $"pdmsystem-{DateTime.Now:yyyy-MM-dd}.log");
+        var path = Path.Combine(logDirectory, $"easypdm-{DateTime.Now:yyyy-MM-dd}.log");
         lock (writeLock)
         {
             File.AppendAllText(path, line + Environment.NewLine);
@@ -38,9 +38,9 @@ class FileLoggerProvider : ILoggerProvider
     private void PruneOldLogs()
     {
         var cutoff = DateTime.Now.Date.AddDays(-RetentionDays);
-        foreach (var file in Directory.GetFiles(logDirectory, "pdmsystem-*.log"))
+        foreach (var file in Directory.GetFiles(logDirectory, "easypdm-*.log"))
         {
-            var datePart = Path.GetFileNameWithoutExtension(file).Replace("pdmsystem-", "");
+            var datePart = Path.GetFileNameWithoutExtension(file).Replace("easypdm-", "");
             if (DateTime.TryParseExact(datePart, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
                 && date < cutoff)
             {

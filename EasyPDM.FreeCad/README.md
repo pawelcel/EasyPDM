@@ -1,24 +1,24 @@
-# PdmSystem — makro FreeCAD
+# EasyPDM — makro FreeCAD
 
-Makro `PdmUpload.FCMacro` wysyła aktywny dokument FreeCAD wprost do PdmSystem, bez
+Makro `EasyPDMUpload.FCMacro` wysyła aktywny dokument FreeCAD wprost do EasyPDM, bez
 przechodzenia przez przeglądarkę.
 
 ## Instalacja
 
 Nie trzeba niczego instalować jako workbench. Wystarczy w FreeCAD:
 
-- **Macro → Macros… → Add path to macro path list** i wskazać ten folder (`PdmSystem.FreeCad/`),
+- **Macro → Macros… → Add path to macro path list** i wskazać ten folder (`EasyPDM.FreeCad/`),
   a potem uruchamiać makro `PdmUpload` z listy — **albo**
-- **Macro → Macros… → Execute** i wskazać plik `PdmUpload.FCMacro` bezpośrednio, za każdym
+- **Macro → Macros… → Execute** i wskazać plik `EasyPDMUpload.FCMacro` bezpośrednio, za każdym
   razem z dowolnej lokalizacji na dysku.
 
 Adres API (domyślnie `http://localhost:5000/api`) jest zapamiętywany w preferencjach FreeCAD
-(`User parameter:BaseApp/PdmSystem`) po pierwszym uruchomieniu — można go zmienić w oknie
+(`User parameter:BaseApp/EasyPDM`) po pierwszym uruchomieniu — można go zmienić w oknie
 dialogowym makra, w polu "Adres API".
 
 ## Logowanie
 
-PdmSystem.Api wymaga zalogowania dla każdego wywołania poza samym logowaniem — makro więc
+EasyPDM.Api wymaga zalogowania dla każdego wywołania poza samym logowaniem — makro więc
 też się loguje. Przy pierwszym uruchomieniu (albo gdy zapisana sesja wygasła lub została
 unieważniona) pojawia się okno logowania (nazwa użytkownika + hasło, te same konta co
 w aplikacji webowej). Token sesji trafia do tych samych preferencji FreeCAD co adres API,
@@ -120,7 +120,7 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   zapisanego po wysłaniu, makro zaproponuje utworzenie go w PDM jeszcze raz — trzeba to
   wtedy przerwać/skorygować ręcznie.
 - **Kopiowanie/rejestrowanie pliku w `storage/` zakłada, że ten folder jest widoczny
-  w systemie plików tej maszyny** — dziś klient (FreeCAD) i serwer (`PdmSystem.Api`)
+  w systemie plików tej maszyny** — dziś klient (FreeCAD) i serwer (`EasyPDM.Api`)
   działają na tym samym dysku, więc to działa bez dodatkowej konfiguracji. Jeśli
   `GET /api/config` jest nieosiągalne albo ścieżka niedostępna do zapisu (np. FreeCAD na
   innej maszynie niż serwer), kopia trafia do PDM zwykłym uploadem HTTP — w tym trybie
@@ -134,7 +134,7 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
 ## Weryfikacja
 
 Logika (bez samego okna dialogowego) była testowana automatycznie przez `freecadcmd`
-przeciwko żywemu `PdmSystem.Api`:
+przeciwko żywemu `EasyPDM.Api`:
 - **logowanie/sesja**: wywołanie API bez sesji odrzucone (401); złe hasło odrzucone zwykłym
   błędem (token lokalny zostaje pusty); poprawne logowanie zapisuje token i wyświetlaną
   nazwę użytkownika w preferencjach FreeCAD, kolejne wywołania API z tym tokenem działają;

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-PdmUpload — makro FreeCAD do wysyłania aktywnego dokumentu do PdmSystem.
+EasyPDMUpload — makro FreeCAD do wysyłania aktywnego dokumentu do EasyPDM.
 
 Instalacja / uruchomienie:
     Macro -> Macros... -> "Add path to macro path list" -> wskaż ten folder,
@@ -57,11 +57,11 @@ Automatyczne wykrywanie złożenia:
     dotychczas (bez podelementów).
 
 Logowanie:
-    PdmSystem.Api wymaga sesji (ciasteczko pdm_session) dla każdego wywołania poza
+    EasyPDM.Api wymaga sesji (ciasteczko pdm_session) dla każdego wywołania poza
     POST /api/auth/login — to samo makro więc też się loguje. Przy pierwszym uruchomieniu
     (albo gdy zapisana sesja wygasła/została unieważniona) pojawia się okno logowania
     (nazwa użytkownika + hasło); token sesji trafia do tych samych preferencji FreeCAD co
-    adres API (User parameter:BaseApp/PdmSystem), więc kolejne uruchomienia makra (także po
+    adres API (User parameter:BaseApp/EasyPDM), więc kolejne uruchomienia makra (także po
     restarcie FreeCAD) NIE proszą o ponowne logowanie, dopóki sesja jest ważna (30 dni, tak
     samo jak w aplikacji webowej). W głównym oknie "Wyślij do PDM" widać, kto jest zalogowany,
     i można się stamtąd wylogować (przycisk "Wyloguj") — kolejne uruchomienie makra od razu
@@ -84,7 +84,7 @@ Ograniczenia (świadomie poza zakresem pierwszej wersji):
       fallbackowym historia rewizji nie jest zachowywana (każda wysyłka nadpisuje
       poprzednią kopię po stronie PDM). W obu trybach lokalny plik zawsze zostaje
       nienaruszony w miejscu, gdzie go otwarto.
-    - Adres API zapisywany jest w preferencjach FreeCAD (User parameter:BaseApp/PdmSystem),
+    - Adres API zapisywany jest w preferencjach FreeCAD (User parameter:BaseApp/EasyPDM),
       domyślnie http://localhost:5000/api.
 """
 
@@ -107,7 +107,7 @@ except ImportError:
         from PySide import QtGui as QtWidgets  # bardzo stare FreeCAD (Qt4)
 
 
-PARAM_GROUP = "User parameter:BaseApp/PdmSystem"
+PARAM_GROUP = "User parameter:BaseApp/EasyPDM"
 DEFAULT_BASE_URL = "http://localhost:5000/api"
 SESSION_COOKIE_NAME = "pdm_session"
 
@@ -195,7 +195,7 @@ def api_post_json(path, payload):
 
 
 def api_upload_file(path, file_path, field_name="file", override_filename=None):
-    boundary = f"----PdmUploadBoundary{uuid.uuid4().hex}"
+    boundary = f"----EasyPDMUploadBoundary{uuid.uuid4().hex}"
     with open(file_path, "rb") as f:
         file_content = f.read()
     filename = override_filename or os.path.basename(file_path)
@@ -329,7 +329,7 @@ ASSEMBLY_KINDS = ["Wykonywana", "Zakupowa", "Normalia"]
 
 def kind_field_visibility(is_part, rodzaj):
     """Jedno źródło prawdy dla widoczności pól zależnych od typu/rodzaju — używane zarówno
-    przez PdmUploadDialog (tryb "nowy element"), jak i NewComponentDialog (automatyczne
+    przez EasyPDMUploadDialog (tryb "nowy element"), jak i NewComponentDialog (automatyczne
     wykrywanie złożenia), żeby te dwa miejsca nie mogły się rozjechać. Dokładnie te same
     reguły co PartPropertyForm/add-node-dialog w aplikacji webowej: Wykonywana -> Materiał;
     Zakupowa -> Producent/Numery zamówieniowe/Masa; Normalia -> Materiał/Norma; Klienta ->
@@ -564,7 +564,7 @@ def push_to_existing_item(doc, item_id, confirm_new_revision):
 
 
 class LoginDialog(QtWidgets.QDialog):
-    """Logowanie do PdmSystem — pokazywane przez ensure_logged_in(), gdy nie ma jeszcze
+    """Logowanie do EasyPDM — pokazywane przez ensure_logged_in(), gdy nie ma jeszcze
     zapisanej sesji albo poprzednia wygasła/została unieważniona."""
 
     def __init__(self, parent=None):
@@ -657,7 +657,7 @@ class NewComponentDialog(QtWidgets.QDialog):
     """Zbiera dane dla JEDNEGO automatycznie wykrytego, jeszcze nie istniejącego w PDM
     komponentu złożenia (część albo pod-złożenie) — pokazywane raz na każdy taki komponent,
     w kolejności "liście najpierw", zanim zostanie przetworzony plik, który go używa.
-    Pola i ich widoczność to dokładnie ta sama logika co w PdmUploadDialog (tryb "nowy
+    Pola i ich widoczność to dokładnie ta sama logika co w EasyPDMUploadDialog (tryb "nowy
     element"), tylko bez wyboru trybu/elementu nadrzędnego — te są tu z góry przesądzone
     (zawsze "nowy", rodzic dopina się automatycznie po utworzeniu)."""
 
@@ -832,7 +832,7 @@ class NewComponentDialog(QtWidgets.QDialog):
         )
 
 
-class PdmUploadDialog(QtWidgets.QDialog):
+class EasyPDMUploadDialog(QtWidgets.QDialog):
     def __init__(self, doc, parent=None):
         super().__init__(parent)
         self.doc = doc
@@ -1227,7 +1227,7 @@ def process_assembly_tree(top_doc):
     go w PDM, po czym podpina relacje rodzic-dziecko (BOM) MIĘDZY odkrytymi komponentami.
     Relacje, gdzie rodzicem jest top_doc, NIE są tu podpinane — top_doc jeszcze nie ma
     swojego item_id w PDM (może to być nowy ALBO już istniejący element — o tym decyduje
-    reszta run() przez zwykły PdmUploadDialog); te relacje dopina run() po jego utworzeniu.
+    reszta run() przez zwykły EasyPDMUploadDialog); te relacje dopina run() po jego utworzeniu.
 
     Zwraca (edges_for_top, cancelled):
         edges_for_top — lista (child_item_id, quantity) do podpięcia pod element top_doc,
@@ -1329,7 +1329,7 @@ def process_assembly_tree(top_doc):
 
 
 def run():
-    # Krok 0: upewnij się, że jest aktywna sesja — PdmSystem.Api wymaga jej dla każdego
+    # Krok 0: upewnij się, że jest aktywna sesja — EasyPDM.Api wymaga jej dla każdego
     # wywołania poza samym logowaniem.
     if not ensure_logged_in():
         return  # użytkownik anulował logowanie
@@ -1360,7 +1360,7 @@ def run():
         return
 
     # Krok 2: uzupełnienie danych w oknie dialogowym (tworzy element + dogrywa plik + zmienia nazwę).
-    dialog = PdmUploadDialog(doc)
+    dialog = EasyPDMUploadDialog(doc)
     if dialog.exec() != QtWidgets.QDialog.Accepted:
         return
 

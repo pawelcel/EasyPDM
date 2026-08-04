@@ -250,7 +250,7 @@ CREATE TABLE saved_filters (
 GRANT SELECT, INSERT, UPDATE, DELETE ON saved_filters TO pdm_user;
 
 -- ============================================================
--- Śledzenie zastosowanych migracji — od tej wersji PdmSystem.Api sam sprawdza tę tabelę
+-- Śledzenie zastosowanych migracji — od tej wersji EasyPDM.Api sam sprawdza tę tabelę
 -- przy starcie i automatycznie stosuje nowe pliki z db/migrations/ (zob. MigrationRunner.cs).
 -- Świeża instalacja (ten plik) jest już na bieżąco ze wszystkimi migracjami poniżej, więc
 -- z góry oznaczamy je jako zastosowane — inaczej program przy pierwszym starcie próbowałby

@@ -10,13 +10,13 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-APP_DIR=/opt/pdmsystem
-CONFIG_DIR=/etc/pdmsystem
-SERVICE_USER=pdmsystem
+APP_DIR=/opt/easypdm
+CONFIG_DIR=/etc/easypdm
+SERVICE_USER=easypdm
 
 echo "Zatrzymuję i usuwam usługę systemd..."
-systemctl disable --now pdmsystem 2>/dev/null || true
-rm -f /etc/systemd/system/pdmsystem.service
+systemctl disable --now easypdm 2>/dev/null || true
+rm -f /etc/systemd/system/easypdm.service
 systemctl daemon-reload
 
 echo "Usuwam aplikację i konfigurację (${APP_DIR}, ${CONFIG_DIR})..."
@@ -27,7 +27,7 @@ getent group "${SERVICE_USER}" >/dev/null && groupdel "${SERVICE_USER}" 2>/dev/n
 
 echo
 echo "Gotowe. NIE usunięto (zrób to ręcznie, jeśli naprawdę chcesz):"
-echo "  - magazynu plików/kopii zapasowych/logów: /var/lib/pdmsystem/"
+echo "  - magazynu plików/kopii zapasowych/logów: /var/lib/easypdm/"
 echo "  - bazy danych: sudo -u postgres dropdb pdm"
 echo "  - roli bazy danych: sudo -u postgres psql -c \"DROP ROLE pdm_user;\""
-echo "  - samego PostgreSQL (jeśli był zainstalowany tylko dla PdmSystem)"
+echo "  - samego PostgreSQL (jeśli był zainstalowany tylko dla EasyPDM)"

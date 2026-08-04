@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instaluje PdmSystem jako usługę systemd na TEJ maszynie (natywnie, bez Dockera):
+# Instaluje EasyPDM jako usługę systemd na TEJ maszynie (natywnie, bez Dockera):
 # PostgreSQL (jeśli jeszcze nie ma), baza danych, self-contained publish backendu razem
 # ze zbudowanym frontendem, dedykowane konto systemowe, usługa systemd z autostartem.
 #
@@ -26,10 +26,10 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_DIR=/opt/pdmsystem
-DATA_DIR=/var/lib/pdmsystem
-CONFIG_DIR=/etc/pdmsystem
-SERVICE_USER=pdmsystem
+APP_DIR=/opt/easypdm
+DATA_DIR=/var/lib/easypdm
+CONFIG_DIR=/etc/easypdm
+SERVICE_USER=easypdm
 DB_NAME=pdm
 DB_USER=pdm_user
 
@@ -106,12 +106,12 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 echo "Buduję frontend (npm run build)..."
-(cd "${REPO_ROOT}/PdmSystem.Web" && npm ci && npm run build)
+(cd "${REPO_ROOT}/EasyPDM.Web" && npm ci && npm run build)
 
 echo "Publikuję backend (self-contained, linux-x64)..."
-PUBLISH_DIR="${REPO_ROOT}/PdmSystem.Api/bin/publish-linux"
+PUBLISH_DIR="${REPO_ROOT}/EasyPDM.Api/bin/publish-linux"
 rm -rf "${PUBLISH_DIR}"
-dotnet publish "${REPO_ROOT}/PdmSystem.Api" -c Release -r linux-x64 --self-contained true \
+dotnet publish "${REPO_ROOT}/EasyPDM.Api" -c Release -r linux-x64 --self-contained true \
     -p:PublishSingleFile=true -o "${PUBLISH_DIR}"
 
 echo "== 4/6: Konto systemowe i katalogi =="
@@ -127,24 +127,24 @@ rm -rf "${APP_DIR}"
 install -d "${APP_DIR}"
 cp -r "${PUBLISH_DIR}/." "${APP_DIR}/"
 chown -R root:root "${APP_DIR}"
-chmod +x "${APP_DIR}/PdmSystem.Api"
+chmod +x "${APP_DIR}/EasyPDM.Api"
 
 echo "== 5/6: Konfiguracja i usługa systemd =="
 # Sekrety (hasło do bazy) w osobnym pliku z ograniczonymi uprawnieniami — nie w samej
 # jednostce systemd w /etc/systemd/system/, która bywa czytelna dla wszystkich.
-cat > "${CONFIG_DIR}/pdmsystem.env" <<EOF
+cat > "${CONFIG_DIR}/easypdm.env" <<EOF
 ConnectionString=Host=localhost;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}
 StorageRoot=${DATA_DIR}/storage
 BackupRoot=${DATA_DIR}/backups
 LogRoot=${DATA_DIR}/logs
 ASPNETCORE_URLS=http://0.0.0.0:5000
 EOF
-chmod 600 "${CONFIG_DIR}/pdmsystem.env"
-chown root:root "${CONFIG_DIR}/pdmsystem.env"
+chmod 600 "${CONFIG_DIR}/easypdm.env"
+chown root:root "${CONFIG_DIR}/easypdm.env"
 
-cat > /etc/systemd/system/pdmsystem.service <<EOF
+cat > /etc/systemd/system/easypdm.service <<EOF
 [Unit]
-Description=PdmSystem — lokalny serwer PDM
+Description=EasyPDM — lokalny serwer PDM
 After=network.target postgresql.service
 Wants=postgresql.service
 
@@ -156,8 +156,8 @@ Group=${SERVICE_USER}
 # katalog główny (content root, więc i wwwroot/) z BIEŻĄCEGO katalogu roboczego procesu,
 # nie z lokalizacji samego pliku wykonywalnego.
 WorkingDirectory=${APP_DIR}
-EnvironmentFile=${CONFIG_DIR}/pdmsystem.env
-ExecStart=${APP_DIR}/PdmSystem.Api
+EnvironmentFile=${CONFIG_DIR}/easypdm.env
+ExecStart=${APP_DIR}/EasyPDM.Api
 Restart=on-failure
 RestartSec=5
 ReadWritePaths=${DATA_DIR}
@@ -170,19 +170,19 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable pdmsystem
+systemctl enable easypdm
 # "restart", nie "start" — przy AKTUALIZACJI usługa zwykle już działa (poprzednia wersja),
 # a "systemctl start" na już uruchomionej usłudze nic by nie zrobił, więc stary proces
-# zostałby ze starym plikiem wykonywalnym mimo podmienionych plików w /opt/pdmsystem.
-systemctl restart pdmsystem
+# zostałby ze starym plikiem wykonywalnym mimo podmienionych plików w /opt/easypdm.
+systemctl restart easypdm
 
 echo "== 6/6: Gotowe =="
-echo "PdmSystem działa pod http://localhost:5000"
+echo "EasyPDM działa pod http://localhost:5000"
 echo "Migracje bazy (jeśli jakieś nowe) program stosuje sam przy starcie — nic dodatkowego"
 echo "nie trzeba robić ręcznie."
 echo "Pierwsze logowanie: admin / admin — zmień hasło od razu po zalogowaniu."
-echo "Status usługi:   systemctl status pdmsystem"
-echo "Logi na żywo:    journalctl -u pdmsystem -f"
+echo "Status usługi:   systemctl status easypdm"
+echo "Logi na żywo:    journalctl -u easypdm -f"
 if [ "$GENERATED_PASSWORD" -eq 1 ]; then
-    echo "Wygenerowane hasło do bazy danych zapisane w ${CONFIG_DIR}/pdmsystem.env (tylko root)."
+    echo "Wygenerowane hasło do bazy danych zapisane w ${CONFIG_DIR}/easypdm.env (tylko root)."
 fi

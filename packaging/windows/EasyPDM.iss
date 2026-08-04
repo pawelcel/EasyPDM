@@ -1,20 +1,20 @@
-; Instalator Windows dla PdmSystem — Inno Setup (https://jrsoftware.org/isinfo.php).
+; Instalator Windows dla EasyPDM — Inno Setup (https://jrsoftware.org/isinfo.php).
 ;
 ; PRZED kompilacją: uruchom packaging\windows\build.ps1 (buduje frontend + publikuje
 ; self-contained backend win-x64 do packaging\windows\publish\), potem skompiluj ten plik
 ; w Inno Setup Compiler (iscc.exe / GUI).
 ;
-; Co robi zainstalowany PdmSystem:
+; Co robi zainstalowany EasyPDM:
 ;   1. Sprawdza, czy PostgreSQL jest już zainstalowany (szuka psql.exe w typowej lokalizacji
 ;      instalatora EDB) — jeśli nie, kieruje na stronę pobierania i przerywa instalację
 ;      (świadomie NIE próbujemy cicho pobierać/instalować 300+ MB instalatora PostgreSQL —
 ;      za duże ryzyko niewidocznej awarii bez możliwości zdiagnozowania).
-;   2. Pyta o hasło superużytkownika "postgres" (potrzebne, żeby założyć rolę/bazę PdmSystem).
+;   2. Pyta o hasło superużytkownika "postgres" (potrzebne, żeby założyć rolę/bazę EasyPDM).
 ;   3. Zakłada rolę "pdm_user" (z wygenerowanym losowo hasłem) i bazę "pdm", ładuje schemat
 ;      (db\schema.sql, dołączony do instalatora).
 ;   4. Zapisuje appsettings.Production.json z prawdziwym connection stringiem i ścieżkami
-;      magazynu/kopii/logów w %ProgramData%\PdmSystem.
-;   5. Rejestruje PdmSystem.Api.exe jako usługę Windows (autostart, działa w tle bez okna
+;      magazynu/kopii/logów w %ProgramData%\EasyPDM.
+;   5. Rejestruje EasyPDM.Api.exe jako usługę Windows (autostart, działa w tle bez okna
 ;      konsoli) i ją uruchamia.
 ;   6. Skrót na pulpicie/w Menu Start otwierający http://localhost:5000.
 ;
@@ -29,11 +29,11 @@
 ; skompilowany ani nie przetestowany end-to-end. Przy pierwszym uruchomieniu obserwuj
 ; przebieg instalacji i zgłoś, co nie zagra.
 
-#define MyAppName "PdmSystem"
+#define MyAppName "EasyPDM"
 #define MyAppVersion "1.0.0"
-#define MyAppExeName "PdmSystem.Api.exe"
-#define MyServiceName "PdmSystem"
-#define MyDataDir "{commonappdata}\PdmSystem"
+#define MyAppExeName "EasyPDM.Api.exe"
+#define MyServiceName "EasyPDM"
+#define MyDataDir "{commonappdata}\EasyPDM"
 
 [Setup]
 ; Stały GUID — nie zmieniaj między wersjami, Inno Setup używa go do wykrywania aktualizacji
@@ -44,7 +44,7 @@ AppVersion={#MyAppVersion}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-OutputBaseFilename=PdmSystemSetup
+OutputBaseFilename=EasyPDMSetup
 OutputDir=Output
 Compression=lzma2/max
 SolidCompression=yes
@@ -205,7 +205,7 @@ begin
   PostgresPasswordPage := CreateInputQueryPage(wpSelectDir,
     'Połączenie z PostgreSQL',
     'Hasło superużytkownika "postgres"',
-    'PdmSystem potrzebuje go JEDNORAZOWO, żeby założyć własną rolę (pdm_user) i bazę danych ' +
+    'EasyPDM potrzebuje go JEDNORAZOWO, żeby założyć własną rolę (pdm_user) i bazę danych ' +
     '(pdm) — nie jest nigdzie zapisywane.');
   PostgresPasswordPage.Add('Hasło "postgres":', True);
 end;
@@ -291,7 +291,7 @@ begin
   StringChangeEx(AppSettings, '\', '\\', True);
   SaveStringToFile(ExpandConstant('{app}\appsettings.Production.json'), AppSettings, False);
 
-  { Rejestracja jako usługa Windows — PdmSystem.Api.exe wywołuje builder.Host.UseWindowsService(),
+  { Rejestracja jako usługa Windows — EasyPDM.Api.exe wywołuje builder.Host.UseWindowsService(),
     więc poprawnie integruje się z Menedżerem Sterowania Usługami (start/stop/restart).
     Przy AKTUALIZACJI usługa już istnieje (PrepareToInstall tylko ją zatrzymał, nie usunął) —
     "sc create" na istniejącej usłudze kończy się błędem, więc po prostu ją wtedy startujemy
@@ -300,7 +300,7 @@ begin
   begin
     Exec(ExpandConstant('{sys}\sc.exe'),
       'create {#MyServiceName} binPath= "' + ExpandConstant('{app}\{#MyAppExeName}') +
-      '" start= auto DisplayName= "PdmSystem"',
+      '" start= auto DisplayName= "EasyPDM"',
       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec(ExpandConstant('{sys}\sc.exe'), 'description {#MyServiceName} "Lokalny serwer PDM"',
       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);

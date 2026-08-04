@@ -11,5 +11,5 @@ logs/
 .git/
 .vscode/
 .claude/
-PdmSystem.FreeCad/
+EasyPDM.FreeCad/
 *.md
