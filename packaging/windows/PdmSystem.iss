@@ -18,6 +18,12 @@
 ;      konsoli) i ją uruchamia.
 ;   6. Skrót na pulpicie/w Menu Start otwierający http://localhost:5000.
 ;
+; Aktualizacja: uruchom ten sam instalator ponownie (nowy build z packaging\windows\build.ps1)
+; — wykrywa istniejącą rolę/bazę (pomija zakładanie schematu), zatrzymuje usługę PRZED
+; podmianą plików (PrepareToInstall — inaczej Windows zablokowałby nadpisanie działającego
+; .exe), i uruchamia ją z powrotem zamiast rejestrować od nowa. Nowe migracje bazy program
+; stosuje sam automatycznie przy starcie (nic nie trzeba robić ręcznie).
+;
 ; NIEZWERYFIKOWANE: ten plik został napisany bez dostępu do Windows/Inno Setup Compiler w tym
 ; środowisku (Linux) — oparty o udokumentowane, standardowe wzorce Inno Setup, ale nie
 ; skompilowany ani nie przetestowany end-to-end. Przy pierwszym uruchomieniu obserwuj
@@ -163,6 +169,37 @@ begin
   end;
 end;
 
+{ "sc query" zwraca 0, jeśli usługa istnieje (niezależnie od tego, czy działa), a 1060
+  ("nie istnieje taka usługa"), jeśli nie ma jej wcale. }
+function ServiceExists(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\sc.exe'), 'query {#MyServiceName}', '', SW_HIDE,
+    ewWaitUntilTerminated, ResultCode);
+  Result := ResultCode = 0;
+end;
+
+{ Wywoływane przez Inno Setup TUŻ PRZED skopiowaniem plików (po kliknięciu "Instaluj", ale
+  przed [Files]) — kluczowe przy AKTUALIZACJI: Windows blokuje nadpisanie pliku .exe
+  uruchomionego procesu usługi, więc trzeba ją najpierw zatrzymać, inaczej kopiowanie plików
+  zawiedzie z niejasnym błędem "plik używany przez inny program". }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Result := '';
+  if ServiceExists() then
+  begin
+    Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#MyServiceName}', '', SW_HIDE,
+      ewWaitUntilTerminated, ResultCode);
+    { "sc stop" wraca od razu po WYSŁANIU sygnału zatrzymania, nie po faktycznym zakończeniu
+      procesu — bez tej chwili zapasu kopiowanie plików mogłoby trafić na jeszcze zamknięty
+      plik .exe. }
+    Sleep(3000);
+  end;
+end;
+
 procedure InitializeWizard();
 begin
   PostgresPasswordPage := CreateInputQueryPage(wpSelectDir,
@@ -255,13 +292,19 @@ begin
   SaveStringToFile(ExpandConstant('{app}\appsettings.Production.json'), AppSettings, False);
 
   { Rejestracja jako usługa Windows — PdmSystem.Api.exe wywołuje builder.Host.UseWindowsService(),
-    więc poprawnie integruje się z Menedżerem Sterowania Usługami (start/stop/restart). }
-  Exec(ExpandConstant('{sys}\sc.exe'),
-    'create {#MyServiceName} binPath= "' + ExpandConstant('{app}\{#MyAppExeName}') +
-    '" start= auto DisplayName= "PdmSystem"',
-    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec(ExpandConstant('{sys}\sc.exe'), 'description {#MyServiceName} "Lokalny serwer PDM"',
-    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    więc poprawnie integruje się z Menedżerem Sterowania Usługami (start/stop/restart).
+    Przy AKTUALIZACJI usługa już istnieje (PrepareToInstall tylko ją zatrzymał, nie usunął) —
+    "sc create" na istniejącej usłudze kończy się błędem, więc po prostu ją wtedy startujemy
+    z powrotem zamiast rejestrować od nowa. }
+  if not ServiceExists() then
+  begin
+    Exec(ExpandConstant('{sys}\sc.exe'),
+      'create {#MyServiceName} binPath= "' + ExpandConstant('{app}\{#MyAppExeName}') +
+      '" start= auto DisplayName= "PdmSystem"',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{sys}\sc.exe'), 'description {#MyServiceName} "Lokalny serwer PDM"',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
   Exec(ExpandConstant('{sys}\sc.exe'), 'start {#MyServiceName}',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;

@@ -16,4 +16,12 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
   </ItemGroup>
 
+  <!-- Migracje wbudowane w sam plik wykonywalny (embedded resource) — działa identycznie
+       niezależnie od sposobu wdrożenia (Docker, self-contained publish na Linux/Windows,
+       zwykłe "dotnet run"), bez zależności od tego, czy folder db/migrations/ został
+       skądś skopiowany obok. Zob. MigrationRunner.cs. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\db\migrations\*.sql" LinkBase="Migrations" />
+  </ItemGroup>
+
 </Project>
