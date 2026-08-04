@@ -1,7 +1,7 @@
 -- Migracja 012: logowanie (nazwa użytkownika + hasło) i role (admin/user).
 -- Tabela users już istniała (pusta — nic dotąd do niej nie wpisywało), więc bezpiecznie
 -- dodajemy kolumny NOT NULL. Domyślne konto administratora (login "admin") jest tworzone
--- przez PdmSystem.Api przy starcie, jeśli tabela users jest pusta — nie tutaj, bo hasło
+-- przez EasyPDM.Api przy starcie, jeśli tabela users jest pusta — nie tutaj, bo hasło
 -- trzeba zahaszować kodem C#, nie SQL-em.
 -- Uruchom: psql -h localhost -U pdm_user -d pdm -f db/migrations/012_users_auth.sql
 

@@ -36,7 +36,7 @@ services:
       - "5000:8080"
     volumes:
       # Magazyn plików + automatyczne kopie zapasowe + logi programu — wszystko, co
-      # PdmSystem.Api zapisuje poza bazą danych, w jednym miejscu na hoście.
+      # EasyPDM.Api zapisuje poza bazą danych, w jednym miejscu na hoście.
       - pdm-data:/data
 
 volumes:

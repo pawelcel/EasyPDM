@@ -1,5 +1,5 @@
 -- Migracja 027: tabela śledząca, które pliki z db/migrations/ zostały już zastosowane.
--- Od tej wersji PdmSystem.Api sam sprawdza tę tabelę przy KAŻDYM starcie i automatycznie
+-- Od tej wersji EasyPDM.Api sam sprawdza tę tabelę przy KAŻDYM starcie i automatycznie
 -- stosuje nowe migracje (dołączone do programu jako embedded resources — zob.
 -- MigrationRunner.cs) — więc aktualizacja już zainstalowanego programu (Docker/Linux/
 -- Windows) sprowadza się do podmiany plików i restartu, bez ręcznego odpalania psql.

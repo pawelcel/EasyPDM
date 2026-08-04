@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>PdmSystem.Api</RootNamespace>
+    <RootNamespace>EasyPDM.Api</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

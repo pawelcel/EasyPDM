@@ -1,7 +1,7 @@
-# Obraz PdmSystem.Api, serwujący też zbudowany frontend (PdmSystem.Web) ze swojego
+# Obraz EasyPDM.Api, serwujący też zbudowany frontend (EasyPDM.Web) ze swojego
 # wwwroot/ — dokładnie tak samo, jak przy uruchomieniu lokalnym (zob. run.sh). Budowany
-# z KORZENIA repozytorium (kontekst budowy musi widzieć zarówno PdmSystem.Web/, jak
-# i PdmSystem.Api/), zob. docker-compose.yml.
+# z KORZENIA repozytorium (kontekst budowy musi widzieć zarówno EasyPDM.Web/, jak
+# i EasyPDM.Api/), zob. docker-compose.yml.
 
 # ============================================================
 # Etap 1: budowa frontendu (React + Vite)
@@ -9,13 +9,13 @@
 FROM node:24-alpine AS frontend-build
 WORKDIR /src
 
-COPY PdmSystem.Web/package.json PdmSystem.Web/package-lock.json PdmSystem.Web/
-RUN cd PdmSystem.Web && npm ci
+COPY EasyPDM.Web/package.json EasyPDM.Web/package-lock.json EasyPDM.Web/
+RUN cd EasyPDM.Web && npm ci
 
-COPY PdmSystem.Web PdmSystem.Web/
-# vite.config.ts ma outDir "../PdmSystem.Api/wwwroot" (ścieżka względna do PdmSystem.Web/)
+COPY EasyPDM.Web EasyPDM.Web/
+# vite.config.ts ma outDir "../EasyPDM.Api/wwwroot" (ścieżka względna do EasyPDM.Web/)
 # — katalog musi istnieć obok, żeby "npm run build" miał gdzie zapisać wynik.
-RUN mkdir -p PdmSystem.Api/wwwroot && cd PdmSystem.Web && npm run build
+RUN mkdir -p EasyPDM.Api/wwwroot && cd EasyPDM.Web && npm run build
 
 # ============================================================
 # Etap 2: publikacja backendu (.NET)
@@ -23,15 +23,15 @@ RUN mkdir -p PdmSystem.Api/wwwroot && cd PdmSystem.Web && npm run build
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
 WORKDIR /src
 
-COPY PdmSystem.Api/PdmSystem.Api.csproj PdmSystem.Api/
-RUN dotnet restore PdmSystem.Api/PdmSystem.Api.csproj
+COPY EasyPDM.Api/EasyPDM.Api.csproj EasyPDM.Api/
+RUN dotnet restore EasyPDM.Api/EasyPDM.Api.csproj
 
-COPY PdmSystem.Api PdmSystem.Api/
+COPY EasyPDM.Api EasyPDM.Api/
 # Zbudowany frontend z etapu 1 trafia do wwwroot/ PRZED publikacją, żeby "dotnet publish"
 # skopiował go razem z resztą (UseStaticFiles w Program.cs serwuje go z tego katalogu).
-COPY --from=frontend-build /src/PdmSystem.Api/wwwroot PdmSystem.Api/wwwroot/
+COPY --from=frontend-build /src/EasyPDM.Api/wwwroot EasyPDM.Api/wwwroot/
 
-RUN dotnet publish PdmSystem.Api/PdmSystem.Api.csproj -c Release -o /app --no-restore
+RUN dotnet publish EasyPDM.Api/EasyPDM.Api.csproj -c Release -o /app --no-restore
 
 # ============================================================
 # Etap 3: obraz uruchomieniowy
@@ -69,4 +69,4 @@ ENV ASPNETCORE_URLS=http://+:8080
 VOLUME ["/data"]
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "PdmSystem.Api.dll"]
+ENTRYPOINT ["dotnet", "EasyPDM.Api.dll"]

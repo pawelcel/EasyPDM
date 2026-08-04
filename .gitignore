@@ -3,7 +3,7 @@ bin/
 obj/
 *.user
 
-# Magazyn wgranych plików/załączników (PdmSystem.Api StorageRoot) — dane użytkownika, nie kod
+# Magazyn wgranych plików/załączników (EasyPDM.Api StorageRoot) — dane użytkownika, nie kod
 /storage/
 
 # Node / frontend
@@ -21,7 +21,7 @@ __pycache__/
 .env
 
 # Lokalne dane dostępowe (hasło do bazy itd.) — appsettings.Local.json.example jest wzorem w repo
-PdmSystem.Api/appsettings.Local.json
+EasyPDM.Api/appsettings.Local.json
 
 # Instalator Windows — publish/ i Output/ to wygenerowane artefakty budowy, nie kod
 packaging/windows/publish/

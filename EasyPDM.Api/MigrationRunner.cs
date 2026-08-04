@@ -5,14 +5,14 @@ using Npgsql;
 // niezależnie od sposobu wdrożenia (Docker, Linux/Windows jako usługa, zwykłe "dotnet run"),
 // więc aktualizacja już zainstalowanego programu sprowadza się do podmiany plików i
 // restartu, bez ręcznego odpalania psql. Migracje są wbudowane w sam plik wykonywalny jako
-// embedded resources (zob. PdmSystem.Api.csproj) — nie zależą od tego, czy folder
+// embedded resources (zob. EasyPDM.Api.csproj) — nie zależą od tego, czy folder
 // db/migrations/ został skądś skopiowany obok.
 static class MigrationRunner
 {
     // Nadany przez <EmbeddedResource ... LinkBase="Migrations" /> w połączeniu
-    // z RootNamespace "PdmSystem.Api" w .csproj — potwierdzone odczytem
+    // z RootNamespace "EasyPDM.Api" w .csproj — potwierdzone odczytem
     // Assembly.GetManifestResourceNames() na realnie zbudowanym DLL-u.
-    private const string ResourcePrefix = "PdmSystem.Api.Migrations.";
+    private const string ResourcePrefix = "EasyPDM.Api.Migrations.";
 
     public static async Task ApplyPendingMigrationsAsync(string connectionString, ILogger logger)
     {
