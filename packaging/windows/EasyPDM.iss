@@ -24,10 +24,15 @@
 ; .exe), i uruchamia ją z powrotem zamiast rejestrować od nowa. Nowe migracje bazy program
 ; stosuje sam automatycznie przy starcie (nic nie trzeba robić ręcznie).
 ;
-; NIEZWERYFIKOWANE: ten plik został napisany bez dostępu do Windows/Inno Setup Compiler w tym
-; środowisku (Linux) — oparty o udokumentowane, standardowe wzorce Inno Setup, ale nie
-; skompilowany ani nie przetestowany end-to-end. Przy pierwszym uruchomieniu obserwuj
-; przebieg instalacji i zgłoś, co nie zagra.
+; Kompilacja: automatyczna, przy każdym pushu dotykającym tych plików —
+; .github/workflows/build-windows-installer.yml buduje EasyPDMSetup.exe na windowsowym
+; runnerze GitHuba (ma Inno Setup Compiler fabrycznie) i wystawia go jako pobieralny
+; artefakt przebiegu — nie trzeba mieć Windows/Inno Setup lokalnie, żeby dostać gotowy
+; instalator. Skompilowane i zweryfikowane realnym kompilatorem (kilka błędów Pascal
+; Script — brak lokalnych "const" w funkcjach, LoadStringFromFile wymaga AnsiString,
+; brak Randomize/RandSeed/GetTickCount w tym dialekcie — zostało po drodze wyłapanych
+; i poprawionych). Instalacja end-to-end na żywej maszynie z PostgreSQL wciąż nie była
+; ręcznie przetestowana — przy pierwszym uruchomieniu obserwuj przebieg i zgłoś, co nie zagra.
 
 #define MyAppName "EasyPDM"
 #define MyAppVersion "1.0.0"
