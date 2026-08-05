@@ -40,8 +40,9 @@ token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
      pola — dla Części rodzaj jest wymagany: **Wykonywana** → Materiał, **Zakupowa** →
      Producent/Numer zamówieniowy 1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** →
      brak dodatkowych pól. Dla Złożenia rodzaj jest opcjonalny i ograniczony do
-     Wykonywana/Zakupowa/Normalia (bez "Klienta"), a Materiał/Masa są zawsze widoczne
-     niezależnie od wybranego rodzaju — identycznie jak w aplikacji webowej.
+     Wykonywana/Zakupowa/Normalia (bez "Klienta"), a Masa jest zawsze widoczna niezależnie od
+     wybranego rodzaju — Złożenie nigdy nie ma pola Materiał (tylko Część) — identycznie jak
+     w aplikacji webowej.
      **Automatyczne wykrycie istniejącego elementu**: makro sprawdza nazwę (przy otwarciu
      okna — na podstawie etykiety dokumentu — i na bieżąco przy wpisywaniu w polu "Nazwa")
      i jeśli w PDM istnieje już Część/Złożenie o dokładnie takiej nazwie, samo przełącza
@@ -143,7 +144,8 @@ przeciwko żywemu `EasyPDM.Api`:
 - **cztery rodzaje Części** (Wykonywana/Zakupowa/Normalia/Klienta) w combo, z widocznością pól
   zależną od wybranego rodzaju dokładnie jak w `PartPropertyForm` (sprawdzone na realnym oknie
   `PdmUploadDialog`, wyświetlonym przez Qt w trybie `offscreen`); rodzaj Złożenia ograniczony
-  do trzech opcji bez "Klienta", z Materiałem/Masą zawsze widocznymi niezależnie od rodzaju;
+  do trzech opcji bez "Klienta", z Masą zawsze widoczną niezależnie od rodzaju, ale bez pola
+  Materiał (tylko Część je ma);
   utworzenie Części "Normalia" (z Materiałem i Normą) i "Klienta" (bez dodatkowych pól)
   potwierdzone odczytem zapisanych właściwości z serwera,
 - **automatyczne wykrywanie złożenia** (trzypoziomowe drzewo: część linkowana 2× osobnymi

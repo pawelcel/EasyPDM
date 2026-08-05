@@ -82,7 +82,6 @@ function AddNodeDialog({
 
   // Folder / Część
   const [name, setName] = useState("")
-  const [material, setMaterial] = useState("")
   const [mass, setMass] = useState("")
   const [rodzaj, setRodzaj] = useState("")
 
@@ -120,7 +119,6 @@ function AddNodeDialog({
   function reset() {
     setMode(lockMode ?? availableModes[0] ?? "folder")
     setName("")
-    setMaterial("")
     setMass("")
     setRodzaj("")
     setFile(null)
@@ -154,7 +152,6 @@ function AddNodeDialog({
       properties.rodzaj = rodzaj
     }
     if (itemType === "assembly") {
-      if (material.trim()) properties.material = material.trim()
       if (mass.trim()) properties.mass = mass.trim()
       if (rodzaj) properties.rodzaj = rodzaj
     }
@@ -350,13 +347,6 @@ function AddNodeDialog({
 
             {mode === "assembly" && (
               <>
-                <Label htmlFor="node-material">{t("addNode.materialOptional")}</Label>
-                <Input
-                  id="node-material"
-                  value={material}
-                  onChange={(e) => setMaterial(e.target.value)}
-                  placeholder={t("material.namePlaceholder")}
-                />
                 <Label htmlFor="node-mass">{t("addNode.massOptional")}</Label>
                 <Input
                   id="node-mass"
