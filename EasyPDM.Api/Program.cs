@@ -126,3 +126,7 @@ static async Task EnsureDefaultAdminAsync(string connectionString)
         "Utworzono domyślne konto administratora — login: admin, hasło: admin. " +
         "Zmień hasło zaraz po pierwszym zalogowaniu.");
 }
+
+// Odsłania niejawną klasę Program (top-level statements) jako publiczną — potrzebne, żeby
+// EasyPDM.Api.Tests mogło użyć WebApplicationFactory<Program> z osobnego assembly.
+public partial class Program;

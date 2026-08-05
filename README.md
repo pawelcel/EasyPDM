@@ -32,6 +32,11 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   Ustawienia → Logi.
 - **`EasyPDM.Web/`** — frontend: React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui
   (komponenty na bazie Base UI, styl „base-nova”), i18n (pl/en/de), motyw jasny/ciemny.
+- **`EasyPDM.Api.Tests/`** — testy integracyjne (xUnit + `WebApplicationFactory`),
+  uruchamiają CAŁĄ aplikację przeciwko prawdziwemu PostgreSQL (osobny schemat `pdm_test` w
+  tej samej bazie, zerowany przed każdą klasą testową). Lokalnie: `dotnet test
+  EasyPDM.Api.Tests` (connection string domyślnie wskazuje na lokalny `pdm`/`pdm_user` —
+  nadpisywalny zmienną `EASYPDM_TEST_CONNECTION_STRING`, tak jak w CI).
 - **`EasyPDM.FreeCad/`** — makro `EasyPDMUpload.FCMacro`: uruchamiane z poziomu FreeCAD,
   zapisuje aktywny dokument, pyta o dane (projekt, typ, rodzaj, materiał/producent/numery
   zamówieniowe...), tworzy Część/Złożenie w PDM, dogrywa plik jako załącznik i zmienia
@@ -43,6 +48,18 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 - **`Dockerfile`/`docker-compose.yml`**, **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i
   **`packaging/windows/`** (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez
   ręcznego składania z osobna backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
+- **`.github/workflows/`** — trzy workflowy CI, wszystkie uruchamialne też ręcznie
+  (`workflow_dispatch`) albo przez `gh workflow run <plik>`:
+  - `build.yml` — przy każdym pushu/PR: build backendu + testy integracyjne
+    (`EasyPDM.Api.Tests`, przeciwko usłudze `postgres` w CI) i typy/lint/build frontendu.
+  - `build-windows-installer.yml` — buduje `EasyPDMSetup.exe` (zob. wyżej) i dodatkowo
+    **realnie go instaluje** na windowsowym runnerze (PostgreSQL przez Chocolatey,
+    `/VERYSILENT`), sprawdzając dwukrotnie (świeża instalacja + symulacja aktualizacji), że
+    usługa startuje i serwer odpowiada — jedyny sposób, żeby to sprawdzić bez posiadania
+    fizycznego/wirtualnego Windows.
+  - `test-linux-installer.yml` — uruchamia `install-easypdm-linux.sh` naprawdę na czystym
+    Ubuntu (świeża instalacja, "aktualizacja", `uninstall-easypdm-linux.sh`), czego lokalne
+    środowisko deweloperskie (bez hasła do `sudo` w tej sesji) nie pozwalało zrobić.
 
 ### Model danych — elementy i struktura
 
