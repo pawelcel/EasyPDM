@@ -51,10 +51,41 @@ function ItemList({
   const [partKind, setPartKind] = useState<PartKindFilter>("all")
   const [manufacturer, setManufacturer] = useState("")
   const [selection, setSelection] = useState<Selection | null>(null)
+  // Element pobrany BEZPOŚREDNIO po ID (przez przycisk "Przejdź" na wierszu BOM-u), z
+  // pominięciem aktualnie przefiltrowanej/wyszukanej listy po lewej — cel nawigacji może
+  // wcale nie pasować do bieżących filtrów (inny rodzaj/producent/wynik wyszukiwania), więc
+  // szukanie go w visibleItems byłoby zawodne (efekt niżej resetujący zaznaczenie przy
+  // filtrowaniu i tak wywaliłby je jako "zniknęło z listy"). Ma pierwszeństwo przed
+  // selection — czyszczony przy każdym zwykłym kliknięciu w lewej liście.
+  const [externalItem, setExternalItem] = useState<Item | null>(null)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const [selectedItemChildren, setSelectedItemChildren] = useState<
     { item: Item; quantity: number; position: number }[]
   >([])
+
+  async function handleSelectChild(childId: string) {
+    setSelection(null)
+    try {
+      setExternalItem(await api.getItem(childId))
+    } catch {
+      setExternalItem(null)
+    }
+  }
+
+  // externalItem to zamrożona migawka (pobrana raz przez handleSelectChild), niepowiązana
+  // z odświeżeniem listy items — bez tego edycje (zmiana nazwy/statusu/właściwości) na
+  // elemencie pokazanym przez "Przejdź" nie byłyby widoczne w panelu, dopóki ktoś nie
+  // zaznaczyłby czegoś innego i nie wrócił.
+  async function refetchItemsAndExternal() {
+    await onItemsRefetch()
+    if (externalItem) {
+      try {
+        setExternalItem(await api.getItem(externalItem.id))
+      } catch {
+        setExternalItem(null)
+      }
+    }
+  }
 
   // Filtr "rodzaj części" ma sens tylko dla Części, a "producent" tylko dla Części
   // zakupowych — zmiana filtra wyżej w hierarchii kasuje te niżej, żeby nie został
@@ -88,6 +119,7 @@ function ItemList({
     await api.deleteItem(confirmingDeleteId)
     setConfirmingDeleteId(null)
     setSelection(null)
+    setExternalItem(null)
     await onItemsRefetch()
   }
 
@@ -115,7 +147,7 @@ function ItemList({
         })
 
   const selectedItem =
-    selection?.kind === "item" ? (visibleItems.find((i) => i.id === selection.id) ?? null) : null
+    externalItem ?? (selection?.kind === "item" ? (visibleItems.find((i) => i.id === selection.id) ?? null) : null)
 
   // Jeśli zaznaczony rekord zniknie z bieżącej, przefiltrowanej listy (zmiana filtra,
   // odświeżenie, usunięcie) — panel po prawej wraca do stanu "nic nie wybrano".
@@ -160,7 +192,9 @@ function ItemList({
 
   const selectedProject =
     selection?.kind === "project" ? (visibleProjects.find((p) => p.id === selection.id) ?? null) : null
-  const deletingItem = confirmingDeleteId ? visibleItems.find((i) => i.id === confirmingDeleteId) : null
+  const deletingItem = confirmingDeleteId
+    ? (externalItem?.id === confirmingDeleteId ? externalItem : visibleItems.find((i) => i.id === confirmingDeleteId))
+    : null
 
   return (
     <div className="flex flex-col gap-3">
@@ -181,14 +215,20 @@ function ItemList({
       {visibleProjects.length === 0 && visibleItems.length === 0 ? (
         <Hint>{t("database.empty")}</Hint>
       ) : (
-        <div className="grid grid-cols-4 gap-4">
-          <div className="col-span-1 flex flex-col gap-0.5 rounded-xl bg-card p-2 ring-1 ring-foreground/10">
+        <div className="grid grid-cols-4 items-start gap-4">
+          {/* max-h + overflow-y-auto — przy dużej bazie ta kolumna ma WŁASNY, ograniczony
+              scroll zamiast rozciągać całą stronę do wysokości pełnej listy elementów
+              (sticky top pod nagłówkiem, który sam jest "sticky top-0"). */}
+          <div className="sticky top-24 col-span-1 flex max-h-[calc(100vh-6rem)] flex-col gap-0.5 overflow-y-auto rounded-xl bg-card p-2 ring-1 ring-foreground/10">
             {visibleProjects.map((project) => (
               <ProjectRow
                 key={project.id}
                 project={project}
-                selected={selection?.kind === "project" && selection.id === project.id}
-                onSelect={() => setSelection({ kind: "project", id: project.id })}
+                selected={!externalItem && selection?.kind === "project" && selection.id === project.id}
+                onSelect={() => {
+                  setExternalItem(null)
+                  setSelection({ kind: "project", id: project.id })
+                }}
               />
             ))}
             {visibleItems.map((item) => (
@@ -196,8 +236,11 @@ function ItemList({
                 key={item.id}
                 item={item}
                 projectName={projects.find((p) => p.id === item.projectId)?.name}
-                selected={selection?.kind === "item" && selection.id === item.id}
-                onSelect={() => setSelection({ kind: "item", id: item.id })}
+                selected={!externalItem && selection?.kind === "item" && selection.id === item.id}
+                onSelect={() => {
+                  setExternalItem(null)
+                  setSelection({ kind: "item", id: item.id })
+                }}
               />
             ))}
           </div>
@@ -209,10 +252,14 @@ function ItemList({
                 item={selectedItem}
                 projectName={projects.find((p) => p.id === selectedItem.projectId)?.name}
                 childEntries={selectedItemChildren}
-                onItemsRefetch={onItemsRefetch}
+                onSelectChild={handleSelectChild}
+                onItemsRefetch={refetchItemsAndExternal}
                 onTagsRefetch={onTagsRefetch}
                 onDeleteCompletely={isAdmin ? () => setConfirmingDeleteId(selectedItem.id) : undefined}
-                onDuplicated={(newId) => setSelection({ kind: "item", id: newId })}
+                onDuplicated={(newId) => {
+                  setExternalItem(null)
+                  setSelection({ kind: "item", id: newId })
+                }}
               />
             ) : selectedProject ? (
               <ProjectDetailPanel
