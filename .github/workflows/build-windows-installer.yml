@@ -102,6 +102,38 @@ jobs:
             }
           }
           if (-not $ok) {
+            Write-Host "::group::Diagnostyka — appsettings.Production.json (hasło ukryte)"
+            (Get-Content "C:\Program Files\EasyPDM\appsettings.Production.json" -ErrorAction SilentlyContinue) `
+              -replace 'Password=[^"]*', 'Password=***'
+            Write-Host "::endgroup::"
+
+            Write-Host "::group::Diagnostyka — logi aplikacji (%ProgramData%\EasyPDM\logs)"
+            Get-ChildItem "C:\ProgramData\EasyPDM\logs" -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "--- $($_.FullName) ---"
+              Get-Content $_.FullName -ErrorAction SilentlyContinue
+            }
+            Write-Host "::endgroup::"
+
+            Write-Host "::group::Diagnostyka — zdarzenia Dziennika zdarzeń Windows (Application)"
+            Get-WinEvent -LogName Application -MaxEvents 2000 -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -like "*EasyPDM*" -or $_.ProviderName -like "*.NET*" } |
+              Select-Object -First 20 TimeCreated, ProviderName, Id, Message | Format-List
+            Write-Host "::endgroup::"
+
+            Write-Host "::group::Diagnostyka — bezpośrednie uruchomienie EXE w konsoli (nie jako usługa)"
+            $consoleOut = Join-Path $PWD "console-run.log"
+            $p = Start-Process -FilePath "C:\Program Files\EasyPDM\EasyPDM.Api.exe" `
+              -WorkingDirectory "C:\Program Files\EasyPDM" `
+              -RedirectStandardOutput $consoleOut -RedirectStandardError "$consoleOut.err" `
+              -PassThru
+            Start-Sleep -Seconds 8
+            if (-not $p.HasExited) { $p.Kill() }
+            Write-Host "--- stdout ---"
+            Get-Content $consoleOut -ErrorAction SilentlyContinue
+            Write-Host "--- stderr ---"
+            Get-Content "$consoleOut.err" -ErrorAction SilentlyContinue
+            Write-Host "::endgroup::"
+
             Write-Error "EasyPDM nie odpowiedziało pod http://localhost:5000 po instalacji."
             exit 1
           }
