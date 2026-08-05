@@ -57,20 +57,25 @@ jobs:
       # tym runnerze), z góry ustawiając hasło superużytkownika "postgres" — to samo hasło
       # podajemy potem instalatorowi przez /PGPASSWORD, żeby /VERYSILENT (bez interakcji)
       # mogło w ogóle założyć rolę/bazę EasyPDM.
-      # windows-latest ma PostgreSQL preinstalowany fabrycznie (jako uruchomioną usługę na
-      # porcie 5432) — bez zatrzymania go, świeżo zainstalowany przez Chocolatey PostgreSQL
-      # ląduje na innym porcie (port 5432 zajęty), a nasz instalator (łączący się przez
-      # "-h localhost" bez jawnego portu) trafia w STARĄ usługę z zupełnie innym hasłem
-      # superużytkownika niż to, które podajemy przez /PGPASSWORD. Efekt: CREATE ROLE/CREATE
-      # DATABASE cicho zawodzą (przed tym commitem nie były w ogóle sprawdzane), a appsettings
-      # i tak zapisuje się z "docelowym" hasłem, które nigdy nie trafiło do żadnej bazy.
-      - name: Zatrzymaj preinstalowany PostgreSQL na runnerze (zwalnia port 5432)
+      # windows-latest ma PostgreSQL preinstalowany fabrycznie (Chocolatey, aktualnie w wersji
+      # 17). SAMO zatrzymanie jego usługi NIE WYSTARCZA — instalator EDB używany przez pakiet
+      # Chocolatey "postgresql18" ignoruje parametr /Password, jeśli na maszynie wykryje
+      # JAKĄKOLWIEK już istniejącą instalację PostgreSQL (niezależnie od tego, czy jej usługa
+      # akurat działa), i po cichu generuje losowe hasło zamiast naszego — potwierdzone
+      # w dokumentacji pakietu. Dlatego preinstalowaną wersję trzeba faktycznie ODINSTALOWAĆ,
+      # nie tylko zatrzymać jej usługę.
+      - name: Odinstaluj preinstalowany PostgreSQL na runnerze
         shell: pwsh
         run: |
+          $installed = choco list --local-only --limit-output 2>$null |
+            Where-Object { $_ -match '^postgresql' } | ForEach-Object { $_.Split('|')[0] }
+          foreach ($pkg in $installed) {
+            Write-Host "Odinstalowuję preinstalowany pakiet Chocolatey: $pkg"
+            choco uninstall $pkg -y --remove-dependencies
+          }
           Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "Zatrzymuję preinstalowaną usługę $($_.Name) (status: $($_.Status))"
+            Write-Host "Zatrzymuję pozostałą usługę $($_.Name) (status: $($_.Status))"
             Stop-Service -Name $_.Name -Force -ErrorAction SilentlyContinue
-            Set-Service -Name $_.Name -StartupType Disabled -ErrorAction SilentlyContinue
           }
 
       # "postgresql" to pakiet-meta zależny od konkretnej wersji (np. postgresql18) — Chocolatey
