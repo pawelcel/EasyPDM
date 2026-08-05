@@ -302,7 +302,14 @@ def ensure_logged_in():
     anulował logowanie."""
     if get_session_token():
         try:
-            api_get("/auth/me")
+            me = api_get("/auth/me")
+            # Odświeżamy zapisaną nazwę z /auth/me — bez tego, jeśli token pochodzi z sesji
+            # zapisanej wcześniej BEZ przechodzenia przez api_login() w TEJ instalacji (np.
+            # ustawiony ręcznie, albo zapisany przez starszą wersję makra), SavedDisplayName
+            # zostawałoby puste na zawsze, mimo w pełni ważnej sesji — okno pokazywałoby
+            # "Zalogowano jako: ?".
+            if me:
+                set_saved_username(me.get("displayName") or me.get("username"))
             return True
         except AuthError:
             set_session_token(None)  # token wygasł/nieważny — nie próbuj go już więcej

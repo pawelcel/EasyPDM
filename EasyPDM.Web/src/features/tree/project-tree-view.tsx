@@ -19,7 +19,12 @@ import { ItemTree } from "@/features/tree/item-tree"
 import { useProjectTree } from "@/features/tree/use-project-tree"
 import { useLanguage } from "@/i18n/use-language"
 
-type Selection = { kind: "project" } | { kind: "item"; id: string; parentId: string | null }
+// parentId: string (zwykłe dziecko) | null (prawdziwy korzeń projektu, bez rodzica) |
+// undefined (przeszliśmy tu przyciskiem "Przejdź" na zagłębionym wpisie BOM-u — prawdziwy
+// rodzic istnieje, ale to jakieś POD-złożenie, którego tu nie znamy). Rozróżnienie
+// null/undefined jest celowe — patrz handleRemoveFromStructure i miejsce, gdzie
+// onRemoveFromStructure jest (nie) przekazywane do ItemDetailPanel.
+type Selection = { kind: "project" } | { kind: "item"; id: string; parentId: string | null | undefined }
 
 function ProjectTreeView({
   project,
@@ -230,10 +235,14 @@ function ProjectTreeView({
               item={selectedItem}
               projectName={project.name}
               childEntries={tree.childrenOf(selectedItem.id)}
-              onSelectChild={(childId) => setSelection({ kind: "item", id: childId, parentId: selectedItem.id })}
+              onSelectChild={(childId, parentId) => setSelection({ kind: "item", id: childId, parentId })}
               onItemsRefetch={tree.refetch}
               onTagsRefetch={onTagsRefetch}
-              onRemoveFromStructure={handleRemoveFromStructure}
+              // parentId undefined = przejście tu przyciskiem "Przejdź" na zagłębionym wpisie
+              // BOM-u, prawdziwy rodzic nieznany — nie oferujemy "Usuń ze struktury" w ogóle,
+              // zamiast zgadywać (błędnie odpiąć od niewłaściwego rodzica albo błędnie
+              // schować jako "korzeń", którym ten element wcale nie jest).
+              onRemoveFromStructure={selectedItemParentId !== undefined ? handleRemoveFromStructure : undefined}
               onDeleteCompletely={isAdmin ? () => setConfirmingDelete(true) : undefined}
               onDuplicated={(newId) =>
                 setSelection({ kind: "item", id: newId, parentId: selectedItemParentId })
