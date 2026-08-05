@@ -17,7 +17,7 @@ public class BomEndpointsTests
     // "/bom" (widok ekranowy) i "/bom/aggregated-csv" (zsumowany eksport) celowo różni).
     private static async Task<(Guid projectId, Guid zlozenie1, Guid zlozenie2, Guid czesc2)> BuildNestedAssemblyAsync(HttpClient client)
     {
-        var projectId = await client.CreateProjectAsync("Projekt BOM zaglebiony");
+        var projectId = await client.CreateProjectAsync($"Projekt BOM zaglebiony {Guid.NewGuid()}");
         var zlozenie1 = await client.CreateNodeAsync(projectId, "Zlozenie1", "assembly");
         var zlozenie2 = await client.CreateNodeAsync(projectId, "Zlozenie2", "assembly");
 
