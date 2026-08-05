@@ -82,9 +82,10 @@ var
   PsqlPath: String;
   DebugLogPath: String;
 
-{ Log instalacji zapisywany do %ProgramData%\EasyPDM (przetrwa poza {tmp}, więc da się go
-  obejrzeć już PO zakończeniu instalatora) — RunPsql/RoleExists/DatabaseExists nic wcześniej
-  nie logowały, więc cichy błąd (np. zła rola/baza/hasło) był kompletnie niewidoczny. }
+{ Log instalacji zapisywany do %ProgramData%\EasyPDM (przetrwa poza katalogiem tymczasowym
+  instalatora, więc da się go obejrzeć już PO zakończeniu) — RunPsql/RoleExists/DatabaseExists
+  nic wcześniej nie logowały, więc cichy błąd (np. zła rola/baza/hasło) był kompletnie
+  niewidoczny. }
 procedure LogInstall(Msg: String);
 begin
   if DebugLogPath = '' then
