@@ -67,16 +67,21 @@ jobs:
       - name: Odinstaluj preinstalowany PostgreSQL na runnerze
         shell: pwsh
         run: |
-          $installed = choco list --local-only --limit-output 2>$null |
-            Where-Object { $_ -match '^postgresql' } | ForEach-Object { $_.Split('|')[0] }
-          foreach ($pkg in $installed) {
-            Write-Host "Odinstalowuję preinstalowany pakiet Chocolatey: $pkg"
-            choco uninstall $pkg -y --remove-dependencies
-          }
+          # Preinstalowany PostgreSQL na windows-latest NIE jest zarządzany przez Chocolatey
+          # ("choco list --local-only" go nie widzi) — jest zainstalowany bezpośrednio przez
+          # skrypty budujące obraz runnera, więc trzeba go odinstalować jego WŁASNYM
+          # deinstalatorem EDB (BitRock InstallBuilder), nie przez choco.
           Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "Zatrzymuję pozostałą usługę $($_.Name) (status: $($_.Status))"
+            Write-Host "Zatrzymuję usługę $($_.Name) (status: $($_.Status))"
             Stop-Service -Name $_.Name -Force -ErrorAction SilentlyContinue
           }
+          Get-ChildItem "C:\Program Files\PostgreSQL" -Filter "uninstall-postgresql.exe" -Recurse -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              Write-Host "Odinstalowuję preinstalowany PostgreSQL: $($_.FullName)"
+              Start-Process -FilePath $_.FullName -ArgumentList "--mode unattended" -Wait
+            }
+          Write-Host "=== Pozostałość C:\Program Files\PostgreSQL po odinstalowaniu ==="
+          Get-ChildItem "C:\Program Files\PostgreSQL" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
 
       # "postgresql" to pakiet-meta zależny od konkretnej wersji (np. postgresql18) — Chocolatey
       # NIE przekazuje --params do zależności domyślnie, więc samo "--params" ustawiało hasło
