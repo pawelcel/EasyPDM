@@ -73,15 +73,40 @@ jobs:
             Set-Service -Name $_.Name -StartupType Disabled -ErrorAction SilentlyContinue
           }
 
+      # "postgresql" to pakiet-meta zależny od konkretnej wersji (np. postgresql18) — Chocolatey
+      # NIE przekazuje --params do zależności domyślnie, więc samo "--params" ustawiało hasło
+      # na pakiecie "postgresql", a faktyczny instalator (postgresql18) i tak generował sobie
+      # LOSOWE hasło superużytkownika (widać to po "WARNING: ... insecure one has been
+      # generated for you" w logu) — /PGPASSWORD=postgres podawane potem naszemu instalatorowi
+      # nigdy nie mogło pasować. --params-global wymusza przekazanie parametrów też na
+      # zależności.
       - name: Zainstaluj PostgreSQL (Chocolatey) — do testu instalatora
         shell: pwsh
-        run: choco install postgresql -y --params "/Password:postgres" --no-progress
+        run: choco install postgresql -y --params-global "/Password:postgres" --no-progress
 
       - name: Diagnostyka — gdzie Chocolatey faktycznie zainstalował psql.exe
         shell: pwsh
         run: |
           Get-ChildItem "C:\Program Files\PostgreSQL" -Recurse -Filter psql.exe -ErrorAction SilentlyContinue |
             ForEach-Object { Write-Host $_.FullName }
+
+      # Szybka weryfikacja PRZED uruchomieniem instalatora — jeśli --params-global
+      # jednak nie zadziała (np. zmiana zachowania Chocolatey/pakietu), ten krok pada
+      # w kilka sekund z jasnym komunikatem, zamiast dowiadywać się o tym dopiero po
+      # całym ~15-minutowym cyklu instalacja+polling usługi.
+      - name: Zweryfikuj, że hasło superużytkownika PostgreSQL faktycznie zostało ustawione
+        shell: pwsh
+        run: |
+          $psql = (Get-ChildItem "C:\Program Files\PostgreSQL" -Recurse -Filter psql.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notlike "*pgAdmin*" } |
+            Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          $env:PGPASSWORD = "postgres"
+          & $psql -h localhost -U postgres -c "SELECT 1;" postgres
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Nie udało się połączyć jako postgres/postgres po instalacji Chocolatey — hasło superużytkownika nie zostało poprawnie ustawione (--params-global nie zadziałał?)."
+            exit 1
+          }
+          Write-Host "Połączenie jako postgres/postgres działa poprawnie."
 
       - name: Uruchom EasyPDMSetup.exe w trybie cichym (/VERYSILENT)
         shell: pwsh
