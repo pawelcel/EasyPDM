@@ -3,7 +3,8 @@
 ## Status
 
 Ręczne tworzenie projektów i elementów przez aplikację webową (upload pliku wprost do
-magazynu API) albo przez makro FreeCAD (`EasyPDM.FreeCad/`), które woła to samo API.
+magazynu API) albo przez makro FreeCAD (`EasyPDM.FreeCad/`) lub SolidWorks
+(`EasyPDM.SolidWorks/`), które wołają to samo API.
 Wcześniejsze podejście ze skanowaniem dysku (`EasyPDM.Core`, `EasyPDM.Indexer`) zostało
 usunięte z repo — było niezgodne ze schematem od migracji `002` i nigdy nieużywane przez
 `Api`.
@@ -35,6 +36,10 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   zapisuje aktywny dokument, pyta o dane (projekt, typ, rodzaj, materiał/producent/numery
   zamówieniowe...), tworzy Część/Złożenie w PDM, dogrywa plik jako załącznik i zmienia
   nazwę lokalnego pliku na `numer (nazwa)`. Szczegóły w `EasyPDM.FreeCad/README.md`.
+- **`EasyPDM.SolidWorks/`** — odpowiednik powyższego dla SolidWorks (makro VBA
+  `EasyPDMUpload.bas`), bez automatycznego wykrywania całego drzewa złożenia i z prostszymi
+  oknami (`InputBox`/`MsgBox`) niż w FreeCAD. **Niezweryfikowane** — napisane bez dostępu do
+  SolidWorks/VBA, zob. `EasyPDM.SolidWorks/README.md` po szczegóły i znane ryzyka.
 - **`Dockerfile`/`docker-compose.yml`**, **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i
   **`packaging/windows/`** (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez
   ręcznego składania z osobna backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
