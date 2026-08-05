@@ -1,16 +1,24 @@
-# EasyPDM — makro FreeCAD
+# EasyPDM — makra FreeCAD
 
-Makro `EasyPDMUpload.FCMacro` wysyła aktywny dokument FreeCAD wprost do EasyPDM, bez
-przechodzenia przez przeglądarkę.
+Dwa niezależne makra, jedno na wysyłanie, jedno na pobieranie/otwieranie:
+
+- **`EasyPDMUpload.FCMacro`** wysyła aktywny dokument FreeCAD wprost do EasyPDM, bez
+  przechodzenia przez przeglądarkę (opisane w tym pliku niżej).
+- **`EasyPDMDownload.FCMacro`** pobiera Część/Złożenie z EasyPDM (razem ze WSZYSTKIMI jego
+  składnikami, jeśli to Złożenie) i od razu je otwiera w FreeCAD (opisane w osobnej sekcji
+  na końcu tego pliku).
+
+Oba dzielą to samo logowanie i adres API (te same preferencje FreeCAD) — zalogowanie się
+w jednym starcza dla drugiego.
 
 ## Instalacja
 
-Nie trzeba niczego instalować jako workbench. Wystarczy w FreeCAD:
+Nie trzeba niczego instalować jako workbench. Dla każdego z dwóch makr osobno, w FreeCAD:
 
 - **Macro → Macros… → Add path to macro path list** i wskazać ten folder (`EasyPDM.FreeCad/`),
-  a potem uruchamiać makro `PdmUpload` z listy — **albo**
-- **Macro → Macros… → Execute** i wskazać plik `EasyPDMUpload.FCMacro` bezpośrednio, za każdym
-  razem z dowolnej lokalizacji na dysku.
+  a potem uruchamiać makro z listy — **albo**
+- **Macro → Macros… → Execute** i wskazać plik (`EasyPDMUpload.FCMacro` albo
+  `EasyPDMDownload.FCMacro`) bezpośrednio, za każdym razem z dowolnej lokalizacji na dysku.
 
 Adres API (domyślnie `http://localhost:5000/api`) jest zapamiętywany w preferencjach FreeCAD
 (`User parameter:BaseApp/EasyPDM`) po pierwszym uruchomieniu — można go zmienić w oknie
@@ -192,3 +200,81 @@ Wszystko przeszło poprawnie — w tym raz na żywo przez samego użytkownika w 
 środowisku, nie tylko w testach automatycznych. Samo okno dialogowe (PySide6, w tym
 wyszukiwarka istniejących elementów i okno "Nowa rewizja" z komentarzem) było też sprawdzane
 ręcznie — testowane na FreeCAD 1.1.3 z PySide6.
+
+---
+
+# EasyPDMDownload.FCMacro — pobieranie i otwieranie
+
+Drugie makro: zamiast wysyłać, **pobiera** Część/Złożenie z EasyPDM i od razu **otwiera** je
+w FreeCAD. Logowanie i adres API są dokładnie tak samo skonfigurowane jak w
+`EasyPDMUpload.FCMacro` (te same preferencje FreeCAD) — osobna instalacja/uruchomienie
+(patrz "Instalacja" wyżej), ale wspólna sesja.
+
+## Co robi
+
+1. Okno z wyszukiwarką Części/Złożenia (identyczny mechanizm co pole "Element" przy wysyłaniu
+   do istniejącego elementu — pisanie po numerze albo nazwie podpowiada dopasowania z całej
+   bazy) i folderem docelowym. Folder domyślnie podpowiada ostatnio użyty (osobna preferencja
+   FreeCAD, `DownloadFolder`), z przyciskiem **"..."** do zmiany w dowolnym momencie.
+2. Dla **Złożenia**: pobiera też WSZYSTKIE jego składniki rekurencyjnie (bezpośrednie dzieci,
+   potem ich dzieci, i tak dalej — cały BOM), do TEGO SAMEGO folderu co plik główny. Bez tego
+   złożenie zbudowane na odnośnikach `App::Link` do zewnętrznych, zapisanych plików (standard
+   w workbenchu Assembly/Assembly4) nie miałoby czym się otworzyć — FreeCAD rozwiązuje te
+   odnośniki dopiero przy otwieraniu dokumentu, więc pliki składników muszą już leżeć na dysku
+   PRZED otwarciem pliku głównego.
+3. Jeśli w folderze docelowym jest już plik o **dokładnie tej samej nazwie** (czyli tej samej
+   rewizji) i tym samym rozmiarze co na serwerze — pomija go, nie pobiera drugi raz.
+4. Jeśli w folderze jest już plik TEGO SAMEGO elementu, ale w **innej (starszej) rewizji**,
+   a na serwerze jest nowsza — pyta, czy pobrać nowszą, zamiast cicho nadpisywać albo cicho
+   zostawiać nieaktualny plik.
+5. Na końcu **otwiera** główny (wybrany) plik w FreeCAD (`App.openDocument`) — pliki
+   składników zostają tylko na dysku, nie są automatycznie otwierane jako osobne dokumenty
+   (dokładnie tak, jak FreeCAD sam otwiera złożenie: linkowane pliki wczytuje w tle).
+
+## Skąd bierze pliki
+
+EasyPDM nie ma osobnego "pliku elementu" dla Części/Złożenia — aktualny plik CAD jest
+załącznikiem (`item_attachments`), a przy KAŻDEJ wysyłce nowej rewizji przez
+`EasyPDMUpload.FCMacro` poprzednia kopia ZOSTAJE (nowy załącznik obok starego, różne nazwy:
+`numer (nazwa).REWIZJA.rozszerzenie`) — więc historia rewizji jest w praktyce odtwarzalna
+z samej listy załączników, bez potrzeby osobnego API do "starych wersji pliku". Makro
+rozpoznaje tę konwencję nazw, żeby trafić w załącznik odpowiadający AKTUALNEJ rewizji
+elementu; jeśli element nigdy nie przeszedł przez żadne makro CAD (np. dograny ręcznie
+w aplikacji webowej, załączniki mają dowolne, oryginalne nazwy), bierze po prostu najnowiej
+wgrany załącznik jako najlepsze przybliżenie.
+
+## Ograniczenia pierwszej wersji
+
+- Zawsze celuje w AKTUALNĄ rewizję — nie da się nim pobrać konkretnej, wybranej starszej
+  rewizji (starsze lokalne kopie służą wyłącznie do wykrycia "masz nieaktualną wersję",
+  punkt 4 wyżej).
+- Wszystkie pliki (główny + składniki) lądują płasko w JEDNYM folderze, bez odtwarzania
+  struktury BOM jako podfolderów. To najbezpieczniejszy domyślny wybór dla odnośników
+  `App::Link` zapisanych jako ścieżki WZGLĘDEM folderu dokumentu (typowe dla Assembly4), ale
+  jeśli oryginalny model był budowany z plikami w osobnych podfolderach albo z odnośnikami
+  zapisanymi jako ścieżki BEZWZGLĘDNE z innej maszyny, odnośniki mogą mimo to nie rozwiązać
+  się automatycznie — wtedy trzeba je poprawić ręcznie w FreeCAD (Assembly4 ma do tego
+  narzędzie "Make link relative"/zmianę ścieżki linku).
+- Współdzielony komponent (użyty w kilku miejscach drzewa) pobierany jest tylko raz
+  (rozpoznawany po ID elementu) — tak samo jak przy wysyłaniu w `EasyPDMUpload.FCMacro`.
+- Rozpoznanie "to jest plik tego elementu" opiera się na tej samej konwencji nazw co
+  wysyłanie (`numer (nazwa).REWIZJA.rozszerzenie`) — element, którego JEDYNY załącznik ma
+  zupełnie inną nazwę (nigdy nie przeszedł przez żadne makro CAD), i tak zostanie pobrany
+  (bierze najnowszy załącznik), ale wykrycie "masz już starszą rewizję" (punkt 4) wtedy nie
+  zadziała, bo nie ma z czego rozpoznać litery rewizji w nazwie lokalnego pliku.
+
+## Status weryfikacji
+
+⚠️ **Nieprzetestowane na żywym FreeCAD** — w odróżnieniu od `EasyPDMUpload.FCMacro` (które
+przeszło pełny cykl testów przez `freecadcmd` przeciwko żywemu serwerowi, plus ręczną
+weryfikację w GUI), to makro było możliwe do zweryfikować tylko: składniowo (`ast.parse`),
+pod kątem poprawności polskich znaków (skrypt sprawdzający częstość znaków — zero
+zniekształceń) i przez uważny przegląd logiki względem rzeczywistych endpointów API
+(`GET /api/items`, `/items/{id}/attachments`, `/items/{id}/children`,
+`/attachments/{id}/file`, każdy sprawdzony w kodzie `EasyPDM.Api`). Przy pierwszym
+uruchomieniu na żywym FreeCAD obserwuj przebieg (log w oknie na końcu i w konsoli raportów
+FreeCAD) i zgłoś, co nie zagra — najbardziej ryzykowne miejsca to: rozpoznawanie nazw
+załączników regexem (jeśli plik ma nietypową nazwę) i to, czy odnośniki `App::Link` w
+pobranym złożeniu faktycznie rozwiążą się automatycznie po umieszczeniu wszystkich plików
+w jednym, płaskim folderze (zależy od tego, jak zapisane są ścieżki linków w oryginalnym
+pliku — patrz "Ograniczenia" wyżej).
