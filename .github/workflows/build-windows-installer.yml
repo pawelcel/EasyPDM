@@ -251,6 +251,11 @@ jobs:
           }
 
           Start-Sleep -Seconds 3
+          # "sc.exe query" na nieistniejącej usłudze kończy się kodem 1060 — to oczekiwany
+          # wynik tutaj, ale zostawia $LASTEXITCODE=1060, a pwsh w Actions traktuje resztkowy
+          # $LASTEXITCODE na końcu skryptu jako wynik całego kroku (nawet jeśli nasza własna
+          # logika już poprawnie rozpoznała sukces) — bez jawnego "exit 0" krok padałby mimo
+          # poprawnego wyniku.
           $svcOutput = sc.exe query EasyPDM 2>&1 | Out-String
           Write-Host $svcOutput
           if ($svcOutput -notmatch "1060") {
@@ -258,3 +263,4 @@ jobs:
             exit 1
           }
           Write-Host "Usługa EasyPDM poprawnie usunięta po odinstalowaniu."
+          exit 0
