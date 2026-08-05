@@ -210,7 +210,13 @@ def api_logout():
 def ensure_logged_in():
     if get_session_token():
         try:
-            api_get("/auth/me")
+            me = api_get("/auth/me")
+            # Odświeżamy zapisaną nazwę z /auth/me — bez tego, jeśli token pochodzi z sesji
+            # zapisanej wcześniej BEZ przechodzenia przez api_login() w tej instalacji,
+            # SavedDisplayName zostawałoby puste na zawsze mimo ważnej sesji — okno
+            # pokazywałoby "Zalogowano jako: ?" (dokładnie tak, jak zaobserwowano w praktyce).
+            if me:
+                set_saved_username(me.get("displayName") or me.get("username"))
             return True
         except AuthError:
             set_session_token(None)
@@ -358,12 +364,16 @@ def _download_children_recursive(item, target_dir, log, seen):
     ich dzieci, itd.) do target_dir — patrz punkt 2 w docstringu modułu. `seen` (zbiór ID
     elementów) chroni przed podwójnym pobraniem tego samego, współdzielonego komponentu."""
     try:
-        children = api_get(f"/items/{item['id']}/children") or []
+        rows = api_get(f"/items/{item['id']}/children") or []
     except Exception as e:
         label = f"{item.get('itemNumber')} ({item.get('fileName')})"
         log(f"  {label}: nie udało się pobrać listy składników ({e}).")
         return
-    for child in children:
+    # UWAGA: odpowiedź to lista {"item": {...}, "quantity": ..., "position": ...} — sam
+    # element jest ZAGNIEŻDŻONY pod kluczem "item" (ta sama konwencja co childEntries
+    # w item-detail-panel.tsx), NIE płaski obiekt jak w GET /api/items.
+    for row in rows:
+        child = row["item"]
         if child["id"] in seen:
             continue
         seen.add(child["id"])
@@ -547,20 +557,13 @@ class DownloadDialog(QtWidgets.QDialog):
         self.accept()
 
 
-def main():
-    if not ensure_logged_in():
-        return
-
-    dlg = DownloadDialog()
-    if dlg.exec() != QtWidgets.QDialog.Accepted:
-        return
-
-    log_lines = []
-
-    def log(msg):
-        log_lines.append(msg)
-        App.Console.PrintMessage(msg + "\n")
-
+def _run_download(dlg, log):
+    """Faktyczne pobieranie + otwarcie, wydzielone z main() wyłącznie po to, żeby dało się
+    je owinąć w jeden szeroki try/except (zob. main()) — błąd, którego nie przewidzieliśmy
+    (np. nieoczekiwany kształt odpowiedzi API), ma się skończyć CZYTELNYM komunikatem
+    z pełnym tracebackiem, a nie cichym zniknięciem makra bez żadnego okna na końcu
+    (dokładnie to przydarzyło się w praktyce, zanim doszło to zabezpieczenie — zob. też
+    poprawiony _download_children_recursive, gdzie leżała PIERWOTNA przyczyna)."""
     top_item = dlg.result_item
     target_dir = dlg.result_folder
     log(f"Pobieram {top_item['itemNumber']} ({top_item['fileName']}) do {target_dir}...")
@@ -578,6 +581,38 @@ def main():
             log(f"Nie udało się otworzyć {top_path} w FreeCAD: {e}")
     else:
         log("Nie udało się ustalić pliku głównego do otwarcia.")
+
+
+def main():
+    if not ensure_logged_in():
+        return
+
+    dlg = DownloadDialog()
+    if dlg.exec() != QtWidgets.QDialog.Accepted:
+        return
+
+    log_lines = []
+
+    def log(msg):
+        log_lines.append(msg)
+        App.Console.PrintMessage(msg + "\n")
+
+    try:
+        _run_download(dlg, log)
+    except Exception:
+        import traceback
+
+        tb = traceback.format_exc()
+        App.Console.PrintError(tb + "\n")
+        QtWidgets.QMessageBox.critical(
+            None,
+            "EasyPDM — błąd",
+            "Pobieranie przerwane nieoczekiwanym błędem:\n\n"
+            + tb
+            + "\n\nDotychczasowy log:\n"
+            + "\n".join(log_lines[-15:]),
+        )
+        return
 
     QtWidgets.QMessageBox.information(None, "EasyPDM", "\n".join(log_lines[-25:]))
 

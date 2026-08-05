@@ -10,7 +10,7 @@ import {
 } from "@dnd-kit/core"
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Upload } from "lucide-react"
+import { ArrowUpRight, GripVertical, Upload } from "lucide-react"
 
 import { api } from "@/api/client"
 import {
@@ -66,7 +66,14 @@ function ItemDetailPanel({
   projectName?: string
   showHeader?: boolean
   childEntries?: { item: Item; quantity: number; position: number }[]
-  onSelectChild?: (id: string) => void
+  // parentId przekazywany razem z id — dla bezpośredniego dziecka to zawsze TEN element
+  // (poprawny rodzic). Dla zagłębionego wpisu (głębszego niż jeden poziom) to celowo
+  // undefined: jego prawdziwy bezpośredni rodzic to jakieś POD-złożenie (nie to złożenie),
+  // więc podanie złego parentId zepsułoby "Usuń ze struktury" po przejściu tam (odpięłoby od
+  // NIEWŁAŚCIWEGO rodzica albo błędnie schowało jako "korzeń"). undefined ≠ null: null to
+  // świadomie stwierdzony PRAWDZIWY korzeń projektu (bez żadnego rodzica), undefined to
+  // "rodzic istnieje, ale nieznany tutaj" — z undefined "Usuń ze struktury" się nie pokazuje.
+  onSelectChild?: (id: string, parentId: string | null | undefined) => void
   onItemsRefetch: () => void | Promise<void>
   onTagsRefetch: () => void | Promise<void>
   onRemoveFromStructure?: () => void | Promise<void>
@@ -344,6 +351,7 @@ function ItemDetailPanel({
                     <TableHead>{t("common.manufacturer")}</TableHead>
                     <TableHead>{t("item.colOrderNumber1")}</TableHead>
                     <TableHead>{t("item.colOrderNumber2")}</TableHead>
+                    <TableHead className="w-8" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -447,7 +455,7 @@ function SortableBomRow({
   quantity: number
   position: number
   nestedEntries: BomEntry[]
-  onSelectChild?: (id: string) => void
+  onSelectChild?: (id: string, parentId: string | null | undefined) => void
   onItemsRefetch: () => void | Promise<void>
   setBomError: (message: string | null) => void
   disabled?: boolean
@@ -489,19 +497,7 @@ function SortableBomRow({
             />
           </div>
         </TableCell>
-        <TableCell>
-          {onSelectChild ? (
-            <button
-              type="button"
-              onClick={() => onSelectChild(child.id)}
-              className="text-left text-primary hover:underline"
-            >
-              {itemDisplayLabel(child)}
-            </button>
-          ) : (
-            itemDisplayLabel(child)
-          )}
-        </TableCell>
+        <TableCell>{itemDisplayLabel(child)}</TableCell>
         <TableCell className="text-right">
           <BomQuantityCell
             parentId={parentId}
@@ -515,6 +511,19 @@ function SortableBomRow({
         <TableCell>{bomPropertyOrDash(child.properties, "manufacturer")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "orderNumber")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "orderNumber2")}</TableCell>
+        <TableCell>
+          {onSelectChild && (
+            <button
+              type="button"
+              onClick={() => onSelectChild(child.id, parentId)}
+              className="text-muted-foreground hover:text-primary"
+              aria-label={t("item.goToItemAria")}
+              title={t("item.goToItemAria")}
+            >
+              <ArrowUpRight className="size-4" />
+            </button>
+          )}
+        </TableCell>
       </TableRow>
       {nestedEntries.map((entry) => (
         <TableRow key={entry.itemId + bomPositionLabel(entry.path)} className="text-muted-foreground">
@@ -537,6 +546,23 @@ function SortableBomRow({
           <TableCell>{bomPropertyOrDash(entry.properties, "manufacturer")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "orderNumber")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "orderNumber2")}</TableCell>
+          <TableCell>
+            {onSelectChild && (
+              // parentId=undefined (nie null!): prawdziwy bezpośredni rodzic tego zagłębionego
+              // wpisu to jakieś POD-złożenie, nie to złożenie — z undefined "Usuń ze struktury"
+              // po prostu się nie pokaże po przejściu tam, zamiast błędnie odpiąć element od
+              // NIEWŁAŚCIWEGO rodzica albo błędnie schować go jako "korzeń".
+              <button
+                type="button"
+                onClick={() => onSelectChild(entry.itemId, undefined)}
+                className="text-muted-foreground hover:text-primary"
+                aria-label={t("item.goToItemAria")}
+                title={t("item.goToItemAria")}
+              >
+                <ArrowUpRight className="size-4" />
+              </button>
+            )}
+          </TableCell>
         </TableRow>
       ))}
     </Fragment>
