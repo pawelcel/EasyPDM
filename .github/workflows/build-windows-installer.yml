@@ -61,16 +61,30 @@ jobs:
         shell: pwsh
         run: choco install postgresql -y --params "/Password:postgres" --no-progress
 
+      - name: Diagnostyka — gdzie Chocolatey faktycznie zainstalował psql.exe
+        shell: pwsh
+        run: |
+          Get-ChildItem "C:\Program Files\PostgreSQL" -Recurse -Filter psql.exe -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host $_.FullName }
+
       - name: Uruchom EasyPDMSetup.exe w trybie cichym (/VERYSILENT)
         shell: pwsh
         run: |
-          $exe = "packaging\windows\Output\EasyPDMSetup.exe"
-          & $exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PGPASSWORD=postgres /LOG=install.log
-          $exitCode = $LASTEXITCODE
+          $exe = (Resolve-Path "packaging\windows\Output\EasyPDMSetup.exe").Path
+          $logPath = Join-Path $PWD "install.log"
+          # Start-Process -PassThru zamiast "& $exe ...; $LASTEXITCODE" — to drugie w tym
+          # przebiegu CI dało PUSTY (nie zerowy, PUSTY) kod wyjścia, co wygląda na to, że
+          # $LASTEXITCODE po prostu nie ustawił się tak, jak oczekiwano dla tego procesu;
+          # Start-Process zwraca jawny obiekt z niezawodną właściwością .ExitCode.
+          $proc = Start-Process -FilePath $exe -ArgumentList @(
+            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+            "/PGPASSWORD=postgres", "/LOG=$logPath"
+          ) -Wait -PassThru
+          Write-Host "Kod wyjścia instalatora: $($proc.ExitCode)"
           Write-Host "=== install.log ==="
-          Get-Content install.log -ErrorAction SilentlyContinue
-          if ($exitCode -ne 0) {
-            Write-Error "EasyPDMSetup.exe zakończył się kodem $exitCode."
+          Get-Content $logPath -ErrorAction SilentlyContinue
+          if ($proc.ExitCode -ne 0) {
+            Write-Error "EasyPDMSetup.exe zakończył się kodem $($proc.ExitCode)."
             exit 1
           }
 
@@ -99,13 +113,17 @@ jobs:
       - name: Uruchom instalator drugi raz (symulacja aktualizacji)
         shell: pwsh
         run: |
-          $exe = "packaging\windows\Output\EasyPDMSetup.exe"
-          & $exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PGPASSWORD=postgres /LOG=install2.log
-          $exitCode = $LASTEXITCODE
+          $exe = (Resolve-Path "packaging\windows\Output\EasyPDMSetup.exe").Path
+          $logPath = Join-Path $PWD "install2.log"
+          $proc = Start-Process -FilePath $exe -ArgumentList @(
+            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+            "/PGPASSWORD=postgres", "/LOG=$logPath"
+          ) -Wait -PassThru
+          Write-Host "Kod wyjścia instalatora: $($proc.ExitCode)"
           Write-Host "=== install2.log ==="
-          Get-Content install2.log -ErrorAction SilentlyContinue
-          if ($exitCode -ne 0) {
-            Write-Error "Drugie uruchomienie EasyPDMSetup.exe zakończyło się kodem $exitCode."
+          Get-Content $logPath -ErrorAction SilentlyContinue
+          if ($proc.ExitCode -ne 0) {
+            Write-Error "Drugie uruchomienie EasyPDMSetup.exe zakończyło się kodem $($proc.ExitCode)."
             exit 1
           }
 
