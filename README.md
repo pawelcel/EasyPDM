@@ -37,10 +37,15 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   tej samej bazie, zerowany przed każdą klasą testową). Lokalnie: `dotnet test
   EasyPDM.Api.Tests` (connection string domyślnie wskazuje na lokalny `pdm`/`pdm_user` —
   nadpisywalny zmienną `EASYPDM_TEST_CONNECTION_STRING`, tak jak w CI).
-- **`EasyPDM.FreeCad/`** — makro `EasyPDMUpload.FCMacro`: uruchamiane z poziomu FreeCAD,
-  zapisuje aktywny dokument, pyta o dane (projekt, typ, rodzaj, materiał/producent/numery
-  zamówieniowe...), tworzy Część/Złożenie w PDM, dogrywa plik jako załącznik i zmienia
-  nazwę lokalnego pliku na `numer (nazwa)`. Szczegóły w `EasyPDM.FreeCad/README.md`.
+- **`EasyPDM.FreeCad/`** — dwa makra: `EasyPDMUpload.FCMacro` (uruchamiane z poziomu
+  FreeCAD, zapisuje aktywny dokument, pyta o dane — projekt, typ, rodzaj,
+  materiał/producent/numery zamówieniowe... — tworzy Część/Złożenie w PDM, dogrywa plik jako
+  załącznik i zmienia nazwę lokalnego pliku na `numer (nazwa)`) i `EasyPDMDownload.FCMacro`
+  (odwrotny kierunek: wyszukuje Część/Złożenie w PDM, pobiera je razem z CAŁYM drzewem
+  składników Złożenia — żeby odnośniki `App::Link` się rozwiązały — i od razu otwiera
+  w FreeCAD; pomija już pobrane pliki, pyta przed nadpisaniem starszej rewizji nowszą).
+  **Drugie makro nieprzetestowane na żywym FreeCAD** (zob. sekcja "Status weryfikacji"
+  w `EasyPDM.FreeCad/README.md`). Szczegóły obu w `EasyPDM.FreeCad/README.md`.
 - **`EasyPDM.SolidWorks/`** — odpowiednik powyższego dla SolidWorks (makro VBA
   `EasyPDMUpload.bas`), bez automatycznego wykrywania całego drzewa złożenia i z prostszymi
   oknami (`InputBox`/`MsgBox`) niż w FreeCAD. **Niezweryfikowane** — napisane bez dostępu do
