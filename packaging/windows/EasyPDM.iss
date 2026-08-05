@@ -308,10 +308,17 @@ begin
   PsqlPath := FindPsqlPath();
   if PsqlPath = '' then
   begin
-    if MsgBox('Nie znaleziono zainstalowanego PostgreSQL (wymagany, wersja 18 zalecana). ' +
-              'Otworzyć stronę pobierania? Po instalacji uruchom ten instalator ponownie.',
-              mbConfirmation, MB_YESNO) = IDYES then
-      ShellExec('open', 'https://www.postgresql.org/download/windows/', '', '', SW_SHOW, ewNoWait, ResultCode);
+    { WizardSilent — /SUPPRESSMSGBOXES wycisza tylko WBUDOWANE okna Inno Setup, NIE własne
+      MsgBox() z [Code]; bez tej straży instalacja /VERYSILENT bez PostgreSQL zawiesiłaby się
+      w nieskończoność czekając na kliknięcie, którego nikt nigdy nie wykona (dokładnie to
+      przydarzyło się w CI po dodaniu analogicznych MsgBox w CurStepChanged poniżej). }
+    if not WizardSilent then
+    begin
+      if MsgBox('Nie znaleziono zainstalowanego PostgreSQL (wymagany, wersja 18 zalecana). ' +
+                'Otworzyć stronę pobierania? Po instalacji uruchom ten instalator ponownie.',
+                mbConfirmation, MB_YESNO) = IDYES then
+        ShellExec('open', 'https://www.postgresql.org/download/windows/', '', '', SW_SHOW, ewNoWait, ResultCode);
+    end;
     Result := False;
   end
   else
@@ -367,13 +374,17 @@ begin
     działa więcej niż jedna instancja na porcie 5432) appsettings.json i tak zapisywało się
     z hasłem, które NIGDY nie trafiło do żadnej realnej roli — usługa startowała, ale
     EasyPDM.Api.exe od razu padał na "password authentication failed". Teraz przerywamy
-    głośno zamiast zostawiać użytkownika z cichą, niedziałającą instalacją. }
+    głośno zamiast zostawiać użytkownika z cichą, niedziałającą instalacją. MsgBox tylko
+    poza trybem cichym — /SUPPRESSMSGBOXES NIE wycisza własnych MsgBox z [Code], więc pod
+    /VERYSILENT taki MsgBox zawiesiłby instalator w nieskończoność (dokładnie to się stało
+    w CI, zanim doszła straż WizardSilent poniżej). }
   if not RoleOk then
   begin
     LogInstall('BLAD KRYTYCZNY: nie udalo sie zalozyc/zaktualizowac roli pdm_user - przerywam konfiguracje bazy.');
-    MsgBox('Nie udało się skonfigurować roli bazy danych PostgreSQL (pdm_user). ' +
-      'Sprawdź hasło superużytkownika "postgres" oraz czy na tym porcie (5432) nie działa ' +
-      'inna instancja PostgreSQL. Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
+    if not WizardSilent then
+      MsgBox('Nie udało się skonfigurować roli bazy danych PostgreSQL (pdm_user). ' +
+        'Sprawdź hasło superużytkownika "postgres" oraz czy na tym porcie (5432) nie działa ' +
+        'inna instancja PostgreSQL. Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
     exit;
   end;
 
@@ -387,7 +398,8 @@ begin
     if not DbOk then
     begin
       LogInstall('BLAD KRYTYCZNY: nie udalo sie utworzyc bazy danych pdm.');
-      MsgBox('Nie udało się utworzyć bazy danych PostgreSQL "pdm". Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
+      if not WizardSilent then
+        MsgBox('Nie udało się utworzyć bazy danych PostgreSQL "pdm". Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
       exit;
     end;
 
@@ -395,7 +407,8 @@ begin
     if not SchemaOk then
     begin
       LogInstall('BLAD KRYTYCZNY: nie udalo sie zaladowac schema.sql do bazy pdm.');
-      MsgBox('Nie udało się załadować schematu bazy danych. Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
+      if not WizardSilent then
+        MsgBox('Nie udało się załadować schematu bazy danych. Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
       exit;
     end;
   end;
