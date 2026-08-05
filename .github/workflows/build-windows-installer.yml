@@ -57,6 +57,22 @@ jobs:
       # tym runnerze), z góry ustawiając hasło superużytkownika "postgres" — to samo hasło
       # podajemy potem instalatorowi przez /PGPASSWORD, żeby /VERYSILENT (bez interakcji)
       # mogło w ogóle założyć rolę/bazę EasyPDM.
+      # windows-latest ma PostgreSQL preinstalowany fabrycznie (jako uruchomioną usługę na
+      # porcie 5432) — bez zatrzymania go, świeżo zainstalowany przez Chocolatey PostgreSQL
+      # ląduje na innym porcie (port 5432 zajęty), a nasz instalator (łączący się przez
+      # "-h localhost" bez jawnego portu) trafia w STARĄ usługę z zupełnie innym hasłem
+      # superużytkownika niż to, które podajemy przez /PGPASSWORD. Efekt: CREATE ROLE/CREATE
+      # DATABASE cicho zawodzą (przed tym commitem nie były w ogóle sprawdzane), a appsettings
+      # i tak zapisuje się z "docelowym" hasłem, które nigdy nie trafiło do żadnej bazy.
+      - name: Zatrzymaj preinstalowany PostgreSQL na runnerze (zwalnia port 5432)
+        shell: pwsh
+        run: |
+          Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "Zatrzymuję preinstalowaną usługę $($_.Name) (status: $($_.Status))"
+            Stop-Service -Name $_.Name -Force -ErrorAction SilentlyContinue
+            Set-Service -Name $_.Name -StartupType Disabled -ErrorAction SilentlyContinue
+          }
+
       - name: Zainstaluj PostgreSQL (Chocolatey) — do testu instalatora
         shell: pwsh
         run: choco install postgresql -y --params "/Password:postgres" --no-progress
@@ -102,6 +118,10 @@ jobs:
             }
           }
           if (-not $ok) {
+            Write-Host "::group::Diagnostyka — install-debug.log (log instalatora [Code], nie sam Inno Setup)"
+            Get-Content "C:\ProgramData\EasyPDM\install-debug.log" -ErrorAction SilentlyContinue
+            Write-Host "::endgroup::"
+
             Write-Host "::group::Diagnostyka — appsettings.Production.json (hasło ukryte)"
             (Get-Content "C:\Program Files\EasyPDM\appsettings.Production.json" -ErrorAction SilentlyContinue) `
               -replace 'Password=[^"]*', 'Password=***'
@@ -173,6 +193,9 @@ jobs:
             }
           }
           if (-not $ok) {
+            Write-Host "::group::Diagnostyka — install-debug.log"
+            Get-Content "C:\ProgramData\EasyPDM\install-debug.log" -ErrorAction SilentlyContinue
+            Write-Host "::endgroup::"
             Write-Error "EasyPDM nie odpowiedziało pod http://localhost:5000 po drugiej instalacji."
             exit 1
           }

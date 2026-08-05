@@ -80,6 +80,18 @@ const
 var
   PostgresPasswordPage: TInputQueryWizardPage;
   PsqlPath: String;
+  DebugLogPath: String;
+
+{ Log instalacji zapisywany do %ProgramData%\EasyPDM (przetrwa poza {tmp}, więc da się go
+  obejrzeć już PO zakończeniu instalatora) — RunPsql/RoleExists/DatabaseExists nic wcześniej
+  nie logowały, więc cichy błąd (np. zła rola/baza/hasło) był kompletnie niewidoczny. }
+procedure LogInstall(Msg: String);
+begin
+  if DebugLogPath = '' then
+    exit;
+  SaveStringToFile(DebugLogPath,
+    GetDateTimeString('yyyy/mm/dd hh:nn:ss', '-', ':') + '  ' + Msg + #13#10, True);
+end;
 
 { Szuka psql.exe w typowej lokalizacji instalatora EDB: C:\Program Files\PostgreSQL\<wersja>\bin\ .
   Zwraca pełną ścieżkę do najnowszej znalezionej wersji, albo pusty string, jeśli nic nie ma. }
@@ -143,10 +155,12 @@ end;
   Zwraca True, jeśli psql zakończył się kodem 0. UWAGA: Args MUSI zawierać własne "-U <rola>"
   — ta funkcja nie narzuca żadnej roli domyślnej (wywołania łączą się raz jako "postgres",
   raz jako "pdm_user"). }
-function RunPsql(PgPassword, Args: String): Boolean;
+function RunPsql(PgPassword, Args, StepLabel: String): Boolean;
 var
   BatchFile: String;
   ResultCode: Integer;
+  ExecOk: Boolean;
+  StatusText: String;
 begin
   BatchFile := ExpandConstant('{tmp}\pdm_psql_' + IntToStr(Random(1000000)) + '.bat');
   SaveStringToFile(BatchFile,
@@ -155,7 +169,15 @@ begin
     '"' + PsqlPath + '" -h localhost ' + Args + #13#10,
     False);
   try
-    Result := Exec(BatchFile, '', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+    ExecOk := Exec(BatchFile, '', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Result := ExecOk and (ResultCode = 0);
+    if not ExecOk then
+      StatusText := 'nie udalo sie uruchomic psql.exe'
+    else if ResultCode <> 0 then
+      StatusText := 'psql zakonczyl sie kodem ' + IntToStr(ResultCode)
+    else
+      StatusText := 'OK';
+    LogInstall('psql [' + StepLabel + ']: ' + StatusText);
   finally
     DeleteFile(BatchFile);
   end;
@@ -184,6 +206,7 @@ begin
       Result := Pos('1', Output) > 0
     else
       Result := False;
+    LogInstall('RoleExists: surowy wynik = "' + Output + '" -> ' + IntToStr(ResultCode));
   finally
     DeleteFile(BatchFile);
     DeleteFile(OutFile);
@@ -211,6 +234,7 @@ begin
       Result := Pos('1', Output) > 0
     else
       Result := False;
+    LogInstall('DatabaseExists: surowy wynik = "' + Output + '" -> ' + IntToStr(ResultCode));
   finally
     DeleteFile(BatchFile);
     DeleteFile(OutFile);
@@ -303,7 +327,7 @@ begin
       MsgBox('Podaj hasło superużytkownika "postgres".', mbError, MB_OK);
       Result := False;
     end
-    else if not RunPsql(PostgresPasswordPage.Values[0], '-U postgres -c "SELECT 1;" postgres') then
+    else if not RunPsql(PostgresPasswordPage.Values[0], '-U postgres -c "SELECT 1;" postgres', 'test polaczenia') then
     begin
       MsgBox('Nie udało się połączyć z PostgreSQL tym hasłem. Spróbuj ponownie.', mbError, MB_OK);
       Result := False;
@@ -315,9 +339,14 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   PgSuperPassword, PdmPassword, AppSettings: String;
   ResultCode: Integer;
+  RoleOk, DbOk, SchemaOk: Boolean;
 begin
   if CurStep <> ssPostInstall then
     exit;
+
+  ForceDirectories(ExpandConstant('{#MyDataDir}'));
+  DebugLogPath := ExpandConstant('{#MyDataDir}\install-debug.log');
+  LogInstall('=== Instalacja/aktualizacja EasyPDM rozpoczeta ===');
 
   PgSuperPassword := PgPasswordFromCmdLine();
   if PgSuperPassword = '' then
@@ -328,9 +357,24 @@ begin
     (aktualizacja) i rola już istnieje; hasło pdm_user jest wtedy i tak nadpisywane, żeby
     appsettings zawsze się zgadzało z tym, co faktycznie jest w bazie. }
   if RoleExists(PgSuperPassword) then
-    RunPsql(PgSuperPassword, '-U postgres -c "ALTER ROLE pdm_user PASSWORD ''' + PdmPassword + ''';" postgres')
+    RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "ALTER ROLE pdm_user PASSWORD ''' + PdmPassword + ''';" postgres', 'ALTER ROLE pdm_user')
   else
-    RunPsql(PgSuperPassword, '-U postgres -c "CREATE ROLE pdm_user LOGIN PASSWORD ''' + PdmPassword + ''';" postgres');
+    RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE ROLE pdm_user LOGIN PASSWORD ''' + PdmPassword + ''';" postgres', 'CREATE ROLE pdm_user');
+
+  { Wcześniej wynik powyższego wcale nie był sprawdzany — przy błędzie (np. złe hasło
+    superużytkownika albo połączenie z niewłaściwym serwerem PostgreSQL, gdy na maszynie
+    działa więcej niż jedna instancja na porcie 5432) appsettings.json i tak zapisywało się
+    z hasłem, które NIGDY nie trafiło do żadnej realnej roli — usługa startowała, ale
+    EasyPDM.Api.exe od razu padał na "password authentication failed". Teraz przerywamy
+    głośno zamiast zostawiać użytkownika z cichą, niedziałającą instalacją. }
+  if not RoleOk then
+  begin
+    LogInstall('BLAD KRYTYCZNY: nie udalo sie zalozyc/zaktualizowac roli pdm_user - przerywam konfiguracje bazy.');
+    MsgBox('Nie udało się skonfigurować roli bazy danych PostgreSQL (pdm_user). ' +
+      'Sprawdź hasło superużytkownika "postgres" oraz czy na tym porcie (5432) nie działa ' +
+      'inna instancja PostgreSQL. Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
+    exit;
+  end;
 
   { Baza sprawdzana NIEZALEŻNIE od roli (nie w tej samej gałęzi if/else) — instalacja
     przerwana wcześniej dokładnie między CREATE ROLE a CREATE DATABASE zostawiłaby rolę
@@ -338,9 +382,24 @@ begin
     zostałby już NA ZAWSZE bez bazy/schematu przy każdym kolejnym uruchomieniu instalatora. }
   if not DatabaseExists(PgSuperPassword) then
   begin
-    RunPsql(PgSuperPassword, '-U postgres -c "CREATE DATABASE pdm OWNER pdm_user;" postgres');
-    RunPsql(PdmPassword, '-U pdm_user -f "' + ExpandConstant('{app}\db\schema.sql') + '" pdm');
+    DbOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE DATABASE pdm OWNER pdm_user;" postgres', 'CREATE DATABASE pdm');
+    if not DbOk then
+    begin
+      LogInstall('BLAD KRYTYCZNY: nie udalo sie utworzyc bazy danych pdm.');
+      MsgBox('Nie udało się utworzyć bazy danych PostgreSQL "pdm". Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
+      exit;
+    end;
+
+    SchemaOk := RunPsql(PdmPassword, '-U pdm_user -f "' + ExpandConstant('{app}\db\schema.sql') + '" pdm', 'zaladuj schema.sql');
+    if not SchemaOk then
+    begin
+      LogInstall('BLAD KRYTYCZNY: nie udalo sie zaladowac schema.sql do bazy pdm.');
+      MsgBox('Nie udało się załadować schematu bazy danych. Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
+      exit;
+    end;
   end;
+
+  LogInstall('Rola i baza danych OK. Zapisuje appsettings.Production.json i rejestruje usluge.');
 
   { Katalogi na magazyn plików/kopie zapasowe/logi — %ProgramData%, bo to trwałe dane
     aplikacji współdzielone przez wszystkich użytkowników maszyny, nie profil pojedynczej
@@ -376,11 +435,13 @@ begin
       'create {#MyServiceName} binPath= "' + ExpandConstant('{app}\{#MyAppExeName}') +
       '" start= auto DisplayName= "EasyPDM"',
       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    LogInstall('sc create {#MyServiceName} -> kod wyjscia ' + IntToStr(ResultCode));
     Exec(ExpandConstant('{sys}\sc.exe'), 'description {#MyServiceName} "Lokalny serwer PDM"',
       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
   Exec(ExpandConstant('{sys}\sc.exe'), 'start {#MyServiceName}',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  LogInstall('sc start {#MyServiceName} -> kod wyjscia ' + IntToStr(ResultCode));
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
