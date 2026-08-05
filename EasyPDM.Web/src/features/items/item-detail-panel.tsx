@@ -513,15 +513,15 @@ function SortableBomRow({
         <TableCell>{bomPropertyOrDash(child.properties, "orderNumber2")}</TableCell>
         <TableCell>
           {onSelectChild && (
-            <button
+            <Button
               type="button"
+              size="icon-xs"
               onClick={() => onSelectChild(child.id, parentId)}
-              className="text-muted-foreground hover:text-primary"
               aria-label={t("item.goToItemAria")}
               title={t("item.goToItemAria")}
             >
-              <ArrowUpRight className="size-4" />
-            </button>
+              <ArrowUpRight />
+            </Button>
           )}
         </TableCell>
       </TableRow>
@@ -552,15 +552,15 @@ function SortableBomRow({
               // wpisu to jakieś POD-złożenie, nie to złożenie — z undefined "Usuń ze struktury"
               // po prostu się nie pokaże po przejściu tam, zamiast błędnie odpiąć element od
               // NIEWŁAŚCIWEGO rodzica albo błędnie schować go jako "korzeń".
-              <button
+              <Button
                 type="button"
+                size="icon-xs"
                 onClick={() => onSelectChild(entry.itemId, undefined)}
-                className="text-muted-foreground hover:text-primary"
                 aria-label={t("item.goToItemAria")}
                 title={t("item.goToItemAria")}
               >
-                <ArrowUpRight className="size-4" />
-              </button>
+                <ArrowUpRight />
+              </Button>
             )}
           </TableCell>
         </TableRow>
