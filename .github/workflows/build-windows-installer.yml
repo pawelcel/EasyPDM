@@ -52,58 +52,55 @@ jobs:
           if-no-files-found: error
 
       # Od tego miejsca: prawdziwy test end-to-end samej INSTALACJI (nie tylko kompilacji
-      # skryptu) — czego nie dało się zweryfikować wcześniej. Runner windows-latest nie ma
-      # PostgreSQL domyślnie, więc doinstalowujemy je przez Chocolatey (preinstalowane na
-      # tym runnerze), z góry ustawiając hasło superużytkownika "postgres" — to samo hasło
-      # podajemy potem instalatorowi przez /PGPASSWORD, żeby /VERYSILENT (bez interakcji)
-      # mogło w ogóle założyć rolę/bazę EasyPDM.
-      # windows-latest ma PostgreSQL preinstalowany fabrycznie (Chocolatey, aktualnie w wersji
-      # 17). SAMO zatrzymanie jego usługi NIE WYSTARCZA — instalator EDB używany przez pakiet
-      # Chocolatey "postgresql18" ignoruje parametr /Password, jeśli na maszynie wykryje
-      # JAKĄKOLWIEK już istniejącą instalację PostgreSQL (niezależnie od tego, czy jej usługa
-      # akurat działa), i po cichu generuje losowe hasło zamiast naszego — potwierdzone
-      # w dokumentacji pakietu. Dlatego preinstalowaną wersję trzeba faktycznie ODINSTALOWAĆ,
-      # nie tylko zatrzymać jej usługę.
-      - name: Odinstaluj preinstalowany PostgreSQL na runnerze
+      # skryptu) — czego nie dało się zweryfikować wcześniej. Z góry ustawiamy hasło
+      # superużytkownika PostgreSQL na "postgres" — to samo hasło podajemy potem instalatorowi
+      # przez /PGPASSWORD, żeby /VERYSILENT (bez interakcji) mogło w ogóle założyć rolę/bazę
+      # EasyPDM. windows-latest ma PostgreSQL preinstalowany fabrycznie (aktualnie wersja 17). Instalacja
+      # przez pakiet Chocolatey "postgresql"/"postgresql18" okazała się niewiarygodna w tym
+      # środowisku — niezależnie od /params, --params-global czy odinstalowania preinstalowanej
+      # wersji jej własnym deinstalatorem, pakiet i tak po cichu generował LOSOWE hasło
+      # superużytkownika zamiast naszego (widać to po "WARNING: ... insecure one has been
+      # generated for you" w logu za każdym razem) — wygląda na to, że warstwa tłumaczenia
+      # parametrów tego pakietu (Get-PackageParameters w jego chocolateyInstall.ps1) ma jakąś
+      # osobliwość związaną z wykrywaniem istniejącej instalacji na tym konkretnym obrazie
+      # runnera. Zamiast dalej próbować obejść tę warstwę, pobieramy i uruchamiamy PRAWDZIWY
+      # instalator EDB bezpośrednio, z jego własnymi, udokumentowanymi flagami wiersza poleceń
+      # (--superpassword, --serverport) — to ten sam plik .exe, który i tak pobierał pakiet
+      # Chocolatey (adres z jego logu), tylko bez pośredniej warstwy, która zawodziła.
+      - name: Zatrzymaj preinstalowany PostgreSQL na runnerze (zwalnia port 5432)
         shell: pwsh
         run: |
-          # Preinstalowany PostgreSQL na windows-latest NIE jest zarządzany przez Chocolatey
-          # ("choco list --local-only" go nie widzi) — jest zainstalowany bezpośrednio przez
-          # skrypty budujące obraz runnera, więc trzeba go odinstalować jego WŁASNYM
-          # deinstalatorem EDB (BitRock InstallBuilder), nie przez choco.
           Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue | ForEach-Object {
             Write-Host "Zatrzymuję usługę $($_.Name) (status: $($_.Status))"
             Stop-Service -Name $_.Name -Force -ErrorAction SilentlyContinue
           }
-          Get-ChildItem "C:\Program Files\PostgreSQL" -Filter "uninstall-postgresql.exe" -Recurse -ErrorAction SilentlyContinue |
-            ForEach-Object {
-              Write-Host "Odinstalowuję preinstalowany PostgreSQL: $($_.FullName)"
-              Start-Process -FilePath $_.FullName -ArgumentList "--mode unattended" -Wait
-            }
-          Write-Host "=== Pozostałość C:\Program Files\PostgreSQL po odinstalowaniu ==="
-          Get-ChildItem "C:\Program Files\PostgreSQL" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
 
-      # "postgresql" to pakiet-meta zależny od konkretnej wersji (np. postgresql18) — Chocolatey
-      # NIE przekazuje --params do zależności domyślnie, więc samo "--params" ustawiało hasło
-      # na pakiecie "postgresql", a faktyczny instalator (postgresql18) i tak generował sobie
-      # LOSOWE hasło superużytkownika (widać to po "WARNING: ... insecure one has been
-      # generated for you" w logu) — /PGPASSWORD=postgres podawane potem naszemu instalatorowi
-      # nigdy nie mogło pasować. --params-global wymusza przekazanie parametrów też na
-      # zależności.
-      - name: Zainstaluj PostgreSQL (Chocolatey) — do testu instalatora
+      - name: Zainstaluj PostgreSQL 18 (bezpośrednio przez instalator EDB) — do testu instalatora
         shell: pwsh
-        run: choco install postgresql -y --params-global "/Password:postgres" --no-progress
+        run: |
+          $installerUrl = "https://get.enterprisedb.com/postgresql/postgresql-18.4-1-windows-x64.exe"
+          $installerPath = Join-Path $env:TEMP "postgresql-18-installer.exe"
+          Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath
+          $proc = Start-Process -FilePath $installerPath -ArgumentList @(
+            "--mode", "unattended", "--unattendedmodeui", "none",
+            "--superpassword", "postgres", "--serverport", "5432",
+            "--disable-components", "stackbuilder"
+          ) -Wait -PassThru
+          Write-Host "Kod wyjścia instalatora PostgreSQL: $($proc.ExitCode)"
+          if ($proc.ExitCode -ne 0) {
+            Write-Error "Instalacja PostgreSQL zakończyła się kodem $($proc.ExitCode)."
+            exit 1
+          }
 
-      - name: Diagnostyka — gdzie Chocolatey faktycznie zainstalował psql.exe
+      - name: Diagnostyka — gdzie zainstalował się psql.exe
         shell: pwsh
         run: |
           Get-ChildItem "C:\Program Files\PostgreSQL" -Recurse -Filter psql.exe -ErrorAction SilentlyContinue |
             ForEach-Object { Write-Host $_.FullName }
 
-      # Szybka weryfikacja PRZED uruchomieniem instalatora — jeśli --params-global
-      # jednak nie zadziała (np. zmiana zachowania Chocolatey/pakietu), ten krok pada
-      # w kilka sekund z jasnym komunikatem, zamiast dowiadywać się o tym dopiero po
-      # całym ~15-minutowym cyklu instalacja+polling usługi.
+      # Szybka weryfikacja PRZED uruchomieniem instalatora — jeśli hasło jednak się nie
+      # ustawiło, ten krok pada w kilka sekund z jasnym komunikatem, zamiast dowiadywać się
+      # o tym dopiero po całym ~15-minutowym cyklu instalacja+polling usługi.
       - name: Zweryfikuj, że hasło superużytkownika PostgreSQL faktycznie zostało ustawione
         shell: pwsh
         run: |
@@ -113,7 +110,7 @@ jobs:
           $env:PGPASSWORD = "postgres"
           & $psql -h localhost -U postgres -c "SELECT 1;" postgres
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Nie udało się połączyć jako postgres/postgres po instalacji Chocolatey — hasło superużytkownika nie zostało poprawnie ustawione (--params-global nie zadziałał?)."
+            Write-Error "Nie udało się połączyć jako postgres/postgres po instalacji PostgreSQL — hasło superużytkownika nie zostało poprawnie ustawione."
             exit 1
           }
           Write-Host "Połączenie jako postgres/postgres działa poprawnie."
