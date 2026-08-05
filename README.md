@@ -35,7 +35,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   zapisuje aktywny dokument, pyta o dane (projekt, typ, rodzaj, materiał/producent/numery
   zamówieniowe...), tworzy Część/Złożenie w PDM, dogrywa plik jako załącznik i zmienia
   nazwę lokalnego pliku na `numer (nazwa)`. Szczegóły w `EasyPDM.FreeCad/README.md`.
-- **`Dockerfile`/`docker-compose.yml`**, **`install-linux.sh`/`uninstall-linux.sh`** i
+- **`Dockerfile`/`docker-compose.yml`**, **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i
   **`packaging/windows/`** (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez
   ręcznego składania z osobna backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
 
@@ -222,13 +222,13 @@ z `schema.sql` odpala się TYLKO przy pierwszym, zupełnie pustym starcie wolume
 ### Linux — instalacja natywna jako usługa systemd (bez Dockera)
 
 ```bash
-sudo ./install-linux.sh
+sudo ./install-easypdm-linux.sh
 ```
 
 Jeden skrypt: instaluje PostgreSQL, jeśli go jeszcze nie ma (rozpoznaje `pacman`/`apt`/`dnf`
 — na Arch/CachyOS dodatkowo sam inicjalizuje klaster, bo tamtejszy pakiet, w odróżnieniu od
 Debiana/Fedory, nie robi tego automatycznie), zakłada rolę i bazę `pdm` (generuje losowe
-hasło, jeśli nie podasz własnego przez `PDM_DB_PASSWORD=... sudo -E ./install-linux.sh`),
+hasło, jeśli nie podasz własnego przez `PDM_DB_PASSWORD=... sudo -E ./install-easypdm-linux.sh`),
 buduje frontend i publikuje backend jako **self-contained pojedynczy plik wykonywalny**
 (`dotnet publish -r linux-x64 --self-contained -p:PublishSingleFile=true` — gotowa usługa
 NIE wymaga już zainstalowanego .NET-a, tylko sam czas budowy), zakłada dedykowane,
@@ -237,10 +237,10 @@ nieuprzywilejowane konto systemowe `easypdm`, i instaluje usługę systemd
 `/var/lib/easypdm` — usługa nie może pisać nigdzie indziej w systemie). Po instalacji:
 `http://localhost:5000`, status przez `systemctl status easypdm`, logi na żywo przez
 `journalctl -u easypdm -f` (niezależnie od własnego dziennika aplikacji w Ustawienia ->
-Logi). Odinstalowanie: `sudo ./uninstall-linux.sh` (celowo NIE rusza samej bazy danych ani
+Logi). Odinstalowanie: `sudo ./uninstall-easypdm-linux.sh` (celowo NIE rusza samej bazy danych ani
 PostgreSQL — o tym decyduje się ręcznie, żeby nie skasować danych przez pomyłkę).
 
-**Aktualizacja**: `git pull`, potem `sudo ./install-linux.sh` ponownie — wykrywa istniejącą
+**Aktualizacja**: `git pull`, potem `sudo ./install-easypdm-linux.sh` ponownie — wykrywa istniejącą
 bazę/konto (pomija ich zakładanie), przebudowuje i podmienia tylko aplikację, jawnie
 **restartuje usługę** (`systemctl restart`, nie tylko `enable --now`, które na już
 uruchomionej usłudze nic by nie zrobiło). Nowe migracje bazy program stosuje sam
@@ -256,8 +256,15 @@ automatycznie przy starcie — nic dodatkowego nie trzeba robić ręcznie.
 
 ### Windows — instalator (`.exe`, Inno Setup)
 
-Wymaga zbudowania na maszynie z Windows (.NET 10 SDK + Node.js + [Inno Setup
-Compiler](https://jrsoftware.org/isinfo.php)):
+**Najprościej: `.github/workflows/build-windows-installer.yml`** buduje gotowy
+`EasyPDMSetup.exe` automatycznie na windowsowym runnerze GitHuba (ma Inno Setup Compiler
+fabrycznie) przy każdym pushu dotykającym backendu/frontendu/instalatora — nie trzeba mieć
+Windows ani Inno Setup lokalnie. Uruchom ręcznie przez `gh workflow run
+build-windows-installer.yml`, poczekaj (`gh run watch`), pobierz artefakt (`gh run download
+<id> -n EasyPDMSetup`).
+
+Alternatywnie, do zbudowania lokalnie na maszynie z Windows (.NET 10 SDK + Node.js +
+[Inno Setup Compiler](https://jrsoftware.org/isinfo.php)):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
@@ -281,18 +288,14 @@ Windows zablokowałby nadpisanie działającego `.exe`), instalator wykrywa istn
 rolę/bazę (pomija zakładanie schematu) i istniejącą usługę (uruchamia ją z powrotem zamiast
 rejestrować od nowa). Nowe migracje bazy program stosuje sam automatycznie przy starcie.
 
-> **To jedyna z trzech ścieżek, której w ogóle nie dało się niczego zweryfikować w tym
-> środowisku** (Linux, bez dostępu do Windows/Wine/Inno Setup Compiler) — poza samym
-> cross-kompilowaniem self-contained `.exe` z Linuksa (`dotnet publish -r win-x64`), co
-> zadziałało. Skrypt `.iss` napisany starannie wg udokumentowanych wzorców Inno Setup
-> (m.in. hasło do PostgreSQL przez tymczasowy plik `.bat`, bo `Exec()` nie ma wprost
-> parametru na zmienne środowiskowe), z dwoma realnymi błędami złapanymi i poprawionymi
-> przy ręcznym przeglądzie kodu (brakująca deklaracja zmiennej, zduplikowana flaga `-U`
-> w wywołaniu `psql`) — ale bez kompilatora nie da się wykluczyć kolejnych. Traktuj to jako
-> solidny punkt startowy do wypróbowania na prawdziwym Windows, nie jako gotowe,
-> zweryfikowane wydanie.
-> Wymaga do budowy: potrzebny jest fizyczny/wirtualny Windows z zainstalowanym Inno Setup
-> Compiler — sam plik `.iss` niczego nie instaluje bez tego kroku.
+> Skrypt `.iss` faktycznie się kompiluje (zweryfikowane prawdziwym Inno Setup Compilerem w
+> CI, nie tylko przeglądem kodu) — po drodze złapane i poprawione 5 realnych błędów
+> specyficznych dla dialektu Pascal Script Inno Setup (m.in. brak lokalnych sekcji `const`
+> w funkcjach, `LoadStringFromFile` wymagające `AnsiString`, brak `Randomize`/`RandSeed`/
+> `GetTickCount` — nie ma żadnego udokumentowanego sposobu na ręczne zasianie wbudowanego
+> `Random`, więc korzysta z niego wprost). Sama instalacja end-to-end na żywej maszynie z
+> PostgreSQL nie była jeszcze ręcznie przetestowana — przy pierwszym uruchomieniu obserwuj
+> przebieg i zgłoś, co nie zagra.
 
 Pierwsze logowanie: **`admin` / `admin`** (konto zakładane automatycznie, jeśli tabela
 `users` jest pusta — zob. "Logowanie, role i dostęp do projektów" wyżej). Zmień hasło od
@@ -329,9 +332,6 @@ Magazyn plików tylko dla administratora).
    `docker compose up --build` wraca do wartości ze zmiennej środowiskowej `StorageRoot`
    ustawionej w `Dockerfile`. Sama zmiana lokalizacji API działa poprawnie w trakcie życia
    kontenera — problem dotyczy tylko trwałości tego ustawienia między przebudowaniami.
-   Migracje bazy (`db/migrations/`) po aktualizacji trzeba na razie stosować ręcznie —
-   `docker-entrypoint-initdb.d` zakłada schemat tylko przy pierwszym, pustym starcie
-   wolumenu `pgdata` (zob. „Docker" w sekcji „Jak uruchomić").
 
 ## Następne kroki (proponowana kolejność)
 
