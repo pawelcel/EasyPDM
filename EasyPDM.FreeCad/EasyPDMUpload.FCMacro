@@ -333,13 +333,14 @@ def kind_field_visibility(is_part, rodzaj):
     wykrywanie złożenia), żeby te dwa miejsca nie mogły się rozjechać. Dokładnie te same
     reguły co PartPropertyForm/add-node-dialog w aplikacji webowej: Wykonywana -> Materiał;
     Zakupowa -> Producent/Numery zamówieniowe/Masa; Normalia -> Materiał/Norma; Klienta ->
-    brak dodatkowych pól. Złożenie: Materiał/Masa zawsze widoczne razem, niezależnie od
-    rodzaju; Norma dotyczy tylko Części."""
+    brak dodatkowych pól. Złożenie: Masa zawsze widoczna niezależnie od rodzaju; Materiał
+    NIGDY (tylko Część go ma — Złożenie może mieć masę, ale nie materiał); Norma dotyczy
+    tylko Części."""
     wykonywana = rodzaj == "Wykonywana"
     zakupowa = rodzaj == "Zakupowa"
     normalia = rodzaj == "Normalia"
     return {
-        "material": (wykonywana or normalia) if is_part else True,
+        "material": is_part and (wykonywana or normalia),
         "mass": zakupowa if is_part else True,
         "purchase": is_part and zakupowa,
         "norm": is_part and normalia,

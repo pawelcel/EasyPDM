@@ -51,6 +51,9 @@ function PartPropertyForm({
   const { t } = useLanguage()
   const { user } = useAuth()
   const rodzaj = typeof item.properties.rodzaj === "string" ? item.properties.rodzaj : ""
+  // Materiał dotyczy tylko Części — Złożenia mogą mieć Masę, ale nie Materiał (w
+  // odróżnieniu od reszty pól zależnych od "rodzaju", które dla obu typów działają tak samo).
+  const isAssembly = item.itemType === "assembly"
   const statusLocked = isLocked(item)
   const ownerBlocked = user ? !canEditOwnerLocked(item, user.id) : false
   const locked = statusLocked || ownerBlocked
@@ -133,7 +136,7 @@ function PartPropertyForm({
 
       {rodzaj === "Wykonywana" && (
         <>
-          <MaterialField item={item} onSave={saveField} disabled={locked} />
+          {!isAssembly && <MaterialField item={item} onSave={saveField} disabled={locked} />}
           <PriceRow item={item} onChanged={onChanged} />
           <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
@@ -152,7 +155,7 @@ function PartPropertyForm({
 
       {rodzaj === "Normalia" && (
         <>
-          <MaterialField item={item} onSave={saveField} disabled={locked} />
+          {!isAssembly && <MaterialField item={item} onSave={saveField} disabled={locked} />}
           <PropField label={t("part.norm")} propKey="norm" item={item} onSave={saveField} disabled={locked} />
           <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
