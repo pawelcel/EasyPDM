@@ -20,13 +20,13 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
 
@@ -45,7 +45,7 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\EasyPDM.iss
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: EasyPDMSetup
           path: packaging/windows/Output/EasyPDMSetup.exe
@@ -232,3 +232,29 @@ jobs:
             exit 1
           }
           Write-Host "EasyPDM odpowiada poprawnie po symulowanej aktualizacji."
+
+      # Analogicznie do test-linux-installer.yml — CurUninstallStepChanged (w EasyPDM.iss)
+      # zatrzymuje i usuwa usługę, ale celowo NIE rusza bazy/roli PostgreSQL (deinstalacja
+      # nie powinna kasować danych użytkownika), więc weryfikujemy tylko to, co uninstaller
+      # faktycznie ma zrobić: usługa ma zniknąć z SCM.
+      - name: Odinstaluj EasyPDM i sprawdź, że usługa zniknęła
+        shell: pwsh
+        run: |
+          $uninstaller = "C:\Program Files\EasyPDM\unins000.exe"
+          $proc = Start-Process -FilePath $uninstaller -ArgumentList @(
+            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
+          ) -Wait -PassThru
+          Write-Host "Kod wyjścia deinstalatora: $($proc.ExitCode)"
+          if ($proc.ExitCode -ne 0) {
+            Write-Error "Deinstalator zakończył się kodem $($proc.ExitCode)."
+            exit 1
+          }
+
+          Start-Sleep -Seconds 3
+          $svcOutput = sc.exe query EasyPDM 2>&1 | Out-String
+          Write-Host $svcOutput
+          if ($svcOutput -notmatch "1060") {
+            Write-Error "Usługa EasyPDM nadal istnieje po odinstalowaniu."
+            exit 1
+          }
+          Write-Host "Usługa EasyPDM poprawnie usunięta po odinstalowaniu."
