@@ -1,0 +1,78 @@
+name: Test Linux Installer
+
+# Uruchamia NAPRAWDĘ install-easypdm-linux.sh na czystym Ubuntu (runner ma sudo bez hasła,
+# czego zabrakło w lokalnym środowisku deweloperskim, gdzie ten skrypt dało się tylko
+# przejrzeć/zweryfikować składniowo) — sprawdza pełną instalację od zera, "aktualizację"
+# (drugie uruchomienie) i odinstalowanie.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "EasyPDM.Api/**"
+      - "EasyPDM.Web/**"
+      - "db/**"
+      - "install-easypdm-linux.sh"
+      - "uninstall-easypdm-linux.sh"
+      - ".github/workflows/test-linux-installer.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Zainstaluj od zera
+        run: sudo ./install-easypdm-linux.sh
+
+      - name: Sprawdź status usługi i odpowiedź serwera
+        run: |
+          systemctl status easypdm --no-pager
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/ > /dev/null; then
+              echo "EasyPDM odpowiada poprawnie po świeżej instalacji."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::EasyPDM nie odpowiedziało pod http://localhost:5000 po instalacji."
+          journalctl -u easypdm --no-pager | tail -100
+          exit 1
+
+      - name: Uruchom ponownie (symulacja aktualizacji)
+        run: sudo ./install-easypdm-linux.sh
+
+      - name: Sprawdź, czy serwer odpowiada też po "aktualizacji"
+        run: |
+          systemctl status easypdm --no-pager
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/ > /dev/null; then
+              echo "EasyPDM odpowiada poprawnie po symulowanej aktualizacji."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::EasyPDM nie odpowiedziało pod http://localhost:5000 po drugiej instalacji."
+          journalctl -u easypdm --no-pager | tail -100
+          exit 1
+
+      - name: Odinstaluj
+        run: sudo ./uninstall-easypdm-linux.sh
+
+      - name: Sprawdź, że usługa faktycznie zniknęła
+        run: |
+          if systemctl status easypdm --no-pager 2>&1 | grep -q "could not be found"; then
+            echo "Usługa poprawnie usunięta."
+          else
+            echo "::error::Usługa easypdm wciąż istnieje po odinstalowaniu."
+            systemctl status easypdm --no-pager || true
+            exit 1
+          fi

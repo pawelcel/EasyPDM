@@ -50,3 +50,80 @@ jobs:
           name: EasyPDMSetup
           path: packaging/windows/Output/EasyPDMSetup.exe
           if-no-files-found: error
+
+      # Od tego miejsca: prawdziwy test end-to-end samej INSTALACJI (nie tylko kompilacji
+      # skryptu) — czego nie dało się zweryfikować wcześniej. Runner windows-latest nie ma
+      # PostgreSQL domyślnie, więc doinstalowujemy je przez Chocolatey (preinstalowane na
+      # tym runnerze), z góry ustawiając hasło superużytkownika "postgres" — to samo hasło
+      # podajemy potem instalatorowi przez /PGPASSWORD, żeby /VERYSILENT (bez interakcji)
+      # mogło w ogóle założyć rolę/bazę EasyPDM.
+      - name: Zainstaluj PostgreSQL (Chocolatey) — do testu instalatora
+        shell: pwsh
+        run: choco install postgresql -y --params "/Password:postgres" --no-progress
+
+      - name: Uruchom EasyPDMSetup.exe w trybie cichym (/VERYSILENT)
+        shell: pwsh
+        run: |
+          $exe = "packaging\windows\Output\EasyPDMSetup.exe"
+          & $exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PGPASSWORD=postgres /LOG=install.log
+          $exitCode = $LASTEXITCODE
+          Write-Host "=== install.log ==="
+          Get-Content install.log -ErrorAction SilentlyContinue
+          if ($exitCode -ne 0) {
+            Write-Error "EasyPDMSetup.exe zakończył się kodem $exitCode."
+            exit 1
+          }
+
+      - name: Sprawdź, czy usługa wystartowała i serwer odpowiada
+        shell: pwsh
+        run: |
+          sc.exe query EasyPDM
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $resp = Invoke-WebRequest -Uri http://localhost:5000 -UseBasicParsing -TimeoutSec 3
+              if ($resp.StatusCode -eq 200) { $ok = $true; break }
+            } catch {
+              Start-Sleep -Seconds 2
+            }
+          }
+          if (-not $ok) {
+            Write-Error "EasyPDM nie odpowiedziało pod http://localhost:5000 po instalacji."
+            exit 1
+          }
+          Write-Host "EasyPDM odpowiada poprawnie po świeżej instalacji."
+
+      # Uruchomienie instalatora DRUGI RAZ symuluje aktualizację — sprawdza, że wykrywa
+      # istniejącą rolę/bazę/usługę (nie próbuje zakładać ich od nowa) i poprawnie
+      # restartuje usługę zamiast się wywalić na "usługa już istnieje".
+      - name: Uruchom instalator drugi raz (symulacja aktualizacji)
+        shell: pwsh
+        run: |
+          $exe = "packaging\windows\Output\EasyPDMSetup.exe"
+          & $exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PGPASSWORD=postgres /LOG=install2.log
+          $exitCode = $LASTEXITCODE
+          Write-Host "=== install2.log ==="
+          Get-Content install2.log -ErrorAction SilentlyContinue
+          if ($exitCode -ne 0) {
+            Write-Error "Drugie uruchomienie EasyPDMSetup.exe zakończyło się kodem $exitCode."
+            exit 1
+          }
+
+      - name: Sprawdź, czy serwer odpowiada też po "aktualizacji"
+        shell: pwsh
+        run: |
+          sc.exe query EasyPDM
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              $resp = Invoke-WebRequest -Uri http://localhost:5000 -UseBasicParsing -TimeoutSec 3
+              if ($resp.StatusCode -eq 200) { $ok = $true; break }
+            } catch {
+              Start-Sleep -Seconds 2
+            }
+          }
+          if (-not $ok) {
+            Write-Error "EasyPDM nie odpowiedziało pod http://localhost:5000 po drugiej instalacji."
+            exit 1
+          }
+          Write-Host "EasyPDM odpowiada poprawnie po symulowanej aktualizacji."

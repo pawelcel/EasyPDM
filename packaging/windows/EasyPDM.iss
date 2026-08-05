@@ -258,6 +258,24 @@ begin
   PostgresPasswordPage.Add('Hasło "postgres":', True);
 end;
 
+{ Hasło superużytkownika "postgres" podane z góry przez /PGPASSWORD=... w wierszu poleceń —
+  do automatyzacji (np. testu instalatora w CI, gdzie i tak nie ma z kim wejść w interakcję
+  przez /VERYSILENT). Zwraca pusty string, jeśli parametr nie został podany — wtedy
+  normalny, interaktywny przebieg z PostgresPasswordPage działa jak dotychczas. }
+function PgPasswordFromCmdLine(): String;
+begin
+  Result := ExpandConstant('{param:PGPASSWORD|}');
+end;
+
+{ Pomija stronę z hasłem, jeśli podano je już przez /PGPASSWORD — inaczej w trybie
+  /VERYSILENT strona i tak się nie pokazuje, ale NextButtonClick nigdy by się nie wywołał,
+  więc PostgresPasswordPage.Values[0] zostałoby puste; jawne pominięcie jest tu tylko dla
+  spójności interaktywnego przebiegu (np. /LoadInf), nie zmienia zachowania w /VERYSILENT. }
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PageID = PostgresPasswordPage.ID) and (PgPasswordFromCmdLine() <> '');
+end;
+
 function InitializeSetup(): Boolean;
 var
   ResultCode: Integer;
@@ -301,7 +319,9 @@ begin
   if CurStep <> ssPostInstall then
     exit;
 
-  PgSuperPassword := PostgresPasswordPage.Values[0];
+  PgSuperPassword := PgPasswordFromCmdLine();
+  if PgSuperPassword = '' then
+    PgSuperPassword := PostgresPasswordPage.Values[0];
   PdmPassword := GenerateRandomPassword(32);
 
   { Rola — pomijana (tylko ALTER hasła), jeśli instalator jest uruchamiany ponownie

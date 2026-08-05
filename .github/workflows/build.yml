@@ -1,0 +1,66 @@
+name: Build & Test
+
+# Sprawdza backend (build + testy integracyjne przeciwko prawdziwemu PostgreSQL) i frontend
+# (typy + lint + build) przy KAŻDYM pushu/PR — bez tego złamany build/lint wykrywało się
+# dotąd tylko ręcznym uruchomieniem tych samych komend przy okazji jakiejś innej zmiany.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: pdm_user
+          POSTGRES_PASSWORD: haslo
+          POSTGRES_DB: pdm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      EASYPDM_TEST_CONNECTION_STRING: "Host=localhost;Port=5432;Database=pdm;Username=pdm_user;Password=haslo;Search Path=pdm_test"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Buduj EasyPDM.Api
+        run: dotnet build EasyPDM.Api
+
+      - name: Uruchom testy integracyjne
+        run: dotnet test EasyPDM.Api.Tests --logger "console;verbosity=normal"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Instaluj zależności
+        working-directory: EasyPDM.Web
+        run: npm ci
+
+      - name: Sprawdź typy
+        working-directory: EasyPDM.Web
+        run: npx tsc -b
+
+      - name: Lint
+        working-directory: EasyPDM.Web
+        run: npx oxlint src
+
+      - name: Buduj
+        working-directory: EasyPDM.Web
+        run: npm run build
