@@ -1619,6 +1619,18 @@ def run():
                 None, "PDM", f"Nie udało się podpiąć jednego z podelementów pod główny element: {e}"
             )
 
+    # Mimo że doc już przeszedł przez _rename_and_upload (Label + saveAs), FreeCAD potrafi
+    # oznaczyć dokument jako "dotknięty" (gwiazdka przy nazwie) PO tym zapisie — np. przez
+    # odroczony rekompute App::Link-ów po zmianie ścieżki linkowanych dzieci (renamed przez
+    # process_assembly_tree wcześniej w tej samej sesji), który dopiero teraz "dogania"
+    # dokument. Jawny recompute+save na samym końcu zamiata to, niezależnie od dokładnej
+    # przyczyny — użytkownik nie powinien widzieć gwiazdki po udanej wysyłce.
+    try:
+        doc.recompute()
+        doc.save()
+    except Exception:
+        pass
+
     if info.get("localRenamed"):
         local_line = f"Lokalny plik zapisany pod nazwą PDM (Save As), stary plik pod oryginalną nazwą pozostał nietknięty:\n{doc.FileName}"
     else:
