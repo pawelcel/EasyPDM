@@ -10,6 +10,12 @@ Instalacja / uruchomienie:
 Co robi (w tej kolejności):
     1. Zapisuje aktywny dokument na dysku (jeśli nie był jeszcze zapisany, prosi o
        wskazanie ścieżki przez natywne okno "Zapisz jako").
+    1a. Pyta o FOLDER DOCELOWY dla lokalnych kopii (Save As) wszystkich dokumentów,
+        które zostaną wysłane w tej sesji (patrz punkt 3 niżej) — domyślnie podpowiada
+        ostatnio użyty (WSPÓLNA preferencja z EasyPDMDownload.FCMacro, DownloadFolder),
+        z możliwością zmiany. Pytane RAZ, na samym początku — obejmuje też automatycznie
+        wykryte drzewo złożenia (część/pod-złożenia), wysyłane wcześniej niż otwiera się
+        główne okno.
     2. Pyta, czy chodzi o **nowy** rekord w PDM, czy o wgranie pliku do **już
        istniejącego** — w drugim przypadku pozwala wpisać/wyszukać (Część/Złożenie
        z całej bazy, nie tylko bieżącego projektu — dokładnie jak w aplikacji webowej).
@@ -155,6 +161,18 @@ def get_saved_username():
 
 def set_saved_username(name):
     App.ParamGet(PARAM_GROUP).SetString("SessionDisplayName", name or "")
+
+
+def get_download_folder():
+    """Ostatnio użyty folder docelowy — WSPÓLNA preferencja z EasyPDMDownload.FCMacro
+    (ten sam klucz w tej samej grupie), więc oba makra mogą celować w to samo miejsce:
+    pobrane pliki i lokalne kopie (Save As) wysyłanych dokumentów lądują razem."""
+    folder = App.ParamGet(PARAM_GROUP).GetString("DownloadFolder", "")
+    return folder or None
+
+
+def set_download_folder(folder):
+    App.ParamGet(PARAM_GROUP).SetString("DownloadFolder", folder or "")
 
 
 def _auth_headers():
@@ -482,24 +500,28 @@ def _usage_hint_for(file_path, edges):
     return "Używane: " + ", ".join(parts) if parts else ""
 
 
-def _rename_and_upload(doc, item_id, item_number, name, revision):
+def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=None):
     """Wspólna końcówka obu trybów: KOPIUJE bieżący plik dokumentu do PDM pod nazwą
     "numer (nazwa).REWIZJA.rozszerzenie" (ta sama konwencja numer/nazwa co itemDisplayLabel
     we froncie, plus litera rewizji — zob. revision_label) — i teraz TAK SAMO zapisuje
-    (Save As) LOKALNY dokument, w tym samym folderze co oryginał, pod tą samą nazwą.
+    (Save As) LOKALNY dokument pod tą samą nazwą, w `target_folder` (jeśli podany — zob.
+    TargetFolderDialog/run) albo domyślnie w tym samym folderze co oryginał.
 
     Po co zmieniać lokalny plik: jeśli ten dokument jest linkowany (App::Link) z jakiegoś
     ZŁOŻENIA otwartego w TEJ SAMEJ sesji FreeCAD, złożenie trzyma żywe odwołanie do obiektu
     Document, więc dalej "widzi" ten sam dokument mimo zmiany jego ścieżki — a gdy złożenie
     zostanie zapisane PO tej zmianie (co dla całego automatycznie wykrytego drzewa i tak
     następuje jako ostatni krok — to złożenie też przechodzi przez tę samą funkcję, patrz
-    process_assembly_tree/run), zapisze swój odnośnik już pod NOWĄ nazwą. Dzięki temu po
-    pobraniu złożenia+składników przez EasyPDMDownload.FCMacro (który zapisuje pliki pod
-    DOKŁADNIE tą samą konwencją nazw) odnośniki od razu się zgadzają — bez tego złożenie
-    szukałoby oryginalnej, lokalnej nazwy pliku sprzed wysyłki, której pobieranie nigdy by
-    nie odtworzyło (potwierdzone w praktyce: pobrane złożenie zgłaszało "Link broken! ...
-    File: <oryginalna_nazwa>.FCStd"). STARY plik (pod oryginalną nazwą) ZOSTAJE na dysku
-    nietknięty — nic nie usuwamy automatycznie, tylko doc.FileName od teraz wskazuje na nowy.
+    process_assembly_tree/run), zapisze swój odnośnik już pod NOWĄ nazwą (i w tym samym
+    `target_folder`, jeśli wszystkie komponenty tam trafiają — dzięki temu odnośnik
+    zapisany jako ścieżka względna nadal działa). Dzięki temu po pobraniu złożenia+
+    składników przez EasyPDMDownload.FCMacro (który zapisuje pliki pod DOKŁADNIE tą samą
+    konwencją nazw, do jednego wybranego folderu) odnośniki od razu się zgadzają — bez tego
+    złożenie szukałoby oryginalnej, lokalnej nazwy pliku sprzed wysyłki, której pobieranie
+    nigdy by nie odtworzyło (potwierdzone w praktyce: pobrane złożenie zgłaszało
+    "Link broken! ... File: <oryginalna_nazwa>.FCStd"). STARY plik (pod oryginalną nazwą,
+    w oryginalnym folderze) ZOSTAJE na dysku nietknięty — nic nie usuwamy automatycznie,
+    tylko doc.FileName od teraz wskazuje na nowy.
 
     Jeśli magazyn PDM jest osiągalny z tej maszyny (zob. GET /api/config): kopia trafia do
     WSPÓLNEGO folderu storage/components/ (jeden dla wszystkich projektów — Część/Złożenie
@@ -510,14 +532,17 @@ def _rename_and_upload(doc, item_id, item_number, name, revision):
     powtórna wysyłka bez zmiany statusu. Jeśli magazyn nie jest osiągalny, kopia trafia przez
     zwykły upload HTTP (POST .../attachments) pod tą samą, ładną nazwą.
 
-    Zwraca dict: {"itemId", "itemNumber", "newPath"} — "newPath" to ścieżka KOPII na serwerze
-    (albo lokalny plik, jeśli magazyn jest nieosiągalny), NIE lokalny plik dokumentu (ten
-    jest teraz dostępny jako doc.FileName, już pod nową nazwą)."""
+    Zwraca dict: {"itemId", "itemNumber", "newPath", "localRenamed"} — "newPath" to ścieżka
+    KOPII na serwerze (albo lokalny plik, jeśli magazyn jest nieosiągalny), NIE lokalny plik
+    dokumentu (ten jest teraz dostępny jako doc.FileName). "localRenamed" mówi, czy lokalny
+    plik FAKTYCZNIE zmienił ścieżkę (False, jeśli już tam był — np. powtórna wysyłka tej samej
+    rewizji już przemianowanego pliku) — do komunikatu końcowego w run(), żeby nie sugerować
+    przenosin, które się nie odbyły."""
     ext = os.path.splitext(doc.FileName)[1]
     name_prefix = f"{item_number} ({sanitize_filename(name)})"
     new_filename = f"{name_prefix}.{revision_label(revision)}{ext}"
     new_label = f"{item_number} ({name}).{revision_label(revision)}"
-    new_local_path = os.path.join(os.path.dirname(doc.FileName), new_filename)
+    new_local_path = os.path.join(target_folder or os.path.dirname(doc.FileName), new_filename)
 
     storage_root = get_storage_root()
     target_path = None
@@ -558,31 +583,43 @@ def _rename_and_upload(doc, item_id, item_number, name, revision):
         # serwerze jeszcze się nie powiodła, więc ani etykieta, ani lokalny plik nie powinny
         # sugerować, że wysyłka już się udała.
         doc.Label = new_label
-        _save_local_as_pdm_name(doc, new_local_path)
-        return {"itemId": item_id, "itemNumber": item_number, "newPath": target_path}
+        local_renamed = _save_local_as_pdm_name(doc, new_local_path)
+        return {
+            "itemId": item_id,
+            "itemNumber": item_number,
+            "newPath": target_path,
+            "localRenamed": local_renamed,
+        }
 
     api_upload_file(f"/items/{item_id}/attachments", doc.FileName, override_filename=new_filename)
     doc.Label = new_label
-    _save_local_as_pdm_name(doc, new_local_path)
-    return {"itemId": item_id, "itemNumber": item_number, "newPath": doc.FileName}
+    local_renamed = _save_local_as_pdm_name(doc, new_local_path)
+    return {
+        "itemId": item_id,
+        "itemNumber": item_number,
+        "newPath": doc.FileName,
+        "localRenamed": local_renamed,
+    }
 
 
 def _save_local_as_pdm_name(doc, new_local_path):
-    """Save As lokalnego dokumentu pod nazwą PDM (numer/nazwa/rewizja) w tym samym folderze
-    co oryginał — patrz pełne wyjaśnienie w docstringu _rename_and_upload. Cicho ignoruje
-    błąd zapisu (np. brak uprawnień, pełny dysk): sam upload do PDM już się powiódł w tym
-    momencie, więc nieudana lokalna zmiana nazwy nie powinna wyglądać jak porażka całej
-    operacji — w najgorszym razie lokalny plik zostaje pod starą nazwą, dokładnie jak przed
-    tą funkcją."""
+    """Save As lokalnego dokumentu pod nazwą PDM (numer/nazwa/rewizja), do new_local_path —
+    patrz pełne wyjaśnienie w docstringu _rename_and_upload. Cicho ignoruje błąd zapisu (np.
+    brak uprawnień, pełny dysk): sam upload do PDM już się powiódł w tym momencie, więc
+    nieudana lokalna zmiana nazwy nie powinna wyglądać jak porażka całej operacji — w
+    najgorszym razie lokalny plik zostaje pod starą nazwą, dokładnie jak przed tą funkcją.
+    Zwraca True, jeśli plik faktycznie zmienił ścieżkę; False, jeśli już tam był (nic do
+    zrobienia) albo zapis się nie udał."""
     if os.path.abspath(new_local_path) == os.path.abspath(doc.FileName):
-        return
+        return False
     try:
         doc.saveAs(new_local_path)
+        return True
     except Exception:
-        pass
+        return False
 
 
-def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id=None):
+def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id=None, target_folder=None):
     """Tworzy NOWY element w PDM, a potem dogrywa bieżący dokument jako jego załącznik
     (zob. _rename_and_upload). Nowy element zawsze zaczyna od rewizji 1."""
     if not doc.FileName:
@@ -594,10 +631,10 @@ def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id
         body["parentId"] = parent_id
 
     created = api_post_json(f"/projects/{project_id}/nodes", body)
-    return _rename_and_upload(doc, created["id"], created["itemNumber"], name, 1)
+    return _rename_and_upload(doc, created["id"], created["itemNumber"], name, 1, target_folder)
 
 
-def push_to_existing_item(doc, item_id, confirm_new_revision):
+def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None):
     """Dogrywa bieżący dokument jako aktualny plik JUŻ ISTNIEJĄCEJ Części/Złożenia
     (np. nowa wersja po zmianach) — bez tworzenia nowego rekordu w PDM.
 
@@ -638,7 +675,9 @@ def push_to_existing_item(doc, item_id, confirm_new_revision):
         status_changed = False
 
     try:
-        return _rename_and_upload(doc, item_id, item["itemNumber"], item["fileName"], revision)
+        return _rename_and_upload(
+            doc, item_id, item["itemNumber"], item["fileName"], revision, target_folder
+        )
     except Exception as exc:
         if status_changed:
             # Status/rewizja zostały już podniesione na serwerze (musiały być, żeby dogranie
@@ -710,6 +749,74 @@ class LoginDialog(QtWidgets.QDialog):
         except Exception as e:
             self.error_label.setText(str(e))
             return
+        self.accept()
+
+
+class TargetFolderDialog(QtWidgets.QDialog):
+    """Pyta o folder, do którego mają trafiać lokalne kopie (Save As) wysyłanych dokumentów
+    — pokazywane RAZ, na samym początku run(), PRZED jakimkolwiek przetwarzaniem (żeby
+    objęło też automatycznie wykryte drzewo złożenia, wysyłane wcześniej niż otwiera się
+    główne okno EasyPDMUploadDialog). Ten sam folder co "Folder docelowy" w
+    EasyPDMDownload.FCMacro (współdzielona preferencja DownloadFolder) — dzięki temu
+    wysłane i pobrane pliki mogą lądować w tym samym, jednym miejscu, zamiast rozjeżdżać
+    się po różnych folderach zależnie od tego, gdzie akurat leżał oryginał."""
+
+    def __init__(self, doc, parent=None):
+        super().__init__(parent)
+        self.result_folder = None
+
+        self.setWindowTitle("Folder docelowy")
+        self.setMinimumWidth(440)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(
+            QtWidgets.QLabel(
+                "Gdzie mają trafić lokalne kopie wysyłanych dokumentów (ten sam plik pod "
+                "nazwą PDM, zamiast oryginalnej)? To samo miejsce co folder pobierania w "
+                "EasyPDMDownload.FCMacro — warto ustawić jednakowo."
+            )
+        )
+
+        row = QtWidgets.QHBoxLayout()
+        default_folder = get_download_folder() or (os.path.dirname(doc.FileName) if doc.FileName else "")
+        self.folder_edit = QtWidgets.QLineEdit(default_folder)
+        row.addWidget(self.folder_edit)
+        browse_btn = QtWidgets.QPushButton("...")
+        browse_btn.setMaximumWidth(32)
+        browse_btn.clicked.connect(self.on_browse)
+        row.addWidget(browse_btn)
+        layout.addLayout(row)
+
+        self.error_label = QtWidgets.QLabel("")
+        self.error_label.setStyleSheet("color: #c0392b;")
+        self.error_label.setWordWrap(True)
+        layout.addWidget(self.error_label)
+
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
+        )
+        buttons.accepted.connect(self._try_accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def on_browse(self):
+        start = self.folder_edit.text().strip() or os.path.expanduser("~")
+        chosen = QtWidgets.QFileDialog.getExistingDirectory(self, "Wybierz folder docelowy", start)
+        if chosen:
+            self.folder_edit.setText(chosen)
+
+    def _try_accept(self):
+        folder = self.folder_edit.text().strip()
+        if not folder:
+            self.error_label.setText("Wskaż folder.")
+            return
+        try:
+            os.makedirs(folder, exist_ok=True)
+        except OSError as e:
+            self.error_label.setText(f"Nie można użyć tego folderu: {e}")
+            return
+        set_download_folder(folder)
+        self.result_folder = folder
         self.accept()
 
 
@@ -930,9 +1037,10 @@ class NewComponentDialog(QtWidgets.QDialog):
 
 
 class EasyPDMUploadDialog(QtWidgets.QDialog):
-    def __init__(self, doc, parent=None):
+    def __init__(self, doc, target_folder=None, parent=None):
         super().__init__(parent)
         self.doc = doc
+        self.target_folder = target_folder
         self.result_info = None
         self._existing_items = []
 
@@ -1249,7 +1357,9 @@ class EasyPDMUploadDialog(QtWidgets.QDialog):
         try:
             # None oznacza: element był "Wydany", a użytkownik odmówił nowej rewizji —
             # nic nie zostało zapisane, ale to nie jest błąd.
-            self.result_info = push_to_existing_item(self.doc, item_id, confirm_new_revision)
+            self.result_info = push_to_existing_item(
+                self.doc, item_id, confirm_new_revision, target_folder=self.target_folder
+            )
         except Exception as e:
             self.error_label.setText(str(e))
             return
@@ -1308,7 +1418,8 @@ class EasyPDMUploadDialog(QtWidgets.QDialog):
 
         try:
             self.result_info = push_new_item_to_pdm(
-                self.doc, project_id, item_type, name, properties, parent_id
+                self.doc, project_id, item_type, name, properties, parent_id,
+                target_folder=self.target_folder,
             )
         except Exception as e:
             self.error_label.setText(str(e))
@@ -1317,11 +1428,13 @@ class EasyPDMUploadDialog(QtWidgets.QDialog):
         self.accept()
 
 
-def process_assembly_tree(top_doc):
+def process_assembly_tree(top_doc, target_folder=None):
     """Wykrywa złożenie (App::Link do zewnętrznych plików, rekurencyjnie) i dla KAŻDEGO
     nowego komponentu (jeszcze nie wysłanego do PDM — rozpoznawane po etykiecie
     "numer (nazwa).REWIZJA", zob. match_existing_item) pokazuje NewComponentDialog, tworzy
-    go w PDM, po czym podpina relacje rodzic-dziecko (BOM) MIĘDZY odkrytymi komponentami.
+    go w PDM (lokalna kopia trafia do target_folder — zob. TargetFolderDialog/run, żeby
+    wszystkie komponenty złożenia lądowały razem w jednym, wybranym folderze), po czym
+    podpina relacje rodzic-dziecko (BOM) MIĘDZY odkrytymi komponentami.
     Relacje, gdzie rodzicem jest top_doc, NIE są tu podpinane — top_doc jeszcze nie ma
     swojego item_id w PDM (może to być nowy ALBO już istniejący element — o tym decyduje
     reszta run() przez zwykły EasyPDMUploadDialog); te relacje dopina run() po jego utworzeniu.
@@ -1390,7 +1503,9 @@ def process_assembly_tree(top_doc):
 
             project_id, item_type, name, properties = dlg.result_data()
             try:
-                result = push_new_item_to_pdm(doc, project_id, item_type, name, properties)
+                result = push_new_item_to_pdm(
+                    doc, project_id, item_type, name, properties, target_folder=target_folder
+                )
             except Exception as e:
                 QtWidgets.QMessageBox.critical(
                     None, "PDM", f"Nie udało się wysłać {os.path.basename(file_path)}: {e}"
@@ -1464,15 +1579,24 @@ def run():
             QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się zapisać dokumentu: {e}")
             return
 
+    # Krok 1a-0: folder docelowy dla lokalnych kopii (Save As) — pytamy RAZ, na samym
+    # początku, przed process_assembly_tree (które dla automatycznie wykrytego drzewa i tak
+    # wysyła części WCZEŚNIEJ niż otworzy się główne okno) — dzięki temu wszystkie
+    # komponenty (części + finalne złożenie) lądują w TYM SAMYM, jednym folderze.
+    folder_dialog = TargetFolderDialog(doc)
+    if folder_dialog.exec() != QtWidgets.QDialog.Accepted:
+        return
+    target_folder = folder_dialog.result_folder
+
     # Krok 1a: wykryj i (opcjonalnie) wyślij złożenie rekurencyjnie — części/pod-złożenia
     # znalezione przez App::Link, w kolejności liście-najpierw.
-    edges_for_top, cancelled = process_assembly_tree(doc)
+    edges_for_top, cancelled = process_assembly_tree(doc, target_folder)
     if cancelled:
         QtWidgets.QMessageBox.information(None, "PDM", "Przerwano — anulowano wysyłkę.")
         return
 
     # Krok 2: uzupełnienie danych w oknie dialogowym (tworzy element + dogrywa plik + zmienia nazwę).
-    dialog = EasyPDMUploadDialog(doc)
+    dialog = EasyPDMUploadDialog(doc, target_folder)
     if dialog.exec() != QtWidgets.QDialog.Accepted:
         return
 
@@ -1495,6 +1619,11 @@ def run():
                 None, "PDM", f"Nie udało się podpiąć jednego z podelementów pod główny element: {e}"
             )
 
+    if info.get("localRenamed"):
+        local_line = f"Lokalny plik zapisany pod nazwą PDM (Save As), stary plik pod oryginalną nazwą pozostał nietknięty:\n{doc.FileName}"
+    else:
+        local_line = f"Lokalny plik już był pod właściwą nazwą PDM — nic nie trzeba było przenosić:\n{doc.FileName}"
+
     QtWidgets.QMessageBox.information(
         None,
         "PDM",
@@ -1502,8 +1631,7 @@ def run():
         + (f" razem z {len(edges_for_top)} podelementami" if edges_for_top else "")
         + ".\n"
         f"Kopia w magazynie PDM:\n{info['newPath']}\n\n"
-        f"Lokalny plik zapisany pod nazwą PDM (Save As), stary plik pod oryginalną nazwą "
-        f"pozostał nietknięty:\n{doc.FileName}",
+        f"{local_line}",
     )
 
 
