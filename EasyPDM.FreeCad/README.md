@@ -155,6 +155,16 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   magazynu (`StorageRoot`) — nie da się nim "podpiąć" dowolnego pliku z dysku serwera.
 - Zapisany dokument jest wysyłany w swoim aktualnym stanie — makro nie waliduje np. czy
   dokument ma otwarte niezapisane zmiany w innych powiązanych plikach.
+- **Gwiazdka "niezapisane zmiany" przy nazwie dokumentu może zostać widoczna nawet PO
+  udanej wysyłce (i po jawnym `recompute()`+`save()` na końcu, i na każdym dokumencie z
+  osobna)** — potwierdzone jako niezależne od makra: ten sam dokument dostaje gwiazdkę
+  nawet po zwykłym, ręcznym `doc.save()` wpisanym wprost w konsoli Pythona FreeCAD (a
+  właściwie już od samego korzystania z konsoli, jeszcze przed `save()`), bez udziału
+  jakiegokolwiek kodu z tego pliku. To zachowanie samego FreeCAD (prawdopodobnie workbencha
+  Assembly) — makro nie ma jak temu zapobiec, bo problem nie leży w tym, co ono robi.
+  Nie zweryfikowano, czy sam PLIK na dysku jest mimo to poprawnie zapisany z aktualną
+  zawartością (prawdopodobne, skoro `save()` faktycznie się wykonuje — tylko sam wskaźnik
+  "zmieniony" w GUI nie znika).
 
 ## Weryfikacja
 
