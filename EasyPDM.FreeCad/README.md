@@ -75,10 +75,15 @@ token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
    — ten sam format numer/nazwa, w jakim PDM wyświetla Części/Złożenia wszędzie indziej, plus
    rewizja jako **wielka litera** (A, B, C... — ta sama konwencja `revisionLabel()` co
    w aplikacji webowej; liczba w bazie się nie zmienia, to czysto kwestia formatowania).
-   **Lokalny plik, w miejscu gdzie został otwarty, NIE jest ruszany** — nie jest ani
-   przenoszony, ani usuwany (tylko etykieta dokumentu w FreeCAD się zmienia, co nie ma
-   wpływu na dysk); przyda się to, gdy serwer PDM przestanie współdzielić dysk z klientem,
-   np. po przeniesieniu do kontenera Docker.
+   **Lokalny dokument jest też zapisywany (Save As) pod TĄ SAMĄ nazwą**, w tym samym
+   folderze co oryginał — stary plik zostaje na dysku nietknięty, ale `doc.FileName` od
+   teraz wskazuje na nowy. Dzięki temu złożenie linkujące (`App::Link`) do tego dokumentu,
+   zapisywane PO nim w tej samej sesji (automatycznie wykryte drzewo złożenia zawsze
+   zapisuje złożenie jako ostatnie — zob. niżej), zapisze swój odnośnik już pod nową nazwą —
+   dokładnie tą, pod jaką `EasyPDMDownload.FCMacro` później zapisuje pobrane pliki, więc
+   odnośniki po pobraniu od razu się zgadzają. **Bez tego złożenie po pobraniu szukałoby
+   oryginalnej, sprzed-wysyłkowej nazwy pliku** (potwierdzone w praktyce komunikatem FreeCAD:
+   `Link broken! ... File: <oryginalna_nazwa>.FCStd`).
 4. Jeśli magazyn PDM jest widoczny z tej maszyny (zob. `GET /api/config`), kopia trafia do
    **WSPÓLNEGO folderu** `storage/components/` (jeden dla wszystkich projektów — Część/
    Złożenie bywa współdzielone jako komponent BOM między projektami) i jest **REJESTROWANA
@@ -89,7 +94,7 @@ token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
    nieosiągalny z tej maszyny (np. FreeCAD na innym komputerze niż serwer), kopia trafia
    przez zwykły upload HTTP (`POST /api/items/{id}/attachments`, ten sam mechanizm co
    dogrywanie plików CAD z panelu właściwości w aplikacji webowej) — wtedy historia rewizji
-   nie jest zachowywana. W obu przypadkach lokalny plik zostaje nienaruszony.
+   nie jest zachowywana.
 
 ## Automatyczne wykrywanie złożenia
 
@@ -123,24 +128,37 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   `App::Part` (te nie mają osobnych plików do wysłania osobno; trzeba je wtedy wysyłać
   ręcznie, część po części, tak jak dotychczas).
 - Rozpoznanie "już wysłanego" komponentu opiera się na etykiecie dokumentu — makro samo ją
-  nadaje po wysłaniu, ale **nie zapisuje tej zmiany na dysk** (żeby nie ruszać pliku
-  użytkownika bez pytania), więc działa pewnie tylko w obrębie jednej sesji FreeCAD, chyba
-  że dokument zostanie potem ręcznie zapisany. W nowej sesji, dla pliku nigdy ręcznie nie
-  zapisanego po wysłaniu, makro zaproponuje utworzenie go w PDM jeszcze raz — trzeba to
-  wtedy przerwać/skorygować ręcznie.
+  nadaje po wysłaniu i od razu zapisuje na dysk (Save As pod nazwą PDM), więc działa też
+  w NOWEJ sesji FreeCAD, o ile otwarty zostanie przemianowany plik (ten pod nazwą PDM) —
+  stara kopia sprzed wysyłki (zostawiona nietknięta na dysku) nadal ma oryginalną etykietę
+  i nie zostanie rozpoznana.
+- **Lokalny plik dokumentu jest PRZENOSZONY na nową nazwę (Save As) przy każdej wysyłce** —
+  stary plik (pod oryginalną nazwą) zostaje na dysku, ale nie jest już aktywnie
+  edytowany/otwarty; ręczna zmiana starego pliku NIE trafi automatycznie do PDM (trzeba
+  wysłać ją z powrotem jako kolejną rewizję).
 - **Kopiowanie/rejestrowanie pliku w `storage/` zakłada, że ten folder jest widoczny
   w systemie plików tej maszyny** — dziś klient (FreeCAD) i serwer (`EasyPDM.Api`)
   działają na tym samym dysku, więc to działa bez dodatkowej konfiguracji. Jeśli
   `GET /api/config` jest nieosiągalne albo ścieżka niedostępna do zapisu (np. FreeCAD na
   innej maszynie niż serwer), kopia trafia do PDM zwykłym uploadem HTTP — w tym trybie
   fallbackowym historia rewizji NIE jest zachowywana (każda wysyłka nadpisuje poprzednią
-  kopię po stronie PDM). W obu trybach lokalny plik zawsze zostaje nienaruszony.
+  kopię po stronie PDM).
 - Endpoint rejestracji akceptuje wyłącznie ścieżki leżące wewnątrz skonfigurowanego
   magazynu (`StorageRoot`) — nie da się nim "podpiąć" dowolnego pliku z dysku serwera.
 - Zapisany dokument jest wysyłany w swoim aktualnym stanie — makro nie waliduje np. czy
   dokument ma otwarte niezapisane zmiany w innych powiązanych plikach.
 
 ## Weryfikacja
+
+⚠️ **Poniższe testy dotyczą wersji SPRZED zmiany "Save As lokalnego pliku pod nazwą PDM"**
+(opisanej w kroku 3 wyżej) — w szczególności punkty mówiące, że lokalny plik/`doc.FileName`
+"nie zmienia się"/"zostaje nienaruszony" opisują POPRZEDNIE zachowanie, nie obecne. Sama
+zmiana (Save As) nie była jeszcze przetestowana na żywym FreeCAD tak rygorystycznie jak
+reszta poniżej — wprowadzona po tym, jak użytkownik na żywo złapał realny problem
+(pobrane przez `EasyPDMDownload.FCMacro` złożenie nie znajdowało swojej Części, bo
+odnośnik w złożeniu wskazywał na oryginalną, lokalną nazwę pliku sprzed wysyłki, a nie na
+nazwę pod jaką pobieranie zapisuje pliki) — przy pierwszym użyciu po tej zmianie warto
+sprawdzić, czy złożenie po wysłaniu+pobraniu faktycznie otwiera się bez błędu "Link broken".
 
 Logika (bez samego okna dialogowego) była testowana automatycznie przez `freecadcmd`
 przeciwko żywemu `EasyPDM.Api`:

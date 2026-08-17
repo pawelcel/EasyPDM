@@ -28,9 +28,15 @@ Co robi (w tej kolejności):
        — ten sam format numer/nazwa, w jakim PDM wyświetla Części/Złożenia wszędzie indziej
        (zob. itemDisplayLabel w froncie), plus rewizja jako WIELKA LITERA (A, B, C... — ta
        sama konwencja co revisionLabel() we froncie; numer w bazie zostaje liczbą, to czysto
-       kwestia formatowania nazwy). LOKALNY plik, w miejscu gdzie został otwarty, NIE jest
-       ruszany — nie jest ani przenoszony, ani usuwany (przyda się, gdy serwer PDM przestanie
-       współdzielić dysk z klientem, np. po przeniesieniu do kontenera Docker). Jeśli magazyn
+       kwestia formatowania nazwy). LOKALNY dokument jest też zapisywany (Save As) pod TĄ
+       SAMĄ nazwą, w tym samym folderze co oryginał — stary plik zostaje na dysku nietknięty,
+       ale doc.FileName od teraz wskazuje na nowy. Dzięki temu złożenie linkujące (App::Link)
+       do tego dokumentu, zapisywane PO nim w tej samej sesji (a automatycznie wykryte drzewo
+       złożenia zawsze zapisuje złożenie jako ostatnie — patrz niżej), zapisze swój odnośnik
+       już pod nową nazwą — dokładnie tą, pod jaką EasyPDMDownload.FCMacro później zapisuje
+       pobrane pliki, więc odnośniki po pobraniu od razu się zgadzają (bez tego złożenie
+       szukałoby oryginalnej, sprzed-wysyłkowej nazwy pliku, potwierdzone w praktyce
+       komunikatem FreeCAD "Link broken! ... File: <oryginalna_nazwa>.FCStd"). Jeśli magazyn
        PDM jest widoczny z tej maszyny (zob. GET /api/config), kopia trafia do WSPÓLNEGO
        folderu storage/components/ (jednego dla wszystkich projektów — Część/Złożenie bywa
        współdzielone jako komponent BOM między projektami) i jest REJESTROWANA
@@ -72,18 +78,20 @@ Ograniczenia (świadomie poza zakresem pierwszej wersji):
       zapisanych plików (App::Link) — nie dla złożeń trzymanych w jednym pliku jako
       kontenery App::Part (te nie mają osobnych plików do wysłania osobno).
     - Rozpoznanie "już wysłanego" komponentu opiera się na etykiecie dokumentu — makro
-      samo ją nadaje po wysłaniu, ale NIE zapisuje tej zmiany na dysk (żeby nie ruszać
-      pliku użytkownika bez pytania), więc działa pewnie tylko w obrębie JEDNEJ sesji
-      FreeCAD, chyba że dokument zostanie potem ręcznie zapisany. W nowej sesji, dla
-      pliku nigdy ręcznie nie zapisanego po wysłaniu, makro zaproponuje utworzenie go
-      w PDM jeszcze raz (duplikat) — trzeba to wtedy przerwać/skorygować ręcznie.
+      samo ją nadaje po wysłaniu i od razu zapisuje (Save As pod nazwą PDM), więc w
+      odróżnieniu od wcześniejszej wersji działa też w NOWEJ sesji FreeCAD, o ile otwarty
+      zostanie ten (przemianowany) plik, nie stara kopia sprzed wysyłki.
+    - Lokalny plik dokumentu jest teraz PRZENOSZONY na nową nazwę (Save As) przy każdej
+      wysyłce — stary plik (pod oryginalną nazwą) zostaje na dysku, ale nie jest już
+      aktywnie edytowany/otwarty; jeśli ktoś ręcznie wróci do starego pliku i coś w nim
+      zmieni, te zmiany NIE trafią automatycznie do PDM (trzeba by je wysłać z powrotem,
+      tworząc kolejną rewizję).
     - Kopiowanie/rejestrowanie pliku w folderze magazynu zakłada, że jest on widoczny
       w systemie plików tej maszyny (dziś: klient i serwer na tym samym dysku) — jeśli
       GET /api/config jest nieosiągalne albo ścieżka nie istnieje/nie da się do niej
       zapisać, kopia trafia do PDM zwykłym uploadem (kopia HTTP) — w tym trybie
       fallbackowym historia rewizji nie jest zachowywana (każda wysyłka nadpisuje
-      poprzednią kopię po stronie PDM). W obu trybach lokalny plik zawsze zostaje
-      nienaruszony w miejscu, gdzie go otwarto.
+      poprzednią kopię po stronie PDM).
     - Adres API zapisywany jest w preferencjach FreeCAD (User parameter:BaseApp/EasyPDM),
       domyślnie http://localhost:5000/api.
 """
@@ -440,13 +448,12 @@ def discover_component_tree(top_doc):
 
 def match_existing_item(doc, existing_items):
     """Sprawdza, czy etykieta dokumentu wygląda jak "numer (nazwa).REWIZJA" — format,
-    który to samo makro nadaje PO wysłaniu (zob. _rename_and_upload) — i jeśli tak, czy
-    taki numer faktycznie istnieje w PDM. Zwraca dopasowany wpis (jak z GET /api/items)
-    albo None, jeśli dokument trzeba dopiero utworzyć. Uwaga: to dopasowanie działa tylko
-    w obrębie BIEŻĄCEJ sesji FreeCAD albo jeśli plik został ręcznie zapisany po
-    zmianie etykiety — sama zmiana etykiety po wysłaniu NIE jest zapisywana na dysk
-    (zob. komentarz w _rename_and_upload), więc ponowne otwarcie pliku w NOWEJ sesji
-    FreeCAD bez wcześniejszego ręcznego zapisu pokaże oryginalną etykietę.
+    który to samo makro nadaje PO wysłaniu i od razu zapisuje na dysk (Save As pod nazwą
+    PDM, zob. _rename_and_upload) — i jeśli tak, czy taki numer faktycznie istnieje w PDM.
+    Zwraca dopasowany wpis (jak z GET /api/items) albo None, jeśli dokument trzeba dopiero
+    utworzyć. Działa też w NOWEJ sesji FreeCAD, o ile otwarty zostanie przemianowany plik
+    (ten pod nazwą PDM) — stara kopia sprzed wysyłki (zostawiona nietknięta na dysku, patrz
+    _rename_and_upload) nadal ma oryginalną etykietę i nie zostanie rozpoznana.
 
     Samo dopasowanie numeru NIE wystarcza: użytkownik mógł nazywać swoje pliki wg
     WŁASNEJ konwencji "numer (nazwa)" jeszcze zanim kiedykolwiek użył tego makra — bez
@@ -478,12 +485,21 @@ def _usage_hint_for(file_path, edges):
 def _rename_and_upload(doc, item_id, item_number, name, revision):
     """Wspólna końcówka obu trybów: KOPIUJE bieżący plik dokumentu do PDM pod nazwą
     "numer (nazwa).REWIZJA.rozszerzenie" (ta sama konwencja numer/nazwa co itemDisplayLabel
-    we froncie, plus litera rewizji — zob. revision_label). Lokalny plik, w miejscu gdzie
-    został otwarty, NIE jest ruszany — nie jest ani przenoszony, ani usuwany (tylko etykieta
-    dokumentu w FreeCAD się zmienia, co nie ma wpływu na dysk). Dzięki temu ten sam mechanizm
-    będzie działał także wtedy, gdy serwer PDM przestanie współdzielić dysk z klientem (np.
-    po przeniesieniu do kontenera Docker) — dziś to jeszcze zwykła kopia na tym samym dysku,
-    ale nic nie zakłada, że lokalny plik i magazyn muszą leżeć w tym samym miejscu na stałe.
+    we froncie, plus litera rewizji — zob. revision_label) — i teraz TAK SAMO zapisuje
+    (Save As) LOKALNY dokument, w tym samym folderze co oryginał, pod tą samą nazwą.
+
+    Po co zmieniać lokalny plik: jeśli ten dokument jest linkowany (App::Link) z jakiegoś
+    ZŁOŻENIA otwartego w TEJ SAMEJ sesji FreeCAD, złożenie trzyma żywe odwołanie do obiektu
+    Document, więc dalej "widzi" ten sam dokument mimo zmiany jego ścieżki — a gdy złożenie
+    zostanie zapisane PO tej zmianie (co dla całego automatycznie wykrytego drzewa i tak
+    następuje jako ostatni krok — to złożenie też przechodzi przez tę samą funkcję, patrz
+    process_assembly_tree/run), zapisze swój odnośnik już pod NOWĄ nazwą. Dzięki temu po
+    pobraniu złożenia+składników przez EasyPDMDownload.FCMacro (który zapisuje pliki pod
+    DOKŁADNIE tą samą konwencją nazw) odnośniki od razu się zgadzają — bez tego złożenie
+    szukałoby oryginalnej, lokalnej nazwy pliku sprzed wysyłki, której pobieranie nigdy by
+    nie odtworzyło (potwierdzone w praktyce: pobrane złożenie zgłaszało "Link broken! ...
+    File: <oryginalna_nazwa>.FCStd"). STARY plik (pod oryginalną nazwą) ZOSTAJE na dysku
+    nietknięty — nic nie usuwamy automatycznie, tylko doc.FileName od teraz wskazuje na nowy.
 
     Jeśli magazyn PDM jest osiągalny z tej maszyny (zob. GET /api/config): kopia trafia do
     WSPÓLNEGO folderu storage/components/ (jeden dla wszystkich projektów — Część/Złożenie
@@ -495,11 +511,13 @@ def _rename_and_upload(doc, item_id, item_number, name, revision):
     zwykły upload HTTP (POST .../attachments) pod tą samą, ładną nazwą.
 
     Zwraca dict: {"itemId", "itemNumber", "newPath"} — "newPath" to ścieżka KOPII na serwerze
-    (albo lokalny plik, jeśli magazyn jest nieosiągalny), NIE lokalny plik dokumentu."""
+    (albo lokalny plik, jeśli magazyn jest nieosiągalny), NIE lokalny plik dokumentu (ten
+    jest teraz dostępny jako doc.FileName, już pod nową nazwą)."""
     ext = os.path.splitext(doc.FileName)[1]
     name_prefix = f"{item_number} ({sanitize_filename(name)})"
     new_filename = f"{name_prefix}.{revision_label(revision)}{ext}"
     new_label = f"{item_number} ({name}).{revision_label(revision)}"
+    new_local_path = os.path.join(os.path.dirname(doc.FileName), new_filename)
 
     storage_root = get_storage_root()
     target_path = None
@@ -535,15 +553,33 @@ def _rename_and_upload(doc, item_id, item_number, name, revision):
                 except OSError:
                     pass
                 raise
-        # Etykieta dokumentu zmienia się DOPIERO PO potwierdzonym sukcesie kopii/rejestracji —
-        # wcześniej (przed tym momentem) żadna zmiana na serwerze jeszcze się nie powiodła,
-        # więc etykieta w FreeCAD nie powinna sugerować, że wysyłka już się udała.
+        # Etykieta dokumentu (i lokalny Save As) zmieniają się DOPIERO PO potwierdzonym
+        # sukcesie kopii/rejestracji — wcześniej (przed tym momentem) żadna zmiana na
+        # serwerze jeszcze się nie powiodła, więc ani etykieta, ani lokalny plik nie powinny
+        # sugerować, że wysyłka już się udała.
         doc.Label = new_label
+        _save_local_as_pdm_name(doc, new_local_path)
         return {"itemId": item_id, "itemNumber": item_number, "newPath": target_path}
 
     api_upload_file(f"/items/{item_id}/attachments", doc.FileName, override_filename=new_filename)
     doc.Label = new_label
+    _save_local_as_pdm_name(doc, new_local_path)
     return {"itemId": item_id, "itemNumber": item_number, "newPath": doc.FileName}
+
+
+def _save_local_as_pdm_name(doc, new_local_path):
+    """Save As lokalnego dokumentu pod nazwą PDM (numer/nazwa/rewizja) w tym samym folderze
+    co oryginał — patrz pełne wyjaśnienie w docstringu _rename_and_upload. Cicho ignoruje
+    błąd zapisu (np. brak uprawnień, pełny dysk): sam upload do PDM już się powiódł w tym
+    momencie, więc nieudana lokalna zmiana nazwy nie powinna wyglądać jak porażka całej
+    operacji — w najgorszym razie lokalny plik zostaje pod starą nazwą, dokładnie jak przed
+    tą funkcją."""
+    if os.path.abspath(new_local_path) == os.path.abspath(doc.FileName):
+        return
+    try:
+        doc.saveAs(new_local_path)
+    except Exception:
+        pass
 
 
 def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id=None):
@@ -1466,7 +1502,8 @@ def run():
         + (f" razem z {len(edges_for_top)} podelementami" if edges_for_top else "")
         + ".\n"
         f"Kopia w magazynie PDM:\n{info['newPath']}\n\n"
-        f"Lokalny plik pozostał bez zmian:\n{doc.FileName}",
+        f"Lokalny plik zapisany pod nazwą PDM (Save As), stary plik pod oryginalną nazwą "
+        f"pozostał nietknięty:\n{doc.FileName}",
     )
 
 
