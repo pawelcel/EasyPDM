@@ -40,6 +40,12 @@ token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
 
 1. **Zapisuje aktywny dokument** — jeśli dokument nie miał jeszcze nadanej ścieżki na dysku,
    makro poprosi o "Zapisz jako" (standardowe okno FreeCAD), zanim cokolwiek wyśle.
+1a. **Pyta o folder docelowy** dla lokalnych kopii (Save As) wszystkich dokumentów wysyłanych
+    w tej sesji (patrz krok 3 niżej) — domyślnie podpowiada ostatnio użyty (**współdzielona
+    preferencja z `EasyPDMDownload.FCMacro`** — ustaw ten sam folder w obu makrach, żeby
+    wysłane i pobrane pliki lądowały razem w jednym miejscu). Pytane RAZ, na samym początku —
+    obejmuje też automatycznie wykryte drzewo złożenia (część/pod-złożenia wysyłane wcześniej
+    niż otwiera się główne okno).
 2. **Otwiera okno dialogowe**, w którym najpierw wybiera się **tryb**:
    - **Nowy element w PDM** — pełny formularz: projekt PDM (pobierany z serwera) i
      opcjonalnie element nadrzędny (Folder/Złożenie tego projektu — dokładnie te same
@@ -75,9 +81,11 @@ token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
    — ten sam format numer/nazwa, w jakim PDM wyświetla Części/Złożenia wszędzie indziej, plus
    rewizja jako **wielka litera** (A, B, C... — ta sama konwencja `revisionLabel()` co
    w aplikacji webowej; liczba w bazie się nie zmienia, to czysto kwestia formatowania).
-   **Lokalny dokument jest też zapisywany (Save As) pod TĄ SAMĄ nazwą**, w tym samym
-   folderze co oryginał — stary plik zostaje na dysku nietknięty, ale `doc.FileName` od
-   teraz wskazuje na nowy. Dzięki temu złożenie linkujące (`App::Link`) do tego dokumentu,
+   **Lokalny dokument jest też zapisywany (Save As) pod TĄ SAMĄ nazwą**, w folderze
+   wybranym w kroku 1a (albo w folderze oryginału, jeśli akurat nic tam nie trzeba było
+   przenosić — plik już tam był pod właściwą nazwą) — stary plik zostaje na dysku
+   nietknięty, ale `doc.FileName` od teraz wskazuje na nowy. Dzięki temu złożenie linkujące
+   (`App::Link`) do tego dokumentu,
    zapisywane PO nim w tej samej sesji (automatycznie wykryte drzewo złożenia zawsze
    zapisuje złożenie jako ostatnie — zob. niżej), zapisze swój odnośnik już pod nową nazwą —
    dokładnie tą, pod jaką `EasyPDMDownload.FCMacro` później zapisuje pobrane pliki, więc
@@ -152,13 +160,15 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
 
 ⚠️ **Poniższe testy dotyczą wersji SPRZED zmiany "Save As lokalnego pliku pod nazwą PDM"**
 (opisanej w kroku 3 wyżej) — w szczególności punkty mówiące, że lokalny plik/`doc.FileName`
-"nie zmienia się"/"zostaje nienaruszony" opisują POPRZEDNIE zachowanie, nie obecne. Sama
-zmiana (Save As) nie była jeszcze przetestowana na żywym FreeCAD tak rygorystycznie jak
-reszta poniżej — wprowadzona po tym, jak użytkownik na żywo złapał realny problem
-(pobrane przez `EasyPDMDownload.FCMacro` złożenie nie znajdowało swojej Części, bo
-odnośnik w złożeniu wskazywał na oryginalną, lokalną nazwę pliku sprzed wysyłki, a nie na
-nazwę pod jaką pobieranie zapisuje pliki) — przy pierwszym użyciu po tej zmianie warto
-sprawdzić, czy złożenie po wysłaniu+pobraniu faktycznie otwiera się bez błędu "Link broken".
+"nie zmienia się"/"zostaje nienaruszony" opisują POPRZEDNIE zachowanie, nie obecne.
+
+Sam mechanizm Save As **został potwierdzony na żywo przez użytkownika** — wysłanie
+złożenia z Częścią, a potem pobranie go przez `EasyPDMDownload.FCMacro`, otworzyło się BEZ
+błędu "Link broken" (wcześniej, przed tą zmianą, złożenie zgłaszało dokładnie taki błąd,
+szukając oryginalnej nazwy pliku sprzed wysyłki). Dwie NOWSZE, dobudowane od razu potem
+rzeczy nie były jeszcze testowane na żywo: **okno wyboru folderu docelowego** (krok 1a —
+współdzielone z folderem pobierania w `EasyPDMDownload.FCMacro`) i **poprawiony komunikat
+końcowy** (rozróżniający, czy lokalny plik faktycznie został przeniesiony, czy już tam był).
 
 Logika (bez samego okna dialogowego) była testowana automatycznie przez `freecadcmd`
 przeciwko żywemu `EasyPDM.Api`:
