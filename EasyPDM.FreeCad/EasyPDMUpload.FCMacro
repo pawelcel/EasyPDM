@@ -613,6 +613,7 @@ def _save_local_as_pdm_name(doc, new_local_path):
     if os.path.abspath(new_local_path) == os.path.abspath(doc.FileName):
         return False
     try:
+        doc.recompute()
         doc.saveAs(new_local_path)
         return True
     except Exception:
@@ -624,6 +625,7 @@ def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id
     (zob. _rename_and_upload). Nowy element zawsze zaczyna od rewizji 1."""
     if not doc.FileName:
         raise RuntimeError("Dokument nie jest zapisany na dysku.")
+    doc.recompute()
     doc.save()
 
     body = {"name": name, "itemType": item_type, "properties": properties}
@@ -648,6 +650,7 @@ def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None
     potem plik trafia do PDM pod nazwą nowej rewizji."""
     if not doc.FileName:
         raise RuntimeError("Dokument nie jest zapisany na dysku.")
+    doc.recompute()
     doc.save()
 
     item = api_get(f"/items/{item_id}")
@@ -1574,6 +1577,11 @@ def run():
             return  # użytkownik anulował zapis
     else:
         try:
+            # recompute PRZED save — bez tego (potwierdzone w praktyce: gwiazdka "niezapisane
+            # zmiany" pojawiała się natychmiast po tym save, jeszcze przed oknem folderu)
+            # save łapie dokument PRZED ustabilizowaniem się solvera złączeń workbencha
+            # Assembly, więc plik od razu po zapisie znów wygląda na "dotknięty".
+            doc.recompute()
             doc.save()
         except Exception as e:
             QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się zapisać dokumentu: {e}")
