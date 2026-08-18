@@ -1,5 +1,12 @@
-# Uruchomienie: skopiuj .env.example do .env, ustaw PDM_DB_PASSWORD, potem:
-#   docker compose up -d --build
+# Dwa sposoby uruchomienia:
+#   1. Masz sklonowane całe repo (rozwój/testowanie zmian): "docker compose up -d --build"
+#      buduje obraz "api" lokalnie ze źródeł (sekcja "build:" niżej).
+#   2. Samo wdrożenie, bez klonowania repo (masz tylko ten plik + .env, np. ściągnięte przez
+#      curl): "docker compose pull && docker compose up -d" — ściąga gotowy obraz z GHCR
+#      (publikowany automatycznie przez .github/workflows/publish-docker-image.yml przy
+#      każdym pushu na main), sekcja "build:" jest wtedy po prostu ignorowana (nieużywana,
+#      dopóki ktoś jawnie nie poprosi o build).
+# W obu przypadkach najpierw: skopiuj .env.example do .env, ustaw PDM_DB_PASSWORD.
 # Pierwsze logowanie: admin / admin (zob. README.md -> "Jak uruchomić").
 services:
   postgres:
@@ -29,6 +36,10 @@ services:
       retries: 10
 
   api:
+    # "image" — używane przez "docker compose pull"/"up" (bez --build): ściąga gotowy obraz
+    # zamiast wymagać lokalnego źródła. "build" — używane tylko przez jawne "--build"/"build",
+    # gdy masz sklonowane repo i chcesz zbudować własną kopię (np. z lokalnymi zmianami).
+    image: ghcr.io/pawelcel/easypdm-api:latest
     build:
       context: .
       dockerfile: Dockerfile
