@@ -50,9 +50,10 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   `EasyPDMUpload.bas`), bez automatycznego wykrywania całego drzewa złożenia i z prostszymi
   oknami (`InputBox`/`MsgBox`) niż w FreeCAD. **Niezweryfikowane** — napisane bez dostępu do
   SolidWorks/VBA, zob. `EasyPDM.SolidWorks/README.md` po szczegóły i znane ryzyka.
-- **`Dockerfile`/`docker-compose.yml`**, **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i
-  **`packaging/windows/`** (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez
-  ręcznego składania z osobna backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
+- **`Dockerfile`/`docker-compose.yml`/`install-easypdm-docker.sh`**,
+  **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i **`packaging/windows/`**
+  (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez ręcznego składania z osobna
+  backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
 - **`.github/workflows/`** — trzy workflowy CI, wszystkie uruchamialne też ręcznie
   (`workflow_dispatch`) albo przez `gh workflow run <plik>`:
   - `build.yml` — przy każdym pushu/PR: build backendu + testy integracyjne
@@ -225,6 +226,14 @@ Do wdrożenia: `npm run build` w `EasyPDM.Web/` nadpisuje `EasyPDM.Api/wwwroot/`
 `dotnet run` serwuje wynik pod `http://localhost:5000` bez dodatkowej konfiguracji.
 
 ### Docker (zalecane do wdrożenia serwerowego)
+
+**Najprościej**: `./install-easypdm-docker.sh` — zakłada `.env` (generuje losowe hasło do
+bazy, jeśli nie podasz własnego), sam wybiera WOLNY port hosta (próbuje od 5000 wzwyż —
+przydatne na serwerze, gdzie inne usługi mogą już coś tam trzymać, co w praktyce jest częstym
+przypadkiem), buduje i uruchamia kontenery. Uruchom ten sam skrypt ponownie po `git pull`,
+żeby zaktualizować — wykrywa istniejący `.env` i niczego w nim nie nadpisuje.
+
+Albo ręcznie:
 
 ```bash
 cp .env.example .env      # ustaw prawdziwe PDM_DB_PASSWORD
