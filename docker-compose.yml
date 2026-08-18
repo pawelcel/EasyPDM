@@ -10,7 +10,13 @@
 # Pierwsze logowanie: admin / admin (zob. README.md -> "Jak uruchomić").
 services:
   postgres:
-    image: postgres:18
+    # "image" — postgres:18 z WBUDOWANYM db/schema.sql (zob. Dockerfile.postgres), potrzebne
+    # do wdrożenia bez klonowania repo (bez lokalnego pliku do zamontowania). "build" — do
+    # zbudowania własnej kopii, gdy masz sklonowane repo (np. lokalna zmiana w schema.sql).
+    image: ghcr.io/pawelcel/easypdm-postgres:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: pdm_user
@@ -24,11 +30,10 @@ services:
       # images are configured to store database data in a format which is compatible with
       # pg_ctlcluster...") — potwierdzone w praktyce (zob. https://github.com/docker-library/postgres/pull/1259).
       - pgdata:/var/lib/postgresql
-      # Uruchamiane automatycznie przez oficjalny obraz postgres TYLKO przy zupełnie
-      # pustym wolumenie danych — czyli tylko przy pierwszym starcie. Kolejne migracje
-      # (db/migrations/*.sql, gdy się pojawią po aktualizacji) trzeba na razie zastosować
-      # ręcznie: docker compose exec -T postgres psql -U pdm_user -d pdm < db/migrations/xxx.sql
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      # db/schema.sql jest już WBUDOWANY w obraz (zob. Dockerfile.postgres) — uruchamia się
+      # automatycznie przez oficjalny mechanizm postgres TYLKO przy zupełnie pustym wolumenie
+      # danych, czyli tylko przy pierwszym starcie. Kolejne migracje (db/migrations/*.sql)
+      # program stosuje sam automatycznie przy starcie (zob. MigrationRunner.cs).
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pdm_user -d pdm"]
       interval: 5s

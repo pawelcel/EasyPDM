@@ -1,0 +1,9 @@
+# Obraz PostgreSQL z WBUDOWANYM db/schema.sql — pozwala uruchomić EasyPDM przez Docker Compose
+# BEZ klonowania repo (samo docker-compose.yml + .env, zob. README.md -> "Wdrożenie BEZ
+# klonowania repo"). Bez tego docker-compose.yml musiałby montować ./db/schema.sql jako lokalny
+# plik (docker-entrypoint-initdb.d), którego przy wdrożeniu "tylko dwa pliki" po prostu nie ma —
+# MigrationRunner.cs (EasyPDM.Api) świadomie NIE tworzy sam podstawowego schematu (tylko
+# migracje 002+, zakładające że tabele bazowe typu "users" już istnieją), więc bez tego obrazu
+# świeża baza zostałaby pusta i program nie wystartowałby poprawnie.
+FROM postgres:18
+COPY db/schema.sql /docker-entrypoint-initdb.d/01-schema.sql
