@@ -45,6 +45,7 @@ const pl = {
   "settings.logs": "Logi",
   "settings.appearance": "Wygląd",
   "settings.language": "Język",
+  "settings.author": "Autor",
   "settings.noPermission": "Brak uprawnień.",
 
   "app.logout": "Wyloguj",
@@ -127,6 +128,12 @@ const pl = {
 
   "language.title": "Język",
   "language.description": "Wybierz język interfejsu aplikacji. Zmiana obowiązuje od razu i zapamiętywana jest w tej przeglądarce.",
+
+  "author.title": "Autor",
+  "author.appVersionLabel": "Wersja",
+  "author.originatorLabel": "Pomysłodawca",
+  "author.licenseLabel": "Licencja",
+  "author.repoLabel": "Repozytorium",
 
   "appearance.title": "Wygląd",
   "appearance.description": "Wybierz jasny lub ciemny motyw interfejsu. Zmiana obowiązuje od razu i zapamiętywana jest w tej przeglądarce.",
@@ -449,6 +456,7 @@ const en: Record<TranslationKey, string> = {
   "settings.logs": "Logs",
   "settings.appearance": "Appearance",
   "settings.language": "Language",
+  "settings.author": "Author",
   "settings.noPermission": "No permission.",
 
   "app.logout": "Log out",
@@ -531,6 +539,12 @@ const en: Record<TranslationKey, string> = {
 
   "language.title": "Language",
   "language.description": "Choose the application's interface language. The change applies immediately and is remembered in this browser.",
+
+  "author.title": "Author",
+  "author.appVersionLabel": "Version",
+  "author.originatorLabel": "Originator",
+  "author.licenseLabel": "License",
+  "author.repoLabel": "Repository",
 
   "appearance.title": "Appearance",
   "appearance.description": "Choose a light or dark interface theme. The change applies immediately and is remembered in this browser.",
@@ -851,6 +865,7 @@ const de: Record<TranslationKey, string> = {
   "settings.logs": "Protokolle",
   "settings.appearance": "Erscheinungsbild",
   "settings.language": "Sprache",
+  "settings.author": "Autor",
   "settings.noPermission": "Keine Berechtigung.",
 
   "app.logout": "Abmelden",
@@ -933,6 +948,12 @@ const de: Record<TranslationKey, string> = {
 
   "language.title": "Sprache",
   "language.description": "Wählen Sie die Sprache der Benutzeroberfläche. Die Änderung wird sofort wirksam und in diesem Browser gespeichert.",
+
+  "author.title": "Autor",
+  "author.appVersionLabel": "Version",
+  "author.originatorLabel": "Ideengeber",
+  "author.licenseLabel": "Lizenz",
+  "author.repoLabel": "Repository",
 
   "appearance.title": "Erscheinungsbild",
   "appearance.description": "Wählen Sie ein helles oder dunkles Design der Benutzeroberfläche. Die Änderung wird sofort wirksam und in diesem Browser gespeichert.",

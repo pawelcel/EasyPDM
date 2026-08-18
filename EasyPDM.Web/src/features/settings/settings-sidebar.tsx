@@ -16,6 +16,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
   { id: "logs", labelKey: "settings.logs", adminOnly: true },
   { id: "appearance", labelKey: "settings.appearance" },
   { id: "language", labelKey: "settings.language" },
+  { id: "author", labelKey: "settings.author" },
 ]
 
 function SettingsSidebar({
