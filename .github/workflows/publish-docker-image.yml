@@ -1,18 +1,24 @@
 name: Publish Docker Image
 
-# Buduje obraz "api" (Dockerfile w korzeniu repo — backend + zbudowany frontend) i publikuje
-# go do GitHub Container Registry (ghcr.io) przy każdym pushu na main dotykającym kodu
-# serwera. Dzięki temu wdrożenie Dockerem NIE wymaga już klonowania całego repo (ze
-# wszystkimi makrami CAD/instalatorami/testami, których wdrożenie serwera w ogóle nie
-# potrzebuje) — wystarczą same docker-compose.yml + .env, "docker compose pull" ściąga
-# gotowy obraz zamiast budować go lokalnie ze źródeł.
+# Buduje DWA obrazy i publikuje je do GitHub Container Registry (ghcr.io) przy każdym pushu
+# na main dotykającym kodu serwera:
+#   - easypdm-api      (Dockerfile — backend + zbudowany frontend)
+#   - easypdm-postgres (Dockerfile.postgres — postgres:18 z WBUDOWANYM db/schema.sql)
+# Dzięki temu wdrożenie Dockerem NIE wymaga już klonowania całego repo (ze wszystkimi
+# makrami CAD/instalatorami/testami, których wdrożenie serwera w ogóle nie potrzebuje) —
+# wystarczą same docker-compose.yml + .env, "docker compose pull" ściąga oba gotowe obrazy
+# zamiast budować je lokalnie ze źródeł. Osobny obraz dla postgresa jest konieczny, bo
+# MigrationRunner.cs (EasyPDM.Api) świadomie NIE tworzy sam podstawowego schematu — bez
+# db/schema.sql wbudowanego w obraz, świeża baza zostałaby pusta przy wdrożeniu bez
+# lokalnego pliku do zamontowania.
 #
-# UWAGA: przy PIERWSZYM opublikowaniu pakiet w GHCR domyślnie jest PRYWATNY, niezależnie od
-# widoczności samego repo — trzeba go raz ręcznie przełączyć na publiczny (GitHub -> zakładka
-# "Packages" przy repo -> easypdm-api -> Package settings -> Change visibility), inaczej
-# "docker compose pull" bez wcześniejszego "docker login ghcr.io" dostanie 403/404. Jeśli
-# repo jest prywatne i pakiet ma zostać prywatny też — każda maszyna wdrożeniowa potrzebuje
-# własnego "docker login ghcr.io" z tokenem (uprawnienie read:packages).
+# UWAGA: przy PIERWSZYM opublikowaniu KAŻDY pakiet w GHCR domyślnie jest PRYWATNY,
+# niezależnie od widoczności samego repo — trzeba go raz ręcznie przełączyć na publiczny dla
+# OBU pakietów (GitHub -> zakładka "Packages" przy repo -> easypdm-api / easypdm-postgres ->
+# Package settings -> Change visibility), inaczej "docker compose pull" bez wcześniejszego
+# "docker login ghcr.io" dostanie 403/404. Jeśli repo jest prywatne i pakiety mają zostać
+# prywatne też — każda maszyna wdrożeniowa potrzebuje własnego "docker login ghcr.io"
+# z tokenem (uprawnienie read:packages).
 on:
   push:
     branches: [main]
@@ -21,6 +27,7 @@ on:
       - "EasyPDM.Web/**"
       - "db/**"
       - "Dockerfile"
+      - "Dockerfile.postgres"
       - ".dockerignore"
       - ".github/workflows/publish-docker-image.yml"
   workflow_dispatch:
@@ -43,10 +50,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Dwa tagi: "latest" (do zwykłego "docker compose pull") i sam commit SHA (do
+      # Dwa tagi na obraz: "latest" (do zwykłego "docker compose pull") i sam commit SHA (do
       # ewentualnego przypięcia/wycofania konkretnej wersji, niezależnie od tego, co akurat
-      # wskazuje "latest").
-      - name: Buduj i publikuj obraz
+      # wskazuje "latest"). Osobny "cache-from"/"cache-to" (scope) na obraz, żeby cache
+      # jednego nie nadpisywał/mieszał się z cache drugiego.
+      - name: Buduj i publikuj obraz api
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -55,5 +63,17 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/easypdm-api:latest
             ghcr.io/${{ github.repository_owner }}/easypdm-api:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Buduj i publikuj obraz postgres
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.postgres
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/easypdm-postgres:latest
+            ghcr.io/${{ github.repository_owner }}/easypdm-postgres:${{ github.sha }}
+          cache-from: type=gha,scope=postgres
+          cache-to: type=gha,mode=max,scope=postgres
