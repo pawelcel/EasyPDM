@@ -39,7 +39,13 @@ services:
     environment:
       ConnectionString: Host=postgres;Port=5432;Database=pdm;Username=pdm_user;Password=${PDM_DB_PASSWORD:?Ustaw PDM_DB_PASSWORD w pliku .env (skopiuj z .env.example)}
     ports:
-      - "5000:8080"
+      # Port hosta parametryzowany zmienną PDM_HOST_PORT (domyślnie 5000) — jeśli 5000 jest
+      # już zajęte na tej maszynie (np. przez inny serwis), ustaw PDM_HOST_PORT w .env
+      # zamiast edytować ten plik bezpośrednio (edycja tu przeszkadzałaby przy "git pull").
+      # Compose scala LISTY (jak "ports") między docker-compose.yml a
+      # docker-compose.override.yml przez DOKLEJENIE, nie zastąpienie — więc override z
+      # innym portem i tak próbowałby zbindować OBA porty naraz i padał na tym zajętym.
+      - "${PDM_HOST_PORT:-5000}:8080"
     volumes:
       # Magazyn plików + automatyczne kopie zapasowe + logi programu — wszystko, co
       # EasyPDM.Api zapisuje poza bazą danych, w jednym miejscu na hoście.
