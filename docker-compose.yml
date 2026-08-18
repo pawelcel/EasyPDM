@@ -10,7 +10,13 @@ services:
       POSTGRES_PASSWORD: ${PDM_DB_PASSWORD:?Ustaw PDM_DB_PASSWORD w pliku .env (skopiuj z .env.example)}
       POSTGRES_DB: pdm
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # UWAGA: obraz postgres:18+ oczekuje wolumenu zamontowanego na /var/lib/postgresql
+      # (BEZ podkatalogu "/data") — sam zarządza podkatalogiem konkretnej wersji w środku
+      # (kompatybilność z pg_ctlcluster/pg_upgrade). Starsza konwencja (.../data) używana
+      # przez obrazy postgres:9-17 powoduje w 18+ odmowę startu ("in 18+, these Docker
+      # images are configured to store database data in a format which is compatible with
+      # pg_ctlcluster...") — potwierdzone w praktyce (zob. https://github.com/docker-library/postgres/pull/1259).
+      - pgdata:/var/lib/postgresql
       # Uruchamiane automatycznie przez oficjalny obraz postgres TYLKO przy zupełnie
       # pustym wolumenie danych — czyli tylko przy pierwszym starcie. Kolejne migracje
       # (db/migrations/*.sql, gdy się pojawią po aktualizacji) trzeba na razie zastosować
