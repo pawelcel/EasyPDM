@@ -54,7 +54,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i **`packaging/windows/`**
   (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez ręcznego składania z osobna
   backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
-- **`.github/workflows/`** — trzy workflowy CI, wszystkie uruchamialne też ręcznie
+- **`.github/workflows/`** — cztery workflowy CI, wszystkie uruchamialne też ręcznie
   (`workflow_dispatch`) albo przez `gh workflow run <plik>`:
   - `build.yml` — przy każdym pushu/PR: build backendu + testy integracyjne
     (`EasyPDM.Api.Tests`, przeciwko usłudze `postgres` w CI) i typy/lint/build frontendu.
@@ -66,6 +66,9 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   - `test-linux-installer.yml` — uruchamia `install-easypdm-linux.sh` naprawdę na czystym
     Ubuntu (świeża instalacja, "aktualizacja", `uninstall-easypdm-linux.sh`), czego lokalne
     środowisko deweloperskie (bez hasła do `sudo` w tej sesji) nie pozwalało zrobić.
+  - `publish-docker-image.yml` — buduje i publikuje obraz `api` do GitHub Container
+    Registry (`ghcr.io/pawelcel/easypdm-api`) przy każdym pushu dotykającym kodu serwera —
+    umożliwia wdrożenie Dockerem bez klonowania repo, zob. "Docker" niżej.
 
 ### Model danych — elementy i struktura
 
@@ -257,6 +260,38 @@ kod, kontener się odtwarza, a program **sam stosuje nowe migracje bazy przy sta
 `MigrationRunner.cs`) — nic więcej nie trzeba robić ręcznie. `docker-entrypoint-initdb.d`
 z `schema.sql` odpala się TYLKO przy pierwszym, zupełnie pustym starcie wolumenu `pgdata`
 (świeża instalacja); przy aktualizacji nie jest w ogóle dotykany, bo wolumen już istnieje.
+
+#### Wdrożenie BEZ klonowania repo (tylko gotowy obraz)
+
+`.github/workflows/publish-docker-image.yml` publikuje gotowy obraz `api` do GitHub
+Container Registry (`ghcr.io/pawelcel/easypdm-api`) przy każdym pushu na main dotykającym
+kodu serwera — więc do samego wdrożenia NIE trzeba klonować całego repo (ze wszystkimi
+makrami CAD/instalatorami/testami, których serwer w ogóle nie potrzebuje). Wystarczą dwa
+pliki:
+
+```bash
+mkdir easypdm-deploy && cd easypdm-deploy
+curl -O https://raw.githubusercontent.com/pawelcel/EasyPDM/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/pawelcel/EasyPDM/main/.env.example
+cp .env.example .env      # ustaw prawdziwe PDM_DB_PASSWORD
+docker compose pull
+docker compose up -d
+```
+
+> Dopóki repo (i pakiet w GHCR) jest prywatne, `curl` powyżej i `docker compose pull`
+> wymagają uwierzytelnienia — `curl` z nagłówkiem `Authorization: Bearer <token>`, a przed
+> `docker compose pull` dodatkowo `docker login ghcr.io -u <login> -p <token>` (token z
+> uprawnieniem `read:packages`). Po upublicznieniu repo/obrazu żadne logowanie nie będzie
+> już potrzebne.
+>
+> **Jednorazowo, po pierwszej publikacji**: pakiet w GHCR domyślnie jest PRYWATNY
+> niezależnie od widoczności samego repo — trzeba go raz ręcznie przełączyć na publiczny
+> (GitHub → zakładka **Packages** przy repo → `easypdm-api` → **Package settings** →
+> **Change visibility**), inaczej `docker compose pull` bez wcześniejszego `docker login`
+> dostanie 403/404 nawet na publicznym repo.
+
+**Aktualizacja** tą ścieżką: `docker compose pull && docker compose up -d` — bez `git pull`
+(nie ma czego pullować, nie masz tu repo), po prostu ściąga nowszy `latest`.
 
 ### Linux — instalacja natywna jako usługa systemd (bez Dockera)
 
