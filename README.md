@@ -237,7 +237,10 @@ z `db/schema.sql` zakładany automatycznie przy pustym wolumenie) i `api` (budow
 `postgresql-client-18` dla funkcji backup/restore w Ustawieniach). Magazyn plików,
 automatyczne kopie zapasowe i logi trzymane są na wolumenie `pdm-data` (`/data` w
 kontenerze) — przetrwają przebudowanie obrazu przy aktualizacji. Po starcie:
-`http://localhost:5000`.
+`http://localhost:5000`. Jeśli port 5000 jest już zajęty na tej maszynie, ustaw
+`PDM_HOST_PORT=inny_port` w `.env` (NIE przez `docker-compose.override.yml` — Compose
+DOKLEJA listy jak `ports` między plikami zamiast je zastępować, więc override z innym
+portem i tak próbowałby zbindować oba naraz i padłby na tym zajętym).
 
 **Aktualizacja**: `git pull && docker compose up -d --build` — nowy obraz `api` dostaje nowy
 kod, kontener się odtwarza, a program **sam stosuje nowe migracje bazy przy starcie**
