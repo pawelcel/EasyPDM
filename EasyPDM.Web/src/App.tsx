@@ -16,6 +16,7 @@ import { useItems } from "@/features/items/use-items"
 import { MaterialsView } from "@/features/materials/materials-view"
 import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
 import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
+import { AuthorSettingsView } from "@/features/settings/author-settings-view"
 import { LanguageSettingsView } from "@/features/settings/language-settings-view"
 import { LogsView } from "@/features/settings/logs-view"
 import { MyProjectsView } from "@/features/settings/my-projects-view"
@@ -236,6 +237,8 @@ function App() {
           {view === "settings" && settingsSection === "appearance" && <AppearanceSettingsView />}
 
           {view === "settings" && settingsSection === "language" && <LanguageSettingsView />}
+
+          {view === "settings" && settingsSection === "author" && <AuthorSettingsView />}
 
           {view === "settings" && settingsSection === "myProjects" && (
             <MyProjectsView displayName={user.displayName} projects={projects} />
