@@ -10,7 +10,7 @@ import {
 } from "@dnd-kit/core"
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { ArrowUpRight, GripVertical, Upload } from "lucide-react"
+import { ArrowUpRight, Eye, GripVertical, Upload } from "lucide-react"
 
 import { api } from "@/api/client"
 import {
@@ -37,10 +37,13 @@ import { useAuth } from "@/features/auth/use-auth"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { ItemHistoryPanel } from "@/features/items/item-history-panel"
 import { OwnerControl } from "@/features/items/owner-control"
-import { PartPropertyForm } from "@/features/items/part-property-form"
+import { PartPropertyForm, PartSummaryFields } from "@/features/items/part-property-form"
 import { PropertyEditor } from "@/features/items/property-editor"
 import { StatusControl } from "@/features/items/status-control"
+import { ItemPreviewBox } from "@/features/preview/item-preview-box"
+import { PreviewDialog } from "@/features/preview/preview-dialog"
 import { useLanguage } from "@/i18n/use-language"
+import { previewKindOf } from "@/lib/file-preview"
 
 // W BOM-ie nie każda Część ma Materiał/Producenta/Numery zamówieniowe (zależy od "rodzaju") —
 // brakującą wartość pokazujemy jako "-", zamiast pustej komórki.
@@ -101,6 +104,8 @@ function ItemDetailPanel({
   // Ten licznik przekazywany jest do ItemHistoryPanel jako dodatkowa zależność, żeby po
   // każdej takiej akcji faktycznie doczytał świeże dane zamiast czekać na ponowne zaznaczenie.
   const [historyRefreshSignal, setHistoryRefreshSignal] = useState(0)
+  const [previewingMainFile, setPreviewingMainFile] = useState(false)
+  const [previewingFileId, setPreviewingFileId] = useState<string | null>(null)
   async function refreshAfterAction() {
     setHistoryRefreshSignal((n) => n + 1)
     await onItemsRefetch()
@@ -244,35 +249,60 @@ function ItemDetailPanel({
         </div>
       )}
 
-      {showHeader && (
-        <>
-          <div className="text-[15px] font-semibold">{itemDisplayLabel(item)}</div>
-          <div className="text-[12.5px] text-muted-foreground">
-            {typeLabel} · {t("item.modifiedOn")} {modified}
-            {projectName ? ` · ${projectName}` : ""}
-          </div>
-        </>
-      )}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          {showHeader && (
+            <>
+              <div className="text-[15px] font-semibold">{itemDisplayLabel(item)}</div>
+              <div className="text-[12.5px] text-muted-foreground">
+                {typeLabel} · {t("item.modifiedOn")} {modified}
+                {projectName ? ` · ${projectName}` : ""}
+              </div>
+            </>
+          )}
 
-      {(item.itemType === "part" || item.itemType === "assembly") && (
-        <div className="mt-2">
-          <StatusControl item={item} disabled={!ownerEditable} onChanged={refreshAfterAction} />
-          <OwnerControl item={item} onChanged={refreshAfterAction} />
+          {(item.itemType === "part" || item.itemType === "assembly") && (
+            <div className="mt-2">
+              <StatusControl item={item} disabled={!ownerEditable} onChanged={refreshAfterAction} />
+              <OwnerControl item={item} onChanged={refreshAfterAction} />
+            </div>
+          )}
+
+          {item.itemType === "part" && (
+            <div className="mt-3">
+              <PartSummaryFields item={item} onChanged={refreshAfterAction} />
+            </div>
+          )}
+
+          {item.itemType === "file" &&
+            (item.filePath ? (
+              <div className="mt-3 flex items-center gap-3">
+                <a className="text-[13px] text-primary hover:underline" href={api.fileDownloadUrl(item.id)} download>
+                  {t("item.downloadFile")}
+                </a>
+                {previewKindOf(item.fileName) && (
+                  <Button size="sm" variant="outline" onClick={() => setPreviewingMainFile(true)}>
+                    <Eye className="size-3.5" /> {t("common.preview")}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Hint>{t("item.fileNotUploaded")}</Hint>
+            ))}
         </div>
-      )}
 
-      {item.itemType === "file" &&
-        (item.filePath ? (
-          <a
-            className="mt-3 inline-block text-[13px] text-primary hover:underline"
-            href={api.fileDownloadUrl(item.id)}
-            download
-          >
-            {t("item.downloadFile")}
-          </a>
-        ) : (
-          <Hint>{t("item.fileNotUploaded")}</Hint>
-        ))}
+        <ItemPreviewBox item={item} />
+      </div>
+
+      {previewingMainFile && item.itemType === "file" && (
+        <PreviewDialog
+          open
+          onOpenChange={(open) => !open && setPreviewingMainFile(false)}
+          fileName={item.fileName}
+          url={api.fileDownloadUrl(item.id)}
+          kind={previewKindOf(item.fileName)!}
+        />
+      )}
 
       {item.itemType === "folder" && (
         <div className="mt-3">
@@ -398,13 +428,16 @@ function ItemDetailPanel({
                 <li key={file.id} className="flex items-center justify-between gap-2 text-[13px]">
                   <span className="truncate">{file.fileName}</span>
                   {file.filePath ? (
-                    <a
-                      className="shrink-0 text-primary hover:underline"
-                      href={api.fileDownloadUrl(file.id)}
-                      download
-                    >
-                      {t("common.download")}
-                    </a>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {previewKindOf(file.fileName) && (
+                        <Button size="icon-sm" variant="ghost" onClick={() => setPreviewingFileId(file.id)} aria-label={t("common.preview")}>
+                          <Eye className="size-3.5 text-muted-foreground" />
+                        </Button>
+                      )}
+                      <a className="text-primary hover:underline" href={api.fileDownloadUrl(file.id)} download>
+                        {t("common.download")}
+                      </a>
+                    </span>
                   ) : (
                     <span className="shrink-0 text-muted-foreground">{t("item.noFile")}</span>
                   )}
@@ -414,6 +447,21 @@ function ItemDetailPanel({
           ) : (
             <Hint>{t("item.noFilesAdded")}</Hint>
           )}
+          {previewingFileId &&
+            (() => {
+              const file = attachedFiles.find((f) => f.id === previewingFileId)
+              const kind = file ? previewKindOf(file.fileName) : null
+              if (!file || !kind) return null
+              return (
+                <PreviewDialog
+                  open
+                  onOpenChange={(open) => !open && setPreviewingFileId(null)}
+                  fileName={file.fileName}
+                  url={api.fileDownloadUrl(file.id)}
+                  kind={kind}
+                />
+              )
+            })()}
         </>
       )}
 

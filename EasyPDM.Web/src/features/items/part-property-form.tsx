@@ -41,7 +41,9 @@ const CURRENCIES = [
   { value: "USD", symbol: "$" },
 ]
 
-function PartPropertyForm({
+// Rodzaj/Nazwa/Materiał — wydzielone z reszty formularza, bo pokazują się od razu w
+// nagłówku panelu (obok podglądu), nie dopiero w sekcji "Właściwości" niżej.
+function PartSummaryFields({
   item,
   onChanged,
 }: {
@@ -87,7 +89,7 @@ function PartPropertyForm({
       {ownerBlocked && !statusLocked && <Hint>{t("item.ownerLockedHint")}</Hint>}
 
       <Label>{t("part.kind")}</Label>
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         <Button
           size="sm"
           variant={rodzaj === "Wykonywana" ? "default" : "outline"}
@@ -134,9 +136,38 @@ function PartPropertyForm({
         }}
       />
 
+      {(rodzaj === "Wykonywana" || rodzaj === "Normalia") && !isAssembly && (
+        <MaterialField item={item} onSave={saveField} disabled={locked} />
+      )}
+
+      {!rodzaj && <Hint>{t("part.selectKindHint")}</Hint>}
+    </div>
+  )
+}
+
+function PartPropertyForm({
+  item,
+  onChanged,
+}: {
+  item: Item
+  onChanged: () => void | Promise<void>
+}) {
+  const { t } = useLanguage()
+  const { user } = useAuth()
+  const rodzaj = typeof item.properties.rodzaj === "string" ? item.properties.rodzaj : ""
+  const statusLocked = isLocked(item)
+  const ownerBlocked = user ? !canEditOwnerLocked(item, user.id) : false
+  const locked = statusLocked || ownerBlocked
+
+  async function saveField(key: string, value: string) {
+    await api.updateProperties(item.id, { [key]: value })
+    await onChanged()
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
       {rodzaj === "Wykonywana" && (
         <>
-          {!isAssembly && <MaterialField item={item} onSave={saveField} disabled={locked} />}
           <PriceRow item={item} onChanged={onChanged} />
           <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
@@ -155,7 +186,6 @@ function PartPropertyForm({
 
       {rodzaj === "Normalia" && (
         <>
-          {!isAssembly && <MaterialField item={item} onSave={saveField} disabled={locked} />}
           <PropField label={t("part.norm")} propKey="norm" item={item} onSave={saveField} disabled={locked} />
           <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
         </>
@@ -164,8 +194,6 @@ function PartPropertyForm({
       {rodzaj === "Klienta" && (
         <PropField label={t("part.notes")} propKey="notes" item={item} onSave={saveField} disabled={locked} />
       )}
-
-      {!rodzaj && <Hint>{t("part.selectKindHint")}</Hint>}
     </div>
   )
 }
@@ -533,4 +561,4 @@ function PropField({
   )
 }
 
-export { PartPropertyForm }
+export { PartPropertyForm, PartSummaryFields }

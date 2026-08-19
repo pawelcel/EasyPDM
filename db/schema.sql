@@ -144,13 +144,17 @@ CREATE TABLE item_relations (
 -- właściwości po prawej stronie.
 -- ============================================================
 CREATE TABLE item_attachments (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    item_id     UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    file_name   TEXT NOT NULL,
-    file_path   TEXT NOT NULL UNIQUE,
-    file_hash   TEXT,
-    file_size   BIGINT,
-    uploaded_at TIMESTAMPTZ DEFAULT now()
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id      UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    file_name    TEXT NOT NULL,
+    file_path    TEXT NOT NULL UNIQUE,
+    file_hash    TEXT,
+    file_size    BIGINT,
+    uploaded_at  TIMESTAMPTZ DEFAULT now(),
+    -- Opcjonalna "rola" — pdf/step — wskazuje, KTÓRY załącznik zasila stały podgląd
+    -- (2D/3D) w panelu właściwości elementu, żeby nie zgadywać po rozszerzeniu przy
+    -- więcej niż jednym pliku PDF/STEP.
+    preview_role TEXT CHECK (preview_role IN ('pdf', 'step'))
 );
 
 CREATE INDEX idx_item_attachments_item ON item_attachments (item_id);
@@ -275,4 +279,4 @@ INSERT INTO schema_migrations (filename) VALUES
     ('021_drop_dead_revision_schema.sql'), ('022_item_history.sql'),
     ('023_attachment_history.sql'), ('024_owner_lock_history.sql'),
     ('025_backup_schedule.sql'), ('026_backup_retention.sql'),
-    ('027_schema_migrations_tracking.sql');
+    ('027_schema_migrations_tracking.sql'), ('028_attachment_preview_role.sql');

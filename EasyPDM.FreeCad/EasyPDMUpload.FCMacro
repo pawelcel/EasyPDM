@@ -106,6 +106,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import uuid
 from urllib import error, request
 
@@ -175,6 +176,17 @@ def set_download_folder(folder):
     App.ParamGet(PARAM_GROUP).SetString("DownloadFolder", folder or "")
 
 
+def get_export_step_pref():
+    """Czy domyślnie eksportować i wysyłać model STEP (podgląd 3D) — zapamiętane
+    zaznaczenie checkboksa z TargetFolderDialog, żeby nie trzeba było go włączać/wyłączać
+    przy każdym uruchomieniu makra. Domyślnie włączone (True), gdy jeszcze nie ustawiono."""
+    return App.ParamGet(PARAM_GROUP).GetBool("ExportStep", True)
+
+
+def set_export_step_pref(value):
+    App.ParamGet(PARAM_GROUP).SetBool("ExportStep", bool(value))
+
+
 def _auth_headers():
     token = get_session_token()
     return {"Cookie": f"{SESSION_COOKIE_NAME}={token}"} if token else {}
@@ -220,13 +232,18 @@ def api_post_json(path, payload):
         raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
 
 
-def api_upload_file(path, file_path, field_name="file", override_filename=None):
+def api_upload_file(path, file_path, field_name="file", override_filename=None, extra_fields=None):
     boundary = f"----EasyPDMUploadBoundary{uuid.uuid4().hex}"
     with open(file_path, "rb") as f:
         file_content = f.read()
     filename = override_filename or os.path.basename(file_path)
 
-    parts = [
+    parts = []
+    for key, value in (extra_fields or {}).items():
+        parts.append(f"--{boundary}\r\n".encode("utf-8"))
+        parts.append(f'Content-Disposition: form-data; name="{key}"\r\n\r\n'.encode("utf-8"))
+        parts.append(f"{value}\r\n".encode("utf-8"))
+    parts += [
         f"--{boundary}\r\n".encode("utf-8"),
         f'Content-Disposition: form-data; name="{field_name}"; filename="{filename}"\r\n'.encode("utf-8"),
         b"Content-Type: application/octet-stream\r\n\r\n",
@@ -253,6 +270,18 @@ def api_patch_json(path, payload):
     headers = {"Content-Type": "application/json"}
     headers.update(_auth_headers())
     req = request.Request(get_base_url() + path, data=data, method="PATCH", headers=headers)
+    try:
+        with request.urlopen(req, timeout=15) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body) if body else None
+    except error.HTTPError as e:
+        _raise_for_http_error(e)
+    except error.URLError as e:
+        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+
+
+def api_delete(path):
+    req = request.Request(get_base_url() + path, method="DELETE", headers=_auth_headers())
     try:
         with request.urlopen(req, timeout=15) as resp:
             body = resp.read().decode("utf-8")
@@ -500,7 +529,7 @@ def _usage_hint_for(file_path, edges):
     return "Używane: " + ", ".join(parts) if parts else ""
 
 
-def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=None):
+def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=None, export_step=True):
     """Wspólna końcówka obu trybów: KOPIUJE bieżący plik dokumentu do PDM pod nazwą
     "numer (nazwa).REWIZJA.rozszerzenie" (ta sama konwencja numer/nazwa co itemDisplayLabel
     we froncie, plus litera rewizji — zob. revision_label) — i teraz TAK SAMO zapisuje
@@ -584,6 +613,8 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
         # sugerować, że wysyłka już się udała.
         doc.Label = new_label
         local_renamed = _save_local_as_pdm_name(doc, new_local_path)
+        if export_step:
+            _upload_step_attachment(doc, item_id)
         return {
             "itemId": item_id,
             "itemNumber": item_number,
@@ -594,6 +625,8 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
     api_upload_file(f"/items/{item_id}/attachments", doc.FileName, override_filename=new_filename)
     doc.Label = new_label
     local_renamed = _save_local_as_pdm_name(doc, new_local_path)
+    if export_step:
+        _upload_step_attachment(doc, item_id)
     return {
         "itemId": item_id,
         "itemNumber": item_number,
@@ -620,7 +653,57 @@ def _save_local_as_pdm_name(doc, new_local_path):
         return False
 
 
-def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id=None, target_folder=None):
+def _upload_step_attachment(doc, item_id):
+    """Eksportuje widoczną geometrię `doc` do STEP i wgrywa jako załącznik z rolą "step" —
+    zasila stały podgląd 3D w panelu elementu w aplikacji webowej (box 2D/3D nad
+    Właściwościami, zob. ItemPreviewBox/RoleSlot). Zastępuje POPRZEDNI załącznik z tą rolą
+    (usuwa go przed wysyłką nowego) — ta sama zasada "jeden plik na rolę" co przy ręcznym
+    wgrywaniu przez slot STEP na stronie, więc podgląd zawsze pokazuje aktualną rewizję, nie
+    starą.
+
+    Błędy tutaj NIE przerywają wysyłki: sam upload/rejestracja pliku .FCStd (wywołujący tę
+    funkcję z _rename_and_upload) już się w tym momencie powiodła — nieudany eksport STEP
+    (np. dokument bez żadnej widocznej bryły — sam szkic, sam złom) nie powinien wyglądać
+    jak porażka całej operacji."""
+    try:
+        import Part
+
+        objs = [
+            obj for obj in doc.Objects
+            if hasattr(obj, "Shape") and obj.Shape and not obj.Shape.isNull()
+            and getattr(obj, "Visibility", True)
+        ]
+        if not objs:
+            return
+
+        tmp_dir = tempfile.mkdtemp(prefix="easypdm_step_")
+        try:
+            step_path = os.path.join(tmp_dir, sanitize_filename(doc.Label or "model") + ".step")
+            Part.export(objs, step_path)
+
+            try:
+                existing = api_get(f"/items/{item_id}/attachments") or []
+            except Exception:
+                existing = []
+            for att in existing:
+                if att.get("role") == "step":
+                    try:
+                        api_delete(f"/attachments/{att['id']}")
+                    except Exception:
+                        pass
+
+            api_upload_file(
+                f"/items/{item_id}/attachments", step_path,
+                override_filename=os.path.basename(step_path),
+                extra_fields={"role": "step"},
+            )
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+    except Exception:
+        pass
+
+
+def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id=None, target_folder=None, export_step=True):
     """Tworzy NOWY element w PDM, a potem dogrywa bieżący dokument jako jego załącznik
     (zob. _rename_and_upload). Nowy element zawsze zaczyna od rewizji 1."""
     if not doc.FileName:
@@ -633,10 +716,10 @@ def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id
         body["parentId"] = parent_id
 
     created = api_post_json(f"/projects/{project_id}/nodes", body)
-    return _rename_and_upload(doc, created["id"], created["itemNumber"], name, 1, target_folder)
+    return _rename_and_upload(doc, created["id"], created["itemNumber"], name, 1, target_folder, export_step)
 
 
-def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None):
+def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None, export_step=True):
     """Dogrywa bieżący dokument jako aktualny plik JUŻ ISTNIEJĄCEJ Części/Złożenia
     (np. nowa wersja po zmianach) — bez tworzenia nowego rekordu w PDM.
 
@@ -679,7 +762,7 @@ def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None
 
     try:
         return _rename_and_upload(
-            doc, item_id, item["itemNumber"], item["fileName"], revision, target_folder
+            doc, item_id, item["itemNumber"], item["fileName"], revision, target_folder, export_step
         )
     except Exception as exc:
         if status_changed:
@@ -767,6 +850,7 @@ class TargetFolderDialog(QtWidgets.QDialog):
     def __init__(self, doc, parent=None):
         super().__init__(parent)
         self.result_folder = None
+        self.result_export_step = get_export_step_pref()
 
         self.setWindowTitle("Folder docelowy")
         self.setMinimumWidth(440)
@@ -789,6 +873,12 @@ class TargetFolderDialog(QtWidgets.QDialog):
         browse_btn.clicked.connect(self.on_browse)
         row.addWidget(browse_btn)
         layout.addLayout(row)
+
+        self.export_step_checkbox = QtWidgets.QCheckBox(
+            "Eksportuj i wyślij model STEP (podgląd 3D w aplikacji webowej)"
+        )
+        self.export_step_checkbox.setChecked(self.result_export_step)
+        layout.addWidget(self.export_step_checkbox)
 
         self.error_label = QtWidgets.QLabel("")
         self.error_label.setStyleSheet("color: #c0392b;")
@@ -820,6 +910,8 @@ class TargetFolderDialog(QtWidgets.QDialog):
             return
         set_download_folder(folder)
         self.result_folder = folder
+        self.result_export_step = self.export_step_checkbox.isChecked()
+        set_export_step_pref(self.result_export_step)
         self.accept()
 
 
@@ -1040,10 +1132,11 @@ class NewComponentDialog(QtWidgets.QDialog):
 
 
 class EasyPDMUploadDialog(QtWidgets.QDialog):
-    def __init__(self, doc, target_folder=None, parent=None):
+    def __init__(self, doc, target_folder=None, export_step=True, parent=None):
         super().__init__(parent)
         self.doc = doc
         self.target_folder = target_folder
+        self.export_step = export_step
         self.result_info = None
         self._existing_items = []
 
@@ -1361,7 +1454,8 @@ class EasyPDMUploadDialog(QtWidgets.QDialog):
             # None oznacza: element był "Wydany", a użytkownik odmówił nowej rewizji —
             # nic nie zostało zapisane, ale to nie jest błąd.
             self.result_info = push_to_existing_item(
-                self.doc, item_id, confirm_new_revision, target_folder=self.target_folder
+                self.doc, item_id, confirm_new_revision,
+                target_folder=self.target_folder, export_step=self.export_step,
             )
         except Exception as e:
             self.error_label.setText(str(e))
@@ -1422,7 +1516,7 @@ class EasyPDMUploadDialog(QtWidgets.QDialog):
         try:
             self.result_info = push_new_item_to_pdm(
                 self.doc, project_id, item_type, name, properties, parent_id,
-                target_folder=self.target_folder,
+                target_folder=self.target_folder, export_step=self.export_step,
             )
         except Exception as e:
             self.error_label.setText(str(e))
@@ -1431,7 +1525,7 @@ class EasyPDMUploadDialog(QtWidgets.QDialog):
         self.accept()
 
 
-def process_assembly_tree(top_doc, target_folder=None):
+def process_assembly_tree(top_doc, target_folder=None, export_step=True):
     """Wykrywa złożenie (App::Link do zewnętrznych plików, rekurencyjnie) i dla KAŻDEGO
     nowego komponentu (jeszcze nie wysłanego do PDM — rozpoznawane po etykiecie
     "numer (nazwa).REWIZJA", zob. match_existing_item) pokazuje NewComponentDialog, tworzy
@@ -1507,7 +1601,8 @@ def process_assembly_tree(top_doc, target_folder=None):
             project_id, item_type, name, properties = dlg.result_data()
             try:
                 result = push_new_item_to_pdm(
-                    doc, project_id, item_type, name, properties, target_folder=target_folder
+                    doc, project_id, item_type, name, properties,
+                    target_folder=target_folder, export_step=export_step,
                 )
             except Exception as e:
                 QtWidgets.QMessageBox.critical(
@@ -1595,16 +1690,17 @@ def run():
     if folder_dialog.exec() != QtWidgets.QDialog.Accepted:
         return
     target_folder = folder_dialog.result_folder
+    export_step = folder_dialog.result_export_step
 
     # Krok 1a: wykryj i (opcjonalnie) wyślij złożenie rekurencyjnie — części/pod-złożenia
     # znalezione przez App::Link, w kolejności liście-najpierw.
-    edges_for_top, cancelled = process_assembly_tree(doc, target_folder)
+    edges_for_top, cancelled = process_assembly_tree(doc, target_folder, export_step)
     if cancelled:
         QtWidgets.QMessageBox.information(None, "PDM", "Przerwano — anulowano wysyłkę.")
         return
 
     # Krok 2: uzupełnienie danych w oknie dialogowym (tworzy element + dogrywa plik + zmienia nazwę).
-    dialog = EasyPDMUploadDialog(doc, target_folder)
+    dialog = EasyPDMUploadDialog(doc, target_folder, export_step)
     if dialog.exec() != QtWidgets.QDialog.Accepted:
         return
 

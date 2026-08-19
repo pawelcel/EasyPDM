@@ -27,7 +27,7 @@ static class AttachmentEndpoints
                 return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = """
-                SELECT id, file_name, file_size, uploaded_at
+                SELECT id, file_name, file_size, uploaded_at, preview_role
                 FROM item_attachments
                 WHERE item_id = @itemId
                 ORDER BY uploaded_at;
@@ -44,7 +44,8 @@ static class AttachmentEndpoints
                     id = reader.GetGuid(0),
                     fileName = reader.GetString(1),
                     fileSize = reader.IsDBNull(2) ? (long?)null : reader.GetInt64(2),
-                    uploadedAt = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3)
+                    uploadedAt = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3),
+                    role = reader.IsDBNull(4) ? null : reader.GetString(4)
                 });
             }
 
@@ -61,6 +62,11 @@ static class AttachmentEndpoints
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
                 return Results.BadRequest("Brak pliku w polu 'file'.");
+
+            var role = form["role"].ToString();
+            if (role == "") role = null;
+            if (role is not null && role is not ("pdf" or "step"))
+                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step' albo puste.");
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
@@ -99,8 +105,8 @@ static class AttachmentEndpoints
             }
 
             const string insertSql = """
-                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at)
-                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now());
+                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, preview_role)
+                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @role);
                 """;
             try
             {
@@ -111,6 +117,7 @@ static class AttachmentEndpoints
                 insertCmd.Parameters.AddWithValue("filePath", storedPath);
                 insertCmd.Parameters.AddWithValue("hash", hash);
                 insertCmd.Parameters.AddWithValue("size", file.Length);
+                insertCmd.Parameters.AddWithValue("role", (object?)role ?? DBNull.Value);
                 await insertCmd.ExecuteNonQueryAsync();
             }
             catch
@@ -121,7 +128,7 @@ static class AttachmentEndpoints
 
             await LogAttachmentHistoryAsync(conn, itemId, file.FileName, "added", user.Id);
 
-            return Results.Created($"/api/attachments/{attachmentId}", new { id = attachmentId, fileName = file.FileName });
+            return Results.Created($"/api/attachments/{attachmentId}", new { id = attachmentId, fileName = file.FileName, role });
         });
 
         // POST /api/items/{itemId}/attachments/register   body: { "filePath": "..." }
@@ -133,6 +140,9 @@ static class AttachmentEndpoints
         // "podpiąć" jako załącznik dowolny plik z dysku serwera.
         app.MapPost("/api/items/{itemId:guid}/attachments/register", async (Guid itemId, RegisterAttachmentRequest body, HttpContext ctx) =>
         {
+            if (body.Role is not null && body.Role is not ("pdf" or "step"))
+                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step' albo puste.");
+
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
                 return Results.NotFound("Element nie istnieje.");
@@ -181,8 +191,8 @@ static class AttachmentEndpoints
             }
 
             const string insertSql = """
-                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at)
-                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now());
+                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, preview_role)
+                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @role);
                 """;
             await using var insertCmd = new NpgsqlCommand(insertSql, conn);
             insertCmd.Parameters.AddWithValue("id", attachmentId);
@@ -191,11 +201,12 @@ static class AttachmentEndpoints
             insertCmd.Parameters.AddWithValue("filePath", fullPath);
             insertCmd.Parameters.AddWithValue("hash", hash);
             insertCmd.Parameters.AddWithValue("size", fileSize);
+            insertCmd.Parameters.AddWithValue("role", (object?)body.Role ?? DBNull.Value);
             await insertCmd.ExecuteNonQueryAsync();
 
             await LogAttachmentHistoryAsync(conn, itemId, fileName, "added", user.Id);
 
-            return Results.Created($"/api/attachments/{attachmentId}", new { id = attachmentId, fileName });
+            return Results.Created($"/api/attachments/{attachmentId}", new { id = attachmentId, fileName, role = body.Role });
         });
 
         // GET /api/attachments/{id}/file — pobranie załącznika.
@@ -311,4 +322,4 @@ static class AttachmentEndpoints
     }
 }
 
-record RegisterAttachmentRequest(string FilePath);
+record RegisterAttachmentRequest(string FilePath, string? Role = null);
