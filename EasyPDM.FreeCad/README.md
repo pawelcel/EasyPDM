@@ -103,6 +103,21 @@ token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
    przez zwykły upload HTTP (`POST /api/items/{id}/attachments`, ten sam mechanizm co
    dogrywanie plików CAD z panelu właściwości w aplikacji webowej) — wtedy historia rewizji
    nie jest zachowywana.
+5. **Opcjonalnie eksportuje STEP i wgrywa go automatycznie jako załącznik z rolą "step"** —
+   zaznaczane checkboksem "Eksportuj i wyślij model STEP (podgląd 3D...)" w oknie **Folder
+   docelowy** (krok 1a, pytane RAZ na początku, obejmuje więc też automatycznie wykryte
+   drzewo złożenia) — domyślnie **włączone**, zapamiętywane między uruchomieniami makra
+   (ta sama preferencja co folder docelowy). Gdy włączone, działa dokładnie tym samym
+   mechanizmem co ręczny przycisk "STEP" w panelu Załączników w aplikacji webowej, więc od
+   razu zasila stały podgląd 3D w panelu elementu. Eksportowana jest cała **widoczna**
+   geometria dokumentu (wszystkie obiekty z bryłą, których widoczność jest włączona — dla
+   Części to zwykle jedna bryła/Body, dla automatycznie wykrytego złożenia to rozwiązane
+   `App::Link`i, więc STEP
+   odzwierciedla całe złożenie). Poprzedni załącznik z rolą "step" jest **zastępowany**
+   (usuwany przed wysyłką nowego), żeby podgląd zawsze pokazywał aktualną rewizję. Jeśli
+   dokument nie ma żadnej widocznej bryły (sam szkic, pusty dokument) albo eksport/wysyłka
+   się nie powiedzie — krok jest **cicho pomijany**, nie przerywa ani nie cofa reszty
+   wysyłki (plik `.FCStd` w PDM jest już bezpiecznie zapisany w tym momencie).
 
 ## Automatyczne wykrywanie złożenia
 
