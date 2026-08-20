@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
+import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js"
 
 import { useLanguage } from "@/i18n/use-language"
 
 let occtPromise: ReturnType<typeof loadOcct> | null = null
 
 // occt-import-js jest ciężkim modułem WASM (parser OpenCASCADE) — inicjalizujemy go raz
-// i współdzielimy Promise między wszystkimi podglądami STEP w tej samej sesji karty.
+// i współdzielimy Promise między wszystkimi podglądami 3D w tej samej sesji karty.
 function loadOcct() {
   return import("occt-import-js").then(async ({ default: init }) => {
     const wasmUrl = (await import("occt-import-js/dist/occt-import-js.wasm?url")).default
@@ -14,9 +15,44 @@ function loadOcct() {
   })
 }
 
-// Statyczny podgląd bryły STEP pod stałym, izometrycznym kątem — bez OrbitControls i bez
+// STL to gotowa siatka (bez parametrycznej geometrii ani koloru) — three.js ma własny
+// loader, nie potrzeba do tego OpenCASCADE/occt-import-js.
+async function loadStlGeometries(buffer: Uint8Array): Promise<THREE.BufferGeometry[]> {
+  const geometry = new STLLoader().parse(buffer.buffer as ArrayBuffer)
+  if (!geometry.attributes.normal) geometry.computeVertexNormals()
+  return [geometry]
+}
+
+// STEP/IGES mają parametryczną geometrię — occt-import-js (OpenCASCADE po WASM) triangularyzuje
+// je do siatek, ewentualnie w kilku kawałkach (jedna bryła = jeden mesh w wyniku).
+async function loadOcctGeometries(kind: "step" | "iges", buffer: Uint8Array): Promise<THREE.BufferGeometry[]> {
+  occtPromise ??= loadOcct()
+  const occt = await occtPromise
+  const result = kind === "step" ? occt.ReadStepFile(buffer, null) : occt.ReadIgesFile(buffer, null)
+  if (!result.success || result.meshes.length === 0) return []
+
+  return result.meshes.map((mesh) => {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(mesh.attributes.position.array, 3))
+    if (mesh.attributes.normal) {
+      geometry.setAttribute("normal", new THREE.Float32BufferAttribute(mesh.attributes.normal.array, 3))
+    } else {
+      geometry.computeVertexNormals()
+    }
+    if (mesh.index) geometry.setIndex(mesh.index.array)
+    return geometry
+  })
+}
+
+function extensionOf(fileName: string): string {
+  return fileName.toLowerCase().split(".").pop() ?? ""
+}
+
+// Statyczny podgląd bryły 3D pod stałym, izometrycznym kątem — bez OrbitControls i bez
 // żadnej interakcji myszką (użytkownik chciał "jedynie podgląd", nie obracanie modelu).
-function StepPreview({ url }: { url: string }) {
+// Obsługuje STEP/IGES (przez occt-import-js) i STL (przez wbudowany loader three.js) —
+// wybór parsera na podstawie rozszerzenia w `fileName`.
+function StepPreview({ url, fileName }: { url: string; fileName: string }) {
   const { t } = useLanguage()
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -28,13 +64,17 @@ function StepPreview({ url }: { url: string }) {
 
     async function run() {
       try {
-        occtPromise ??= loadOcct()
-        const [occt, res] = await Promise.all([occtPromise, fetch(url)])
+        const ext = extensionOf(fileName)
+        const res = await fetch(url)
         if (!res.ok) throw new Error(String(res.status))
         const buffer = new Uint8Array(await res.arrayBuffer())
-        const result = occt.ReadStepFile(buffer, null)
+
+        const geometries =
+          ext === "stl"
+            ? await loadStlGeometries(buffer)
+            : await loadOcctGeometries(ext === "iges" || ext === "igs" ? "iges" : "step", buffer)
         if (cancelled) return
-        if (!result.success || result.meshes.length === 0) {
+        if (geometries.length === 0) {
           setError(t("preview.stepParseFailed"))
           return
         }
@@ -43,19 +83,10 @@ function StepPreview({ url }: { url: string }) {
         if (!container) return
 
         const group = new THREE.Group()
-        for (const mesh of result.meshes) {
-          const geometry = new THREE.BufferGeometry()
-          geometry.setAttribute("position", new THREE.Float32BufferAttribute(mesh.attributes.position.array, 3))
-          if (mesh.attributes.normal) {
-            geometry.setAttribute("normal", new THREE.Float32BufferAttribute(mesh.attributes.normal.array, 3))
-          } else {
-            geometry.computeVertexNormals()
-          }
-          if (mesh.index) geometry.setIndex(mesh.index.array)
-          // Modele STEP bez zdefiniowanego koloru zwracają z occt-import-js [0,0,0]
-          // (czarny), nieodróżnialne od "faktycznie czarnej" powierzchni — więc świadomie
-          // ignorujemy mesh.color i renderujemy wszystko w jednym, jasnym neutralnym kolorze
-          // (ciemniejszy zlewał się z ciemnym tłem panelu).
+        for (const geometry of geometries) {
+          // Modele bez zdefiniowanego koloru (albo w formatach, które go w ogóle nie niosą,
+          // jak STL) renderujemy w jednym, jasnym neutralnym kolorze — ciemniejszy zlewał
+          // się z ciemnym tłem panelu.
           const material = new THREE.MeshStandardMaterial({ color: 0xe4e4e7, metalness: 0.05, roughness: 0.75 })
           group.add(new THREE.Mesh(geometry, material))
 
@@ -113,7 +144,7 @@ function StepPreview({ url }: { url: string }) {
       renderer?.dispose()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url])
+  }, [url, fileName])
 
   return (
     <div className="relative h-full w-full">

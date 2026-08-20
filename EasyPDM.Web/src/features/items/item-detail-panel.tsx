@@ -291,7 +291,7 @@ function ItemDetailPanel({
             ))}
         </div>
 
-        <ItemPreviewBox item={item} />
+        <ItemPreviewBox item={item} refreshSignal={historyRefreshSignal} />
       </div>
 
       {previewingMainFile && item.itemType === "file" && (

@@ -36,16 +36,20 @@ function RoleSlot({
 }) {
   const { t } = useLanguage()
   const inputRef = useRef<HTMLInputElement>(null)
-  const label = role === "pdf" ? "PDF" : "STEP"
+  // "3D" zamiast "STEP" — slot przyjmuje STEP/IGES/STL, nie tylko dosłownie format STEP.
+  // Krótka etykieta na przycisku, pełna lista formatów obok w nagłówku (za mało miejsca
+  // na przycisku, żeby zmieściła się cała).
+  const label = role === "pdf" ? "PDF" : "3D"
+  const headerLabel = role === "pdf" ? "PDF" : "3D (STEP/IGES/STL)"
 
   return (
     <div className="flex-1 rounded-lg bg-muted/30 p-2 ring-1 ring-foreground/10">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[11px] font-medium text-muted-foreground uppercase">{label}</span>
+        <span className="text-[11px] font-medium text-muted-foreground uppercase">{headerLabel}</span>
         <input
           ref={inputRef}
           type="file"
-          accept={role === "pdf" ? ".pdf" : ".step,.stp"}
+          accept={role === "pdf" ? ".pdf" : ".step,.stp,.iges,.igs,.stl"}
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]

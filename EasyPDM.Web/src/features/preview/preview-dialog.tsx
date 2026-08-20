@@ -40,7 +40,7 @@ function PreviewDialog({
                 </div>
               }
             >
-              <StepPreview url={url} />
+              <StepPreview url={url} fileName={fileName} />
             </Suspense>
           )}
         </div>
