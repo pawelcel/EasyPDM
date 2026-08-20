@@ -521,6 +521,17 @@ Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional 
     CopyBytesInto body, offset, fileBytes
     CopyBytesInto body, offset, tailBytes
 
+    ' MSXML2.XMLHTTP.send() fails with "The parameter is incorrect" when given a raw Byte()
+    ' array directly (confirmed in practice) -- wrapping the bytes in a binary ADODB.Stream
+    ' and sending the Stream object instead is the standard, documented workaround for this
+    ' XMLHTTP limitation.
+    Dim bodyStream As Object
+    Set bodyStream = CreateObject("ADODB.Stream")
+    bodyStream.Type = 1 ' adTypeBinary
+    bodyStream.Open
+    If totalLen > 0 Then bodyStream.Write body
+    bodyStream.Position = 0
+
     Dim http As Object
     Set http = NewHttpRequest()
     http.Open "POST", GetBaseUrl() & path, False
@@ -530,7 +541,7 @@ Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional 
     If cookie <> "" Then http.setRequestHeader "Cookie", cookie
 
     On Error GoTo NetErr
-    http.send body
+    http.send bodyStream
     On Error GoTo 0
 
     LogLine "POST (upload, " & totalLen & " B) " & path & " -> " & http.Status
