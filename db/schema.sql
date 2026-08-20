@@ -58,6 +58,7 @@ CREATE TABLE items (
     item_type           TEXT NOT NULL DEFAULT 'file'
                             CHECK (item_type IN ('folder', 'part', 'file', 'assembly')),
     item_number         INTEGER,                -- numer nadawany automatycznie Częściom i Złożeniom (item_number_seq)
+    item_number_prefix  TEXT,                    -- opcjonalny prefiks-litera, zamrożony przy tworzeniu wg rodzaju + item_number_prefixes
     file_path           TEXT UNIQUE,             -- ścieżka w wewnętrznym magazynie API; puste dla folderów/Części (to kontenery bez własnego pliku)
     file_name           TEXT NOT NULL,           -- nazwa pliku (dla typu 'file') albo nazwa folderu/Części
     file_type           TEXT,                    -- sldprt, sldasm, slddrw, step, dxf... — puste dla folderów/Części
@@ -108,6 +109,17 @@ CREATE TABLE manufacturers (
     id   SERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE
 );
+
+-- ============================================================
+-- Mapowanie rodzaj -> prefiks numeru (Ustawienia -> Nazewnictwo). Brak wiersza dla
+-- danego rodzaju = brak prefiksu. Odczytywane WYŁĄCZNIE w momencie tworzenia elementu
+-- (zob. item_number_prefix w items) — zmiana tu nie wpływa na już istniejące elementy.
+-- ============================================================
+CREATE TABLE item_number_prefixes (
+    rodzaj TEXT PRIMARY KEY,
+    prefix TEXT NOT NULL CHECK (char_length(prefix) BETWEEN 1 AND 4)
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON item_number_prefixes TO pdm_user;
 
 CREATE TABLE manufacturer_contacts (
     id              SERIAL PRIMARY KEY,
@@ -279,4 +291,5 @@ INSERT INTO schema_migrations (filename) VALUES
     ('021_drop_dead_revision_schema.sql'), ('022_item_history.sql'),
     ('023_attachment_history.sql'), ('024_owner_lock_history.sql'),
     ('025_backup_schedule.sql'), ('026_backup_retention.sql'),
-    ('027_schema_migrations_tracking.sql'), ('028_attachment_preview_role.sql');
+    ('027_schema_migrations_tracking.sql'), ('028_attachment_preview_role.sql'),
+    ('029_item_number_prefix.sql');

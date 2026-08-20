@@ -34,6 +34,7 @@ static class BomEndpoints
                     depth = r.Depth,
                     path = r.Path,
                     itemNumber = r.ItemNumber,
+                    itemNumberPrefix = r.ItemNumberPrefix,
                     fileName = r.FileName,
                     properties = JsonDocument.Parse(r.PropertiesJson).RootElement
                 });
@@ -62,7 +63,7 @@ static class BomEndpoints
             foreach (var row in rows)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
-                var name = row.ItemNumber is not null ? $"{row.ItemNumber} ({row.FileName})" : row.FileName;
+                var name = row.ItemNumber is not null ? $"{row.ItemNumberPrefix}{row.ItemNumber} ({row.FileName})" : row.FileName;
                 csv.Append(string.Join(';', new[]
                 {
                     CsvField(string.Join('.', row.Path)),
@@ -104,6 +105,7 @@ static class BomEndpoints
                 .Select(g => new
                 {
                     g.First().ItemNumber,
+                    g.First().ItemNumberPrefix,
                     g.First().FileName,
                     g.First().PropertiesJson,
                     TotalQuantity = g.Sum(r => r.ExtendedQuantity)
@@ -115,7 +117,7 @@ static class BomEndpoints
             foreach (var row in aggregated)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
-                var name = row.ItemNumber is not null ? $"{row.ItemNumber} ({row.FileName})" : row.FileName;
+                var name = row.ItemNumber is not null ? $"{row.ItemNumberPrefix}{row.ItemNumber} ({row.FileName})" : row.FileName;
                 csv.Append(string.Join(';', new[]
                 {
                     CsvField(name),
@@ -145,13 +147,16 @@ static class BomEndpoints
 
     private static async Task<string> GetItemLabel(NpgsqlConnection conn, Guid id)
     {
-        await using var cmd = new NpgsqlCommand("SELECT item_number, file_name FROM items WHERE id = @id;", conn);
+        await using var cmd = new NpgsqlCommand("SELECT item_number, item_number_prefix, file_name FROM items WHERE id = @id;", conn);
         cmd.Parameters.AddWithValue("id", id);
         await using var reader = await cmd.ExecuteReaderAsync();
         if (!await reader.ReadAsync())
             return "BOM";
-        var fileName = reader.GetString(1);
-        return reader.IsDBNull(0) ? fileName : $"{reader.GetInt32(0)} ({fileName})";
+        var fileName = reader.GetString(2);
+        if (reader.IsDBNull(0))
+            return fileName;
+        var prefix = reader.IsDBNull(1) ? "" : reader.GetString(1);
+        return $"{prefix}{reader.GetInt32(0)} ({fileName})";
     }
 
     private static string PropertyOrEmpty(JsonElement properties, string key) =>
@@ -187,7 +192,7 @@ static class BomEndpoints
                 WHERE NOT (ir.parent_id = ANY(b.visited))
             )
             SELECT b.child_id, b.quantity, b.extended_quantity, b.depth, b.path,
-                   i.item_number, i.file_name, i.properties
+                   i.item_number, i.item_number_prefix, i.file_name, i.properties
             FROM bom b
             JOIN items i ON i.id = b.child_id
             ORDER BY b.path;
@@ -206,13 +211,14 @@ static class BomEndpoints
                 Depth: reader.GetInt32(3),
                 Path: reader.GetFieldValue<int[]>(4),
                 ItemNumber: reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                FileName: reader.GetString(6),
-                PropertiesJson: reader.GetFieldValue<string>(7)));
+                ItemNumberPrefix: reader.IsDBNull(6) ? null : reader.GetString(6),
+                FileName: reader.GetString(7),
+                PropertiesJson: reader.GetFieldValue<string>(8)));
         }
         return rows;
     }
 
     private record BomRow(
         Guid ChildId, decimal Quantity, decimal ExtendedQuantity, int Depth, int[] Path,
-        int? ItemNumber, string FileName, string PropertiesJson);
+        int? ItemNumber, string? ItemNumberPrefix, string FileName, string PropertiesJson);
 }

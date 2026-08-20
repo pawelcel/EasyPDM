@@ -79,8 +79,12 @@ export function fileTypeLabel(item: Pick<Item, "itemType" | "fileType">): string
 
 // Część/Złożenie mają numer z bazy (item_number) — wyświetlamy je zawsze jako "numer (nazwa)".
 // Folder/Plik nie mają numeru, więc pokazują samą nazwę.
-export function itemDisplayLabel(item: Pick<Item, "fileName" | "itemNumber">): string {
-  return item.itemNumber !== null ? `${item.itemNumber} (${item.fileName})` : item.fileName
+export function itemDisplayLabel(
+  item: Pick<Item, "fileName" | "itemNumber" | "itemNumberPrefix">
+): string {
+  return item.itemNumber !== null
+    ? `${item.itemNumberPrefix ?? ""}${item.itemNumber} (${item.fileName})`
+    : item.fileName
 }
 
 // Rewizje wyświetlamy jako wielkie litery zamiast cyfr: 1->A, 2->B, ..., 26->Z, 27->AA...
@@ -106,6 +110,7 @@ export interface Item {
   modifiedAt: string | null
   itemType: ItemType
   itemNumber: number | null
+  itemNumberPrefix: string | null
   showInTree: boolean
   status: ItemStatus | null
   revisionNumber: number | null
@@ -180,6 +185,7 @@ export interface BomEntry {
   depth: number
   path: number[]
   itemNumber: number | null
+  itemNumberPrefix: string | null
   fileName: string
   properties: Record<string, unknown>
 }

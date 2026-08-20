@@ -27,8 +27,8 @@ static class StructureEndpoints
 
             const string sql = """
                 SELECT i.id, i.project_id, i.file_name, i.file_type, i.file_path, i.properties, i.modified_at,
-                       i.item_type, i.item_number, i.show_in_tree, i.status, i.revision_number, i.root_position,
-                       i.owner_id, i.owner_locked, u.display_name, ir.quantity, ir.position
+                       i.item_type, i.item_number, i.item_number_prefix, i.show_in_tree, i.status, i.revision_number,
+                       i.root_position, i.owner_id, i.owner_locked, u.display_name, ir.quantity, ir.position
                 FROM item_relations ir
                 JOIN items i ON i.id = ir.child_id
                 LEFT JOIN users u ON u.id = i.owner_id
@@ -57,16 +57,17 @@ static class StructureEndpoints
                         ["modifiedAt"] = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
                         ["itemType"] = reader.GetString(7),
                         ["itemNumber"] = reader.IsDBNull(8) ? null : reader.GetInt32(8),
-                        ["showInTree"] = reader.GetBoolean(9),
-                        ["status"] = reader.IsDBNull(10) ? null : reader.GetString(10),
-                        ["revisionNumber"] = reader.IsDBNull(11) ? null : reader.GetInt32(11),
-                        ["rootPosition"] = reader.GetInt32(12),
-                        ["ownerId"] = reader.IsDBNull(13) ? null : reader.GetGuid(13),
-                        ["ownerLocked"] = reader.GetBoolean(14),
-                        ["ownerDisplayName"] = reader.IsDBNull(15) ? null : reader.GetString(15),
+                        ["itemNumberPrefix"] = reader.IsDBNull(9) ? null : reader.GetString(9),
+                        ["showInTree"] = reader.GetBoolean(10),
+                        ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
+                        ["revisionNumber"] = reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                        ["rootPosition"] = reader.GetInt32(13),
+                        ["ownerId"] = reader.IsDBNull(14) ? null : reader.GetGuid(14),
+                        ["ownerLocked"] = reader.GetBoolean(15),
+                        ["ownerDisplayName"] = reader.IsDBNull(16) ? null : reader.GetString(16),
                         ["tags"] = new List<string>()
                     };
-                    rows.Add((itemDict, reader.GetDecimal(16), reader.GetInt32(17)));
+                    rows.Add((itemDict, reader.GetDecimal(17), reader.GetInt32(18)));
                 }
             }
 

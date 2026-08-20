@@ -295,7 +295,93 @@ static class SettingsEndpoints
                 try { Directory.Delete(tempDir, recursive: true); } catch (IOException) { }
             }
         });
+
+        // GET /api/settings/item-number-prefixes — mapowanie rodzaj -> prefiks (Ustawienia ->
+        // Nazewnictwo). Zwraca ZAWSZE wszystkie 4 kanoniczne wartości rodzaju (te same, które
+        // PartPropertyForm/add-node-dialog pokazują do wyboru), z prefiksem null, jeśli dla
+        // danego rodzaju nie ma jeszcze wiersza w item_number_prefixes — dzięki temu frontend
+        // renderuje stałą listę 4 pól do edycji, nigdy nie musi nic dodawać/usuwać.
+        app.MapGet("/api/settings/item-number-prefixes", async (HttpContext ctx) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string sql = """
+                SELECT k.rodzaj, p.prefix
+                FROM unnest(@rodzaje) AS k(rodzaj)
+                LEFT JOIN item_number_prefixes p ON p.rodzaj = k.rodzaj
+                ORDER BY array_position(@rodzaje, k.rodzaj);
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("rodzaje", ItemNumberPrefixKinds);
+
+            var result = new List<object>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                result.Add(new
+                {
+                    rodzaj = reader.GetString(0),
+                    prefix = reader.IsDBNull(1) ? null : reader.GetString(1),
+                });
+            }
+            return Results.Ok(result);
+        });
+
+        // PATCH /api/settings/item-number-prefixes/{rodzaj}   body: { "prefix": "Z" }
+        // prefix null/pusty usuwa mapowanie (element tego rodzaju znów dostaje sam numer, bez
+        // litery) — dotyczy WYŁĄCZNIE elementów utworzonych PO tej zmianie, zob. item_number_prefix
+        // w ItemEndpoints.cs (zamrożone raz, przy tworzeniu elementu, nigdy nie przeliczane
+        // wstecz).
+        app.MapPatch("/api/settings/item-number-prefixes/{rodzaj}", async (string rodzaj, HttpContext ctx, ItemNumberPrefixRequest body) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+            if (!ItemNumberPrefixKinds.Contains(rodzaj))
+                return Results.BadRequest("Nieprawidłowy rodzaj.");
+
+            var prefix = string.IsNullOrWhiteSpace(body.Prefix) ? null : body.Prefix.Trim();
+            if (prefix is not null && prefix.Length > 4)
+                return Results.BadRequest("Prefiks może mieć maksymalnie 4 znaki.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (prefix is null)
+            {
+                await using var deleteCmd = new NpgsqlCommand(
+                    "DELETE FROM item_number_prefixes WHERE rodzaj = @rodzaj;", conn);
+                deleteCmd.Parameters.AddWithValue("rodzaj", rodzaj);
+                await deleteCmd.ExecuteNonQueryAsync();
+            }
+            else
+            {
+                await using var upsertCmd = new NpgsqlCommand(
+                    """
+                    INSERT INTO item_number_prefixes (rodzaj, prefix) VALUES (@rodzaj, @prefix)
+                    ON CONFLICT (rodzaj) DO UPDATE SET prefix = EXCLUDED.prefix;
+                    """, conn);
+                upsertCmd.Parameters.AddWithValue("rodzaj", rodzaj);
+                upsertCmd.Parameters.AddWithValue("prefix", prefix);
+                await upsertCmd.ExecuteNonQueryAsync();
+            }
+
+            return Results.Ok(new { rodzaj, prefix });
+        });
     }
+
+    // Pierwsze 4 to te same wartości co PART_KINDS/ASSEMBLY_KINDS w EasyPDMUpload.FCMacro i
+    // PartPropertyForm/add-node-dialog w aplikacji webowej — jedyne dozwolone wartości
+    // properties.rodzaj w całym systemie. "Zlozenie" to sztuczny, dodatkowy klucz (NIE
+    // prawdziwa wartość properties.rodzaj) — złożenia nie mają swojego "rodzaju" jako
+    // takiego, ale i tak potrzebują JEDNEGO wspólnego prefiksu dla wszystkich złożeń, więc
+    // dostają ten jeden sztywny wpis zamiast czterech jak części. Zob. ItemEndpoints.cs,
+    // gdzie prefiks złożenia jest dobierany po tym stałym kluczu, a nie po properties.rodzaj.
+    private static readonly string[] ItemNumberPrefixKinds =
+        ["Wykonywana", "Zakupowa", "Normalia", "Klienta", "Zlozenie"];
 
     // Wspólna logika pg_dump + spakowanie magazynu plików w ZIP — używana zarówno przez
     // GET /api/settings/backup (pobranie ręczne, zwraca do przeglądarki), jak i przez
@@ -448,3 +534,5 @@ record BackupSchedule(
 
 record BackupScheduleRequest(
     bool Enabled, string Frequency, int? DayOfWeek, int? DayOfMonth, int Hour, int Minute, int RetentionCount);
+
+record ItemNumberPrefixRequest(string? Prefix);

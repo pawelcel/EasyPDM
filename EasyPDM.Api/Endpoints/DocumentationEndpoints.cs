@@ -183,7 +183,7 @@ static class DocumentationEndpoints
             return null;
 
         const string sql = """
-            SELECT ia.file_name, ia.file_path, i.item_number, i.file_name AS item_name
+            SELECT ia.file_name, ia.file_path, i.item_number, i.item_number_prefix, i.file_name AS item_name
             FROM item_attachments ia
             JOIN items i ON i.id = ia.item_id
             WHERE ia.item_id = ANY(@ids)
@@ -208,7 +208,8 @@ static class DocumentationEndpoints
                 var attachmentFileName = reader.GetString(0);
                 var attachmentPath = reader.GetString(1);
                 var itemNumber = reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2);
-                var itemName = reader.GetString(3);
+                var itemNumberPrefix = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                var itemName = reader.GetString(4);
 
                 var extension = Path.GetExtension(attachmentFileName).TrimStart('.').ToLowerInvariant();
                 if (wantedExtensions is not null && !wantedExtensions.Contains(extension))
@@ -216,7 +217,7 @@ static class DocumentationEndpoints
                 if (!File.Exists(attachmentPath))
                     continue;
 
-                var folderName = SanitizeSegment(itemNumber is not null ? $"{itemNumber} ({itemName})" : itemName);
+                var folderName = SanitizeSegment(itemNumber is not null ? $"{itemNumberPrefix}{itemNumber} ({itemName})" : itemName);
                 var entryName = MakeUniqueEntryName($"{folderName}/{SanitizeSegment(attachmentFileName)}", usedEntryNames);
 
                 var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
