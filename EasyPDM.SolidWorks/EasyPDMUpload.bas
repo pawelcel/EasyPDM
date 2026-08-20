@@ -54,6 +54,14 @@ Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_ItemNumber"
 Private Const ERR_AUTH As Long = vbObjectError + 1001
 Private Const ERR_API As Long = vbObjectError + 1002
 
+' Obiekt aplikacji SolidWorks — WBREW wcześniejszemu (błędnemu) założeniu tego modułu,
+' "swApp" NIE jest automatycznie widoczne w KAŻDYM module VBA projektu, tylko w tym, który
+' SolidWorks sam wygeneruje przy "Narzędzia -> Makro -> Nowy" (tam ma własne "Dim swApp").
+' Ten plik jest importowany jako OSOBNY moduł, więc potrzebuje własnej deklaracji — i
+' własnego przypisania na starcie main() przez "Application.SldWorks" (standardowy sposób
+' uzyskania obiektu aplikacji z poziomu VBA hostowanego wewnątrz samego SolidWorks).
+Private swApp As Object
+
 
 ' ============================================================================
 ' Log — jedyny sposób, żeby zobaczyć krok po kroku co makro faktycznie zrobiło (i gdzie
@@ -1176,8 +1184,8 @@ End Function
 
 ' ============================================================================
 ' SolidWorks — aktywny dokument, zapis, Właściwości niestandardowe (powiązanie z PDM).
-' "swApp" to zmienna globalna, którą SolidWorks automatycznie udostępnia w KAŻDYM makrze
-' VBA utworzonym przez Narzędzia -> Makro -> Nowy — nie trzeba jej samemu tworzyć.
+' "swApp" deklarowane i przypisywane na początku Sub main() (zob. nagłówek modułu) —
+' NIE polegamy na tym, że SolidWorks je udostępni samo.
 ' ============================================================================
 
 ' Wartości z enumu SolidWorks swDocumentTypes_e — zadeklarowane wprost jako liczby, z tego
@@ -1278,6 +1286,10 @@ End Sub
 
 Sub main()
     LogLine "=== Uruchomiono makro EasyPDM ==="
+
+    On Error Resume Next
+    Set swApp = Application.SldWorks
+    On Error GoTo 0
 
     If swApp Is Nothing Then
         MsgBox "To makro trzeba uruchomić z poziomu SolidWorks.", vbCritical, "EasyPDM"
