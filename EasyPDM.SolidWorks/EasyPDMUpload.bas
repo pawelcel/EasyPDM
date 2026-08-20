@@ -51,6 +51,22 @@ Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_ItemNumber"
 Private Const ERR_AUTH As Long = vbObjectError + 1001
 Private Const ERR_API As Long = vbObjectError + 1002
 
+' Values from SolidWorks enums (swDocumentTypes_e, swCustomInfoType_e,
+' swCustomPropertyAddOption_e) -- declared here EXPLICITLY as numbers instead of relying on
+' the bare constant names (swDocPART, swCustomInfoText, ...) resolving on their own through
+' a SolidWorks type library reference. This whole module deliberately uses late binding
+' (Object type instead of SldWorks.*), so without this, "Option Explicit" at the top of the
+' file treats those bare names as undeclared variables ("Variable not defined" at compile
+' time), confirmed in practice. Values are stable, documented in the SolidWorks API,
+' unchanged across many versions (including 2026). Grouped here at the very top of the
+' module (not next to where they are used) on purpose -- pure module-level Const/Dim
+' placement should never matter in VBA, but grouping them here rules that out completely
+' as a possible cause if "Variable not defined" is ever seen on one of these again.
+Private Const SW_DOC_PART As Long = 1                      ' swDocumentTypes_e.swDocPART
+Private Const SW_DOC_ASSEMBLY As Long = 2                   ' swDocumentTypes_e.swDocASSEMBLY
+Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e.swCustomInfoText
+Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
+
 ' SolidWorks application object -- CONTRARY to this module's earlier (wrong) assumption,
 ' "swApp" is NOT automatically visible in EVERY VBA module of the project, only in the one
 ' SolidWorks itself generates via "Tools -> Macro -> New" (that one gets its own "Dim
@@ -1192,13 +1208,6 @@ End Function
 ' NOT rely on SolidWorks providing it automatically.
 ' ============================================================================
 
-' Values from the SolidWorks swDocumentTypes_e enum -- declared explicitly as numbers, for
-' the same reason as SW_CUSTOM_INFO_TEXT/SW_CUSTOM_PROPERTY_REPLACE below (late binding +
-' Option Explicit -> bare constant names with no type library reference fail to compile,
-' confirmed in practice as "Variable not defined").
-Private Const SW_DOC_PART As Long = 1        ' swDocumentTypes_e.swDocPART
-Private Const SW_DOC_ASSEMBLY As Long = 2    ' swDocumentTypes_e.swDocASSEMBLY
-
 ' Returns the file path, the PDM item type ("part"/"assembly"/"file") derived from the
 ' SolidWorks document type, and a default name (file name without extension). Saves the
 ' document if it was not saved yet -- the user must then choose a path via SolidWorks's
@@ -1261,17 +1270,6 @@ Function GetLinkedItemId() As String
     On Error GoTo 0
     GetLinkedItemId = valOut
 End Function
-
-' Values from the SolidWorks swCustomInfoType_e / swCustomPropertyAddOption_e enums --
-' declared here EXPLICITLY as numbers (instead of relying on the bare constant names
-' swCustomInfoText/swCustomPropertyReplaceValue resolving on their own through a SolidWorks
-' type library reference) -- this whole module deliberately uses late binding (Object type
-' instead of SldWorks.*), so without this, "Option Explicit" at the top of the file treats
-' those bare names as undeclared variables ("Variable not defined" at compile time),
-' confirmed in practice. Values are stable, documented in the SolidWorks API, unchanged
-' across many versions (including 2026).
-Private Const SW_CUSTOM_INFO_TEXT As Long = 30            ' swCustomInfoType_e.swCustomInfoText
-Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2       ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 
 ' Saves the document-to-PDM-item link as Custom Properties -- unlike the FreeCAD approach
 ' (changing the label, NOT saved to disk), this works reliably in a brand NEW SolidWorks
