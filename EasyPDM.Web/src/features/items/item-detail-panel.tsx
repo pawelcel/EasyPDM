@@ -587,7 +587,9 @@ function SortableBomRow({
             </div>
           </TableCell>
           <TableCell style={{ paddingLeft: (entry.depth - 1) * 16 }}>
-            {entry.itemNumber !== null ? `${entry.itemNumber} (${entry.fileName})` : entry.fileName}
+            {entry.itemNumber !== null
+              ? `${entry.itemNumberPrefix ?? ""}${entry.itemNumber} (${entry.fileName})`
+              : entry.fileName}
           </TableCell>
           <TableCell className="text-right">{entry.quantity}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "material")}</TableCell>

@@ -49,10 +49,15 @@ const pl = {
   "settings.users": "Użytkownicy",
   "settings.storage": "Magazyn plików",
   "settings.logs": "Logi",
+  "settings.naming": "Nazewnictwo",
   "settings.appearance": "Wygląd",
   "settings.language": "Język",
   "settings.author": "Autor",
   "settings.noPermission": "Brak uprawnień.",
+
+  "naming.hint": "Litera-prefiks jest doklejana przed numerem nowo tworzonych Części/Złożeń danego rodzaju. Zmiana nie wpływa na już istniejące elementy — ich prefiks został zamrożony w momencie utworzenia.",
+  "naming.prefixPlaceholder": "brak",
+  "naming.saveFailed": "Nie udało się zapisać prefiksu.",
 
   "app.logout": "Wyloguj",
   "app.role.admin": "administrator",
@@ -466,10 +471,15 @@ const en: Record<TranslationKey, string> = {
   "settings.users": "Users",
   "settings.storage": "File storage",
   "settings.logs": "Logs",
+  "settings.naming": "Naming",
   "settings.appearance": "Appearance",
   "settings.language": "Language",
   "settings.author": "Author",
   "settings.noPermission": "No permission.",
+
+  "naming.hint": "The letter prefix is prepended to the number of newly created Parts/Assemblies of that kind. Changing it does not affect existing items — their prefix was frozen when they were created.",
+  "naming.prefixPlaceholder": "none",
+  "naming.saveFailed": "Failed to save the prefix.",
 
   "app.logout": "Log out",
   "app.role.admin": "administrator",
@@ -881,10 +891,15 @@ const de: Record<TranslationKey, string> = {
   "settings.users": "Benutzer",
   "settings.storage": "Dateispeicher",
   "settings.logs": "Protokolle",
+  "settings.naming": "Benennung",
   "settings.appearance": "Erscheinungsbild",
   "settings.language": "Sprache",
   "settings.author": "Autor",
   "settings.noPermission": "Keine Berechtigung.",
+
+  "naming.hint": "Das Buchstabenpräfix wird der Nummer neu erstellter Teile/Baugruppen dieser Art vorangestellt. Eine Änderung wirkt sich nicht auf bestehende Elemente aus — deren Präfix wurde bei der Erstellung eingefroren.",
+  "naming.prefixPlaceholder": "keins",
+  "naming.saveFailed": "Präfix konnte nicht gespeichert werden.",
 
   "app.logout": "Abmelden",
   "app.role.admin": "Administrator",

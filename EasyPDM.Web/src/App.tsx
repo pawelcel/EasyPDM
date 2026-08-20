@@ -21,6 +21,7 @@ import { LanguageSettingsView } from "@/features/settings/language-settings-view
 import { LogsView } from "@/features/settings/logs-view"
 import { MyProjectsView } from "@/features/settings/my-projects-view"
 import { SettingsSidebar } from "@/features/settings/settings-sidebar"
+import { NamingSettingsView } from "@/features/settings/naming-settings-view"
 import { StorageSettingsView } from "@/features/settings/storage-settings-view"
 import { TagFilterSelect } from "@/features/tags/tag-filter-select"
 import { useTags } from "@/features/tags/use-tags"
@@ -72,7 +73,13 @@ function App() {
   // Ustawienia (Wygląd/Język) — gdyby zwykły użytkownik trafił tu z domyślnym
   // settingsSection="users", zamiast tego lądował na ekranie "Brak uprawnień".
   useEffect(() => {
-    if (!isAdmin && (settingsSection === "users" || settingsSection === "storage" || settingsSection === "logs")) {
+    if (
+      !isAdmin &&
+      (settingsSection === "users" ||
+        settingsSection === "storage" ||
+        settingsSection === "logs" ||
+        settingsSection === "naming")
+    ) {
       setSettingsSection("appearance")
     }
   }, [isAdmin, settingsSection])
@@ -87,7 +94,7 @@ function App() {
   if (!user) return <LoginView onLoggedIn={refetchAuth} />
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <AppSidebar activeId={view} onSelect={(id) => setView(id as View)} />
 
       {view === "settings" && (
@@ -99,7 +106,7 @@ function App() {
         />
       )}
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-y-auto">
         <header className="sticky top-0 z-10 border-b bg-background px-8 py-5">
           <div className="mb-3.5 flex items-center justify-between">
             <div className="flex items-baseline gap-1.5">
@@ -233,6 +240,10 @@ function App() {
           {view === "settings" &&
             settingsSection === "logs" &&
             (isAdmin ? <LogsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
+
+          {view === "settings" &&
+            settingsSection === "naming" &&
+            (isAdmin ? <NamingSettingsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
 
           {view === "settings" && settingsSection === "appearance" && <AppearanceSettingsView />}
 

@@ -369,6 +369,18 @@ export const api = {
       body: JSON.stringify(schedule),
     }).then((r) => handleResponse<BackupSchedule>(r)),
 
+  getItemNumberPrefixes: () =>
+    fetch(`${BASE}/settings/item-number-prefixes`).then((r) =>
+      handleResponse<{ rodzaj: string; prefix: string | null }[]>(r)
+    ),
+
+  setItemNumberPrefix: (rodzaj: string, prefix: string | null) =>
+    fetch(`${BASE}/settings/item-number-prefixes/${encodeURIComponent(rodzaj)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix }),
+    }).then((r) => handleResponse<{ rodzaj: string; prefix: string | null }>(r)),
+
   restoreBackup: (file: File) => {
     const formData = new FormData()
     formData.append("file", file)
