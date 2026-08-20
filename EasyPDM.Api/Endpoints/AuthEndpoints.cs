@@ -57,7 +57,20 @@ static class AuthEndpoints
                 Path = "/",
             });
 
-            return Results.Ok(ToPublicUser(user));
+            // sessionToken w treści odpowiedzi (obok ciasteczka) — makro SolidWorks (VBA,
+            // MSXML2.XMLHTTP.6.0) nie ma pewnego dostępu do nagłówka Set-Cookie przy
+            // logowaniu (znany problem komponentów COM/WinHTTP, filtrujących ten nagłówek
+            // ze względów bezpieczeństwa), więc czyta token wprost stąd zamiast z ciasteczka.
+            // Ten sam token i tak już trafia do klienta przez ciasteczko — brak dodatkowej
+            // ekspozycji.
+            return Results.Ok(new
+            {
+                id = user.Id,
+                username = user.Username,
+                displayName = user.DisplayName,
+                role = user.Role,
+                sessionToken = token,
+            });
         });
 
         // POST /api/auth/logout

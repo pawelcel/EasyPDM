@@ -549,15 +549,20 @@ Function ApiLogin(ByVal username As String, ByVal password As String) As Object
         Err.Raise ERR_API, "EasyPDM", "Logowanie nie powiodło się: " & http.responseText
     End If
 
-    Dim token As String
-    token = ExtractSessionCookie(http)
-    If token = "" Then
-        LogLine "Logowanie: serwer odpowiedział 2xx, ale nie znaleziono ciasteczka sesji w nagłówkach odpowiedzi."
-        Err.Raise ERR_API, "EasyPDM", "Logowanie nie powiodło się — serwer nie zwrócił sesji."
-    End If
-
     Dim user As Object
     Set user = JsonParse(http.responseText)
+
+    ' Token czytany PRZEDE WSZYSTKIM z treści odpowiedzi JSON ("sessionToken") — MSXML2.
+    ' XMLHTTP.6.0 nie ma pewnego dostępu do nagłówka Set-Cookie (znany problem komponentów
+    ' COM/WinHTTP), więc serwer specjalnie dokłada token też tam. Ciasteczko zostaje jako
+    ' zapasowe źródło (starsze wersje serwera, gdyby ktoś nie zaktualizował API).
+    Dim token As String
+    token = JsonGetString(user, "sessionToken", "")
+    If token = "" Then token = ExtractSessionCookie(http)
+    If token = "" Then
+        LogLine "Logowanie: serwer odpowiedział 2xx, ale nie znaleziono tokenu sesji ani w treści odpowiedzi, ani w nagłówkach."
+        Err.Raise ERR_API, "EasyPDM", "Logowanie nie powiodło się — serwer nie zwrócił sesji."
+    End If
 
     SetSessionToken token
     Dim displayName As String
