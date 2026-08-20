@@ -84,6 +84,12 @@ Private Const SW_DOC_DRAWING As Long = 3     ' swDocumentTypes_e.swDocDRAWING
 ' itself generates via "Tools -> Macro -> New", not in an imported module like this one).
 Private swApp As Object
 
+' Accumulates one run's progress messages (plain text, not a Collection -- fewer moving
+' parts), so DownloadItem/DownloadChildrenRecursive can report progress via AppendLog
+' (they call it directly since they live in the same module) and Sub main() can show it
+' all in one summary dialog at the end. Reset to "" at the start of every run.
+Private gLogText As String
+
 
 ' ============================================================================
 ' Log -- same mechanism as EasyPDMUpload.bas, a separate file so the two macros' logs don't
@@ -998,13 +1004,8 @@ End Function
 ' inside Sub "main").
 ' ============================================================================
 
-' A module-level log used only within one run of main(), so DownloadItem/
-' DownloadChildrenRecursive can append to it -- they call it directly since they live in
-' the same module.
-Private gLogLines As Collection
-
 Sub AppendLog(ByVal message As String)
-    gLogLines.Add message
+    gLogText = gLogText & message & vbCrLf
     LogLine message
 End Sub
 
@@ -1041,7 +1042,7 @@ Sub main()
     EnsureDirectory targetDir
     SetDownloadFolder targetDir
 
-    Set gLogLines = New Collection
+    gLogText = ""
     AppendLog "Downloading " & JsonGetLong(topItem, "itemNumber", 0) & " (" & JsonGetString(topItem, "fileName", "") & ") to " & targetDir & "..."
 
     Dim seen As Object
@@ -1077,12 +1078,7 @@ Sub main()
         AppendLog "Could not determine the main file to open."
     End If
 
-    Dim summary As String
-    Dim i As Long
-    For i = 1 To gLogLines.Count
-        summary = summary & gLogLines(i) & vbCrLf
-    Next i
-    MsgBox summary, vbInformation, "EasyPDM"
+    MsgBox gLogText, vbInformation, "EasyPDM"
     LogLine "=== Finished ==="
     Exit Sub
 
