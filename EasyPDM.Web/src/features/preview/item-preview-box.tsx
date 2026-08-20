@@ -20,7 +20,7 @@ interface PreviewSource {
 // PDF/STEP w panelu Załączniki) — nie zgadujemy po rozszerzeniu, żeby było jednoznaczne,
 // który plik zasila podgląd. Panel Załączników pilnuje, żeby na rolę przypadał najwyżej
 // jeden załącznik (nowy zastępuje stary), więc szukanie pierwszego pasującego wystarczy.
-function usePreviewSources(item: Item): { pdf: PreviewSource | null; step: PreviewSource | null } {
+function usePreviewSources(item: Item, refreshSignal: number): { pdf: PreviewSource | null; step: PreviewSource | null } {
   const [attachmentSources, setAttachmentSources] = useState<{ pdf: PreviewSource | null; step: PreviewSource | null }>({
     pdf: null,
     step: null,
@@ -41,7 +41,11 @@ function usePreviewSources(item: Item): { pdf: PreviewSource | null; step: Previ
     return () => {
       cancelled = true
     }
-  }, [item.id, item.itemType])
+    // refreshSignal celowo w zależnościach — rośnie po każdej akcji w AttachmentsPanel
+    // (wgranie/usunięcie pliku PDF/STEP), żeby box odświeżył się bez ponownego
+    // zaznaczania elementu (zob. historyRefreshSignal w item-detail-panel.tsx).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id, item.itemType, refreshSignal])
 
   if (item.itemType === "file" && item.filePath) {
     const kind = previewKindOf(item.fileName)
@@ -52,16 +56,16 @@ function usePreviewSources(item: Item): { pdf: PreviewSource | null; step: Previ
   return attachmentSources
 }
 
-// Miniaturowy podgląd u góry panelu właściwości — domyślnie rysunek PDF (2D), z
-// przełącznikiem na model STEP (3D). Dla Części/Złożenia box jest widoczny ZAWSZE (nawet
-// bez wgranego pliku) — brak pliku dla wybranego trybu pokazuje podpowiedź "wgraj w
-// Załącznikach" zamiast całkiem znikać, żeby użytkownik od razu widział, gdzie i co dodać.
-function ItemPreviewBox({ item }: { item: Item }) {
+// Miniaturowy podgląd u góry panelu właściwości — domyślnie model 3D, z przełącznikiem na
+// rysunek PDF (2D). Dla Części/Złożenia box jest widoczny ZAWSZE (nawet bez wgranego
+// pliku) — brak pliku dla wybranego trybu pokazuje podpowiedź "wgraj w Załącznikach"
+// zamiast całkiem znikać, żeby użytkownik od razu widział, gdzie i co dodać.
+function ItemPreviewBox({ item, refreshSignal = 0 }: { item: Item; refreshSignal?: number }) {
   const { t } = useLanguage()
-  const { pdf, step } = usePreviewSources(item)
-  const [mode, setMode] = useState<"2d" | "3d">("2d")
+  const { pdf, step } = usePreviewSources(item, refreshSignal)
+  const [mode, setMode] = useState<"2d" | "3d">("3d")
 
-  useEffect(() => setMode("2d"), [item.id])
+  useEffect(() => setMode("3d"), [item.id])
 
   const isAttachmentDriven = item.itemType === "part" || item.itemType === "assembly"
   if (!isAttachmentDriven && !pdf && !step) return null
@@ -83,7 +87,7 @@ function ItemPreviewBox({ item }: { item: Item }) {
                 </div>
               }
             >
-              <StepPreview url={active.url} />
+              <StepPreview url={active.url} fileName={active.fileName} />
             </Suspense>
           )
         ) : (

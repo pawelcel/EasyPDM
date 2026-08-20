@@ -16,6 +16,7 @@ declare module "occt-import-js" {
 
   export interface OcctInstance {
     ReadStepFile(fileBuffer: Uint8Array, params: null): OcctReadResult
+    ReadIgesFile(fileBuffer: Uint8Array, params: null): OcctReadResult
   }
 
   export interface OcctInitOptions {
