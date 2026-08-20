@@ -1180,6 +1180,13 @@ End Function
 ' VBA utworzonym przez Narzędzia -> Makro -> Nowy — nie trzeba jej samemu tworzyć.
 ' ============================================================================
 
+' Wartości z enumu SolidWorks swDocumentTypes_e — zadeklarowane wprost jako liczby, z tego
+' samego powodu co SW_CUSTOM_INFO_TEXT/SW_CUSTOM_PROPERTY_REPLACE niżej (late binding +
+' Option Explicit -> gołe nazwy stałych bez referencji do biblioteki typów nie skompilują
+' się, potwierdzone w praktyce jako "Variable not defined").
+Private Const SW_DOC_PART As Long = 1        ' swDocumentTypes_e.swDocPART
+Private Const SW_DOC_ASSEMBLY As Long = 2    ' swDocumentTypes_e.swDocASSEMBLY
+
 ' Zwraca ścieżkę pliku, typ elementu PDM ("part"/"assembly"/"file") wynikający z typu
 ' dokumentu SolidWorks, i domyślną nazwę (nazwa pliku bez rozszerzenia). Zapisuje dokument,
 ' jeśli jeszcze nie był zapisany na dysku, użytkownik musi wtedy wskazać ścieżkę przez
@@ -1208,9 +1215,9 @@ Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As Strin
     End If
 
     Select Case swModel.GetType()
-        Case swDocPART
+        Case SW_DOC_PART
             itemTypeGuess = "part"
-        Case swDocASSEMBLY
+        Case SW_DOC_ASSEMBLY
             itemTypeGuess = "assembly"
         Case Else
             itemTypeGuess = "file"
@@ -1243,18 +1250,25 @@ Function GetLinkedItemId() As String
     GetLinkedItemId = valOut
 End Function
 
+' Wartości z enumów SolidWorks swCustomInfoType_e / swCustomPropertyAddOption_e —
+' zadeklarowane tu WPROST jako liczby (zamiast liczyć na to, że gołe nazwy stałych
+' swCustomInfoText/swCustomPropertyReplaceValue rozwiążą się same przez referencję do
+' biblioteki typów SolidWorks) — cały ten moduł celowo używa late bindingu (typ Object
+' zamiast SldWorks.*), więc bez tego "Option Explicit" na górze pliku traktuje te gołe
+' nazwy jako niezadeklarowane zmienne ("Variable not defined" przy kompilacji), co
+' faktycznie potwierdzone w praktyce. Wartości stabilne, udokumentowane w SolidWorks API,
+' niezmienne od wielu wersji (w tym 2026).
+Private Const SW_CUSTOM_INFO_TEXT As Long = 30            ' swCustomInfoType_e.swCustomInfoText
+Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2       ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
+
 ' Zapisuje powiązanie dokumentu z elementem PDM jako Właściwości niestandardowe — w
 ' odróżnieniu od podejścia FreeCAD (zmiana etykiety, NIEZAPISYWANA na dysk) działa
 ' niezawodnie także w NOWEJ sesji SolidWorks, bo Właściwości są częścią samego pliku.
-' UWAGA: nazwy stałych swCustomInfoText / swCustomPropertyReplaceValue NIE były
-' weryfikowane względem realnej biblioteki typów SolidWorks w tym środowisku — jeśli
-' edytor VBA zgłosi "zmienna niezdefiniowana" przy którejś z nich, sprawdź dokładną nazwę
-' w przeglądarce obiektów (F2) pod swCustomInfoType_e / swCustomPropertyAddOption_e.
 Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String)
     Dim mgr As Object
     Set mgr = GetCustPropMgr()
-    mgr.Add3 CUSTPROP_ITEM_ID, swCustomInfoText, itemId, swCustomPropertyReplaceValue
-    mgr.Add3 CUSTPROP_ITEM_NUMBER, swCustomInfoText, itemNumberText, swCustomPropertyReplaceValue
+    mgr.Add3 CUSTPROP_ITEM_ID, SW_CUSTOM_INFO_TEXT, itemId, SW_CUSTOM_PROPERTY_REPLACE
+    mgr.Add3 CUSTPROP_ITEM_NUMBER, SW_CUSTOM_INFO_TEXT, itemNumberText, SW_CUSTOM_PROPERTY_REPLACE
 End Sub
 
 
