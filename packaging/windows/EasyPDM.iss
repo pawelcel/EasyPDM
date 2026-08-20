@@ -422,6 +422,21 @@ begin
   ForceDirectories(ExpandConstant('{#MyDataDir}\backups'));
   ForceDirectories(ExpandConstant('{#MyDataDir}\logs'));
 
+  { %ProgramData% domyślnie NIE daje zwykłym użytkownikom (grupa "Users") prawa zapisu do
+    nowo utworzonych podfolderów — tylko odczyt. Usługa Windows działa jako LocalSystem
+    (pełny dostęp), więc normalnie tego nie widać, ALE każdy proces uruchomiony jako zwykły
+    użytkownik (ręczne odpalenie EasyPDM.Api.exe do debugowania, albo makro FreeCAD/
+    SolidWorks próbujące zapisać bezpośrednio do współdzielonego magazynu) dostanie
+    UnauthorizedAccessException — potwierdzone w praktyce. "S-1-5-32-545" to
+    lokalizacyjnie-niezależny SID wbudowanej grupy "Users" (nazwa "Users" bywa inna na
+    nie-angielskich Windows, SID zawsze ten sam) — (OI)(CI)M nadaje Modify (odczyt/zapis/
+    usuwanie) rekurencyjnie na cały katalog i wszystko, co w nim później powstanie. Bezpieczne
+    do uruchomienia zawsze (też przy aktualizacji) — icacls /grant jest idempotentne. }
+  Exec(ExpandConstant('{sys}\icacls.exe'),
+    '"' + ExpandConstant('{#MyDataDir}') + '" /grant *S-1-5-32-545:(OI)(CI)M',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  LogInstall('icacls {#MyDataDir} /grant Users:M -> kod wyjscia ' + IntToStr(ResultCode));
+
   { appsettings.Production.json nadpisuje appsettings.json (domyślne środowisko to
     Production) — ten sam mechanizm warstwowej konfiguracji ASP.NET Core co appsettings.json
     + zmienne środowiskowe w Dockerze/na Linuksie, tylko przez plik zamiast zmiennych — na
