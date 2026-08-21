@@ -2,8 +2,10 @@
 
 Dwa niezależne makra, jedno na wysyłanie, jedno na pobieranie/otwieranie:
 
-- **`EasyPDMUpload.FCMacro`** wysyła aktywny dokument FreeCAD wprost do EasyPDM, bez
-  przechodzenia przez przeglądarkę (opisane w tym pliku niżej).
+- **`EasyPDMUpload.FCMacro`** wysyła aktywny dokument FreeCAD do EasyPDM. Makro nie pyta
+  lokalnie o NIC poza folderem zapisu — nawet wybór "nowy element czy dogranie do
+  istniejącego" zapada w **przeglądarce systemowej** (opisane w tym pliku niżej), na tym
+  samym formularzu/pasku co w aplikacji webowej.
 - **`EasyPDMDownload.FCMacro`** pobiera Część/Złożenie z EasyPDM (razem ze WSZYSTKIMI jego
   składnikami, jeśli to Złożenie) i od razu je otwiera w FreeCAD (opisane w osobnej sekcji
   na końcu tego pliku).
@@ -22,7 +24,8 @@ Nie trzeba niczego instalować jako workbench. Dla każdego z dwóch makr osobno
 
 Adres API (domyślnie `http://localhost:5000/api`) jest zapamiętywany w preferencjach FreeCAD
 (`User parameter:BaseApp/EasyPDM`) po pierwszym uruchomieniu — można go zmienić w oknie
-dialogowym makra, w polu "Adres API".
+"Wyślij do PDM" (pierwsze okno w każdym przebiegu — folder docelowy + konto), w polu
+"Adres API".
 
 ## Logowanie
 
@@ -31,10 +34,20 @@ też się loguje. Przy pierwszym uruchomieniu (albo gdy zapisana sesja wygasła 
 unieważniona) pojawia się okno logowania (nazwa użytkownika + hasło, te same konta co
 w aplikacji webowej). Token sesji trafia do tych samych preferencji FreeCAD co adres API,
 więc **kolejne uruchomienia makra — także po restarcie FreeCAD — NIE proszą o ponowne
-logowanie**, dopóki sesja jest ważna (30 dni, tak samo jak w aplikacji webowej). W głównym
-oknie "Wyślij do PDM" widać, kto jest zalogowany, i można się stamtąd **wylogować**
-(przycisk "Wyloguj") — unieważnia to sesję po stronie serwera i czyści lokalnie zapisany
-token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
+logowanie**, dopóki sesja jest ważna (30 dni, tak samo jak w aplikacji webowej). W oknie
+"Wyślij do PDM" widać, kto jest zalogowany, i można się stamtąd **wylogować** (przycisk
+"Wyloguj") — unieważnia to sesję po stronie serwera i czyści lokalnie zapisany token, więc
+kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
+
+**Dlaczego makro w ogóle potrzebuje własnej sesji, skoro decyzja nowy/istniejący i cały
+formularz są w przeglądarce?** Bo makro samo musi się cały czas potrafić uwierzytelnić,
+żeby (a) odpytać, czy przeglądarka już skończyła (`GET /api/create-tickets/{ticket}`), i
+(b) dograć sam plik CAD do wskazanego elementu — to wciąż robi makro, nie przeglądarka, bo
+inaczej zniknęłaby cała automatyka zmiany nazwy pliku / eksportu STEP / BOM-u złożenia. Ta
+sama sesja makra jest przy okazji tym, co loguje przeglądarkę AUTOMATYCZNIE —
+`GET /api/auth/browser-login` zamienia token makra na ciasteczko przeglądarki — więc
+logowanie w makrze i "darmowe" zalogowanie przeglądarki to **jedna, ta sama operacja**, nie
+dwie osobne.
 
 ## Co robi
 
@@ -46,37 +59,56 @@ token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
     wysłane i pobrane pliki lądowały razem w jednym miejscu). Pytane RAZ, na samym początku —
     obejmuje też automatycznie wykryte drzewo złożenia (część/pod-złożenia wysyłane wcześniej
     niż otwiera się główne okno).
-2. **Otwiera okno dialogowe**, w którym najpierw wybiera się **tryb**:
-   - **Nowy element w PDM** — pełny formularz: projekt PDM (pobierany z serwera) i
-     opcjonalnie element nadrzędny (Folder/Złożenie tego projektu — dokładnie te same
-     reguły struktury co w aplikacji webowej: pod Częścią/Plikiem nie da się nic dodać),
-     typ (Część/Złożenie), nazwa (domyślnie etykieta dokumentu), rodzaj i zależne od niego
-     pola — dla Części rodzaj jest wymagany: **Wykonywana** → Materiał, **Zakupowa** →
-     Producent/Numer zamówieniowy 1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** →
-     brak dodatkowych pól. Dla Złożenia rodzaj jest opcjonalny i ograniczony do
-     Wykonywana/Zakupowa/Normalia (bez "Klienta"), a Masa jest zawsze widoczna niezależnie od
-     wybranego rodzaju — Złożenie nigdy nie ma pola Materiał (tylko Część) — identycznie jak
-     w aplikacji webowej.
-     **Automatyczne wykrycie istniejącego elementu**: makro sprawdza nazwę (przy otwarciu
-     okna — na podstawie etykiety dokumentu — i na bieżąco przy wpisywaniu w polu "Nazwa")
-     i jeśli w PDM istnieje już Część/Złożenie o dokładnie takiej nazwie, samo przełącza
-     tryb na "Istniejący element" i zaznacza dopasowany element (jeśli nazwa jest
-     jednoznaczna — przy kilku elementach o tej samej nazwie w różnych projektach tylko
-     zawęża wyszukiwanie, wybór zostaje po stronie użytkownika). To tylko **podpowiedź** —
-     niczego nie wysyła automatycznie; zawsze można ręcznie wrócić do "Nowy element", jeśli
-     rzeczywiście chodziło o nowy rekord o tej samej nazwie.
-   - **Istniejący element w PDM** — jedno pole: Część albo Złożenie do wyboru/wyszukania
-     z **całej bazy** (nie tylko bieżącego projektu, bo komponent może być używany w wielu
-     projektach), z podpowiedziami podczas pisania (po numerze albo nazwie). Wybrany
+2. **Żadne natywne okno się już nie pokazuje.** Makro od razu otwiera **przeglądarkę
+   systemową**, już zalogowaną (most token→ciasteczko, zob. "Logowanie" wyżej), na pasku
+   "oczekuje żądanie z makra CAD" (widoczny na KAŻDYM ekranie aplikacji webowej, dopóki
+   bilet czeka). Pasek pokazuje **jawny wybór dwoma przyciskami** — wybór "nowy element czy
+   dogranie do istniejącego" zapada tam, nie lokalnie i nie przez przypadkowe kliknięcie
+   byle "Dodaj" gdziekolwiek w aplikacji (świadomie NIE dzieje się w ten sposób):
+   - **"Nowy element"** — otwiera **samowystarczalny popup**, bez potrzeby wcześniejszej
+     nawigacji po panelu projektów po lewej: dopiero W TYM POPUPIE wybiera się projekt,
+     opcjonalnie element nadrzędny, typ (Część/Złożenie), nazwę (domyślnie podpowiedziana
+     z etykiety dokumentu), rodzaj i zależne od niego pola: dla Części rodzaj jest
+     wymagany — **Wykonywana** → Materiał, **Zakupowa** → Producent/Numer zamówieniowy
+     1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** → brak dodatkowych pól. Dla
+     Złożenia rodzaj jest opcjonalny i ograniczony do Wykonywana/Zakupowa/Normalia (bez
+     "Klienta"), a Masa jest zawsze widoczna niezależnie od wybranego rodzaju — Złożenie
+     nigdy nie ma pola Materiał (tylko Część). Popup ma też **checkbox "Eksportuj i wyślij
+     model STEP"**. Bilet jest przypięty JAWNIE do tego jednego, konkretnego popupu — żadne
+     INNE "Dodaj" w aplikacji (w drzewie projektu, panelu szczegółów) nigdy przypadkiem go
+     nie "połknie". **Anuluj** w popupie wraca do wyboru "Nowy element"/"Dograj do
+     istniejącego" bez tworzenia niczego.
+   - **"Dograj do istniejącego elementu"** — rozwija wyszukiwarkę Części/Złożenia z
+     **całej bazy** (nie tylko bieżącego projektu, bo komponent może być współdzielony), z
+     podpowiedziami podczas pisania (po numerze albo nazwie) i tym samym checkboksem STEP.
+     Jeśli etykieta lokalnego dokumentu wygląda jak `numer (nazwa).REWIZJA` (bo to samo
+     makro już go tak nazwało po wcześniejszej wysyłce), wyszukiwarka od razu podpowiada
+     dopasowany element — to tylko **podpowiedź**, wybór zawsze można zmienić. Wybrany
      element nie jest tworzony na nowo — bieżący dokument trafia do niego jako **aktualna
-     wersja jego bieżącej rewizji**. Jeśli element ma status **"Wydany"** (w tym statusie
-     PDM nie pozwala dogrywać plików), makro otwiera okno "Nowa rewizja": pyta, czy
-     stworzyć nową rewizję, i pozwala wpisać opcjonalny **komentarz do rewizji** (co się
-     zmieniło) — dokładnie ten sam komentarz, który można dodać w aplikacji webowej przy
-     tej samej zmianie statusu. Anulowanie nic nie zapisuje; zatwierdzenie zmienia status
-     na "W pracy" (ten sam mechanizm co w aplikacji webowej — podnosi numer rewizji
-     i zapisuje komentarz, jeśli podano) i dopiero potem wysyła plik.
-3. **Nowy element**: tworzy go w PDM (`POST /api/projects/{id}/nodes`). W obu trybach:
+     wersja jego bieżącej rewizji** (to, co dzieje się dalej ze statusem "Wydany"/nową
+     rewizją, opisuje krok 2a niżej — to JEDYNA decyzja, która świadomie zostaje lokalna,
+     w FreeCAD, tuż przed samym dograniem pliku).
+
+   Jeden wspólny formularz/pasek w przeglądarce dla WSZYSTKIEGO, więc te reguły nie mogą
+   się już rozjechać między makrem a aplikacją webową. Po zdecydowaniu w przeglądarce
+   (dowolną z dwóch dróg wyżej), FreeCAD (okno "Czekam na przeglądarkę", odpytujące serwer
+   co ~2 s, limit 10 minut) samo wykrywa zakończenie i kontynuuje od kroku 3 niżej — nie
+   trzeba wracać do FreeCAD ręcznie. Anulowanie w przeglądarce albo w oknie oczekiwania
+   kończy makro komunikatem bez tworzenia/dogrania pliku (element mógł już powstać w PDM,
+   jeśli zdążono go zapisać w przeglądarce — wtedy trzeba uruchomić makro ponownie i
+   dograć do niego przez pasek "oczekujące żądanie z makra").
+2a. **Jedyna decyzja, która świadomie ZOSTAŁA lokalna** — dla dogrywanego elementu ze
+    statusem **"Wydany"** (w tym statusie PDM nie pozwala dogrywać plików), makro otwiera
+    okno "Nowa rewizja": pyta, czy stworzyć nową rewizję, i pozwala wpisać opcjonalny
+    **komentarz do rewizji** (co się zmieniło) — dokładnie ten sam komentarz, który można
+    dodać w aplikacji webowej przy tej samej zmianie statusu. To bezpośrednio potwierdzenie
+    tego, co makro zaraz zrobi z plikiem na dysku, nie dane elementu w PDM — stąd zostało
+    lokalne. Anulowanie nic nie zapisuje; zatwierdzenie zmienia status na "W pracy" (ten
+    sam mechanizm co w aplikacji webowej — podnosi numer rewizji i zapisuje komentarz,
+    jeśli podano) i dopiero potem wysyła plik.
+3. Element w tym momencie już istnieje w PDM (nowy — stworzony przez formularz w
+   przeglądarce; już istniejący — wskazany tam samym paskiem, zob. krok 2). W obu
+   przypadkach makro
    **KOPIUJE** bieżący plik dokumentu do PDM pod nazwą `numer (nazwa).REWIZJA.rozszerzenie`
    — ten sam format numer/nazwa, w jakim PDM wyświetla Części/Złożenia wszędzie indziej, plus
    rewizja jako **wielka litera** (A, B, C... — ta sama konwencja `revisionLabel()` co
@@ -104,11 +136,12 @@ token, więc kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
    dogrywanie plików CAD z panelu właściwości w aplikacji webowej) — wtedy historia rewizji
    nie jest zachowywana.
 5. **Opcjonalnie eksportuje STEP i wgrywa go automatycznie jako załącznik z rolą "step"** —
-   zaznaczane checkboksem "Eksportuj i wyślij model STEP (podgląd 3D...)" w oknie **Folder
-   docelowy** (krok 1a, pytane RAZ na początku, obejmuje więc też automatycznie wykryte
-   drzewo złożenia) — domyślnie **włączone**, zapamiętywane między uruchomieniami makra
-   (ta sama preferencja co folder docelowy). Gdy włączone, działa dokładnie tym samym
-   mechanizmem co ręczny przycisk "STEP" w panelu Załączników w aplikacji webowej, więc od
+   makro nie ma tu już żadnego lokalnego wyboru. Dla **nowego** elementu decyduje o tym
+   WYŁĄCZNIE checkbox w formularzu w przeglądarce (krok 2 wyżej). Dla dogrywania do
+   **istniejącego** elementu i dla automatycznie wykrytych komponentów złożenia (oba nigdy
+   nie przechodzą przez przeglądarkę) STEP eksportuje się **zawsze**, bez pytania. Gdy
+   eksportuje, działa dokładnie tym samym mechanizmem co ręczny przycisk "STEP" w panelu
+   Załączników w aplikacji webowej, więc od
    razu zasila stały podgląd 3D w panelu elementu. Eksportowana jest cała **widoczna**
    geometria dokumentu (wszystkie obiekty z bryłą, których widoczność jest włączona — dla
    Części to zwykle jedna bryła/Body, dla automatycznie wykrytego złożenia to rozwiązane
@@ -137,15 +170,25 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   (ten sam format, który makro samo nadaje po wysłaniu) — jeśli taki numer istnieje w PDM,
   komponent NIE jest tworzony ponownie, tylko podpinany do BOM-u z wyliczoną ilością.
 - **Nowe komponenty**: dla każdego jeszcze nie wysłanego pliku pokazuje się osobne, krótkie
-  okno (Projekt/Typ/Nazwa/Rodzaj i zależne od rodzaju pola — te same reguły co dla
-  pojedynczego nowego elementu, patrz wyżej); typ (Część/Złożenie) jest podpowiadany na
-  podstawie tego, czy dany plik sam ma dalsze linki.
+  **natywne** okno (Projekt/Typ/Nazwa/Rodzaj i zależne od rodzaju pola — te same reguły co
+  formularz w przeglądarce dla pojedynczego nowego elementu, patrz wyżej) — **celowo bez
+  przeglądarki**, żeby wysłanie złożenia z wieloma nowymi komponentami nie wymagało tylu
+  samo okien przeglądarki co komponentów; typ (Część/Złożenie) jest podpowiadany na
+  podstawie tego, czy dany plik sam ma dalsze linki. Sam GŁÓWNY dokument złożenia (ten, na
+  którym uruchomiono makro) i tak przechodzi przez formularz w przeglądarce jak każdy inny
+  nowy element — tylko jego automatycznie wykryte SKŁADNIKI omijają przeglądarkę.
 - Wybranie **"Nie"** na pytanie o automatyczne wysłanie wysyła TYLKO bieżący dokument,
   dokładnie tak jak dotychczas (bez podelementów) — struktura BOM-u zostaje wtedy do
   ręcznego uzupełnienia w aplikacji webowej, jak wcześniej.
 
 ## Ograniczenia pierwszej wersji
 
+- **Krok 2** (nowy element/dogranie do istniejącego, oba przez przeglądarkę) wymaga, żeby
+  domyślna przeglądarka systemowa umiała otworzyć adres serwera PDM (ten sam, co adres API
+  w preferencjach makra) — na typowej instalacji (klient i serwer w tej samej sieci)
+  działa to bez dodatkowej konfiguracji. Okno oczekiwania w FreeCAD ma limit **10 minut**
+  — po przekroczeniu (albo Anuluj) makro kończy się komunikatem, bez tworzenia/dogrania
+  pliku.
 - Automatyczne wykrywanie złożenia działa tylko dla odnośników do **zewnętrznych, zapisanych
   plików** (`App::Link`) — nie dla złożeń trzymanych w jednym pliku jako kontenery
   `App::Part` (te nie mają osobnych plików do wysłania osobno; trzeba je wtedy wysyłać
@@ -182,6 +225,19 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   "zmieniony" w GUI nie znika).
 
 ## Weryfikacja
+
+⚠️ **Poniższe testy dotyczą wersji SPRZED zmiany "formularz nowego elementu w
+przeglądarce"** (opisanej w kroku 2 wyżej) — ta zmiana jest **nieprzetestowana na żywym
+FreeCAD**. Zweryfikowane do tej pory: składnia (`py_compile`), spójność struktury (brak
+osieroconych odwołań do usuniętych pól natywnego dialogu), i end-to-end na poziomie samych
+endpointów backendu (`GET /api/auth/browser-login` — ustawienie ciasteczka + przekierowanie
++ ochrona przed open-redirect, `POST /projects/{id}/nodes` z ticketem + `GET
+/create-tickets/{ticket}` — zwrot poprawnych danych elementu) w izolowanym środowisku
+testowym, patrz `EasyPDM.Api.Tests/CreateTicketEndpointsTests.cs` i
+`AuthEndpointsTests.cs`. NIE zweryfikowane na żywo: samo `webbrowser.open()` z poziomu
+FreeCAD, okno "Czekam na przeglądarkę" (`WaitForTicketDialog`) w realnym GUI, oraz cały
+przepływ od kliknięcia "Dodaj" w przeglądarce do automatycznego kontynuowania w FreeCAD.
+Przy pierwszym uruchomieniu obserwuj przebieg uważnie i zgłoś, co nie zagra.
 
 ⚠️ **Poniższe testy dotyczą wersji SPRZED zmiany "Save As lokalnego pliku pod nazwą PDM"**
 (opisanej w kroku 3 wyżej) — w szczególności punkty mówiące, że lokalny plik/`doc.FileName`
@@ -261,14 +317,21 @@ ręcznie — testowane na FreeCAD 1.1.3 z PySide6.
 Drugie makro: zamiast wysyłać, **pobiera** Część/Złożenie z EasyPDM i od razu **otwiera** je
 w FreeCAD. Logowanie i adres API są dokładnie tak samo skonfigurowane jak w
 `EasyPDMUpload.FCMacro` (te same preferencje FreeCAD) — osobna instalacja/uruchomienie
-(patrz "Instalacja" wyżej), ale wspólna sesja.
+(patrz "Instalacja" wyżej), ale wspólna sesja. Tak jak w `EasyPDMUpload.FCMacro`, wybór
+elementu zapada w **przeglądarce systemowej**, nie w natywnym oknie — makro pyta lokalnie
+TYLKO o folder docelowy.
 
 ## Co robi
 
-1. Okno z wyszukiwarką Części/Złożenia (identyczny mechanizm co pole "Element" przy wysyłaniu
-   do istniejącego elementu — pisanie po numerze albo nazwie podpowiada dopasowania z całej
-   bazy) i folderem docelowym. Folder domyślnie podpowiada ostatnio użyty (osobna preferencja
-   FreeCAD, `DownloadFolder`), z przyciskiem **"..."** do zmiany w dowolnym momencie.
+1. Natywne okno pyta TYLKO o folder docelowy (domyślnie podpowiada ostatnio użyty, osobna
+   preferencja FreeCAD `DownloadFolder`, z przyciskiem **"..."** do zmiany) i pokazuje
+   konto/**Wyloguj**. Po zatwierdzeniu makro od razu otwiera **przeglądarkę systemową**, już
+   zalogowaną (most token→ciasteczko), na pasku "oczekuje żądanie pobrania z makra CAD"
+   (widoczny na każdym ekranie aplikacji webowej) — tam dopiero wyszukuje się Część/Złożenie
+   z **całej bazy** (po numerze albo nazwie) i zatwierdza wybór. FreeCAD (okno "Czekam na
+   przeglądarkę", odpytujące co ~2 s, limit **10 minut**) samo wykrywa zatwierdzenie i
+   pobieranie zaczyna się automatycznie — nie trzeba wracać do FreeCAD ręcznie. Anulowanie
+   w przeglądarce/oknie oczekiwania kończy makro bez pobierania niczego.
 2. Dla **Złożenia**: pobiera też WSZYSTKIE jego składniki rekurencyjnie (bezpośrednie dzieci,
    potem ich dzieci, i tak dalej — cały BOM), do TEGO SAMEGO folderu co plik główny. Bez tego
    złożenie zbudowane na odnośnikach `App::Link` do zewnętrznych, zapisanych plików (standard
@@ -298,6 +361,11 @@ wgrany załącznik jako najlepsze przybliżenie.
 
 ## Ograniczenia pierwszej wersji
 
+- **Wybór elementu** (krok 1 wyżej) wymaga, żeby domyślna przeglądarka systemowa umiała
+  otworzyć adres serwera PDM (ten sam, co adres API w preferencjach makra) — na typowej
+  instalacji (klient i serwer w tej samej sieci) działa to bez dodatkowej konfiguracji.
+  Okno oczekiwania w FreeCAD ma limit **10 minut** — po przekroczeniu (albo Anuluj) makro
+  kończy się bez pobierania niczego.
 - Zawsze celuje w AKTUALNĄ rewizję — nie da się nim pobrać konkretnej, wybranej starszej
   rewizji (starsze lokalne kopie służą wyłącznie do wykrycia "masz nieaktualną wersję",
   punkt 4 wyżej).
@@ -331,3 +399,11 @@ załączników regexem (jeśli plik ma nietypową nazwę) i to, czy odnośniki `
 pobranym złożeniu faktycznie rozwiążą się automatycznie po umieszczeniu wszystkich plików
 w jednym, płaskim folderze (zależy od tego, jak zapisane są ścieżki linków w oryginalnym
 pliku — patrz "Ograniczenia" wyżej).
+
+Wybór elementu przez przeglądarkę (krok 1 wyżej) to NAJNOWSZA zmiana w tym pliku, zbudowana
+wprost na tym samym, już zweryfikowanym mechanizmie z `EasyPDMUpload.FCMacro`
+(`GET /api/auth/browser-login`, bilet `GET /api/create-tickets/{ticket}` +
+`POST /create-tickets/{ticket}/attach-existing`, pasek "oczekujące żądanie z makra" w
+aplikacji webowej) — backend/frontend tej części były testowane end-to-end (`curl` w
+izolowanym środowisku), ale samo `EasyPDMDownload.FCMacro` (`webbrowser.open`,
+`WaitForTicketDialog` w realnym GUI) nie było jeszcze uruchomione na żywym FreeCAD.

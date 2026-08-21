@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace EasyPDM.Api.Tests;
 
@@ -67,5 +68,62 @@ public class AuthEndpointsTests
 
         var meAfterLogout = await client.GetAsync("/api/auth/me");
         Assert.Equal(HttpStatusCode.Unauthorized, meAfterLogout.StatusCode);
+    }
+
+    // Most token->ciasteczko dla przeglądarki otwieranej przez makro CAD (zob.
+    // AuthEndpoints.cs, GET /api/auth/browser-login) — token to sessionToken zwracany w
+    // treści /auth/login, ten sam sekret, który makro i tak już trzyma lokalnie.
+    [Fact]
+    public async Task Browser_login_z_poprawnym_tokenem_ustawia_sesje_i_przekierowuje()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var loginClient = factory.CreateClient();
+        var loginResponse = await loginClient.PostAsJsonAsync("/api/auth/login", new { username = AdminUsername, password = AdminPassword });
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var token = loginBody.GetProperty("sessionToken").GetString();
+
+        using var browserClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var response = await browserClient.GetAsync($"/api/auth/browser-login?token={token}&redirect=%2F%3Ffoo%3D1");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/?foo=1", response.Headers.Location?.OriginalString);
+
+        // Ciasteczko ustawione przy przekierowaniu -> kolejne żądanie tym samym klientem
+        // (HandleCookies domyślnie true, niezależnie od AllowAutoRedirect) ma być zalogowane.
+        var me = await browserClient.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+    }
+
+    [Fact]
+    public async Task Browser_login_z_bledym_tokenem_przekierowuje_bez_ustawienia_sesji()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var browserClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await browserClient.GetAsync("/api/auth/browser-login?token=nieistniejacy&redirect=%2F");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var me = await browserClient.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("https://evil.example")]
+    [InlineData("//evil.example")]
+    [InlineData("/\\evil.example")]
+    [InlineData("/javascript:alert(1)")]
+    public async Task Browser_login_odrzuca_niebezpieczny_redirect(string maliciousRedirect)
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var loginClient = factory.CreateClient();
+        var loginResponse = await loginClient.PostAsJsonAsync("/api/auth/login", new { username = AdminUsername, password = AdminPassword });
+        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var token = loginBody.GetProperty("sessionToken").GetString();
+
+        using var browserClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var response = await browserClient.GetAsync($"/api/auth/browser-login?token={token}&redirect={Uri.EscapeDataString(maliciousRedirect)}");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/", response.Headers.Location?.OriginalString);
     }
 }

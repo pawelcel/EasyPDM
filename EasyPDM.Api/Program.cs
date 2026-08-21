@@ -51,14 +51,16 @@ await EnsureDefaultAdminAsync(connectionString);
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// Każda ścieżka /api/* (poza logowaniem) wymaga poprawnej sesji — reszta endpointów nie
-// musi tego sprawdzać samodzielnie. Zalogowany użytkownik trafia do HttpContext.Items pod
-// kluczem "CurrentUser" (typu CurrentUser, zob. AuthEndpoints.cs), skąd mogą go odczytać
+// Każda ścieżka /api/* (poza logowaniem i mostem token->ciasteczko dla przeglądarki
+// otwieranej przez makra CAD) wymaga poprawnej sesji — reszta endpointów nie musi tego
+// sprawdzać samodzielnie. Zalogowany użytkownik trafia do HttpContext.Items pod kluczem
+// "CurrentUser" (typu CurrentUser, zob. AuthEndpoints.cs), skąd mogą go odczytać
 // poszczególne handlery (np. do sprawdzenia roli administratora).
 app.Use(async (context, next) =>
 {
     if (context.Request.Path.StartsWithSegments("/api") &&
-        !context.Request.Path.StartsWithSegments("/api/auth/login"))
+        !context.Request.Path.StartsWithSegments("/api/auth/login") &&
+        !context.Request.Path.StartsWithSegments("/api/auth/browser-login"))
     {
         var user = await AuthEndpoints.GetCurrentUser(context, connectionString);
         if (user is null)
@@ -74,11 +76,13 @@ app.Use(async (context, next) =>
     await next();
 });
 
+var createTicketStore = new CreateTicketStore();
+
 app.MapAuthEndpoints(connectionString);
 app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
 app.MapProjectAccessEndpoints(connectionString);
-app.MapItemEndpoints(connectionString, storage);
+app.MapItemEndpoints(connectionString, storage, createTicketStore);
 app.MapTagEndpoints(connectionString);
 app.MapPropertyEndpoints(connectionString);
 app.MapStructureEndpoints(connectionString);

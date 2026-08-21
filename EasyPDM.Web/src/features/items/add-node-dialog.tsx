@@ -1,7 +1,7 @@
 import { type ReactElement, useEffect, useState } from "react"
 
-import { api } from "@/api/client"
-import { itemDisplayLabel, type Item, type ItemType } from "@/api/types"
+import { api, ApiError } from "@/api/client"
+import { itemDisplayLabel, type Item, type ItemType, type Project } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ManufacturerField, MaterialField, PropField } from "@/features/items/property-fields"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -61,29 +62,103 @@ function modesForParent(parentType: ItemType | null): Mode[] {
 
 function AddNodeDialog({
   trigger,
-  projectId,
-  parentId,
-  parentType,
+  projectId: fixedProjectId,
+  parentId: fixedParentId,
+  parentType: fixedParentType,
   lockMode,
+  initialOpen,
+  initialName,
+  ticket,
+  onOpenChange,
   onCreated,
 }: {
   trigger: ReactElement
-  projectId: string
-  parentId: string | null
-  parentType: ItemType | null
+  // Gdy podane (zwykłe użycie — pasek narzędzi projektu, węzeł drzewa, panel szczegółów):
+  // dialog tworzy od razu w TYM projekcie/pod TYM rodzicem, bez pytania o nic dodatkowego.
+  // Gdy POMINIĘTE (zob. PendingTicketBanner "Nowy element"): dialog SAM pyta o projekt i
+  // (opcjonalnie) element nadrzędny jako pierwszy krok — nie wymaga wcześniejszej nawigacji
+  // po panelu projektów, wszystko dzieje się w tym jednym okienku.
+  projectId?: string
+  parentId?: string | null
+  parentType?: ItemType | null
   lockMode?: ItemType
+  // Wymusza otwarcie od razu po zamontowaniu — używane przez PendingTicketBanner, które
+  // montuje tę instancję dopiero po kliknięciu "Nowy element", z ukrytym triggerem.
+  initialOpen?: boolean
+  initialName?: string
+  // Bilet z makra CAD (zob. EasyPDM.FreeCad/EasyPDMUpload.FCMacro) — doklejany do POST
+  // /nodes, żeby makro mogło się dowiedzieć (GET /create-tickets/{ticket}), że element
+  // powstał. Podawany JAWNIE przez wywołującego (PendingTicketBanner), nie czytany z
+  // żadnego globalnego stanu — zwykłe, ręczne użycia tego dialogu (bez tego propa) nigdy
+  // nie mają z biletem nic wspólnego, niezależnie od tego, czy jakiś akurat czeka.
+  ticket?: string
+  // Wołane przy KAŻDEJ zmianie otwarcia/zamknięcia — PendingTicketBanner używa tego, żeby
+  // wrócić do wyboru "Nowy/Istniejący", gdy użytkownik zamknie to okno bez tworzenia.
+  onOpenChange?: (open: boolean) => void
   onCreated: () => void | Promise<void>
 }) {
   const { t } = useLanguage()
-  const availableModes = modesForParent(parentType)
-  const [open, setOpen] = useState(false)
+  const needsProjectPicker = fixedProjectId === undefined
+  const [open, setOpenState] = useState(initialOpen ?? false)
+  function setOpen(next: boolean) {
+    setOpenState(next)
+    onOpenChange?.(next)
+  }
+
+  // Projekt/rodzic — albo z góry ustalone (zwykłe użycie), albo wybierane W TYM OKNIE
+  // (zob. needsProjectPicker wyżej).
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState("")
+  const projectId = fixedProjectId ?? selectedProjectId
+  const [parentCandidates, setParentCandidates] = useState<Item[]>([])
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(null)
+  const parentId = fixedParentId !== undefined ? fixedParentId : selectedParentId
+  const parentType =
+    fixedParentType !== undefined
+      ? fixedParentType
+      : (parentCandidates.find((i) => i.id === selectedParentId)?.itemType ?? null)
+
+  useEffect(() => {
+    if (needsProjectPicker && open) api.getProjects().then(setProjects)
+  }, [needsProjectPicker, open])
+
+  useEffect(() => {
+    if (!needsProjectPicker || !projectId) {
+      setParentCandidates([])
+      return
+    }
+    api.getItems({ projectId }).then((items) =>
+      setParentCandidates(items.filter((i) => i.itemType === "folder" || i.itemType === "assembly"))
+    )
+  }, [needsProjectPicker, projectId])
+
+  // Bilet doklejony do POST /nodes wymaga sensownego typu (Część/Złożenie) — makro nigdy
+  // nie prosi o Folder/Plik/Istniejący, więc ten dialog, gdy ma podpięty bilet, w ogóle nie
+  // pokazuje tych opcji (dokładnie tak, jak dawny natywny dialog makra ograniczał wybór do
+  // Część/Złożenie).
+  const rawAvailableModes = modesForParent(parentType)
+  const availableModes = ticket
+    ? rawAvailableModes.filter((m): m is "part" | "assembly" => m === "part" || m === "assembly")
+    : rawAvailableModes
   const [mode, setMode] = useState<Mode>(lockMode ?? availableModes[0] ?? "folder")
   const [allItems, setAllItems] = useState<Item[]>([])
 
   // Folder / Część
-  const [name, setName] = useState("")
+  const [name, setName] = useState(initialName ?? "")
   const [mass, setMass] = useState("")
   const [rodzaj, setRodzaj] = useState("")
+  // Materiał/Producent/Numery zamówieniowe/Norma — pola zależne od rodzaju, te same co w
+  // panelu szczegółów już istniejącego elementu (PartPropertyForm), tylko zbierane lokalnie
+  // przed pierwszym zapisem zamiast od razu wysyłane przez API (element jeszcze nie istnieje).
+  const [extraProps, setExtraProps] = useState<Record<string, string>>({})
+  function setExtraField(key: string, value: string) {
+    setExtraProps((prev) => ({ ...prev, [key]: value }))
+  }
+  // Widoczny tylko, gdy tworzenie ma przypięty bilet z makra (zob. props "ticket" wyżej) —
+  // w normalnym, ręcznym dodawaniu przez aplikację webową nie ma żadnego lokalnego pliku
+  // CAD, więc nie ma czego eksportować. Domyślnie zaznaczony (tak jak dawniej w natywnym
+  // dialogu makra).
+  const [exportStep, setExportStep] = useState(true)
 
   // Inny plik
   const [file, setFile] = useState<File | null>(null)
@@ -118,17 +193,27 @@ function AddNodeDialog({
 
   function reset() {
     setMode(lockMode ?? availableModes[0] ?? "folder")
-    setName("")
+    setName(initialName ?? "")
     setMass("")
     setRodzaj("")
+    setExtraProps({})
+    setExportStep(true)
     setFile(null)
     setPropsText("")
     setChildId("")
     setQuantity("1")
     setError("")
+    if (needsProjectPicker) {
+      setSelectedProjectId("")
+      setSelectedParentId(null)
+    }
   }
 
   async function handleCreateContainer(itemType: "folder" | "part" | "assembly") {
+    if (needsProjectPicker && !projectId) {
+      setError(t("addNode.projectRequired"))
+      return
+    }
     if (itemType === "part" && !rodzaj) {
       setError(
         t("addNode.selectKindError", {
@@ -150,6 +235,10 @@ function AddNodeDialog({
     const properties: Record<string, unknown> = {}
     if (itemType === "part") {
       properties.rodzaj = rodzaj
+      if (rodzaj === "Zakupowa" && mass.trim()) properties.mass = mass.trim()
+      for (const [key, value] of Object.entries(extraProps)) {
+        if (value.trim()) properties[key] = value.trim()
+      }
     }
     if (itemType === "assembly") {
       if (mass.trim()) properties.mass = mass.trim()
@@ -164,12 +253,14 @@ function AddNodeDialog({
         itemType,
         properties,
         parentId,
+        ticket,
+        exportStep: ticket ? exportStep : undefined,
       })
       setOpen(false)
       reset()
       await onCreated()
-    } catch {
-      setError(t("addNode.createFailed"))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("addNode.createFailed"))
     } finally {
       setSubmitting(false)
     }
@@ -213,8 +304,8 @@ function AddNodeDialog({
       setOpen(false)
       reset()
       await onCreated()
-    } catch {
-      setError(t("addNode.addFailed"))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("addNode.addFailed"))
     } finally {
       setSubmitting(false)
     }
@@ -250,8 +341,8 @@ function AddNodeDialog({
       setOpen(false)
       reset()
       await onCreated()
-    } catch {
-      setError(t("addNode.addFailed"))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("addNode.addFailed"))
     } finally {
       setSubmitting(false)
     }
@@ -278,7 +369,66 @@ function AddNodeDialog({
           <DialogTitle>{lockMode === "file" ? t("item.uploadFile") : t("addNode.title")}</DialogTitle>
         </DialogHeader>
 
-        {!lockMode && (
+        {needsProjectPicker && (
+          <div className="flex flex-col gap-2">
+            <Label>{t("addNode.projectLabel")}</Label>
+            <Select
+              value={selectedProjectId || "none"}
+              onValueChange={(v) => {
+                setSelectedProjectId(v === "none" ? "" : (v as string))
+                setSelectedParentId(null)
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  {(v: string) =>
+                    v === "none" || !v
+                      ? t("addNode.selectProjectPlaceholder")
+                      : (projects.find((p) => p.id === v)?.name ?? v)
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t("addNode.selectProjectPlaceholder")}</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {projectId && (
+              <>
+                <Label>{t("addNode.parentLabel")}</Label>
+                <Select
+                  value={selectedParentId ?? "root"}
+                  onValueChange={(v) => setSelectedParentId(v === "root" ? null : (v as string))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {(v: string) =>
+                        v === "root" || !v
+                          ? t("addNode.noParent")
+                          : (candidateLabel(parentCandidates.find((i) => i.id === v)) ?? v)
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="root">{t("addNode.noParent")}</SelectItem>
+                    {parentCandidates.map((i) => (
+                      <SelectItem key={i.id} value={i.id}>
+                        {candidateLabel(i)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+          </div>
+        )}
+
+        {(!needsProjectPicker || projectId) && !lockMode && (
           <div className="flex flex-wrap gap-1.5">
             {availableModes.map((m) => (
               <Button
@@ -297,7 +447,7 @@ function AddNodeDialog({
           </div>
         )}
 
-        {mode === "part" && (
+        {(!needsProjectPicker || projectId) && mode === "part" && (
           <div className="flex flex-col gap-2">
             <Label>{t("part.kind")}</Label>
             <div className="flex gap-1.5">
@@ -336,11 +486,65 @@ function AddNodeDialog({
             </div>
             <Label htmlFor="node-name">{t("common.name")}</Label>
             <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} />
+
+            {(rodzaj === "Wykonywana" || rodzaj === "Normalia") && (
+              <MaterialField value={extraProps.material ?? ""} onSave={setExtraField} disabled={false} />
+            )}
+            {rodzaj === "Zakupowa" && (
+              <>
+                <ManufacturerField value={extraProps.manufacturer ?? ""} onSave={setExtraField} disabled={false} />
+                <PropField
+                  label={t("part.orderNumber")}
+                  propKey="orderNumber"
+                  value={extraProps.orderNumber ?? ""}
+                  onSave={setExtraField}
+                  disabled={false}
+                />
+                <PropField
+                  label={t("part.orderNumber2")}
+                  propKey="orderNumber2"
+                  value={extraProps.orderNumber2 ?? ""}
+                  onSave={setExtraField}
+                  disabled={false}
+                />
+                <Label htmlFor="node-part-mass">{t("part.mass")}</Label>
+                <Input
+                  id="node-part-mass"
+                  type="number"
+                  step="any"
+                  value={mass}
+                  onChange={(e) => setMass(e.target.value)}
+                  className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </>
+            )}
+            {rodzaj === "Normalia" && (
+              <PropField
+                label={t("part.norm")}
+                propKey="norm"
+                value={extraProps.norm ?? ""}
+                onSave={setExtraField}
+                disabled={false}
+              />
+            )}
+
+            {ticket && (
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={exportStep}
+                  onChange={(e) => setExportStep(e.target.checked)}
+                  className="size-3.5 shrink-0 accent-primary"
+                />
+                {t("addNode.exportStepOptional")}
+              </label>
+            )}
+
             <FormError>{error}</FormError>
           </div>
         )}
 
-        {(mode === "folder" || mode === "assembly") && (
+        {(!needsProjectPicker || projectId) && (mode === "folder" || mode === "assembly") && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="node-name">{t("common.name")}</Label>
             <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -372,11 +576,22 @@ function AddNodeDialog({
                 </Select>
               </>
             )}
+            {mode === "assembly" && ticket && (
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={exportStep}
+                  onChange={(e) => setExportStep(e.target.checked)}
+                  className="size-3.5 shrink-0 accent-primary"
+                />
+                {t("addNode.exportStepOptional")}
+              </label>
+            )}
             <FormError>{error}</FormError>
           </div>
         )}
 
-        {mode === "file" && (
+        {(!needsProjectPicker || projectId) && mode === "file" && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="node-file">{t("addNode.fileOptional")}</Label>
             <Input
@@ -406,7 +621,7 @@ function AddNodeDialog({
           </div>
         )}
 
-        {mode === "existing" && (
+        {(!needsProjectPicker || projectId) && mode === "existing" && (
           <div className="flex flex-col gap-2">
             {parentId ? (
               <Hint>{t("addNode.existingHintWithParent")}</Hint>
@@ -461,7 +676,7 @@ function AddNodeDialog({
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
+          <Button onClick={handleSubmit} disabled={submitting || (needsProjectPicker && !projectId)}>
             {submitting ? t("common.saving") : t("common.add")}
           </Button>
         </DialogFooter>

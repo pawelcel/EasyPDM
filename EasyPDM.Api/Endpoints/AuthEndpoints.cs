@@ -97,6 +97,35 @@ static class AuthEndpoints
             return Results.Ok(ToPublicUser(user));
         });
 
+        // GET /api/auth/browser-login?token=...&redirect=...   most token -> ciasteczko dla
+        // przeglądarki otwartej przez makro CAD (które ma już własną sesję zapisaną lokalnie,
+        // np. w preferencjach FreeCAD) — pozwala otworzyć przeglądarkę systemową od razu
+        // zalogowaną, bez ponownego wpisywania hasła. Token to ten sam token sesji, który
+        // makro i tak już trzyma jako sekret (por. sessionToken w /auth/login) — most nie
+        // wprowadza nowego sekretu, tylko przenosi istniejący z jednego klienta HTTP do
+        // drugiego. Wyjątek od middleware w Program.cs (musi działać BEZ ciasteczka).
+        app.MapGet("/api/auth/browser-login", async (HttpContext ctx, string? token, string? redirect) =>
+        {
+            var target = SanitizeRedirect(redirect);
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                var session = await ValidateToken(connectionString, token);
+                if (session is not null)
+                {
+                    ctx.Response.Cookies.Append(CookieName, token, new CookieOptions
+                    {
+                        HttpOnly = true,
+                        SameSite = SameSiteMode.Lax,
+                        Expires = session.Value.ExpiresAt,
+                        Path = "/",
+                    });
+                }
+            }
+
+            return Results.Redirect(target);
+        });
+
         // PATCH /api/auth/password   body: { "currentPassword": "...", "newPassword": "..." }
         // Każdy zalogowany użytkownik może zmienić WŁASNE hasło (potrzebne zwłaszcza dla
         // domyślnego konta administratora, zasianego z hasłem "admin" przy pierwszym starcie).
@@ -147,11 +176,19 @@ static class AuthEndpoints
         if (!context.Request.Cookies.TryGetValue(CookieName, out var token) || string.IsNullOrEmpty(token))
             return null;
 
+        var session = await ValidateToken(connectionString, token);
+        return session?.User;
+    }
+
+    // Współdzielone przez GetCurrentUser (ciasteczko) i /auth/browser-login (token z URL) —
+    // ta sama walidacja tokenu sesji, tylko dwa różne miejsca, skąd token przychodzi.
+    private static async Task<(CurrentUser User, DateTime ExpiresAt)?> ValidateToken(string connectionString, string token)
+    {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync();
 
         const string sql = """
-            SELECT u.id, u.username, u.display_name, u.role
+            SELECT u.id, u.username, u.display_name, u.role, s.expires_at
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token = @token AND s.expires_at > now();
@@ -163,7 +200,25 @@ static class AuthEndpoints
         if (!await reader.ReadAsync())
             return null;
 
-        return new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3));
+        var user = new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3));
+        return (user, reader.GetDateTime(4));
+    }
+
+    // Chroni /auth/browser-login przed open-redirect: apka nie ma routera, więc jedyne
+    // sensowne wartości to "/" albo "/?...". Odrzuca "//evil.com" i "/\evil.com" (niektóre
+    // przeglądarki traktują wsteczny ukośnik jak "/", czyniąc go protocol-relative) oraz
+    // wszystko z ":" w pierwszym segmencie (np. "/javascript:..."). Nieprawidłowa wartość
+    // -> fail closed do "/", nie błąd — logowanie ma się udać, tylko bez kontynuacji.
+    private static string SanitizeRedirect(string? redirect)
+    {
+        if (string.IsNullOrEmpty(redirect) || redirect[0] != '/')
+            return "/";
+        if (redirect.Length > 1 && (redirect[1] == '/' || redirect[1] == '\\'))
+            return "/";
+
+        var end = redirect.IndexOfAny(['/', '?'], 1);
+        var firstSegment = end < 0 ? redirect[1..] : redirect[1..end];
+        return firstSegment.Contains(':') ? "/" : redirect;
     }
 
     // Współdzielone przez wszystkie endpointy, które chcą sprawdzić "czy to admin" — zamiast

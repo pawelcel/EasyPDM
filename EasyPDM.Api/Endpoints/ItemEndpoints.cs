@@ -4,8 +4,65 @@ using Npgsql;
 
 static class ItemEndpoints
 {
-    public static void MapItemEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
+    public static void MapItemEndpoints(this WebApplication app, string connectionString, StorageSettings storage, CreateTicketStore createTicketStore)
     {
+        // GET /api/create-tickets/{ticket} — odpytywane przez makro CAD po otwarciu
+        // przeglądarki (zob. Ticket w POST /nodes poniżej): "pending" dopóki przeglądarka nie
+        // dokończy tworzenia elementu, potem dane nowego elementu. Nieznany bilet (jeszcze nie
+        // istnieje w store, bo POST /nodes go jeszcze nie wypełnił) traktowany tak samo jak
+        // "pending" — z punktu widzenia odpytującego nie ma różnicy, upraszcza pętlę w makrze
+        // do dwóch stanów zamiast trzech.
+        app.MapGet("/api/create-tickets/{ticket:guid}", (Guid ticket) =>
+        {
+            if (!createTicketStore.TryGet(ticket, out var state))
+                return Results.Accepted(value: new { status = "pending" });
+
+            return Results.Ok(new
+            {
+                itemId = state.ItemId,
+                itemNumber = state.ItemNumber,
+                itemNumberPrefix = state.ItemNumberPrefix,
+                name = state.Name,
+                exportStep = state.ExportStep,
+                existing = state.Existing,
+            });
+        });
+
+        // POST /api/create-tickets/{ticket}/attach-existing   body: { itemId, exportStep? }
+        // Druga (obok POST /nodes z Ticket) droga dopełnienia biletu — makro CAD otworzyło
+        // przeglądarkę bez wiedzy, czy użytkownik zdecyduje się na nowy element, czy dogranie
+        // do już istniejącego (zob. deep-link ?ticket=&name= w App.tsx); to jest ta druga
+        // opcja, wybierana w banerze "oczekujące żądanie z makra" zamiast przez zwykłe
+        // AddNodeDialog. Nie tworzy niczego — tylko każe makru dograć plik do WSKAZANEGO,
+        // już istniejącego elementu (existing=true w odpowiedzi GET /create-tickets/{ticket}
+        // każe makru odpalić lokalną ścieżkę push_to_existing_item zamiast tworzenia).
+        app.MapPost("/api/create-tickets/{ticket:guid}/attach-existing", async (Guid ticket, AttachExistingTicketRequest body, HttpContext ctx) =>
+        {
+            var info = await GetItemTypeAndStatus(connectionString, body.ItemId);
+            if (info is null)
+                return Results.NotFound("Element nie istnieje.");
+            if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
+                return Results.BadRequest("Można dograć plik tylko do Części albo Złożenia.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
+            const string sql = "SELECT item_number, item_number_prefix, file_name FROM items WHERE id = @id;";
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", body.ItemId);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            await reader.ReadAsync();
+            var itemNumber = reader.IsDBNull(0) ? (int?)null : reader.GetInt32(0);
+            var itemNumberPrefix = reader.IsDBNull(1) ? null : reader.GetString(1);
+            var fileName = reader.GetString(2);
+
+            createTicketStore.Complete(ticket, body.ItemId, itemNumber, itemNumberPrefix, fileName, body.ExportStep, existing: true);
+            return Results.Ok();
+        });
+
         // POST /api/projects/{projectId}/items   multipart/form-data:
         //   file        — wymagany, sam plik
         //   properties  — opcjonalny, JSON np. {"material":"Stal S235"}
@@ -225,6 +282,12 @@ static class ItemEndpoints
                 relCmd.Parameters.AddWithValue("childId", itemId);
                 await relCmd.ExecuteNonQueryAsync();
             }
+
+            // Zamyka pętlę dla makra CAD, które otworzyło przeglądarkę i teraz odpytuje
+            // GET /create-tickets/{ticket} — zob. CreateTicketStore.cs. Czysto addytywne,
+            // zero zmiany zachowania dla wywołań bez ticketu (czyli normalnego webowego UI).
+            if (body.Ticket is not null)
+                createTicketStore.Complete(body.Ticket.Value, itemId, itemNumber, itemNumberPrefix, body.Name.Trim(), body.ExportStep, existing: false);
 
             return Results.Created($"/api/items/{itemId}", new { id = itemId, itemNumber, itemNumberPrefix });
         });
@@ -1062,7 +1125,8 @@ static class ItemEndpoints
     }
 }
 
-record CreateNodeRequest(string Name, string ItemType, JsonElement? Properties, Guid? ParentId);
+record CreateNodeRequest(string Name, string ItemType, JsonElement? Properties, Guid? ParentId, Guid? Ticket, bool? ExportStep);
+record AttachExistingTicketRequest(Guid ItemId, bool? ExportStep);
 record VisibilityRequest(bool ShowInTree);
 record RenameRequest(string Name);
 record StatusRequest(string Status, string? Comment = null);
