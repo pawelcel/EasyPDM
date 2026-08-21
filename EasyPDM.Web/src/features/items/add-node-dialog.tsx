@@ -68,6 +68,8 @@ function AddNodeDialog({
   lockMode,
   initialOpen,
   initialName,
+  initialMode,
+  initialProperties,
   ticket,
   onOpenChange,
   onCreated,
@@ -86,6 +88,15 @@ function AddNodeDialog({
   // montuje tę instancję dopiero po kliknięciu "Nowy element", z ukrytym triggerem.
   initialOpen?: boolean
   initialName?: string
+  // Wstępnie wybrany tryb (Część/Złożenie) — używane przez "Duplikuj" w PendingTicketBanner,
+  // żeby od razu otworzyć się na tym samym typie co skopiowany element (nadal można zmienić
+  // ręcznie, w odróżnieniu od lockMode, który chowa przyciski trybu całkowicie).
+  initialMode?: ItemType
+  // Właściwości, którymi wypełnia się pola Część/Złożenie od razu po otwarciu — używane przez
+  // "Duplikuj" (zob. PendingTicketBanner): kopiuje rodzaj/materiał/producenta/numery/normę/masę
+  // ZE WSKAZANEGO elementu, bez kopiowania żadnych plików — dalej można je tu edytować przed
+  // zapisem, to zwykłe tworzenie NOWEGO elementu, tylko wstępnie wypełnione.
+  initialProperties?: Record<string, unknown>
   // Bilet z makra CAD (zob. EasyPDM.FreeCad/EasyPDMUpload.FCMacro) — doklejany do POST
   // /nodes, żeby makro mogło się dowiedzieć (GET /create-tickets/{ticket}), że element
   // powstał. Podawany JAWNIE przez wywołującego (PendingTicketBanner), nie czytany z
@@ -97,6 +108,23 @@ function AddNodeDialog({
   onOpenChange?: (open: boolean) => void
   onCreated: () => void | Promise<void>
 }) {
+  function seedRodzaj(): string {
+    const v = initialProperties?.rodzaj
+    return typeof v === "string" ? v : ""
+  }
+  function seedMass(): string {
+    const v = initialProperties?.mass
+    return v === undefined || v === null ? "" : String(v)
+  }
+  function seedExtraProps(): Record<string, string> {
+    const result: Record<string, string> = {}
+    for (const key of ["material", "manufacturer", "orderNumber", "orderNumber2", "norm"]) {
+      const v = initialProperties?.[key]
+      if (typeof v === "string") result[key] = v
+    }
+    return result
+  }
+
   const { t } = useLanguage()
   const needsProjectPicker = fixedProjectId === undefined
   const [open, setOpenState] = useState(initialOpen ?? false)
@@ -140,17 +168,17 @@ function AddNodeDialog({
   const availableModes = ticket
     ? rawAvailableModes.filter((m): m is "part" | "assembly" => m === "part" || m === "assembly")
     : rawAvailableModes
-  const [mode, setMode] = useState<Mode>(lockMode ?? availableModes[0] ?? "folder")
+  const [mode, setMode] = useState<Mode>(initialMode ?? lockMode ?? availableModes[0] ?? "folder")
   const [allItems, setAllItems] = useState<Item[]>([])
 
   // Folder / Część
   const [name, setName] = useState(initialName ?? "")
-  const [mass, setMass] = useState("")
-  const [rodzaj, setRodzaj] = useState("")
+  const [mass, setMass] = useState(seedMass)
+  const [rodzaj, setRodzaj] = useState(seedRodzaj)
   // Materiał/Producent/Numery zamówieniowe/Norma — pola zależne od rodzaju, te same co w
   // panelu szczegółów już istniejącego elementu (PartPropertyForm), tylko zbierane lokalnie
   // przed pierwszym zapisem zamiast od razu wysyłane przez API (element jeszcze nie istnieje).
-  const [extraProps, setExtraProps] = useState<Record<string, string>>({})
+  const [extraProps, setExtraProps] = useState<Record<string, string>>(seedExtraProps)
   function setExtraField(key: string, value: string) {
     setExtraProps((prev) => ({ ...prev, [key]: value }))
   }
@@ -192,11 +220,11 @@ function AddNodeDialog({
     : partsAndAssemblies
 
   function reset() {
-    setMode(lockMode ?? availableModes[0] ?? "folder")
+    setMode(initialMode ?? lockMode ?? availableModes[0] ?? "folder")
     setName(initialName ?? "")
-    setMass("")
-    setRodzaj("")
-    setExtraProps({})
+    setMass(seedMass())
+    setRodzaj(seedRodzaj())
+    setExtraProps(seedExtraProps())
     setExportStep(true)
     setFile(null)
     setPropsText("")

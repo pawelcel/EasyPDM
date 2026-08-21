@@ -18,67 +18,77 @@ import { AddNodeDialog } from "@/features/items/add-node-dialog"
 import { clearPendingCreateTicket, usePendingCreateTicket } from "@/features/items/pending-create-ticket"
 import { useLanguage } from "@/i18n/use-language"
 
+type Screen = "choice" | "attach" | "duplicate"
+
 // Popup widoczny na każdym ekranie, dopóki czeka bilet z makra CAD (zob.
 // pending-create-ticket.ts) — CAŁY przepływ dzieje się w jednym oknie modalnym, spójnie z
 // resztą aplikacji (ten sam wygląd co AddNodeDialog), bez żadnych swobodnie pływających
 // przycisków w nagłówku. Dwa tryby:
-//   "create" (EasyPDMUpload.FCMacro) — JAWNY wybór między dwoma przyciskami:
+//   "create" (EasyPDMUpload.FCMacro) — JAWNY wybór między trzema przyciskami:
 //     "Nowy element" zamyka ten popup i od razu otwiera AddNodeDialog (bez z góry ustalonego
 //       projektu — sam pyta o projekt i opcjonalnie rodzica jako pierwszy krok, więc NIE
 //       trzeba wcześniej nawigować w panelu po lewej) — bilet przekazywany JAWNIE jako prop,
 //       więc żadne INNE "Dodaj" w aplikacji nigdy przypadkiem go nie "połknie".
-//     "Dograj do istniejącego elementu" — wyszukiwarka + checkbox STEP tutaj, w tym popupie.
+//     "Duplikuj" — wyszukiwarka wskazuje ŹRÓDŁOWY element, potem otwiera ten sam AddNodeDialog
+//       co "Nowy element", tylko wstępnie wypełniony jego właściwościami (rodzaj/materiał/
+//       producent/numery/norma/masa) — BEZ kopiowania żadnych plików, dalej można je tu
+//       edytować przed zapisem. To zwykłe tworzenie nowego elementu, tylko podpowiedziane.
+//     "Dograj do istniejącego" — wyszukiwarka + checkbox STEP tutaj, w tym popupie.
 //   "download" (EasyPDMDownload.FCMacro) — jedyna możliwa akcja, więc wyszukiwarka widoczna
 //     OD RAZU, bez checkboksa STEP (nieistotny przy pobieraniu) i bez wyboru trybu.
-// W obu trybach backend to ta sama operacja — POST /create-tickets/{ticket}/attach-existing
-// nic nie tworzy, tylko wskazuje makru, o który element chodzi.
+// "Dograj do istniejącego" i "download" to backendowo ta sama operacja — POST
+// /create-tickets/{ticket}/attach-existing nic nie tworzy, tylko wskazuje makru, o który
+// element chodzi. "Duplikuj" tej operacji w ogóle nie woła — to zwykłe POST /nodes z
+// ticketem (jak "Nowy element"), tylko z properties przepisanymi ze źródła.
 // Popup jest celowo NIEODRZUCALNY (brak X, Escape/kliknięcie w tło nic nie robi) — makro
 // czeka po drugiej stronie, przypadkowe zamknięcie zostawiłoby je zawieszone.
 function PendingTicketBanner() {
   const { t } = useLanguage()
   const pendingTicket = usePendingCreateTicket()
   const isDownload = pendingTicket?.mode === "download"
-  const [expanded, setExpanded] = useState(false)
+  const [screen, setScreen] = useState<Screen>("choice")
   const [creating, setCreating] = useState(false)
+  const [duplicateSource, setDuplicateSource] = useState<Item | null>(null)
   const [items, setItems] = useState<Item[]>([])
   const [itemId, setItemId] = useState("")
   const [exportStep, setExportStep] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
 
-  const showPicker = expanded || isDownload
+  const pickingItem = screen === "attach" || screen === "duplicate"
 
   useEffect(() => {
-    if (!showPicker) return
+    if (!pickingItem) return
     api.getItems({}).then(setItems)
-  }, [showPicker])
+  }, [pickingItem])
 
   useEffect(() => {
-    if (!pendingTicket) {
-      setExpanded(false)
-      setCreating(false)
-      setItemId("")
-      setError("")
-    }
+    setCreating(false)
+    setDuplicateSource(null)
+    setItemId("")
+    setError("")
+    setScreen(pendingTicket?.mode === "download" ? "attach" : "choice")
   }, [pendingTicket])
 
   const candidates = items.filter((i) => i.itemType === "part" || i.itemType === "assembly")
 
   // Podpowiedź z makra (etykieta lokalnego dokumentu wygląda jak już wysłany element) —
-  // zaznaczana automatycznie przy pierwszym pokazaniu wyszukiwarki, wybór zawsze można zmienić.
-  // Hooki muszą się wywoływać bezwarunkowo (przed ewentualnym "if (!pendingTicket) return
-  // null" niżej) — stąd opcjonalne łańcuchowanie zamiast wczesnego returna wewnątrz efektu.
+  // zaznaczana automatycznie przy pierwszym pokazaniu wyszukiwarki "Dograj do istniejącego",
+  // wybór zawsze można zmienić. NIE dotyczy "Duplikuj" — tam wybieramy ŹRÓDŁO do skopiowania,
+  // a nie "ten sam element co lokalny plik". Hooki muszą się wywoływać bezwarunkowo (przed
+  // ewentualnym "if (!pendingTicket) return null" niżej) — stąd opcjonalne łańcuchowanie
+  // zamiast wczesnego returna wewnątrz efektu.
   useEffect(() => {
-    if (showPicker && !itemId && pendingTicket?.suggestedItemNumber !== undefined) {
+    if (screen === "attach" && !itemId && pendingTicket?.suggestedItemNumber !== undefined) {
       const match = candidates.find((i) => i.itemNumber === pendingTicket.suggestedItemNumber)
       if (match) setItemId(match.id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPicker, candidates.length])
+  }, [screen, candidates.length])
 
   if (!pendingTicket) return null
 
-  async function confirm() {
+  async function confirmAttach() {
     if (!itemId) {
       setError(t("addNode.selectItemRequired"))
       return
@@ -95,6 +105,16 @@ function PendingTicketBanner() {
     }
   }
 
+  function confirmDuplicate() {
+    const source = candidates.find((c) => c.id === itemId)
+    if (!source) {
+      setError(t("addNode.selectItemRequired"))
+      return
+    }
+    setDuplicateSource(source)
+    setCreating(true)
+  }
+
   return (
     <>
       {!creating && (
@@ -109,19 +129,24 @@ function PendingTicketBanner() {
               {pendingTicket.name ? ` (${pendingTicket.name})` : ""}
             </Hint>
 
-            {!showPicker && (
+            {screen === "choice" && (
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => setCreating(true)}>
                   {t("app.pendingTicketCreateNewButton")}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setExpanded(true)}>
+                <Button size="sm" variant="outline" onClick={() => setScreen("duplicate")}>
+                  {t("app.pendingTicketDuplicateButton")}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setScreen("attach")}>
                   {t("app.pendingTicketAttachExistingButton")}
                 </Button>
               </div>
             )}
 
-            {showPicker && (
+            {pickingItem && (
               <div className="flex flex-col gap-2">
+                {screen === "duplicate" && <Hint>{t("addNode.duplicateSourceHint")}</Hint>}
+
                 <Combobox
                   items={candidates.map((c) => c.id)}
                   value={itemId || null}
@@ -147,7 +172,7 @@ function PendingTicketBanner() {
                   </ComboboxContent>
                 </Combobox>
 
-                {!isDownload && (
+                {screen === "attach" && !isDownload && (
                   <label className="flex cursor-pointer items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -163,16 +188,26 @@ function PendingTicketBanner() {
               </div>
             )}
 
-            {showPicker && (
+            {pickingItem && (
               <DialogFooter>
-                {!isDownload && (
-                  <Button variant="outline" onClick={() => setExpanded(false)} disabled={submitting}>
+                {!(screen === "attach" && isDownload) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setScreen("choice")}
+                    disabled={submitting}
+                  >
                     {t("common.cancel")}
                   </Button>
                 )}
-                <Button onClick={confirm} disabled={!itemId || submitting}>
-                  {submitting ? t("common.saving") : t(isDownload ? "common.download" : "common.add")}
-                </Button>
+                {screen === "duplicate" ? (
+                  <Button onClick={confirmDuplicate} disabled={!itemId}>
+                    {t("app.pendingTicketDuplicateButton")}
+                  </Button>
+                ) : (
+                  <Button onClick={confirmAttach} disabled={!itemId || submitting}>
+                    {submitting ? t("common.saving") : t(isDownload ? "common.download" : "common.add")}
+                  </Button>
+                )}
               </DialogFooter>
             )}
           </DialogContent>
@@ -184,12 +219,19 @@ function PendingTicketBanner() {
           trigger={<span className="hidden" />}
           initialOpen
           initialName={pendingTicket.name}
+          initialMode={duplicateSource?.itemType === "assembly" ? "assembly" : duplicateSource ? "part" : undefined}
+          initialProperties={duplicateSource?.properties}
           ticket={pendingTicket.ticket}
           onOpenChange={(open) => {
-            // Zamknięte bez utworzenia (Anuluj/X/Escape) — wraca do wyboru Nowy/Istniejący
-            // zamiast zostawiać ticket w martwym stanie. Po udanym utworzeniu bilet już nie
-            // istnieje (onCreated poniżej go czyści), więc ten efekt się nie uruchomi.
-            if (!open) setCreating(false)
+            // Zamknięte bez utworzenia (Anuluj/X/Escape) — wraca do wyboru Nowy/Duplikuj/
+            // Istniejący zamiast zostawiać ticket w martwym stanie. Po udanym utworzeniu
+            // bilet już nie istnieje (onCreated poniżej go czyści), więc ten efekt się nie
+            // uruchomi.
+            if (!open) {
+              setCreating(false)
+              setDuplicateSource(null)
+              setScreen("choice")
+            }
           }}
           onCreated={async () => {
             clearPendingCreateTicket()
