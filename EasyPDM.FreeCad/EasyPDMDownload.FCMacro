@@ -6,13 +6,27 @@ i od razu otwiera w FreeCAD).
 Instalacja / uruchomienie: dokładnie jak EasyPDMUpload.FCMacro — Macro -> Macros... ->
 "Add path to macro path list", albo "Execute macro from file" bezpośrednio na tym pliku.
 Logowanie i adres API są WSPÓLNE z EasyPDMUpload.FCMacro (te same preferencje FreeCAD,
-User parameter:BaseApp/EasyPDM) — zalogowanie się w jednym makrze starcza dla obu.
+User parameter:BaseApp/EasyPDM) — zalogowanie się w jednym makrze starcza dla obu. Makro
+potrzebuje własnej sesji, mimo że wybór elementu zapada w przeglądarce — to ono odpytuje,
+czy przeglądarka już skończyła (GET /api/create-tickets/{ticket}), i to ono ściąga same
+pliki (GET /api/attachments/{id}/file) — przeglądarka tylko WSKAZUJE co pobrać, nie
+przesyła żadnych bajtów. Ta sama sesja loguje przeglądarkę automatycznie (GET
+/api/auth/browser-login) — jedno logowanie w makrze, nie dwa osobne.
 
 Co robi:
-    1. Okno z wyszukiwarką Części/Złożenia (jak przy wysyłaniu — pole z podpowiedziami
-       po numerze/nazwie, przeszukujące CAŁĄ bazę) i folderem docelowym. Folder domyślnie
-       podpowiada ostatnio użyty (zapamiętany w preferencjach FreeCAD), z przyciskiem "..."
-       do zmiany.
+    1. Natywne okno pyta TYLKO o folder docelowy (domyślnie podpowiada ostatnio użyty,
+       zapamiętany w preferencjach FreeCAD, z przyciskiem "..." do zmiany) i pokazuje
+       konto/Wyloguj — dokładnie jak "Wyślij do PDM" w EasyPDMUpload.FCMacro. WYBÓR,
+       KTÓRĄ Część/Złożenie pobrać, zapada w PRZEGLĄDARCE SYSTEMOWEJ, nie tutaj: po
+       zatwierdzeniu folderu makro od razu otwiera przeglądarkę, już zalogowaną (most
+       token->ciasteczko), na pasku "oczekuje żądanie pobrania z makra CAD" (widoczny na
+       każdym ekranie aplikacji webowej) z wyszukiwarką Części/Złożenia z CAŁEJ bazy (po
+       numerze albo nazwie) — ten sam mechanizm co dogrywanie pliku do istniejącego
+       elementu w EasyPDMUpload.FCMacro, tu użyty do wskazania "co pobrać". Po zatwierdzeniu
+       w przeglądarce, FreeCAD (okno "Czekam na przeglądarkę", odpytujące co ~2s, limit
+       10 minut) samo wykrywa wybór i pobieranie zaczyna się automatycznie — nie trzeba
+       wracać do FreeCAD ręcznie. Anulowanie w przeglądarce/oknie oczekiwania kończy makro
+       bez pobierania niczego.
     2. Dla Złożenia: pobiera też WSZYSTKIE jego składniki rekurencyjnie (bezpośrednie dzieci,
        potem ich dzieci, i tak dalej — cały BOM), do TEGO SAMEGO folderu co plik główny.
        Bez tego złożenie zbudowane na odnośnikach App::Link do zewnętrznych, zapisanych
@@ -42,6 +56,11 @@ Skąd bierze pliki do pobrania:
     wgrany załącznik jako najlepsze przybliżenie.
 
 Ograniczenia (świadomie poza zakresem pierwszej wersji):
+    - Wybór elementu (punkt 1) wymaga, żeby domyślna przeglądarka systemowa umiała otworzyć
+      adres serwera PDM (ten sam, co adres API w preferencjach makra) — na typowej
+      instalacji (klient i serwer w tej samej sieci) działa to bez dodatkowej konfiguracji.
+      Okno oczekiwania w FreeCAD ma limit 10 minut — po przekroczeniu (albo Anuluj) makro
+      kończy się bez pobierania niczego.
     - Nie próbuje pobierać KONKRETNEJ starszej rewizji — zawsze celuje w aktualną, a starsze
       lokalne kopie służą tylko do wykrycia "masz nieaktualną wersję" (patrz punkt 4).
     - Wszystkie pliki (główny + składniki) lądują płasko w JEDNYM folderze, bez odtwarzania
@@ -57,7 +76,10 @@ Ograniczenia (świadomie poza zakresem pierwszej wersji):
 import json
 import os
 import re
+import uuid
+import webbrowser
 from urllib import error, request
+from urllib.parse import urlencode
 
 import FreeCAD as App
 
@@ -118,6 +140,23 @@ def get_download_folder():
 
 def set_download_folder(folder):
     App.ParamGet(PARAM_GROUP).SetString("DownloadFolder", folder or "")
+
+
+def build_browser_download_url(ticket):
+    """Adres, pod którym otwiera się przeglądarka systemowa zamiast natywnej wyszukiwarki
+    Części/Złożenia (zob. WaitForTicketDialog/main) — most logowania token->ciasteczko
+    (GET /api/auth/browser-login, ten sam sekret co makro już trzyma w preferencjach —
+    WSPÓLNYCH z EasyPDMUpload.FCMacro) plus deep-link "?ticket=&mode=download"
+    (pending-create-ticket.ts w aplikacji webowej) — "mode=download" mówi PendingTicketBanner,
+    żeby od razu pokazać samą wyszukiwarkę (bez opcji "nowy element", nieistotnej przy
+    pobieraniu) i pominąć checkbox STEP (dotyczy tylko wysyłania). Element wskazuje się przez
+    POST /create-tickets/{ticket}/attach-existing — ten sam endpoint co przy dogrywaniu pliku
+    w EasyPDMUpload.FCMacro, tu użyty do czystego wskazania "co pobrać", bez tworzenia ani
+    zmieniania niczego. Frontend i API dzielą jeden origin, więc "redirect" to zawsze ścieżka
+    względna zaczynająca się od "/" — dokładnie to, co GET /auth/browser-login akceptuje."""
+    redirect_path = "/?" + urlencode({"ticket": ticket, "mode": "download"})
+    login_params = {"token": get_session_token() or "", "redirect": redirect_path}
+    return f"{get_base_url()}/auth/browser-login?{urlencode(login_params)}"
 
 
 def _auth_headers():
@@ -436,15 +475,16 @@ class LoginDialog(QtWidgets.QDialog):
         self.accept()
 
 
-class DownloadDialog(QtWidgets.QDialog):
-    """Wybór Części/Złożenia do otwarcia (wyszukiwarka jak w EasyPDMUploadDialog przy
-    wysyłaniu do istniejącego elementu) i folderu docelowego."""
+class DownloadFolderDialog(QtWidgets.QDialog):
+    """Jedyne natywne okno w całym przebiegu main() — pyta o folder docelowy (gdzie mają
+    wylądować pobrane pliki) i pokazuje konto/Wyloguj. Wybór KTÓREGO elementu pobrać zapada
+    w przeglądarce (zob. build_browser_download_url/main) — folder to jedyna rzecz, której
+    przeglądarka nie może sama ustalić (wybór lokalnego miejsca zapisu wymaga natywnego
+    okna systemowego)."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.result_item = None
         self.result_folder = None
-        self._items = []
 
         self.setWindowTitle("Pobierz z PDM")
         self.setMinimumWidth(440)
@@ -461,13 +501,6 @@ class DownloadDialog(QtWidgets.QDialog):
         account_row.addWidget(logout_btn)
         account_row.addStretch(1)
         form.addRow("Konto:", account_row)
-
-        self.item_combo = QtWidgets.QComboBox()
-        self.item_combo.setEditable(True)
-        self.item_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
-        self.item_combo.setMinimumContentsLength(30)
-        form.addRow("Część/Złożenie:", self.item_combo)
-        form.addRow("", QtWidgets.QLabel("Zacznij pisać, żeby wyszukać po numerze albo nazwie."))
 
         folder_row = QtWidgets.QHBoxLayout()
         self.folder_edit = QtWidgets.QLineEdit(get_download_folder() or "")
@@ -486,12 +519,9 @@ class DownloadDialog(QtWidgets.QDialog):
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
         )
-        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText("Pobierz i otwórz")
         buttons.accepted.connect(self.on_submit)
         buttons.rejected.connect(self.reject)
         outer.addWidget(buttons)
-
-        self.reload_items()
 
     def on_logout(self):
         api_logout()
@@ -499,36 +529,6 @@ class DownloadDialog(QtWidgets.QDialog):
             self, "PDM", "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie."
         )
         self.reject()
-
-    def reload_items(self):
-        self.error_label.setText("")
-        try:
-            all_items = api_get("/items")
-        except Exception as e:
-            self.error_label.setText(f"Nie udało się pobrać listy elementów: {e}")
-            all_items = []
-        # Tylko Część/Złożenie — to jedyne typy, które mogą być składnikiem BOM-u
-        # i jedyne, dla których to makro w ogóle ma co pobierać (patrz AttachmentEndpoints).
-        self._items = [it for it in all_items if it["itemType"] in ("part", "assembly")]
-        self.item_combo.clear()
-        labels = []
-        for it in self._items:
-            label = f'{it["itemNumber"]} ({it["fileName"]})'
-            labels.append(label)
-            self.item_combo.addItem(label, it["id"])
-        completer = QtWidgets.QCompleter(labels, self.item_combo)
-        completer.setCaseSensitivity(QtCore.Qt.CaseInsensitive)
-        completer.setFilterMode(QtCore.Qt.MatchContains)
-        completer.setCompletionMode(QtWidgets.QCompleter.PopupCompletion)
-        completer.activated.connect(self._on_item_picked)
-        self.item_combo.setCompleter(completer)
-        self.item_combo.setCurrentIndex(-1)
-        self.item_combo.clearEditText()
-
-    def _on_item_picked(self, text):
-        idx = self.item_combo.findText(text)
-        if idx >= 0:
-            self.item_combo.setCurrentIndex(idx)
 
     def on_browse(self):
         start = self.folder_edit.text().strip() or os.path.expanduser("~")
@@ -538,10 +538,6 @@ class DownloadDialog(QtWidgets.QDialog):
 
     def on_submit(self):
         self.error_label.setText("")
-        item_id = self.item_combo.currentData()
-        if not item_id:
-            self.error_label.setText("Wybierz Część albo Złożenie z listy.")
-            return
         folder = self.folder_edit.text().strip()
         if not folder:
             self.error_label.setText("Wskaż folder docelowy.")
@@ -552,20 +548,84 @@ class DownloadDialog(QtWidgets.QDialog):
             self.error_label.setText(f"Nie można użyć tego folderu: {e}")
             return
         set_download_folder(folder)
-        self.result_item = next((it for it in self._items if it["id"] == item_id), None)
         self.result_folder = folder
         self.accept()
 
 
-def _run_download(dlg, log):
+class WaitForTicketDialog(QtWidgets.QDialog):
+    """Identyczne (celowo zduplikowane, zob. LoginDialog wyżej) okno co w
+    EasyPDMUpload.FCMacro — pokazywane PO otwarciu przeglądarki, odpytuje
+    GET /api/create-tickets/{ticket} co POLL_INTERVAL_MS, aż użytkownik wskaże element w
+    przeglądarce (albo aż upłynie timeout / kliknie Anuluj). accept()/reject() nadpisane,
+    żeby timer ZAWSZE zatrzymywał się razem z zamknięciem okna."""
+
+    POLL_INTERVAL_MS = 2000
+
+    def __init__(self, ticket, parent=None, timeout_seconds=600):
+        super().__init__(parent)
+        self.ticket = ticket
+        self.result_data = None
+        self._elapsed_ms = 0
+        self._timeout_ms = timeout_seconds * 1000
+
+        self.setWindowTitle("Czekam na przeglądarkę")
+        self.setMinimumWidth(380)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        label = QtWidgets.QLabel(
+            "Otworzono przeglądarkę — wybierz Część/Złożenie do pobrania i zatwierdź.\n\n"
+            "To okno samo się zamknie, gdy wybór zostanie zatwierdzony."
+        )
+        label.setWordWrap(True)
+        layout.addWidget(label)
+
+        self.error_label = QtWidgets.QLabel("")
+        self.error_label.setStyleSheet("color: #c0392b;")
+        self.error_label.setWordWrap(True)
+        layout.addWidget(self.error_label)
+
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel)
+        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText("Anuluj")
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self._timer = QtCore.QTimer(self)
+        self._timer.setInterval(self.POLL_INTERVAL_MS)
+        self._timer.timeout.connect(self._poll)
+        self._timer.start()
+
+    def accept(self):
+        self._timer.stop()
+        super().accept()
+
+    def reject(self):
+        self._timer.stop()
+        super().reject()
+
+    def _poll(self):
+        self._elapsed_ms += self.POLL_INTERVAL_MS
+        if self._elapsed_ms >= self._timeout_ms:
+            self.error_label.setText("Upłynął czas oczekiwania.")
+            self.reject()
+            return
+        try:
+            data = api_get(f"/create-tickets/{self.ticket}")
+        except Exception as e:
+            # Chwilowy błąd sieci nie przerywa czekania — kolejny cykl spróbuje ponownie.
+            self.error_label.setText(str(e))
+            return
+        if data and data.get("itemId"):
+            self.result_data = data
+            self.accept()
+
+
+def _run_download(top_item, target_dir, log):
     """Faktyczne pobieranie + otwarcie, wydzielone z main() wyłącznie po to, żeby dało się
     je owinąć w jeden szeroki try/except (zob. main()) — błąd, którego nie przewidzieliśmy
     (np. nieoczekiwany kształt odpowiedzi API), ma się skończyć CZYTELNYM komunikatem
     z pełnym tracebackiem, a nie cichym zniknięciem makra bez żadnego okna na końcu
     (dokładnie to przydarzyło się w praktyce, zanim doszło to zabezpieczenie — zob. też
     poprawiony _download_children_recursive, gdzie leżała PIERWOTNA przyczyna)."""
-    top_item = dlg.result_item
-    target_dir = dlg.result_folder
     log(f"Pobieram {top_item['itemNumber']} ({top_item['fileName']}) do {target_dir}...")
 
     seen = {top_item["id"]}
@@ -587,8 +647,36 @@ def main():
     if not ensure_logged_in():
         return
 
-    dlg = DownloadDialog()
-    if dlg.exec() != QtWidgets.QDialog.Accepted:
+    # Jedyne natywne okno w całym przebiegu — folder docelowy + konto. KTÓRY element
+    # pobrać wybiera się w przeglądarce (zob. build_browser_download_url), nie tutaj.
+    folder_dialog = DownloadFolderDialog()
+    if folder_dialog.exec() != QtWidgets.QDialog.Accepted:
+        return
+    target_dir = folder_dialog.result_folder
+
+    ticket = str(uuid.uuid4())
+    url = build_browser_download_url(ticket)
+    try:
+        webbrowser.open(url)
+    except Exception as e:
+        QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się otworzyć przeglądarki: {e}")
+        return
+
+    wait_dlg = WaitForTicketDialog(ticket)
+    if wait_dlg.exec() != QtWidgets.QDialog.Accepted:
+        # Anulowano w przeglądarce/oknie oczekiwania, albo upłynął czas — nic do pobrania.
+        return
+
+    ticket_data = wait_dlg.result_data
+    try:
+        top_item = api_get(f"/items/{ticket_data['itemId']}")
+    except Exception as e:
+        QtWidgets.QMessageBox.critical(
+            None, "PDM", f"Nie udało się pobrać danych wybranego elementu: {e}"
+        )
+        return
+    if top_item is None:
+        QtWidgets.QMessageBox.critical(None, "PDM", "Wybrany element już nie istnieje.")
         return
 
     log_lines = []
@@ -598,7 +686,7 @@ def main():
         App.Console.PrintMessage(msg + "\n")
 
     try:
-        _run_download(dlg, log)
+        _run_download(top_item, target_dir, log)
     except Exception:
         import traceback
 

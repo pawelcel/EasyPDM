@@ -16,21 +16,49 @@ Co robi (w tej kolejności):
         z możliwością zmiany. Pytane RAZ, na samym początku — obejmuje też automatycznie
         wykryte drzewo złożenia (część/pod-złożenia), wysyłane wcześniej niż otwiera się
         główne okno.
-    2. Pyta, czy chodzi o **nowy** rekord w PDM, czy o wgranie pliku do **już
-       istniejącego** — w drugim przypadku pozwala wpisać/wyszukać (Część/Złożenie
-       z całej bazy, nie tylko bieżącego projektu — dokładnie jak w aplikacji webowej).
-       Dla nowego rekordu: projekt PDM, element nadrzędny (opcjonalnie), typ
-       (Część/Złożenie), nazwa, rodzaj (dla Części: Wykonywana/Zakupowa/Normalia/Klienta —
-       dla Złożenia opcjonalnie, bez "Klienta") i zależne od niego pola (Wykonywana:
-       Materiał; Zakupowa: Producent/Numer zamówieniowy 1 i 2/Masa; Normalia:
-       Materiał/Norma; Klienta: brak dodatkowych pól) — te same reguły co
-       PartPropertyForm/add-node-dialog w aplikacji webowej.
-    2a. Dla istniejącego elementu ze statusem "wydany" (w tym statusie PDM nie pozwala
-        dogrywać plików — sprawdzane też po stronie serwera): pyta, czy stworzyć nową
-        rewizję. Odmowa → nic nie jest zapisywane. Zgoda → status zmienia się na
-        "w pracy" (ten sam mechanizm co w aplikacji webowej), co podnosi numer rewizji.
-    3. Nowy rekord: tworzy go w PDM (POST /api/projects/{id}/nodes). Dla obu trybów:
-       KOPIUJE bieżący plik dokumentu do PDM pod nazwą "numer (nazwa).REWIZJA.rozszerzenie"
+    2. **Żadne natywne okno się już nie pokazuje** — makro od razu otwiera PRZEGLĄDARKĘ
+       SYSTEMOWĄ, już zalogowaną (most token->ciasteczko, zob. "Logowanie" niżej), na pasku
+       "oczekuje żądanie z makra CAD" (widoczny na każdym ekranie aplikacji webowej, dopóki
+       bilet czeka). Pasek pokazuje JAWNY wybór dwoma przyciskami — WYBÓR "nowy element czy
+       dogranie do istniejącego" zapada tam, nie lokalnie i nie przez przypadkowe kliknięcie
+       byle "Dodaj" gdziekolwiek w aplikacji (świadomie NIE dzieje się w ten sposób — inaczej
+       jakiekolwiek "Dodaj" kliknięte w międzyczasie, w zupełnie niezwiązanym miejscu,
+       mogłoby przez pomyłkę "połknąć" czekający bilet):
+       - **"Nowy element"** — otwiera samowystarczalny POPUP (bez potrzeby wcześniejszej
+         nawigacji po panelu projektów po lewej) — dopiero W TYM POPUPIE wybiera się projekt,
+         opcjonalnie element nadrzędny, typ (Część/Złożenie), wpisuje nazwę, rodzaj (dla
+         Części: Wykonywana/Zakupowa/Normalia/Klienta — dla Złożenia opcjonalnie, bez
+         "Klienta") i zależne od niego pola (Wykonywana: Materiał; Zakupowa: Producent/Numer
+         zamówieniowy 1 i 2/Masa; Normalia: Materiał/Norma; Klienta: brak dodatkowych pól),
+         a także czy eksportować i wysłać model STEP (checkbox w tym samym popupie). Bilet
+         jest przypięty JAWNIE do tego jednego, konkretnego popupu — żadne INNE "Dodaj" w
+         aplikacji (w drzewie projektu, panelu szczegółów) nigdy przypadkiem go nie
+         "połknie". "Anuluj" w popupie wraca do wyboru "Nowy element"/"Dograj do
+         istniejącego" bez tworzenia niczego.
+       - **"Dograj do istniejącego elementu"** — rozwija wyszukiwarkę Części/Złożenia z
+         CAŁEJ bazy (nie tylko bieżącego projektu, bo komponent może być współdzielony)
+         razem z tym samym checkboksem STEP. Jeśli etykieta lokalnego dokumentu wygląda jak
+         "numer (nazwa).REWIZJA" (bo to samo makro już go tak nazwało po wcześniejszej
+         wysyłce), wyszukiwarka od razu podpowiada dopasowany element — tylko podpowiedź,
+         wybór zawsze można zmienić.
+       Jeden wspólny formularz/pasek w przeglądarce dla WSZYSTKIEGO, więc te reguły nie mogą
+       się już rozjechać między makrem a aplikacją webową. Po zdecydowaniu w przeglądarce
+       (dowolną z dwóch dróg wyżej), makro (okno "Czekam na przeglądarkę", odpytujące co
+       ~2s) samo wykrywa zakończenie i kontynuuje — patrz punkt 3 niżej. Anulowanie w
+       przeglądarce/oknie oczekiwania albo przekroczenie 10 minut kończy makro komunikatem,
+       bez tworzenia/dogrywania żadnego pliku (element mógł już powstać w PDM, jeśli
+       zdążono go zapisać w przeglądarce — tylko plik CAD nie zostanie do niego dograny;
+       wtedy trzeba uruchomić makro ponownie i wybrać "dograj do istniejącego").
+    2a. **JEDYNA decyzja, która świadomie ZOSTAŁA lokalna** — dla dogrywanego elementu ze
+        statusem "wydany" (w tym statusie PDM nie pozwala dogrywać plików — sprawdzane też
+        po stronie serwera): makro pyta, czy stworzyć nową rewizję (bezpośrednio przed
+        faktycznym dograniem pliku, więc to bardziej potwierdzenie operacji na dysku niż
+        dane elementu w PDM). Odmowa → nic nie jest zapisywane. Zgoda → status zmienia się
+        na "w pracy" (ten sam mechanizm co w aplikacji webowej), co podnosi numer rewizji.
+    3. Element w tym momencie już istnieje w PDM (nowy — stworzony przez formularz w
+       przeglądarce; już istniejący — wskazany tam samym paskiem, zob. punkt 2). W obu
+       przypadkach makro KOPIUJE bieżący plik dokumentu do
+       PDM pod nazwą "numer (nazwa).REWIZJA.rozszerzenie"
        — ten sam format numer/nazwa, w jakim PDM wyświetla Części/Złożenia wszędzie indziej
        (zob. itemDisplayLabel w froncie), plus rewizja jako WIELKA LITERA (A, B, C... — ta
        sama konwencja co revisionLabel() we froncie; numer w bazie zostaje liczbą, to czysto
@@ -58,15 +86,18 @@ Automatyczne wykrywanie złożenia:
     w workbenchu Assembly/Assembly4) do INNYCH, zapisanych plików .FCStd, makro PRZED
     otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie. Po zgodzie:
     schodzi rekurencyjnie w głąb (pod-złożenia też mogą linkować dalej), dla każdego
-    jeszcze nie wysłanego komponentu pokazuje osobne, krótkie okno (typ/nazwa/rodzaj —
-    te same pola i reguły co dla nowego elementu), i wysyła wszystko w kolejności
-    LIŚCIE NAJPIERW, na końcu główny dokument, budując po drodze cały BOM (z ilością
-    odczytaną z liczby odnośników do tego samego pliku — pojedyncze linki i wzorce/
-    tablice linków liczą się razem). Komponent uznaje za "już wysłany", jeśli jego
-    etykieta pasuje do formatu "numer (nazwa).REWIZJA" (ten sam, który makro samo nadaje
-    po wysłaniu) I taki numer istnieje w PDM — wtedy tylko podpina go do BOM-u, bez
-    tworzenia duplikatu. "Nie" na to pytanie wysyła TYLKO bieżący dokument, dokładnie jak
-    dotychczas (bez podelementów).
+    jeszcze nie wysłanego komponentu pokazuje osobne, krótkie NATYWNE okno (typ/nazwa/
+    rodzaj — te same pola i reguły co formularz w przeglądarce dla nowego elementu,
+    zob. punkt 2 wyżej) — CELOWO bez przeglądarki, żeby wysłanie złożenia z wieloma
+    nowymi komponentami nie wymagało tylu samo okien przeglądarki co komponentów — i
+    wysyła wszystko w kolejności LIŚCIE NAJPIERW, na końcu główny dokument (ten JUŻ
+    przechodzi przez formularz w przeglądarce — patrz punkt 2), budując po drodze cały
+    BOM (z ilością odczytaną z liczby odnośników do tego samego pliku — pojedyncze
+    linki i wzorce/tablice linków liczą się razem). Komponent uznaje za "już wysłany",
+    jeśli jego etykieta pasuje do formatu "numer (nazwa).REWIZJA" (ten sam, który makro
+    samo nadaje po wysłaniu) I taki numer istnieje w PDM — wtedy tylko podpina go do
+    BOM-u, bez tworzenia duplikatu. "Nie" na to pytanie wysyła TYLKO bieżący dokument,
+    dokładnie jak dotychczas (bez podelementów).
 
 Logowanie:
     EasyPDM.Api wymaga sesji (ciasteczko pdm_session) dla każdego wywołania poza
@@ -75,11 +106,28 @@ Logowanie:
     (nazwa użytkownika + hasło); token sesji trafia do tych samych preferencji FreeCAD co
     adres API (User parameter:BaseApp/EasyPDM), więc kolejne uruchomienia makra (także po
     restarcie FreeCAD) NIE proszą o ponowne logowanie, dopóki sesja jest ważna (30 dni, tak
-    samo jak w aplikacji webowej). W głównym oknie "Wyślij do PDM" widać, kto jest zalogowany,
-    i można się stamtąd wylogować (przycisk "Wyloguj") — kolejne uruchomienie makra od razu
-    poprosi o ponowne zalogowanie.
+    samo jak w aplikacji webowej). W oknie "Folder docelowy" (pierwsze okno w każdym
+    przebiegu, zob. punkt 1a) widać, kto jest zalogowany, i można się stamtąd wylogować
+    (przycisk "Wyloguj") — kolejne uruchomienie makra od razu poprosi o ponowne zalogowanie.
+    Ta sama sesja makra jest NIEZBĘDNA nawet dla kroku 2 (cała decyzja nowy/istniejący i
+    wszystko z nią związane dzieje się w przeglądarce) — makro samo musi się cały czas
+    potrafić uwierzytelnić, żeby (a) odpytać, czy przeglądarka już skończyła (GET
+    /create-tickets), i (b) dograć sam plik CAD do wskazanego elementu (to wciąż robi
+    makro, nie przeglądarka — nie ma jak temu zapobiec bez utraty automatyzacji zmiany
+    nazwy pliku/eksportu STEP/BOM złożenia). Przy okazji: to WŁAŚNIE ta sesja makra jest
+    tym, co loguje przeglądarkę
+    automatycznie — GET /api/auth/browser-login zamienia token makra na ciasteczko
+    przeglądarki (zob. AuthEndpoints.cs), więc logowanie w makrze i "darmowe" zalogowanie
+    przeglądarki to JEDNA, ta sama operacja, nie dwie osobne.
 
 Ograniczenia (świadomie poza zakresem pierwszej wersji):
+    - Krok 2 (punkt wyżej) wymaga, żeby domyślna przeglądarka systemowa umiała otworzyć
+      adres serwera PDM (ten sam, co adres API w preferencjach makra) — na typowej
+      instalacji (klient i serwer w tej samej sieci) działa to bez dodatkowej konfiguracji.
+      Okno oczekiwania w FreeCAD ma limit 10 minut — po przekroczeniu (albo Anuluj) makro
+      kończy się komunikatem, bez dogrania pliku; jeśli element zdążył już powstać w
+      przeglądarce, trzeba uruchomić makro ponownie i dograć do niego przez pasek
+      "oczekujące żądanie z makra".
     - Automatyczne wykrywanie złożenia działa tylko dla odnośników do ZEWNĘTRZNYCH,
       zapisanych plików (App::Link) — nie dla złożeń trzymanych w jednym pliku jako
       kontenery App::Part (te nie mają osobnych plików do wysłania osobno).
@@ -108,7 +156,9 @@ import re
 import shutil
 import tempfile
 import uuid
+import webbrowser
 from urllib import error, request
+from urllib.parse import urlencode
 
 import FreeCAD as App
 
@@ -174,17 +224,6 @@ def get_download_folder():
 
 def set_download_folder(folder):
     App.ParamGet(PARAM_GROUP).SetString("DownloadFolder", folder or "")
-
-
-def get_export_step_pref():
-    """Czy domyślnie eksportować i wysyłać model STEP (podgląd 3D) — zapamiętane
-    zaznaczenie checkboksa z TargetFolderDialog, żeby nie trzeba było go włączać/wyłączać
-    przy każdym uruchomieniu makra. Domyślnie włączone (True), gdy jeszcze nie ustawiono."""
-    return App.ParamGet(PARAM_GROUP).GetBool("ExportStep", True)
-
-
-def set_export_step_pref(value):
-    App.ParamGet(PARAM_GROUP).SetBool("ExportStep", bool(value))
 
 
 def _auth_headers():
@@ -390,9 +429,10 @@ ASSEMBLY_KINDS = ["Wykonywana", "Zakupowa", "Normalia"]
 
 
 def kind_field_visibility(is_part, rodzaj):
-    """Jedno źródło prawdy dla widoczności pól zależnych od typu/rodzaju — używane zarówno
-    przez EasyPDMUploadDialog (tryb "nowy element"), jak i NewComponentDialog (automatyczne
-    wykrywanie złożenia), żeby te dwa miejsca nie mogły się rozjechać. Dokładnie te same
+    """Jedno źródło prawdy dla widoczności pól zależnych od typu/rodzaju — używane przez
+    NewComponentDialog (automatyczne wykrywanie złożenia, jedyne miejsce w tym pliku, gdzie
+    te pola nadal się lokalnie zbiera — dla pojedynczego, głównego elementu przechodzi się
+    teraz przez formularz w przeglądarce, zob. submit_via_browser). Dokładnie te same
     reguły co PartPropertyForm/add-node-dialog w aplikacji webowej: Wykonywana -> Materiał;
     Zakupowa -> Producent/Numery zamówieniowe/Masa; Normalia -> Materiał/Norma; Klienta ->
     brak dodatkowych pól. Złożenie: Masa zawsze widoczna niezależnie od rodzaju; Materiał
@@ -430,6 +470,34 @@ def get_storage_root():
         return config.get("storageRoot") if config else None
     except Exception:
         return None
+
+
+def build_browser_create_url(name, ticket, suggested_item_number=None):
+    """Adres, pod którym otwiera się przeglądarka systemowa zamiast natywnego formularza
+    właściwości (zob. WaitForTicketDialog/submit_via_browser) — most logowania
+    token->ciasteczko (GET /api/auth/browser-login, ten sam sekret co makro już trzyma
+    w preferencjach) plus deep-link "?ticket=&name=&suggestedItemNumber=" (App.tsx /
+    pending-create-ticket.ts w aplikacji webowej). CELOWO bez projektu/rodzica/typu/wyboru
+    "nowy czy istniejący" — to WSZYSTKO wybiera się w przeglądarce: albo zwykłą, ręczną
+    nawigacją i przyciskiem "Dodaj" tam, gdzie akurat ma sens (dokładnie jak przy ręcznym
+    dodawaniu elementu przez człowieka), albo przez baner "oczekujące żądanie z makra" i
+    jego opcję dogrania do istniejącego elementu (zob. PendingTicketBanner) — bilet dołącza
+    się do NAJBLIŻSZEJ z tych dwóch akcji, niezależnie w jakim projekcie/miejscu drzewa.
+    "suggested_item_number" to PODPOWIEDŹ (nie automatyczna decyzja) dla banera — numer
+    elementu, jeśli etykieta lokalnego dokumentu wygląda jak już wcześniej wysłany przez to
+    samo makro (zob. match_existing_item w submit_via_browser). Frontend i API dzielą jeden
+    origin (Program.cs serwuje wwwroot/ z tego samego procesu), więc "redirect" to zawsze
+    ścieżka względna zaczynająca się od "/" — dokładnie to, co GET /auth/browser-login
+    akceptuje (odrzuca wszystko inne jako potencjalny open-redirect)."""
+    deep_link_params = {"ticket": ticket}
+    if name:
+        deep_link_params["name"] = name
+    if suggested_item_number is not None:
+        deep_link_params["suggestedItemNumber"] = str(suggested_item_number)
+    redirect_path = "/?" + urlencode(deep_link_params)
+
+    login_params = {"token": get_session_token() or "", "redirect": redirect_path}
+    return f"{get_base_url()}/auth/browser-login?{urlencode(login_params)}"
 
 
 # ============================================================
@@ -839,23 +907,42 @@ class LoginDialog(QtWidgets.QDialog):
 
 
 class TargetFolderDialog(QtWidgets.QDialog):
-    """Pyta o folder, do którego mają trafiać lokalne kopie (Save As) wysyłanych dokumentów
-    — pokazywane RAZ, na samym początku run(), PRZED jakimkolwiek przetwarzaniem (żeby
-    objęło też automatycznie wykryte drzewo złożenia, wysyłane wcześniej niż otwiera się
-    główne okno EasyPDMUploadDialog). Ten sam folder co "Folder docelowy" w
-    EasyPDMDownload.FCMacro (współdzielona preferencja DownloadFolder) — dzięki temu
-    wysłane i pobrane pliki mogą lądować w tym samym, jednym miejscu, zamiast rozjeżdżać
-    się po różnych folderach zależnie od tego, gdzie akurat leżał oryginał."""
+    """Jedyne natywne okno z polami w całym przebiegu run() (pomijając ewentualne
+    NewComponentDialog dla auto-wykrytych komponentów złożenia) — pyta o folder, do
+    którego mają trafiać lokalne kopie (Save As) wysyłanych dokumentów — pokazywane RAZ, na
+    samym początku, PRZED jakimkolwiek przetwarzaniem (żeby objęło też automatycznie
+    wykryte drzewo złożenia, wysyłane wcześniej niż cokolwiek innego). Ten sam folder co
+    "Folder docelowy" w EasyPDMDownload.FCMacro (współdzielona preferencja DownloadFolder)
+    — dzięki temu wysłane i pobrane pliki mogą lądować w tym samym, jednym miejscu. Trzyma
+    też Adres API i informację o koncie (przeniesione tu z dawnego głównego okna "Wyślij do
+    PDM", które już nie istnieje — wybór nowy/istniejący i wszystko dalsze dzieje się teraz
+    w przeglądarce, zob. submit_via_browser) — to jedyne miejsce w całym przebiegu, gdzie
+    można zmienić adres serwera albo się wylogować."""
 
     def __init__(self, doc, parent=None):
         super().__init__(parent)
         self.result_folder = None
-        self.result_export_step = get_export_step_pref()
 
-        self.setWindowTitle("Folder docelowy")
+        self.setWindowTitle("Wyślij do PDM")
         self.setMinimumWidth(440)
 
         layout = QtWidgets.QVBoxLayout(self)
+
+        top_form = QtWidgets.QFormLayout()
+        layout.addLayout(top_form)
+
+        self.server_edit = QtWidgets.QLineEdit(get_base_url())
+        top_form.addRow("Adres API:", self.server_edit)
+
+        account_row = QtWidgets.QHBoxLayout()
+        self.account_label = QtWidgets.QLabel(f"Zalogowano jako: {get_saved_username() or '?'}")
+        account_row.addWidget(self.account_label)
+        logout_btn = QtWidgets.QPushButton("Wyloguj")
+        logout_btn.clicked.connect(self.on_logout)
+        account_row.addWidget(logout_btn)
+        account_row.addStretch(1)
+        top_form.addRow("Konto:", account_row)
+
         layout.addWidget(
             QtWidgets.QLabel(
                 "Gdzie mają trafić lokalne kopie wysyłanych dokumentów (ten sam plik pod "
@@ -874,12 +961,6 @@ class TargetFolderDialog(QtWidgets.QDialog):
         row.addWidget(browse_btn)
         layout.addLayout(row)
 
-        self.export_step_checkbox = QtWidgets.QCheckBox(
-            "Eksportuj i wyślij model STEP (podgląd 3D w aplikacji webowej)"
-        )
-        self.export_step_checkbox.setChecked(self.result_export_step)
-        layout.addWidget(self.export_step_checkbox)
-
         self.error_label = QtWidgets.QLabel("")
         self.error_label.setStyleSheet("color: #c0392b;")
         self.error_label.setWordWrap(True)
@@ -892,6 +973,13 @@ class TargetFolderDialog(QtWidgets.QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+    def on_logout(self):
+        api_logout()
+        QtWidgets.QMessageBox.information(
+            self, "PDM", "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie."
+        )
+        self.reject()
+
     def on_browse(self):
         start = self.folder_edit.text().strip() or os.path.expanduser("~")
         chosen = QtWidgets.QFileDialog.getExistingDirectory(self, "Wybierz folder docelowy", start)
@@ -899,6 +987,7 @@ class TargetFolderDialog(QtWidgets.QDialog):
             self.folder_edit.setText(chosen)
 
     def _try_accept(self):
+        set_base_url(self.server_edit.text().strip())
         folder = self.folder_edit.text().strip()
         if not folder:
             self.error_label.setText("Wskaż folder.")
@@ -910,8 +999,6 @@ class TargetFolderDialog(QtWidgets.QDialog):
             return
         set_download_folder(folder)
         self.result_folder = folder
-        self.result_export_step = self.export_step_checkbox.isChecked()
-        set_export_step_pref(self.result_export_step)
         self.accept()
 
 
@@ -956,9 +1043,13 @@ class NewComponentDialog(QtWidgets.QDialog):
     """Zbiera dane dla JEDNEGO automatycznie wykrytego, jeszcze nie istniejącego w PDM
     komponentu złożenia (część albo pod-złożenie) — pokazywane raz na każdy taki komponent,
     w kolejności "liście najpierw", zanim zostanie przetworzony plik, który go używa.
-    Pola i ich widoczność to dokładnie ta sama logika co w EasyPDMUploadDialog (tryb "nowy
-    element"), tylko bez wyboru trybu/elementu nadrzędnego — te są tu z góry przesądzone
-    (zawsze "nowy", rodzic dopina się automatycznie po utworzeniu)."""
+    CELOWO natywne, nie przez przeglądarkę (zob. submit_via_browser dla pojedynczego,
+    głównego elementu) — otwieranie przeglądarki N razy dla N nowych komponentów złożenia
+    byłoby gorszym UX niż jedno takie okno na komponent. Pola i ich widoczność (rodzaj i
+    zależne od niego materiał/masa/producent/numery/norma) to ta sama logika co formularz
+    w przeglądarce (kind_field_visibility, dokładnie te same reguły co PartPropertyForm/
+    add-node-dialog), tylko bez wyboru trybu/elementu nadrzędnego — te są tu z góry
+    przesądzone (zawsze "nowy", rodzic dopina się automatycznie po utworzeniu)."""
 
     def __init__(self, file_path, suggested_name, suggested_is_assembly, usage_hint, projects, materials, parent=None):
         super().__init__(parent)
@@ -1131,398 +1222,137 @@ class NewComponentDialog(QtWidgets.QDialog):
         )
 
 
-class EasyPDMUploadDialog(QtWidgets.QDialog):
-    def __init__(self, doc, target_folder=None, export_step=True, parent=None):
+class WaitForTicketDialog(QtWidgets.QDialog):
+    """Pokazywane PO otwarciu przeglądarki na formularzu dodawania (zob.
+    build_browser_create_url/_submit_new) — odpytuje GET /api/create-tickets/{ticket} co
+    POLL_INTERVAL_MS, aż użytkownik zapisze element w przeglądarce, aż upłynie timeout, albo
+    aż sam kliknie Anuluj. accept()/reject() są nadpisane, żeby timer ZAWSZE zatrzymywał się
+    razem z zamknięciem okna — niezależnie od tego, którą drogą się ono zamyka (przycisk,
+    Escape, systemowy krzyżyk) — inaczej odpaliłby się jeszcze raz w już zniszczony dialog."""
+
+    POLL_INTERVAL_MS = 2000
+
+    def __init__(self, ticket, parent=None, timeout_seconds=600):
         super().__init__(parent)
-        self.doc = doc
-        self.target_folder = target_folder
-        self.export_step = export_step
-        self.result_info = None
-        self._existing_items = []
+        self.ticket = ticket
+        self.result_data = None
+        self._elapsed_ms = 0
+        self._timeout_ms = timeout_seconds * 1000
 
-        self.setWindowTitle("Wyślij do PDM")
-        self.setMinimumWidth(440)
+        self.setWindowTitle("Czekam na przeglądarkę")
+        self.setMinimumWidth(380)
 
-        outer = QtWidgets.QVBoxLayout(self)
-
-        top_form = QtWidgets.QFormLayout()
-        outer.addLayout(top_form)
-
-        self.server_edit = QtWidgets.QLineEdit(get_base_url())
-        top_form.addRow("Adres API:", self.server_edit)
-
-        account_row = QtWidgets.QHBoxLayout()
-        self.account_label = QtWidgets.QLabel(f"Zalogowano jako: {get_saved_username() or '?'}")
-        account_row.addWidget(self.account_label)
-        logout_btn = QtWidgets.QPushButton("Wyloguj")
-        logout_btn.clicked.connect(self.on_logout)
-        account_row.addWidget(logout_btn)
-        account_row.addStretch(1)
-        top_form.addRow("Konto:", account_row)
-
-        reload_btn = QtWidgets.QPushButton("Odśwież listy z serwera")
-        reload_btn.clicked.connect(self.reload_lists)
-        top_form.addRow("", reload_btn)
-
-        self.mode_combo = QtWidgets.QComboBox()
-        self.mode_combo.addItems(["Nowy element w PDM", "Istniejący element w PDM"])
-        self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
-        top_form.addRow("Tryb:", self.mode_combo)
-
-        # --- Tryb: nowy element -----------------------------------------
-        self.new_group = QtWidgets.QWidget()
-        new_form = QtWidgets.QFormLayout(self.new_group)
-        new_form.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(self.new_group)
-
-        self.project_combo = QtWidgets.QComboBox()
-        self.project_combo.currentIndexChanged.connect(self.on_project_changed)
-        new_form.addRow("Projekt:", self.project_combo)
-
-        self.parent_combo = QtWidgets.QComboBox()
-        new_form.addRow("Element nadrzędny:", self.parent_combo)
-
-        self.type_combo = QtWidgets.QComboBox()
-        self.type_combo.addItems(["Część", "Złożenie"])
-        self.type_combo.currentIndexChanged.connect(self.on_type_changed)
-        new_form.addRow("Typ:", self.type_combo)
-
-        self.name_edit = QtWidgets.QLineEdit(doc.Label)
-        self.name_edit.textChanged.connect(self._check_name_and_maybe_switch)
-        new_form.addRow("Nazwa:", self.name_edit)
-
-        self.rodzaj_combo = QtWidgets.QComboBox()
-        self.rodzaj_combo.currentIndexChanged.connect(self.on_rodzaj_changed)
-        new_form.addRow("Rodzaj:", self.rodzaj_combo)
-
-        self.material_label = QtWidgets.QLabel("Materiał:")
-        self.material_combo = QtWidgets.QComboBox()
-        self.material_combo.setEditable(True)
-        new_form.addRow(self.material_label, self.material_combo)
-
-        self.mass_label = QtWidgets.QLabel("Masa [kg]:")
-        self.mass_edit = QtWidgets.QLineEdit()
-        new_form.addRow(self.mass_label, self.mass_edit)
-
-        self.manufacturer_label = QtWidgets.QLabel("Producent:")
-        self.manufacturer_edit = QtWidgets.QLineEdit()
-        new_form.addRow(self.manufacturer_label, self.manufacturer_edit)
-
-        self.order1_label = QtWidgets.QLabel("Numer zamówieniowy 1:")
-        self.order1_edit = QtWidgets.QLineEdit()
-        new_form.addRow(self.order1_label, self.order1_edit)
-
-        self.order2_label = QtWidgets.QLabel("Numer zamówieniowy 2:")
-        self.order2_edit = QtWidgets.QLineEdit()
-        new_form.addRow(self.order2_label, self.order2_edit)
-
-        self.norm_label = QtWidgets.QLabel("Norma:")
-        self.norm_edit = QtWidgets.QLineEdit()
-        new_form.addRow(self.norm_label, self.norm_edit)
-
-        # --- Tryb: istniejący element ------------------------------------
-        self.existing_group = QtWidgets.QWidget()
-        existing_form = QtWidgets.QFormLayout(self.existing_group)
-        existing_form.setContentsMargins(0, 0, 0, 0)
-        outer.addWidget(self.existing_group)
-
-        self.existing_combo = QtWidgets.QComboBox()
-        self.existing_combo.setEditable(True)
-        self.existing_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
-        self.existing_combo.setMinimumContentsLength(30)
-        existing_form.addRow("Element (Część/Złożenie z całej bazy):", self.existing_combo)
-        existing_form.addRow(
-            "", QtWidgets.QLabel("Zacznij pisać, żeby wyszukać po numerze albo nazwie.")
+        layout = QtWidgets.QVBoxLayout(self)
+        label = QtWidgets.QLabel(
+            "Otworzono przeglądarkę — uzupełnij dane elementu i zapisz.\n\n"
+            "To okno samo się zamknie, gdy element zostanie utworzony."
         )
-
-        # --- Wspólne --------------------------------------------------------
-        bottom_form = QtWidgets.QFormLayout()
-        outer.addLayout(bottom_form)
+        label.setWordWrap(True)
+        layout.addWidget(label)
 
         self.error_label = QtWidgets.QLabel("")
         self.error_label.setStyleSheet("color: #c0392b;")
         self.error_label.setWordWrap(True)
-        bottom_form.addRow(self.error_label)
+        layout.addWidget(self.error_label)
 
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
-        )
-        buttons.accepted.connect(self.on_submit)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel)
+        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText("Anuluj")
         buttons.rejected.connect(self.reject)
-        bottom_form.addRow(buttons)
+        layout.addWidget(buttons)
 
-        self.on_type_changed()
-        self.on_mode_changed()
-        self.reload_lists()
-        # Sprawdzamy od razu nazwę dokumentu — jeśli Część/Złożenie o tej nazwie już
-        # istnieje w PDM, od razu przełączamy na tryb "Istniejący element".
-        self._check_name_and_maybe_switch(doc.Label)
+        self._timer = QtCore.QTimer(self)
+        self._timer.setInterval(self.POLL_INTERVAL_MS)
+        self._timer.timeout.connect(self._poll)
+        self._timer.start()
 
-    # ------------------------------------------------------------------
-    # Automatyczne wykrycie już istniejącego elementu po nazwie
-    # ------------------------------------------------------------------
-    def _check_name_and_maybe_switch(self, name):
-        # Tylko PODPOWIADAMY (przełączamy tryb i zaznaczamy dopasowanie) — nigdy nie
-        # wysyłamy niczego automatycznie. Użytkownik i tak musi kliknąć "Dodaj", więc
-        # może w każdej chwili wrócić do "Nowy element", jeśli o to mu chodziło.
-        name = name.strip()
-        if not name:
+    def accept(self):
+        self._timer.stop()
+        super().accept()
+
+    def reject(self):
+        self._timer.stop()
+        super().reject()
+
+    def _poll(self):
+        self._elapsed_ms += self.POLL_INTERVAL_MS
+        if self._elapsed_ms >= self._timeout_ms:
+            self.error_label.setText("Upłynął czas oczekiwania.")
+            self.reject()
             return
-
-        # Plik/etykieta mogła już być w formacie "numer (nazwa).REWIZJA" — np. gdy dokument
-        # został ponownie otwarty z pliku zapisanego wcześniej przez to samo makro. Wtedy
-        # dopasowujemy po NUMERZE (jednoznaczny), a nie po całym tekście jako nazwie.
-        number_match = _REVISION_NAME_PATTERN.match(name)
-        if number_match:
-            item_number = int(number_match.group(1))
-            matches = [it for it in self._existing_items if it["itemNumber"] == item_number]
-        else:
-            matches = [it for it in self._existing_items if it["fileName"].strip().lower() == name.lower()]
-        if not matches:
-            return
-
-        self.mode_combo.setCurrentIndex(1)
-        if len(matches) == 1:
-            idx = self.existing_combo.findData(matches[0]["id"])
-            if idx >= 0:
-                self.existing_combo.setCurrentIndex(idx)
-        else:
-            # Kilka elementów o tej samej nazwie (np. w różnych projektach) — zawężamy
-            # wyszukiwanie do tej nazwy, ale wybór zostawiamy użytkownikowi.
-            self.existing_combo.setCurrentIndex(-1)
-            self.existing_combo.setEditText(name)
-
-    def on_logout(self):
-        api_logout()
-        QtWidgets.QMessageBox.information(
-            self, "PDM", "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie."
-        )
-        self.reject()
-
-    # ------------------------------------------------------------------
-    # Ładowanie danych z serwera
-    # ------------------------------------------------------------------
-    def reload_lists(self):
-        set_base_url(self.server_edit.text().strip())
-        self.error_label.setText("")
-
         try:
-            projects = api_get("/projects")
+            data = api_get(f"/create-tickets/{self.ticket}")
         except Exception as e:
-            self.error_label.setText(f"Nie udało się pobrać projektów: {e}")
-            projects = []
-        self.project_combo.clear()
-        for p in projects:
-            self.project_combo.addItem(p["name"], p["id"])
-
-        try:
-            materials = api_get("/materials")
-        except Exception:
-            materials = []
-        self.material_combo.clear()
-        self.material_combo.addItem("", "")
-        for m in materials:
-            self.material_combo.addItem(m["name"], m["name"])
-
-        # Część/Złożenie z CAŁEJ bazy (nie tylko bieżącego projektu) — ten sam komponent
-        # może być współdzielony/wersjonowany niezależnie od tego, gdzie formalnie żyje.
-        try:
-            all_items = api_get("/items")
-        except Exception as e:
-            self.error_label.setText(f"Nie udało się pobrać listy elementów: {e}")
-            all_items = []
-        self._existing_items = [it for it in all_items if it["itemType"] in ("part", "assembly")]
-        self.existing_combo.clear()
-        labels = []
-        for it in self._existing_items:
-            label = f'{it["itemNumber"]} ({it["fileName"]})'
-            labels.append(label)
-            self.existing_combo.addItem(label, it["id"])
-        completer = QtWidgets.QCompleter(labels, self.existing_combo)
-        completer.setCaseSensitivity(QtCore.Qt.CaseInsensitive)
-        completer.setFilterMode(QtCore.Qt.MatchContains)
-        completer.setCompletionMode(QtWidgets.QCompleter.PopupCompletion)
-        completer.activated.connect(self._on_existing_picked)
-        self.existing_combo.setCompleter(completer)
-        self.existing_combo.setCurrentIndex(-1)
-        self.existing_combo.clearEditText()
-
-        self.on_project_changed()
-
-    def on_mode_changed(self):
-        is_new = self.mode_combo.currentIndex() == 0
-        self.new_group.setVisible(is_new)
-        self.existing_group.setVisible(not is_new)
-
-    def _on_existing_picked(self, text):
-        # Wybór podpowiedzi z QCompleter nie zawsze sam ustawia currentIndex/currentData
-        # edytowalnego QComboBox — dowiązujemy to ręcznie po dokładnym dopasowaniu tekstu.
-        idx = self.existing_combo.findText(text)
-        if idx >= 0:
-            self.existing_combo.setCurrentIndex(idx)
-
-    def on_project_changed(self):
-        self.parent_combo.clear()
-        self.parent_combo.addItem("Brak (poziom główny projektu)", None)
-
-        project_id = self.project_combo.currentData()
-        if not project_id:
+            # Chwilowy błąd sieci nie przerywa czekania — kolejny cykl spróbuje ponownie.
+            self.error_label.setText(str(e))
             return
-        try:
-            items = api_get(f"/items?projectId={project_id}")
-        except Exception as e:
-            self.error_label.setText(f"Nie udało się pobrać elementów projektu: {e}")
-            return
-        # Do struktury można dodać coś tylko pod Folderem albo Złożeniem (Część/Plik są liśćmi).
-        for it in items:
-            if it["itemType"] == "folder":
-                label = it["fileName"]
-            elif it["itemType"] == "assembly":
-                label = f'{it["itemNumber"]} ({it["fileName"]})'
-            else:
-                continue
-            self.parent_combo.addItem(label, it["id"])
+        if data and data.get("itemId"):
+            self.result_data = data
+            self.accept()
 
-    # ------------------------------------------------------------------
-    # Widoczność pól zależna od typu/rodzaju (odzwierciedla reguły z aplikacji webowej)
-    # ------------------------------------------------------------------
-    def on_type_changed(self):
-        is_part = self.type_combo.currentText() == "Część"
-        self.rodzaj_combo.blockSignals(True)
-        self.rodzaj_combo.clear()
-        if is_part:
-            self.rodzaj_combo.addItems(PART_KINDS)
-        else:
-            # Złożenie: rodzaj jest opcjonalny i nie ma "Klienta" (tak samo jak w oknie
-            # tworzenia złożenia w aplikacji webowej).
-            self.rodzaj_combo.addItem("(nie wybrano)", "")
-            for k in ASSEMBLY_KINDS:
-                self.rodzaj_combo.addItem(k, k)
-        self.rodzaj_combo.blockSignals(False)
-        self.on_rodzaj_changed()
 
-    def on_rodzaj_changed(self):
-        is_part = self.type_combo.currentText() == "Część"
-        rodzaj = self.rodzaj_combo.currentText()
-        vis = kind_field_visibility(is_part, rodzaj)
+def submit_via_browser(doc, target_folder):
+    """JEDYNA droga tworzenia nowego elementu ALBO dogrywania do istniejącego — obie decyzje
+    (i "co", i "który") zapadają w przeglądarce, nie lokalnie (zob. build_browser_create_url).
+    Makro: generuje bilet, sprawdza czy etykieta dokumentu wygląda jak już wcześniej wysłany
+    element (podpowiedź dla banera w przeglądarce, nie automatyczna decyzja — zob.
+    match_existing_item), otwiera przeglądarkę, czeka (WaitForTicketDialog). Po stronie
+    przeglądarki dwie możliwe drogi dopełniają ten sam bilet: zwykłe "Dodaj" (nowy element,
+    POST /nodes z ticketem) albo baner "oczekujące żądanie z makra" -> dogranie do
+    istniejącego (POST /create-tickets/{ticket}/attach-existing) — GET /create-tickets/
+    {ticket} zwraca pole "existing", które mówi, którą z dwóch dalszych ścieżek odpalić:
+    dla nowego elementu wprost _rename_and_upload (rewizja=1); dla dogrania do istniejącego
+    push_to_existing_item — ten ma WŁASNĄ, lokalną obsługę statusu "wydany" (pyta o nową
+    rewizję i opcjonalny komentarz przez NewRevisionDialog) — to jedyna decyzja, która
+    świadomie ZOSTAJE lokalna, bo jest bezpośrednio związana z tym, co makro zaraz zrobi z
+    plikiem na dysku, a nie z właściwościami elementu w PDM.
 
-        for w in (self.material_label, self.material_combo):
-            w.setVisible(vis["material"])
-        for w in (self.mass_label, self.mass_edit):
-            w.setVisible(vis["mass"])
-        for w in (
-            self.manufacturer_label,
-            self.manufacturer_edit,
-            self.order1_label,
-            self.order1_edit,
-            self.order2_label,
-            self.order2_edit,
-        ):
-            w.setVisible(vis["purchase"])
-        for w in (self.norm_label, self.norm_edit):
-            w.setVisible(vis["norm"])
+    Czy eksportować STEP wybiera się WYŁĄCZNIE w przeglądarce (checkbox widoczny w obu
+    ścieżkach) — makro nie ma tu żadnego lokalnego wyboru/fallbacku poza domyślnym "tak",
+    gdyby formularz z jakiegoś powodu nie przekazał wartości (starsza wersja frontendu).
 
-    # ------------------------------------------------------------------
-    # Zapis
-    # ------------------------------------------------------------------
-    def on_submit(self):
-        self.error_label.setText("")
+    Zwraca to samo co _rename_and_upload/push_to_existing_item, albo None jeśli
+    anulowano/upłynął czas oczekiwania — ten sam sygnał "nic nie zostało wysłane", który
+    run() już rozumie."""
+    try:
+        existing_items = api_get("/items") or []
+    except Exception:
+        existing_items = []
+    matched = match_existing_item(doc, existing_items)
+    suggested_item_number = matched["itemNumber"] if matched else None
 
-        if self.mode_combo.currentIndex() == 1:
-            self._submit_existing()
-        else:
-            self._submit_new()
+    ticket = str(uuid.uuid4())
+    url = build_browser_create_url(doc.Label, ticket, suggested_item_number)
+    try:
+        webbrowser.open(url)
+    except Exception as e:
+        QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się otworzyć przeglądarki: {e}")
+        return None
 
-    def _submit_existing(self):
-        item_id = self.existing_combo.currentData()
-        if not item_id:
-            # Użytkownik mógł wpisać dokładny tekst ręcznie, bez klikania w podpowiedź.
-            idx = self.existing_combo.findText(self.existing_combo.currentText().strip())
-            if idx >= 0:
-                item_id = self.existing_combo.itemData(idx)
-        if not item_id:
-            self.error_label.setText("Wybierz element z listy (Część albo Złożenie).")
-            return
+    wait_dlg = WaitForTicketDialog(ticket)
+    if wait_dlg.exec() != QtWidgets.QDialog.Accepted:
+        return None
 
+    ticket_data = wait_dlg.result_data
+    export_step = ticket_data.get("exportStep")
+    if export_step is None:
+        export_step = True
+
+    if ticket_data.get("existing"):
         def confirm_new_revision():
-            dlg = NewRevisionDialog(self)
+            dlg = NewRevisionDialog()
             if dlg.exec() != QtWidgets.QDialog.Accepted:
                 return None
             return dlg.comment_text()
 
-        try:
-            # None oznacza: element był "Wydany", a użytkownik odmówił nowej rewizji —
-            # nic nie zostało zapisane, ale to nie jest błąd.
-            self.result_info = push_to_existing_item(
-                self.doc, item_id, confirm_new_revision,
-                target_folder=self.target_folder, export_step=self.export_step,
-            )
-        except Exception as e:
-            self.error_label.setText(str(e))
-            return
+        return push_to_existing_item(
+            doc, ticket_data["itemId"], confirm_new_revision,
+            target_folder=target_folder, export_step=export_step,
+        )
 
-        self.accept()
-
-    def _submit_new(self):
-        project_id = self.project_combo.currentData()
-        if not project_id:
-            self.error_label.setText("Wybierz projekt.")
-            return
-
-        item_type = "part" if self.type_combo.currentText() == "Część" else "assembly"
-        name = self.name_edit.text().strip()
-        if not name:
-            self.error_label.setText("Nazwa jest wymagana.")
-            return
-
-        rodzaj = self.rodzaj_combo.currentText()
-        if item_type == "part" and rodzaj not in PART_KINDS:
-            self.error_label.setText(
-                "Dla Części wybierz rodzaj: Wykonywana, Zakupowa, Normalia albo Klienta."
-            )
-            return
-        if rodzaj == "(nie wybrano)":
-            rodzaj = ""
-
-        properties = {}
-        if rodzaj:
-            properties["rodzaj"] = rodzaj
-
-        if self.material_combo.isVisible():
-            material = self.material_combo.currentText().strip()
-            if material:
-                properties["material"] = material
-        if self.mass_edit.isVisible():
-            mass = self.mass_edit.text().strip()
-            if mass:
-                properties["mass"] = mass
-        if self.manufacturer_edit.isVisible():
-            manufacturer = self.manufacturer_edit.text().strip()
-            if manufacturer:
-                properties["manufacturer"] = manufacturer
-            order1 = self.order1_edit.text().strip()
-            if order1:
-                properties["orderNumber"] = order1
-            order2 = self.order2_edit.text().strip()
-            if order2:
-                properties["orderNumber2"] = order2
-        if self.norm_edit.isVisible():
-            norm = self.norm_edit.text().strip()
-            if norm:
-                properties["norm"] = norm
-
-        parent_id = self.parent_combo.currentData()
-
-        try:
-            self.result_info = push_new_item_to_pdm(
-                self.doc, project_id, item_type, name, properties, parent_id,
-                target_folder=self.target_folder, export_step=self.export_step,
-            )
-        except Exception as e:
-            self.error_label.setText(str(e))
-            return
-
-        self.accept()
+    return _rename_and_upload(
+        doc, ticket_data["itemId"], ticket_data["itemNumber"], ticket_data["name"],
+        1, target_folder, export_step,
+    )
 
 
 def process_assembly_tree(top_doc, target_folder=None, export_step=True):
@@ -1534,7 +1364,7 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True):
     podpina relacje rodzic-dziecko (BOM) MIĘDZY odkrytymi komponentami.
     Relacje, gdzie rodzicem jest top_doc, NIE są tu podpinane — top_doc jeszcze nie ma
     swojego item_id w PDM (może to być nowy ALBO już istniejący element — o tym decyduje
-    reszta run() przez zwykły EasyPDMUploadDialog); te relacje dopina run() po jego utworzeniu.
+    reszta run(), przez submit_via_browser); te relacje dopina run() po jego utworzeniu.
 
     Zwraca (edges_for_top, cancelled):
         edges_for_top — lista (child_item_id, quantity) do podpięcia pod element top_doc,
@@ -1690,7 +1520,12 @@ def run():
     if folder_dialog.exec() != QtWidgets.QDialog.Accepted:
         return
     target_folder = folder_dialog.result_folder
-    export_step = folder_dialog.result_export_step
+
+    # Eksport STEP nie jest już nigdzie wyborem w samym makrze. Dla nowego elementu i dla
+    # dogrania do istniejącego (oba TERAZ przechodzą przez przeglądarkę, zob. Krok 2 niżej)
+    # decyduje o tym checkbox w przeglądarce; dla automatycznie wykrytych komponentów
+    # złożenia (NIGDY nie przechodzą przez przeglądarkę) STEP eksportuje się zawsze.
+    export_step = True
 
     # Krok 1a: wykryj i (opcjonalnie) wyślij złożenie rekurencyjnie — części/pod-złożenia
     # znalezione przez App::Link, w kolejności liście-najpierw.
@@ -1699,17 +1534,15 @@ def run():
         QtWidgets.QMessageBox.information(None, "PDM", "Przerwano — anulowano wysyłkę.")
         return
 
-    # Krok 2: uzupełnienie danych w oknie dialogowym (tworzy element + dogrywa plik + zmienia nazwę).
-    dialog = EasyPDMUploadDialog(doc, target_folder, export_step)
-    if dialog.exec() != QtWidgets.QDialog.Accepted:
-        return
+    # Krok 2: nowy element czy dogranie do istniejącego? Makro już o to w ogóle nie pyta —
+    # ta decyzja, razem z wyborem CO/KTÓRY, zapada w przeglądarce (zob. submit_via_browser).
+    info = submit_via_browser(doc, target_folder)
 
-    if dialog.result_info is None:
-        # Element był "Wydany", a użytkownik odmówił stworzenia nowej rewizji.
+    if info is None:
+        # Anulowano/upłynął czas oczekiwania na przeglądarkę, albo element był "Wydany" i
+        # użytkownik odmówił stworzenia nowej rewizji — w obu przypadkach nic nie wysłano.
         QtWidgets.QMessageBox.information(None, "PDM", "Anulowano — nic nie zostało wysłane.")
         return
-
-    info = dialog.result_info
 
     # Krok 3: podepnij pod TEN element podelementy odkryte w kroku 1a (BOM) — dopiero teraz
     # znamy jego item_id, niezależnie od tego, czy był nowy, czy już istniał w PDM.
