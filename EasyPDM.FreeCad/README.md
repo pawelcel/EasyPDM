@@ -62,9 +62,9 @@ dwie osobne.
 2. **Żadne natywne okno się już nie pokazuje.** Makro od razu otwiera **przeglądarkę
    systemową**, już zalogowaną (most token→ciasteczko, zob. "Logowanie" wyżej), na pasku
    "oczekuje żądanie z makra CAD" (widoczny na KAŻDYM ekranie aplikacji webowej, dopóki
-   bilet czeka). Pasek pokazuje **jawny wybór dwoma przyciskami** — wybór "nowy element czy
-   dogranie do istniejącego" zapada tam, nie lokalnie i nie przez przypadkowe kliknięcie
-   byle "Dodaj" gdziekolwiek w aplikacji (świadomie NIE dzieje się w ten sposób):
+   bilet czeka). Pasek pokazuje **jawny wybór trzema przyciskami** — wybór "nowy element,
+   duplikat czy dogranie do istniejącego" zapada tam, nie lokalnie i nie przez przypadkowe
+   kliknięcie byle "Dodaj" gdziekolwiek w aplikacji (świadomie NIE dzieje się w ten sposób):
    - **"Nowy element"** — otwiera **samowystarczalny popup**, bez potrzeby wcześniejszej
      nawigacji po panelu projektów po lewej: dopiero W TYM POPUPIE wybiera się projekt,
      opcjonalnie element nadrzędny, typ (Część/Złożenie), nazwę (domyślnie podpowiedziana
@@ -76,9 +76,14 @@ dwie osobne.
      nigdy nie ma pola Materiał (tylko Część). Popup ma też **checkbox "Eksportuj i wyślij
      model STEP"**. Bilet jest przypięty JAWNIE do tego jednego, konkretnego popupu — żadne
      INNE "Dodaj" w aplikacji (w drzewie projektu, panelu szczegółów) nigdy przypadkiem go
-     nie "połknie". **Anuluj** w popupie wraca do wyboru "Nowy element"/"Dograj do
-     istniejącego" bez tworzenia niczego.
-   - **"Dograj do istniejącego elementu"** — rozwija wyszukiwarkę Części/Złożenia z
+     nie "połknie". **Anuluj** w popupie wraca do wyboru "Nowy element"/"Duplikuj"/"Dograj
+     do istniejącego" bez tworzenia niczego.
+   - **"Duplikuj"** — najpierw wyszukiwarka wskazuje **źródłowy** element (Część/Złożenie)
+     z całej bazy, potem otwiera TEN SAM popup co "Nowy element", tylko wstępnie wypełniony
+     jego właściwościami (rodzaj/materiał/producent/numery zamówieniowe/norma/masa) — **bez
+     kopiowania żadnego pliku**. Wszystkie pola dalej można edytować przed zapisem — to
+     zwykłe tworzenie nowego elementu, tylko podpowiedziane danymi ze źródła.
+   - **"Dograj do istniejącego"** — rozwija wyszukiwarkę Części/Złożenia z
      **całej bazy** (nie tylko bieżącego projektu, bo komponent może być współdzielony), z
      podpowiedziami podczas pisania (po numerze albo nazwie) i tym samym checkboksem STEP.
      Jeśli etykieta lokalnego dokumentu wygląda jak `numer (nazwa).REWIZJA` (bo to samo
@@ -91,7 +96,7 @@ dwie osobne.
 
    Jeden wspólny formularz/pasek w przeglądarce dla WSZYSTKIEGO, więc te reguły nie mogą
    się już rozjechać między makrem a aplikacją webową. Po zdecydowaniu w przeglądarce
-   (dowolną z dwóch dróg wyżej), FreeCAD (okno "Czekam na przeglądarkę", odpytujące serwer
+   (dowolną z trzech dróg wyżej), FreeCAD (okno "Czekam na przeglądarkę", odpytujące serwer
    co ~2 s, limit 10 minut) samo wykrywa zakończenie i kontynuuje od kroku 3 niżej — nie
    trzeba wracać do FreeCAD ręcznie. Anulowanie w przeglądarce albo w oknie oczekiwania
    kończy makro komunikatem bez tworzenia/dogrania pliku (element mógł już powstać w PDM,
