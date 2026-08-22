@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { TagPill } from "@/components/ui/tag-pill"
@@ -50,6 +51,47 @@ import { previewKindOf } from "@/lib/file-preview"
 function bomPropertyOrDash(properties: Record<string, unknown>, key: string): string {
   const value = properties[key]
   return typeof value === "string" && value.trim() ? value : "-"
+}
+
+// Zmiana nazwy Folderu/Pliku — odpowiednik pola nazwy w PartSummaryFields (Część/Złożenie),
+// tylko bez rodzaju/materiału/blokad statusu i właściciela (te dotyczą wyłącznie Części i
+// Złożeń — isLocked/canEditOwnerLocked zawsze zwracają "odblokowane" dla Folderu/Pliku, bo
+// oba pola w bazie są w ich przypadku puste).
+function ItemNameField({
+  item,
+  onChanged,
+}: {
+  item: Item
+  onChanged: () => void | Promise<void>
+}) {
+  const { t } = useLanguage()
+  const [name, setName] = useState(item.fileName)
+  useEffect(() => setName(item.fileName), [item.fileName])
+
+  async function saveName() {
+    const trimmed = name.trim()
+    if (!trimmed || trimmed === item.fileName) {
+      setName(item.fileName)
+      return
+    }
+    await api.renameItem(item.id, trimmed)
+    await onChanged()
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor="item-name">{t("common.name")}</Label>
+      <Input
+        id="item-name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={saveName}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+        }}
+      />
+    </div>
+  )
 }
 
 function ItemDetailPanel({
@@ -271,6 +313,12 @@ function ItemDetailPanel({
           {(item.itemType === "part" || item.itemType === "assembly") && (
             <div className="mt-3">
               <PartSummaryFields item={item} onChanged={refreshAfterAction} />
+            </div>
+          )}
+
+          {(item.itemType === "folder" || item.itemType === "file") && (
+            <div className="mt-3">
+              <ItemNameField item={item} onChanged={refreshAfterAction} />
             </div>
           )}
 
