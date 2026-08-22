@@ -43,8 +43,9 @@ Option Explicit
 '     its component tree (IAssemblyDoc.GetComponents, recursively) and offers to send any
 '     component NOT yet linked to a PDM item, leaves-first -- same idea as FreeCAD's
 '     App::Link auto-detection, except each new component is collected through a short
-'     SEQUENCE OF InputBoxes (Project/Type/Name/Kind + dependent fields) instead of the
-'     browser -- opening N browser tabs for N new components would be worse UX than one
+'     SEQUENCE OF InputBoxes (Project/Type/Name, then -- for a Part only -- Kind and its
+'     dependent fields; an Assembly has no Kind at all, just an optional Mass) instead of
+'     the browser -- opening N browser tabs for N new components would be worse UX than one
 '     native prompt per component, and this file deliberately has no UserForm to build a
 '     richer one. Each new component gets linked via Custom Properties too, so re-running
 '     the macro on it later (alone or as part of another assembly) recognizes it as done.
@@ -1024,31 +1025,29 @@ End Function
 ' Collects Part/Assembly properties from the user using the SAME rules as
 ' kind_field_visibility() in the FreeCAD macro / PartPropertyForm+add-node-dialog in the
 ' web app: Manufactured -> Material; Purchased -> Manufacturer/Order numbers/Mass;
-' Standard -> Material/Norm; Client -> no extra fields. Assembly: Material/Mass always
-' shown together, kind is optional and without "Client".
+' Standard -> Material/Norm; Client -> no extra fields. Assembly has NO "kind" at all
+' (not asked here) -- it only ever gets an optional Mass, matching add-node-dialog.tsx /
+' NewComponentDialog in the FreeCAD macro (a Złożenie never has "rodzaj" or "material").
 Function PromptPartProperties(ByVal isPart As Boolean) As String
-    Dim kindsText As String
-    If isPart Then
-        kindsText = "1 - Manufactured" & vbCrLf & "2 - Purchased" & vbCrLf & "3 - Standard" & vbCrLf & "4 - Client"
-    Else
-        kindsText = "1 - Manufactured" & vbCrLf & "2 - Purchased" & vbCrLf & "3 - Standard" & vbCrLf & "(leave empty - no kind)"
-    End If
-
-    Dim choice As String
     Dim rodzaj As String
-    choice = InputBox("Kind:" & vbCrLf & kindsText, "Properties")
-    Select Case Trim(choice)
-        Case "1": rodzaj = "Wykonywana"
-        Case "2": rodzaj = "Zakupowa"
-        Case "3": rodzaj = "Normalia"
-        Case "4": If isPart Then rodzaj = "Klienta" Else rodzaj = ""
-        Case Else: rodzaj = ""
-    End Select
+    rodzaj = ""
 
-    If isPart And rodzaj = "" Then
-        MsgBox "Kind is required for a Part.", vbExclamation, "EasyPDM"
-        PromptPartProperties = PromptPartProperties(isPart)
-        Exit Function
+    If isPart Then
+        Dim choice As String
+        choice = InputBox("Kind:" & vbCrLf & "1 - Manufactured" & vbCrLf & "2 - Purchased" & vbCrLf & "3 - Standard" & vbCrLf & "4 - Client", "Properties")
+        Select Case Trim(choice)
+            Case "1": rodzaj = "Wykonywana"
+            Case "2": rodzaj = "Zakupowa"
+            Case "3": rodzaj = "Normalia"
+            Case "4": rodzaj = "Klienta"
+            Case Else: rodzaj = ""
+        End Select
+
+        If rodzaj = "" Then
+            MsgBox "Kind is required for a Part.", vbExclamation, "EasyPDM"
+            PromptPartProperties = PromptPartProperties(isPart)
+            Exit Function
+        End If
     End If
 
     Dim props As String
@@ -1068,7 +1067,7 @@ Function PromptPartProperties(ByVal isPart As Boolean) As String
         showPurchase = (rodzaj = "Zakupowa")
         showNorm = (rodzaj = "Normalia")
     Else
-        showMaterial = True
+        showMaterial = False
         showMass = True
         showPurchase = False
         showNorm = False

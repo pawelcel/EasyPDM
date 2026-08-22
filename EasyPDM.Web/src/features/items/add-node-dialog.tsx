@@ -270,7 +270,6 @@ function AddNodeDialog({
     }
     if (itemType === "assembly") {
       if (mass.trim()) properties.mass = mass.trim()
-      if (rodzaj) properties.rodzaj = rodzaj
     }
 
     setSubmitting(true)
@@ -588,20 +587,6 @@ function AddNodeDialog({
                   onChange={(e) => setMass(e.target.value)}
                   className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
-                <Label>{t("addNode.kindOptional")}</Label>
-                <Select value={rodzaj || "none"} onValueChange={(v) => setRodzaj(v === "none" ? "" : (v as string))}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue>
-                      {(v: string) => (v === "none" || !v ? t("addNode.noneSelected") : v)}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{t("addNode.noneSelected")}</SelectItem>
-                    <SelectItem value="Zakupowa">{t("part.kindPurchased")}</SelectItem>
-                    <SelectItem value="Wykonywana">{t("part.kindManufactured")}</SelectItem>
-                    <SelectItem value="Normalia">{t("part.kindStandard")}</SelectItem>
-                  </SelectContent>
-                </Select>
               </>
             )}
             {mode === "assembly" && ticket && (
