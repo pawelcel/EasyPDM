@@ -13,16 +13,41 @@ Option Explicit
 '   - JSON: own minimal parser/builder (below), good enough for this specific API's
 '     response shapes -- NOT general purpose.
 '   - Dialogs: plain InputBox/MsgBox instead of dropdowns/Qt forms -- a plain InputBox
-'     cannot mask a typed password with asterisks.
-'   - DELIBERATELY OUT OF SCOPE for this version: automatic detection of a whole assembly
-'     tree (App::Link -> IComponent2, recursively uploading every component at once) -- the
-'     most complex part of the original macro. Here you upload ONE active document at a
-'     time (Part/Assembly/Drawing); the BOM structure is built in the web app.
+'     cannot mask a typed password with asterisks. NO UserForm anywhere in this file --
+'     see the "browser ticket flow" section below for how the wait-for-browser step works
+'     without one.
 '   - Recognizing an "already uploaded" document: NOT via label/filename (SolidWorks has
 '     no equivalent of FreeCAD's free-form label) -- via document Custom Properties
 '     (EasyPDM_ItemId/EasyPDM_ItemNumber), written into the file itself after a successful
 '     upload. More durable than the FreeCAD approach (also works in a brand NEW session,
-'     no need to manually save after a label change).
+'     no need to manually save after a label change) -- and reliable enough that THIS ONE
+'     decision point stays fully local/native, see "What it does" below.
+'
+' What it does (top-level document, Sub "main"):
+'   - Document ALREADY linked to a PDM item (Custom Property present): asks locally
+'     whether to attach the current version as a new revision, then uploads -- exactly
+'     like before. No browser involved: SolidWorks already knows the target with
+'     certainty, a browser round-trip would add nothing.
+'   - Document NOT yet linked: opens the SAME web browser flow as EasyPDMUpload.FCMacro
+'     (already logged in via a token->cookie bridge link, see "Logowanie" below) on the
+'     "pending request from a CAD macro" popup -- "New item" / "Duplicate" / "Attach to
+'     existing" all decided THERE, not locally, exactly like the FreeCAD macro. The macro
+'     waits (WaitForTicket, polling GET /create-tickets/{ticket}; Escape cancels, no
+'     UserForm needed) and then finishes the job: rename+upload the file, and (see below)
+'     export+upload a STEP attachment.
+'   - STEP export: for the ticket path, whether to export is a checkbox in the browser
+'     (same as FreeCAD); for the "already linked" native path and for auto-detected
+'     assembly components (next point), STEP always exports -- there is no browser
+'     round-trip there to host a checkbox in, matching FreeCAD's own rule.
+'   - Assembly components: if the active document is an Assembly, the macro first walks
+'     its component tree (IAssemblyDoc.GetComponents, recursively) and offers to send any
+'     component NOT yet linked to a PDM item, leaves-first -- same idea as FreeCAD's
+'     App::Link auto-detection, except each new component is collected through a short
+'     SEQUENCE OF InputBoxes (Project/Type/Name/Kind + dependent fields) instead of the
+'     browser -- opening N browser tabs for N new components would be worse UX than one
+'     native prompt per component, and this file deliberately has no UserForm to build a
+'     richer one. Each new component gets linked via Custom Properties too, so re-running
+'     the macro on it later (alone or as part of another assembly) recognizes it as done.
 '
 ' Installation:
 '   SolidWorks -> Tools -> Macro -> New... (create any empty macro project),
@@ -66,6 +91,24 @@ Private Const SW_DOC_PART As Long = 1                      ' swDocumentTypes_e.s
 Private Const SW_DOC_ASSEMBLY As Long = 2                   ' swDocumentTypes_e.swDocASSEMBLY
 Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e.swCustomInfoText
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
+Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
+                                                             ' live SolidWorks install, confirm on first real test (see
+                                                             ' UploadStepAttachment).
+
+' Win32 API used ONLY by WaitForTicket (below) to poll the ticket endpoint while keeping
+' SolidWorks responsive and letting the user cancel with Escape -- this module has no
+' UserForm (see file header), so there is no button to click during the wait; Escape is
+' the only available cancel gesture without one. "#If VBA7" is the standard compatibility
+' guard for 32/64-bit Office/host installs (SolidWorks 2026 is VBA7, but the guard is
+' cheap and future-proof).
+#If VBA7 Then
+    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Private Declare PtrSafe Function GetAsyncKeyState Lib "user32" (ByVal vKey As Long) As Integer
+#Else
+    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Private Declare Function GetAsyncKeyState Lib "user32" (ByVal vKey As Long) As Integer
+#End If
+Private Const VK_ESCAPE As Long = &H1B
 
 ' SolidWorks application object -- CONTRARY to this module's earlier (wrong) assumption,
 ' "swApp" is NOT automatically visible in EVERY VBA module of the project, only in the one
@@ -484,7 +527,7 @@ End Sub
 ' Plain HTTP upload (multipart/form-data), used as a fallback when the PDM storage is not
 ' visible in this machine's file system -- the same mechanism as attaching CAD files from
 ' the properties panel in the web app.
-Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional ByVal overrideFilename As String = "") As Object
+Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional ByVal overrideFilename As String = "", Optional ByVal extraFieldName As String = "", Optional ByVal extraFieldValue As String = "") As Object
     Dim boundary As String
     boundary = "----EasyPDMBoundary" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000))
 
@@ -495,8 +538,16 @@ Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional 
         fileName = Mid(filePath, InStrRev(filePath, "\") + 1)
     End If
 
+    ' Extra plain form field BEFORE the file part -- only ever "role=step" today (see
+    ' UploadStepAttachment), but kept generic rather than hardcoded to that one call site.
     Dim head As String
-    head = "--" & boundary & vbCrLf & _
+    head = ""
+    If extraFieldName <> "" Then
+        head = head & "--" & boundary & vbCrLf & _
+               "Content-Disposition: form-data; name=""" & extraFieldName & """" & vbCrLf & vbCrLf & _
+               extraFieldValue & vbCrLf
+    End If
+    head = head & "--" & boundary & vbCrLf & _
            "Content-Disposition: form-data; name=""file""; filename=""" & fileName & """" & vbCrLf & _
            "Content-Type: application/octet-stream" & vbCrLf & vbCrLf
 
@@ -555,6 +606,184 @@ Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional 
 NetErr:
     LogLine "POST (upload) " & path & " -> NO CONNECTION: " & Err.Description
     Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+End Function
+
+Sub ApiDeleteRequest(ByVal path As String)
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open "DELETE", GetBaseUrl() & path, False
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+
+    On Error GoTo NetErr
+    http.send
+    On Error GoTo 0
+
+    LogLine "DELETE " & path & " -> " & http.Status
+    RaiseForStatus http.Status, http.responseText
+    Exit Sub
+NetErr:
+    LogLine "DELETE " & path & " -> NO CONNECTION: " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+End Sub
+
+
+' ============================================================================
+' Browser ticket flow -- lets the web app (already running, same backend) decide "new item
+' vs duplicate vs attach to existing" instead of a native dialog, exactly like
+' EasyPDM.FreeCad/EasyPDMUpload.FCMacro's submit_via_browser. The macro: generates a GUID
+' ticket, opens the browser on the token->cookie bridge (GET /api/auth/browser-login) with
+' a deep-link to "?ticket=...", waits (WaitForTicket) while the user resolves it in the
+' "pending request from a CAD macro" popup, then reads back what happened via
+' GET /api/create-tickets/{ticket}.
+' ============================================================================
+
+' A v4-ish GUID good enough for a short-lived, purely correlational ticket (never stored
+' anywhere persistent) -- VBA has no built-in GUID generator, this is the standard
+' workaround. Scriptlet.TypeLib.Guid returns "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}";
+' strip the braces defensively via InStr rather than assuming fixed positions, in case a
+' particular Windows/VBA combination pads it differently.
+Function NewGuid() As String
+    Dim raw As String
+    raw = CreateObject("Scriptlet.TypeLib").Guid
+
+    Dim openBrace As Long, closeBrace As Long
+    openBrace = InStr(raw, "{")
+    closeBrace = InStr(raw, "}")
+    If openBrace > 0 And closeBrace > openBrace Then
+        raw = Mid(raw, openBrace + 1, closeBrace - openBrace - 1)
+    End If
+    If Len(raw) > 36 Then raw = Left(raw, 36)
+    NewGuid = LCase(raw)
+End Function
+
+' Percent-encoding for a query string component -- VBA has no built-in URL encoder.
+' Operates on UTF-8 BYTES (not characters), so a document name with Polish diacritics
+' encodes correctly, not just plain ASCII tickets/names.
+Function UrlEncode(ByVal s As String) As String
+    If Len(s) = 0 Then
+        UrlEncode = ""
+        Exit Function
+    End If
+
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+    stream.Type = 2 ' adTypeText
+    stream.Charset = "utf-8"
+    stream.Open
+    stream.WriteText s
+    stream.Position = 0
+    stream.Type = 1 ' adTypeBinary
+    Dim bytes() As Byte
+    bytes = stream.Read
+    stream.Close
+
+    ' ADODB.Stream prepends a UTF-8 BOM (EF BB BF) when converting text->binary this way
+    ' (confirmed in practice) -- must be stripped, or it corrupts the very first encoded
+    ' character.
+    If UBound(bytes) >= 2 Then
+        If bytes(0) = &HEF And bytes(1) = &HBB And bytes(2) = &HBF Then
+            Dim trimmed() As Byte
+            ReDim trimmed(0 To UBound(bytes) - 3)
+            Dim k As Long
+            For k = 3 To UBound(bytes)
+                trimmed(k - 3) = bytes(k)
+            Next k
+            bytes = trimmed
+        End If
+    End If
+
+    Dim result As String
+    Dim i As Long, b As Byte
+    result = ""
+    For i = LBound(bytes) To UBound(bytes)
+        b = bytes(i)
+        If (b >= 65 And b <= 90) Or (b >= 97 And b <= 122) Or (b >= 48 And b <= 57) _
+           Or b = 45 Or b = 95 Or b = 46 Or b = 126 Then ' A-Z a-z 0-9 - _ . ~
+            result = result & Chr(b)
+        Else
+            result = result & "%" & Right("0" & Hex(b), 2)
+        End If
+    Next i
+    UrlEncode = result
+End Function
+
+Sub OpenUrlInBrowser(ByVal url As String)
+    CreateObject("WScript.Shell").Run """" & url & """", 1, False
+End Sub
+
+' Address that logs the browser in (token->cookie bridge, same secret the macro already
+' holds for its own API calls) and deep-links straight to the "pending request from a CAD
+' macro" popup for THIS ticket -- see pending-create-ticket.ts/PendingTicketBanner in the
+' web app. Deliberately WITHOUT a suggested item number hint (unlike the FreeCAD version):
+' this macro already has a MORE reliable way to recognize "already uploaded" via Custom
+' Properties (see GetLinkedItemId), so there is nothing useful to suggest here.
+Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String) As String
+    Dim redirectPath As String
+    redirectPath = "/?ticket=" & UrlEncode(ticket)
+    If name <> "" Then redirectPath = redirectPath & "&name=" & UrlEncode(name)
+
+    BuildBrowserCreateUrl = GetBaseUrl() & "/auth/browser-login?token=" & UrlEncode(GetSessionToken()) & "&redirect=" & UrlEncode(redirectPath)
+End Function
+
+' Polls GET /create-tickets/{ticket} until the user resolves it in the browser, the wait
+' times out (10 minutes), or the user presses Escape. Returns the parsed ticket data
+' (Dictionary with itemId/itemNumber/name/exportStep/existing) on success, or Nothing on
+' cancel/timeout -- the caller treats both the same way ("nothing was sent").
+'
+' No UserForm exists in this file (see file header) to host a visible "Cancel" button, so
+' Escape (checked every tick via GetAsyncKeyState) is the only available cancel gesture;
+' progress is shown in SolidWorks's own status bar instead of a dialog. Uses tick/poll
+' COUNTERS rather than Timer()/Now() on purpose -- Timer() resets at midnight, which would
+' misfire the 10-minute timeout for a wait that happens to straddle it.
+Function WaitForTicket(ByVal ticket As String) As Object
+    Const TICK_MS As Long = 400
+    Const POLL_EVERY_MS As Long = 2000
+    Const TIMEOUT_MS As Long = 600000 ' 10 minutes, same as EasyPDMUpload.FCMacro
+
+    Dim elapsedMs As Long, sincePollMs As Long
+    elapsedMs = 0
+    sincePollMs = POLL_EVERY_MS ' poll right away on the very first tick
+
+    On Error Resume Next
+    swApp.Frame.SetStatusBarText "EasyPDM: waiting for the browser... (Esc to cancel)"
+    On Error GoTo 0
+
+    Do While elapsedMs < TIMEOUT_MS
+        Sleep TICK_MS
+        DoEvents
+        elapsedMs = elapsedMs + TICK_MS
+        sincePollMs = sincePollMs + TICK_MS
+
+        If (GetAsyncKeyState(VK_ESCAPE) And &H8000) <> 0 Then
+            LogLine "WaitForTicket: cancelled by Escape."
+            GoTo TimedOutOrCancelled
+        End If
+
+        If sincePollMs >= POLL_EVERY_MS Then
+            sincePollMs = 0
+            Dim data As Object
+            Set data = Nothing
+            On Error Resume Next
+            Set data = ApiGet("/create-tickets/" & ticket)
+            On Error GoTo 0
+            If Not data Is Nothing Then
+                If JsonGetString(data, "itemId", "") <> "" Then
+                    Set WaitForTicket = data
+                    GoTo Cleanup
+                End If
+            End If
+        End If
+    Loop
+    LogLine "WaitForTicket: timed out after " & (TIMEOUT_MS \ 1000) & "s."
+
+TimedOutOrCancelled:
+    Set WaitForTicket = Nothing
+Cleanup:
+    On Error Resume Next
+    swApp.Frame.SetStatusBarText ""
+    On Error GoTo 0
 End Function
 
 
@@ -1023,16 +1252,69 @@ Function RenameAndUpload(ByVal filePath As String, ByVal itemId As String, ByVal
     RenameAndUpload = True
 End Function
 
+' Exports swModel's visible geometry to a temporary .step file and uploads it as an
+' attachment tagged role="step" (replacing any previous "step" attachment first) -- feeds
+' the item's 2D/3D preview in the web app, same purpose as _upload_step_attachment in
+' EasyPDMUpload.FCMacro. Deliberately swallows ALL errors (On Error Resume Next for the
+' whole body): by the time this is called, the real upload (the .FCStd/.SLDPRT/.SLDASM
+' file itself) has already succeeded, so a failed STEP export (e.g. no visible geometry --
+' an empty assembly, a pure sketch) must not look like the whole operation failed.
+'
+' UNVERIFIED against a live SolidWorks install: the exact IModelDocExtension.SaveAs
+' parameter count/meaning (SaveAsVersion/SaveAsOptions) below is written from documented
+' SolidWorks API behavior, not tested here (no SolidWorks in this environment) -- confirm
+' on the first real run and adjust SW_SAVE_AS_SILENT/argument order if SolidWorks reports
+' a different signature.
+Sub UploadStepAttachment(ByVal swModel As Object, ByVal itemId As String)
+    On Error Resume Next
+
+    Dim tempPath As String
+    tempPath = Environ$("TEMP") & "\EasyPDM_step_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".step"
+
+    Dim saveErrors As Long, saveWarnings As Long
+    Dim saveOk As Boolean
+    saveOk = swModel.Extension.SaveAs(tempPath, 0, SW_SAVE_AS_SILENT, Nothing, saveErrors, saveWarnings)
+    If Not saveOk Or Dir(tempPath) = "" Then
+        LogLine "STEP export failed for item " & itemId & " (SaveAs errors=" & saveErrors & ", warnings=" & saveWarnings & ")."
+        Exit Sub
+    End If
+
+    ' "One file per role" -- same rule as the FreeCAD macro's _upload_step_attachment:
+    ' delete any PREVIOUS step attachment before uploading the fresh one, so the preview
+    ' always reflects the current revision instead of accumulating old ones.
+    Dim existingAttachments As Object
+    Set existingAttachments = ApiGet("/items/" & itemId & "/attachments")
+    If Not existingAttachments Is Nothing Then
+        Dim a As Variant
+        For Each a In existingAttachments
+            If JsonGetString(a, "role", "") = "step" Then
+                ApiDeleteRequest "/attachments/" & JsonGetString(a, "id", "")
+            End If
+        Next a
+    End If
+
+    ApiUploadFile "/items/" & itemId & "/attachments", tempPath, Mid(tempPath, InStrRev(tempPath, "\") + 1), "role", "step"
+    LogLine "Uploaded STEP attachment for item " & itemId & " (" & tempPath & ")."
+
+    Kill tempPath
+    On Error GoTo 0
+End Sub
+
 
 ' ============================================================================
 ' PDM core: new item / attach to an existing item (with revision handling).
 ' ============================================================================
 
 ' Creates a NEW item in PDM, then attaches the current document as its file. A new item
-' always starts at revision 1.
-Function PushNewItemToPdm(ByVal projectId As String, ByVal itemType As String, ByVal name As String, ByVal propertiesJson As String, ByVal filePath As String) As Object
+' always starts at revision 1. "parentId" (new, optional) attaches it as a child right
+' away at creation time -- used by ProcessAssemblyTree for auto-detected components; the
+' top-level document (Sub main) never passes it, since its own parent relationships (if
+' any) are attached separately AFTER it gets an item id (see main()'s "edgesForTop").
+Function PushNewItemToPdm(ByVal projectId As String, ByVal itemType As String, ByVal name As String, ByVal propertiesJson As String, ByVal filePath As String, Optional ByVal parentId As String = "") As Object
     Dim bodyJson As String
-    bodyJson = "{""name"":" & JsonStr(name) & ",""itemType"":" & JsonStr(itemType) & ",""properties"":" & propertiesJson & "}"
+    bodyJson = "{""name"":" & JsonStr(name) & ",""itemType"":" & JsonStr(itemType) & ",""properties"":" & propertiesJson
+    If parentId <> "" Then bodyJson = bodyJson & ",""parentId"":" & JsonStr(parentId)
+    bodyJson = bodyJson & "}"
 
     Dim created As Object
     Set created = ApiPostJson("/projects/" & projectId & "/nodes", bodyJson)
@@ -1184,32 +1466,314 @@ End Function
 ' "67 (Name)") -- NOT by GUID, which a regular user never sees anywhere. Searches the
 ' WHOLE database, not just the current project -- a component can be used across multiple
 ' projects.
-Function PromptForExistingItem() As Object
-    Dim numberText As String
-    numberText = InputBox("Item number in PDM (visible e.g. in the name ""67 (Name)""):", "Existing item")
-    If Trim(numberText) = "" Then
-        Set PromptForExistingItem = Nothing
-        Exit Function
-    End If
-    Dim targetNumber As Long
-    targetNumber = Val(numberText)
+' ============================================================================
+' Assembly tree auto-detection -- walks an Assembly's components (IAssemblyDoc, native SW
+' structure, no equivalent of FreeCAD's "App::Link vs native geometry" distinction needed:
+' every SolidWorks assembly is inherently built from separate component documents) and
+' offers to send any component not yet linked to a PDM item, leaves-first, exactly like
+' EasyPDM.FreeCad/EasyPDMUpload.FCMacro's discover_component_tree/process_assembly_tree --
+' except new components are collected through plain InputBoxes (see
+' PromptNewComponentProperties), not a browser tab per component (see file header).
+'
+' UNVERIFIED against a live SolidWorks install (no SolidWorks in this environment): calls
+' below assume that a late-bound ModelDoc2 Object for an Assembly document can be called
+' directly with IAssemblyDoc methods (GetComponents), and that IComponent2 exposes
+' GetModelDoc2/Name2 -- all documented, commonly used SolidWorks API members, but not
+' actually run here. Confirm on the first live test with a simple 2-3 component assembly.
+' ============================================================================
 
-    Dim items As Object
-    Set items = ApiGet("/items")
-    Dim it As Variant
-    For Each it In items
-        If JsonGetLong(it, "itemNumber", -1) = targetNumber Then
-            Dim itemType As String
-            itemType = JsonGetString(it, "itemType", "")
-            If itemType = "part" Or itemType = "assembly" Then
-                Set PromptForExistingItem = it
-                Exit Function
+' Recursively visits DIRECT children of parentModel (if it is itself an Assembly), THEN
+' recurses into any child that is itself an Assembly, appending to "order" only AFTER
+' recursing -- this is what makes "order" come out leaves-first. "qty" for an edge is the
+' number of sibling instances of the SAME referenced file directly under THIS parent
+' (SolidWorks allows the same part to appear multiple times in one assembly, e.g. 4
+' identical bolts) -- mirrors FreeCAD's ElementCount aggregation. Suppressed/unresolved/
+' virtual (no file) components are skipped: GetModelDoc2() returning Nothing or an empty
+' GetPathName() is used as the "cannot inspect, skip it" signal rather than hardcoding a
+' swComponentSuppressionState_e enum value that cannot be verified without SolidWorks.
+Private Sub VisitAssemblyComponents(ByVal parentModel As Object, ByVal parentPath As String, ByRef order As Collection, ByRef models As Object, ByRef edges As Collection, ByRef visited As Object)
+    If parentModel Is Nothing Then Exit Sub
+    If parentModel.GetType() <> SW_DOC_ASSEMBLY Then Exit Sub
+
+    Dim comps As Variant
+    comps = parentModel.GetComponents(True) ' top-level components of THIS assembly only
+
+    ' Group by referenced file path first, so a part used several times under the same
+    ' parent becomes ONE edge with qty>1 instead of several qty=1 edges.
+    Dim qtyByPath As Object
+    Set qtyByPath = CreateObject("Scripting.Dictionary")
+    Dim modelByPath As Object
+    Set modelByPath = CreateObject("Scripting.Dictionary")
+
+    Dim i As Long
+    If Not IsEmpty(comps) Then
+        For i = LBound(comps) To UBound(comps)
+            Dim comp As Object
+            Set comp = comps(i)
+            If comp Is Nothing Then GoTo NextComp
+
+            Dim childModel As Object
+            Set childModel = comp.GetModelDoc2()
+            If childModel Is Nothing Then GoTo NextComp ' suppressed/lightweight/unresolved
+
+            Dim childPath As String
+            childPath = childModel.GetPathName()
+            If childPath = "" Then
+                LogLine "Skipping component with no file on disk (virtual/embedded): " & comp.Name2
+                GoTo NextComp
+            End If
+
+            If qtyByPath.Exists(childPath) Then
+                qtyByPath(childPath) = qtyByPath(childPath) + 1
+            Else
+                qtyByPath.Add childPath, 1
+                Set modelByPath(childPath) = childModel
+            End If
+NextComp:
+        Next i
+    End If
+
+    Dim pathKey As Variant
+    For Each pathKey In qtyByPath.Keys
+        Dim childModel2 As Object
+        Set childModel2 = modelByPath(pathKey)
+
+        If Not visited.Exists(pathKey) Then
+            visited.Add pathKey, True
+            VisitAssemblyComponents childModel2, CStr(pathKey), order, models, edges, visited
+            If Not models.Exists(pathKey) Then
+                Set models(pathKey) = childModel2
+                order.Add pathKey
             End If
         End If
-    Next it
 
-    MsgBox "No Part/Assembly found with number " & targetNumber & ".", vbExclamation, "EasyPDM"
-    Set PromptForExistingItem = Nothing
+        Dim edge As Object
+        Set edge = CreateObject("Scripting.Dictionary")
+        edge.Add "parent", parentPath
+        edge.Add "child", pathKey
+        edge.Add "qty", qtyByPath(pathKey)
+        edges.Add edge
+    Next pathKey
+End Sub
+
+' Returns a Dictionary with "order" (Collection of file paths, leaves-first, EXCLUDING
+' topModel itself), "models" (Dictionary path->ModelDoc2) and "edges" (Collection of
+' Dictionary{parent,child,qty} for every parent-child pair in the tree, INCLUDING edges
+' where the parent is topModel -- the caller attaches those separately once topModel has
+' its own item id, see ProcessAssemblyTree/main()). Mirrors discover_component_tree.
+Function DiscoverComponentTree(ByVal topModel As Object) As Object
+    Dim order As New Collection
+    Dim models As Object
+    Set models = CreateObject("Scripting.Dictionary")
+    Dim edges As New Collection
+    Dim visited As Object
+    Set visited = CreateObject("Scripting.Dictionary")
+
+    Dim topPath As String
+    topPath = topModel.GetPathName()
+    visited.Add topPath, True
+    VisitAssemblyComponents topModel, topPath, order, models, edges, visited
+
+    Dim result As Object
+    Set result = CreateObject("Scripting.Dictionary")
+    result.Add "order", order
+    result.Add "models", models
+    result.Add "edges", edges
+    Set DiscoverComponentTree = result
+End Function
+
+' Human-readable "used Nx in Parent.SLDASM[, ...]" summary for a component that can appear
+' under several parents at once (a shared part) -- shown in PromptNewComponentProperties
+' for context. Mirrors _usage_hint_for.
+Private Function UsageHintFor(ByVal filePath As String, ByVal edges As Collection) As String
+    Dim result As String
+    result = ""
+    Dim edge As Variant
+    For Each edge In edges
+        If edge("child") = filePath Then
+            Dim parentName As String
+            parentName = Mid(edge("parent"), InStrRev(edge("parent"), "\") + 1)
+            If result <> "" Then result = result & ", "
+            result = result & edge("qty") & "x in " & parentName
+        End If
+    Next edge
+    If result <> "" Then result = "Used: " & result
+    UsageHintFor = result
+End Function
+
+' Collects Project/Type/Name/Kind + dependent fields for ONE new (not yet in PDM) assembly
+' component, through a sequence of InputBoxes -- the field set and visibility rules are
+' the SAME as PromptPartProperties/kind_field_visibility (Manufactured->Material,
+' Purchased->Manufacturer/Order numbers/Mass, Standard->Material/Norm, Client->nothing
+' extra; Assembly: Material/Mass always, kind optional without Client). Returns "" if the
+' user cancelled at any step; otherwise returns projectId, itemType, name and propertiesJson
+' via ByRef out-parameters and "" is never a valid projectId, so callers only need to check
+' that one.
+Sub PromptNewComponentProperties(ByVal filePath As String, ByVal suggestedName As String, ByVal suggestedIsAssembly As Boolean, ByVal usageHint As String, ByRef outProjectId As String, ByRef outItemType As String, ByRef outName As String, ByRef outPropertiesJson As String)
+    outProjectId = ""
+
+    Dim header As String
+    header = "New assembly component: " & Mid(filePath, InStrRev(filePath, "\") + 1)
+    If usageHint <> "" Then header = header & vbCrLf & usageHint
+
+    Dim projectId As String
+    projectId = PromptForProject()
+    If projectId = "" Then Exit Sub
+
+    Dim typeChoice As String
+    typeChoice = InputBox(header & vbCrLf & vbCrLf & "Type:" & vbCrLf & "1 - Part" & vbCrLf & "2 - Assembly", "New component", IIf(suggestedIsAssembly, "2", "1"))
+    Dim isPart As Boolean
+    isPart = (Trim(typeChoice) <> "2")
+
+    Dim name As String
+    name = InputBox(header & vbCrLf & vbCrLf & "Name:", "New component", suggestedName)
+    If Trim(name) = "" Then Exit Sub
+
+    Dim propertiesJson As String
+    propertiesJson = PromptPartProperties(isPart)
+    If propertiesJson = "" Then Exit Sub ' PromptPartProperties never actually returns ""
+                                          ' today (Part requires a kind, retries on empty),
+                                          ' kept here defensively in case that ever changes.
+
+    outProjectId = projectId
+    outItemType = IIf(isPart, "part", "assembly")
+    outName = Trim(name)
+    outPropertiesJson = propertiesJson
+End Sub
+
+' If topModel is an Assembly, discovers its component tree and (on user consent) sends
+' every component NOT yet linked to a PDM item (leaves-first), wiring up parent-child
+' relations as it goes -- mirrors process_assembly_tree. Newly created components are
+' ALSO linked via Custom Properties on their OWN document (SetLinkedItem), so re-running
+' the macro on one of them later (standalone or inside another assembly) recognizes it as
+' already done -- an improvement FreeCAD cannot make (it has no equally reliable local
+' link), made possible here because GetLinkedItemId/SetLinkedItem already exist for the
+' top-level document.
+'
+' Returns True if the user cancelled (edgesForTop may be partially filled from components
+' created before the cancellation -- like the rest of this macro, already-created PDM
+' items are NOT rolled back). "edgesForTop" collects (childItemId, qty) pairs where the
+' parent is topModel ITSELF, for the caller to attach once topModel has its own item id.
+Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Collection) As Boolean
+    ProcessAssemblyTree = False
+    If topModel.GetType() <> SW_DOC_ASSEMBLY Then Exit Function
+
+    Dim tree As Object
+    Set tree = DiscoverComponentTree(topModel)
+    Dim order As Collection
+    Set order = tree("order")
+    If order.Count = 0 Then Exit Function
+
+    Dim summary As String
+    Dim p As Variant
+    For Each p In order
+        summary = summary & "- " & Mid(p, InStrRev(p, "\") + 1) & vbCrLf
+    Next p
+
+    Dim choice As VbMsgBoxResult
+    choice = MsgBox("This assembly links to " & order.Count & " other file(s) (parts/sub-assemblies):" & vbCrLf & vbCrLf & _
+                     summary & vbCrLf & _
+                     "Send them automatically together with this document (leaves first, this document last)?" & vbCrLf & vbCrLf & _
+                     "'No' sends ONLY this document, as before -- without components.", _
+                     vbYesNoCancel + vbQuestion, "Assembly detected")
+    If choice = vbCancel Then
+        ProcessAssemblyTree = True
+        Exit Function
+    End If
+    If choice = vbNo Then Exit Function
+
+    Dim models As Object
+    Set models = tree("models")
+    Dim edges As Collection
+    Set edges = tree("edges")
+
+    ' path -> item id, for components processed so far in this run (existing OR
+    ' newly created) -- needed to resolve child ids when attaching parent-child relations.
+    Dim pathToItemId As Object
+    Set pathToItemId = CreateObject("Scripting.Dictionary")
+
+    ' Files that themselves have further children -> suggest "Assembly" as the type.
+    Dim hasChildren As Object
+    Set hasChildren = CreateObject("Scripting.Dictionary")
+    Dim e As Variant
+    For Each e In edges
+        If Not hasChildren.Exists(e("parent")) Then hasChildren.Add e("parent"), True
+    Next e
+
+    Dim filePath As Variant
+    For Each filePath In order
+        Dim childModel As Object
+        Set childModel = models(filePath)
+
+        Dim existingItemId As String
+        existingItemId = GetLinkedItemIdOn(childModel)
+
+        If existingItemId <> "" Then
+            pathToItemId.Add filePath, existingItemId
+            LogLine "Component already linked to PDM item " & existingItemId & ": " & filePath
+        Else
+            Dim outProjectId As String, outItemType As String, outName As String, outPropertiesJson As String
+            PromptNewComponentProperties CStr(filePath), childModel.GetTitle(), hasChildren.Exists(filePath), UsageHintFor(CStr(filePath), edges), outProjectId, outItemType, outName, outPropertiesJson
+            If outProjectId = "" Then
+                ProcessAssemblyTree = True
+                Exit Function
+            End If
+
+            Dim created As Object
+            On Error Resume Next
+            Set created = PushNewItemToPdm(outProjectId, outItemType, outName, outPropertiesJson, CStr(filePath))
+            Dim createErr As String
+            createErr = Err.Description
+            On Error GoTo 0
+            If created Is Nothing Then
+                MsgBox "Failed to send " & Mid(filePath, InStrRev(filePath, "\") + 1) & ": " & createErr, vbCritical, "EasyPDM"
+                ProcessAssemblyTree = True
+                Exit Function
+            End If
+
+            Dim newItemId As String
+            newItemId = JsonGetString(created, "itemId", "")
+            UploadStepAttachment childModel, newItemId
+            SetLinkedItemOn childModel, newItemId, CStr(JsonGetLong(created, "itemNumber", 0))
+            pathToItemId.Add filePath, newItemId
+        End If
+
+        ' Attach relations where THIS file is the parent, now that it has an item id --
+        ' every child in "edges" at this point already has one too, since "order" is
+        ' leaves-first (children were processed in earlier iterations of this same loop).
+        Dim edge2 As Variant
+        For Each edge2 In edges
+            If edge2("parent") = filePath Then
+                If pathToItemId.Exists(edge2("child")) Then
+                    Dim relErr As String
+                    relErr = ""
+                    On Error Resume Next
+                    Err.Clear
+                    ApiPostJson "/items/" & pathToItemId(filePath) & "/children", "{""childId"":" & JsonStr(pathToItemId(edge2("child"))) & ",""quantity"":" & edge2("qty") & "}"
+                    If Err.Number <> 0 Then relErr = Err.Description
+                    On Error GoTo 0
+                    If relErr <> "" Then
+                        MsgBox "Created " & Mid(CStr(edge2("child")), InStrRev(CStr(edge2("child")), "\") + 1) & _
+                               ", but failed to attach it under " & Mid(filePath, InStrRev(filePath, "\") + 1) & ": " & relErr, vbExclamation, "EasyPDM"
+                    End If
+                End If
+            End If
+        Next edge2
+    Next filePath
+
+    ' Relations where topModel itself is the parent could not be attached above (topModel
+    ' does not have an item id yet -- that is decided by the rest of main()) -- return them
+    ' for the caller to attach once it does.
+    Dim topPath As String
+    topPath = topModel.GetPathName()
+    Dim edge3 As Variant
+    For Each edge3 In edges
+        If edge3("parent") = topPath Then
+            If pathToItemId.Exists(edge3("child")) Then
+                edgesForTop.Add Array(pathToItemId(edge3("child")), edge3("qty"))
+            End If
+        End If
+    Next edge3
 End Function
 
 
@@ -1265,31 +1829,42 @@ Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As Strin
     GetActiveDocInfo = True
 End Function
 
-Private Function GetCustPropMgr() As Object
-    Set GetCustPropMgr = swApp.ActiveDoc.Extension.CustomPropertyManager("")
+Private Function GetCustPropMgrOn(ByVal model As Object) As Object
+    Set GetCustPropMgrOn = model.Extension.CustomPropertyManager("")
 End Function
 
-' Reads the PDM item id saved in the document's Custom Properties (if this document was
-' already uploaded via this macro before) -- empty string if the document is not yet linked
-' to any PDM item.
-Function GetLinkedItemId() As String
+' Reads the PDM item id saved in ANY document's Custom Properties (if it was already
+' uploaded via this macro before) -- empty string if not yet linked to any PDM item.
+' Parametrized by model (not just the active document) so ProcessAssemblyTree can check
+' this on each COMPONENT's own document, not only on whatever is active in SolidWorks.
+Function GetLinkedItemIdOn(ByVal model As Object) As String
     Dim mgr As Object
-    Set mgr = GetCustPropMgr()
+    Set mgr = GetCustPropMgrOn(model)
     Dim valOut As String, resolvedOut As String
     On Error Resume Next
     mgr.Get4 CUSTPROP_ITEM_ID, False, valOut, resolvedOut
     On Error GoTo 0
-    GetLinkedItemId = valOut
+    GetLinkedItemIdOn = valOut
 End Function
 
-' Saves the document-to-PDM-item link as Custom Properties -- unlike the FreeCAD approach
-' (changing the label, NOT saved to disk), this works reliably in a brand NEW SolidWorks
-' session too, since Properties are part of the file itself.
-Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String)
+' Saves the document-to-PDM-item link as Custom Properties on ANY document -- unlike the
+' FreeCAD approach (changing the label, NOT saved to disk), this works reliably in a brand
+' NEW SolidWorks session too, since Properties are part of the file itself.
+Sub SetLinkedItemOn(ByVal model As Object, ByVal itemId As String, ByVal itemNumberText As String)
     Dim mgr As Object
-    Set mgr = GetCustPropMgr()
+    Set mgr = GetCustPropMgrOn(model)
     mgr.Add3 CUSTPROP_ITEM_ID, SW_CUSTOM_INFO_TEXT, itemId, SW_CUSTOM_PROPERTY_REPLACE
     mgr.Add3 CUSTPROP_ITEM_NUMBER, SW_CUSTOM_INFO_TEXT, itemNumberText, SW_CUSTOM_PROPERTY_REPLACE
+End Sub
+
+' Thin wrappers over the active document -- kept so the rest of the file (Sub main, which
+' always deals with swApp.ActiveDoc) does not need to pass it explicitly everywhere.
+Function GetLinkedItemId() As String
+    GetLinkedItemId = GetLinkedItemIdOn(swApp.ActiveDoc)
+End Function
+
+Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String)
+    SetLinkedItemOn swApp.ActiveDoc, itemId, itemNumberText
 End Sub
 
 
@@ -1324,55 +1899,109 @@ Sub main()
 
     On Error GoTo Failed
 
+    ' Step 1: assembly component tree -- offer to auto-detect/send new components first
+    ' (leaves-first), before deciding anything about the top-level document itself. See
+    ' file header / ProcessAssemblyTree for why this stays fully native (no browser).
+    Dim edgesForTop As New Collection
+    If itemTypeGuess = "assembly" Then
+        If ProcessAssemblyTree(swApp.ActiveDoc, edgesForTop) Then
+            LogLine "Cancelled during assembly tree processing -- done."
+            Exit Sub
+        End If
+    End If
+
+    Dim swActiveModel As Object
+    Set swActiveModel = swApp.ActiveDoc
+
     Dim linkedItemId As String
     linkedItemId = GetLinkedItemId()
 
     Dim resultInfo As Object
 
     If linkedItemId <> "" Then
+        ' Already linked -- SolidWorks knows the target with certainty (Custom Property),
+        ' no browser round-trip needed. STEP always exports here (no browser form to host
+        ' a checkbox in for this path -- see UploadStepAttachment callers below).
         Dim confirmUpdate As VbMsgBoxResult
         confirmUpdate = MsgBox("This document is already linked to a PDM item. Attach the current version as a new revision/update?", vbYesNo + vbQuestion, "EasyPDM")
         If confirmUpdate <> vbYes Then Exit Sub
         Set resultInfo = PushToExistingItem(linkedItemId, filePath)
+        If Not resultInfo Is Nothing Then UploadStepAttachment swActiveModel, linkedItemId
     Else
-        Dim mode As VbMsgBoxResult
-        mode = MsgBox("Does this document already exist in PDM (attach a new version to an existing item)?" & vbCrLf & _
-                       "Yes = I will pick an existing item by number." & vbCrLf & _
-                       "No = I will create a new item in PDM.", vbYesNoCancel + vbQuestion, "EasyPDM")
-        If mode = vbCancel Then Exit Sub
+        ' Not yet linked -- "new item vs duplicate vs attach to existing" is decided in
+        ' the browser, not locally, exactly like EasyPDMUpload.FCMacro's
+        ' submit_via_browser. See BuildBrowserCreateUrl/WaitForTicket above.
+        Dim ticket As String
+        ticket = NewGuid()
+        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName)
 
-        If mode = vbYes Then
-            Dim existingItem As Object
-            Set existingItem = PromptForExistingItem()
-            If existingItem Is Nothing Then Exit Sub
-            linkedItemId = JsonGetString(existingItem, "id", "")
-            Set resultInfo = PushToExistingItem(linkedItemId, filePath)
-        Else
-            Dim projectId As String
-            projectId = PromptForProject()
-            If projectId = "" Then Exit Sub
-
-            Dim name As String
-            name = InputBox("Item name:", "New item in PDM", defaultName)
-            If Trim(name) = "" Then Exit Sub
-
-            Dim itemType As String
-            If itemTypeGuess = "part" Or itemTypeGuess = "assembly" Then
-                itemType = itemTypeGuess
-            Else
-                itemType = "file"
-            End If
-
-            Dim propertiesJson As String
-            If itemType = "part" Or itemType = "assembly" Then
-                propertiesJson = PromptPartProperties(itemType = "part")
-            Else
-                propertiesJson = "{}"
-            End If
-
-            Set resultInfo = PushNewItemToPdm(projectId, itemType, name, propertiesJson, filePath)
-            linkedItemId = JsonGetString(resultInfo, "itemId", "")
+        Dim ticketData As Object
+        Set ticketData = WaitForTicket(ticket)
+        If ticketData Is Nothing Then
+            MsgBox "Cancelled -- nothing was sent.", vbInformation, "EasyPDM"
+            LogLine "=== Finished: browser ticket cancelled/timed out ==="
+            Exit Sub
         End If
+
+        Dim exportStep As Boolean
+        exportStep = True
+        If ticketData.Exists("exportStep") Then
+            If Not IsNull(ticketData.Item("exportStep")) Then exportStep = CBool(ticketData.Item("exportStep"))
+        End If
+
+        Dim ticketItemId As String
+        ticketItemId = JsonGetString(ticketData, "itemId", "")
+
+        Dim isExisting As Boolean
+        isExisting = False
+        If ticketData.Exists("existing") Then
+            If ticketData.Item("existing") = True Then isExisting = True
+        End If
+
+        If isExisting Then
+            Set resultInfo = PushToExistingItem(ticketItemId, filePath)
+            If resultInfo Is Nothing Then
+                MsgBox "Cancelled -- nothing was sent.", vbInformation, "EasyPDM"
+                LogLine "=== Finished: existing item declined a new revision ==="
+                Exit Sub
+            End If
+            linkedItemId = ticketItemId
+            If exportStep Then UploadStepAttachment swActiveModel, ticketItemId
+        Else
+            ' New item -- it already exists server-side (the browser called POST /nodes
+            ' with this ticket), so finish DIRECTLY with the file upload; calling
+            ' PushNewItemToPdm here would create a SECOND item.
+            Dim ticketItemNumber As Long
+            ticketItemNumber = JsonGetLong(ticketData, "itemNumber", 0)
+            Dim ticketName As String
+            ticketName = JsonGetString(ticketData, "name", defaultName)
+
+            RenameAndUpload filePath, ticketItemId, ticketItemNumber, ticketName, 1
+            linkedItemId = ticketItemId
+            Set resultInfo = CreateObject("Scripting.Dictionary")
+            resultInfo.Add "itemId", ticketItemId
+            resultInfo.Add "itemNumber", ticketItemNumber
+            resultInfo.Add "revision", 1
+            If exportStep Then UploadStepAttachment swActiveModel, ticketItemId
+        End If
+    End If
+
+    ' Step 3: attach components discovered in step 1 under THIS element, now that it has
+    ' an item id -- regardless of whether it was brand new or already existing.
+    If Not resultInfo Is Nothing Then
+        Dim edgeVariant As Variant
+        For Each edgeVariant In edgesForTop
+            Dim topRelErr As String
+            topRelErr = ""
+            On Error Resume Next
+            Err.Clear
+            ApiPostJson "/items/" & linkedItemId & "/children", "{""childId"":" & JsonStr(edgeVariant(0)) & ",""quantity"":" & edgeVariant(1) & "}"
+            If Err.Number <> 0 Then topRelErr = Err.Description
+            On Error GoTo 0
+            If topRelErr <> "" Then
+                MsgBox "Failed to attach one of the sub-components under the main element: " & topRelErr, vbExclamation, "EasyPDM"
+            End If
+        Next edgeVariant
     End If
 
     If Not resultInfo Is Nothing Then

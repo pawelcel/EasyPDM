@@ -3,24 +3,27 @@
 Dwa makra `.bas`, każde w pełni samodzielne (osobny plik, osobny moduł VBA, bez zależności
 między sobą poza współdzielonym miejscem w rejestrze Windows na sesję logowania):
 
-- **`EasyPDMUpload.bas`** — wysyła aktywny dokument SolidWorks wprost do EasyPDM, bez
-  przechodzenia przez przeglądarkę.
+- **`EasyPDMUpload.bas`** — wysyła aktywny dokument SolidWorks do EasyPDM. Wybór
+  projektu/nowy-czy-istniejący/duplikuj/właściwości elementu odbywa się w przeglądarce
+  (ten sam wzorzec co makra FreeCAD), poza jednym wyjątkiem — patrz "Różnice względem
+  makr FreeCAD" niżej.
 - **`EasyPDMDownload.bas`** — pobiera Część/Złożenie z EasyPDM (wraz ze wszystkimi
-  składnikami złożenia) i otwiera je w SolidWorks.
+  składnikami złożenia) i otwiera je w SolidWorks; wybór KTÓREGO elementu też odbywa się
+  w przeglądarce.
 
 ## Status
 
-**`EasyPDMUpload.bas`: zweryfikowane na żywo** (SolidWorks 2026, 2026-08-20) — pełny
-przebieg: logowanie, utworzenie nowego elementu w PDM, wysłanie pliku. Po drodze
-znalezione i naprawione (w kodzie w repo) realne błędy, których nie dało się wykryć bez
-prawdziwego SolidWorks — zob. "Historia naprawionych problemów" niżej.
+**Poprzednia wersja (bez przeglądarki, natywne `InputBox`/`MsgBox` do wyboru
+projektu/elementu/rodzaju) była zweryfikowana na żywo** (SolidWorks 2026, 2026-08-20) —
+zob. "Historia naprawionych problemów" niżej, wciąż aktualna dla współdzielonej
+infrastruktury logowania/JSON/HTTP, którą obecna wersja w całości zachowuje.
 
-**`EasyPDMDownload.bas`: niezweryfikowane** — napisane analogicznie do już
-zweryfikowanego `EasyPDMUpload.bas` (ta sama, sprawdzona infrastruktura logowania/JSON/
-HTTP, ten sam styl kodu), ale sama logika pobierania (w tym wywołanie
-`swApp.OpenDoc6` otwierające pobrany plik) nie przeszła jeszcze żadnego realnego testu.
-Przed pierwszym użyciem: zaimportuj do edytora VBA (pokaże błędy składniowe od razu) i
-przetestuj na nieistotnym elemencie/folderze testowym.
+**Obecna wersja (wzorzec przeglądarki + eksport STEP + automatyczne wykrywanie drzewa
+złożenia) jest NIEZWERYFIKOWANA** — napisana bez dostępu do SolidWorks/kompilatora VBA w
+środowisku, w którym powstała (w przeciwieństwie do makr FreeCAD, gdzie `py_compile` dawał
+realną weryfikację składni, tu jedyna weryfikacja to ręczny przegląd kodu). Wymaga
+pełnego testu na żywym SolidWorks przed użyciem produkcyjnym — zob. "Znane ryzyka" niżej,
+gdzie są dokładnie wskazane najbardziej niepewne fragmenty.
 
 ## Różnice względem makr FreeCAD
 
@@ -32,22 +35,35 @@ inaczej:
   nie współdzielony — VBA nie ma niezawodnego sposobu importowania jednego modułu z
   drugiego) — wystarczający do kształtów odpowiedzi tego konkretnego API, nie ogólnego
   przeznaczenia.
-- **Okna**: zwykłe `InputBox`/`MsgBox` zamiast rozwijanych list i formularzy Qt z makr
-  FreeCAD. Hasła nie da się zamaskować gwiazdkami zwykłym `InputBox` — wpisywane jest
-  jawnym tekstem (widocznym na ekranie, niezapisywanym nigdzie poza samym oknem). Wybór
-  elementu w PDM to zwykłe pytanie o numer (`InputBox`), nie wyszukiwarka z podpowiedziami.
+- **Brak `UserForm`** — zamiast Qt-owych formularzy FreeCAD, wszystkie natywne okna to
+  zwykłe `InputBox`/`MsgBox` (`UserForm` to osobny plik binarny, nie da się go dołączyć do
+  pojedynczego `.bas` importowanego przez "Plik → Importuj plik..."). Hasła przy logowaniu
+  nie da się zamaskować gwiazdkami zwykłym `InputBox`. Czekanie na przeglądarkę (patrz
+  niżej) pokazuje postęp w pasku stanu SolidWorks zamiast w oknie z przyciskiem Anuluj —
+  Escape jest jedynym dostępnym gestem anulowania.
+- **Wybór projektu/nowy-czy-istniejący/duplikuj/właściwości elementu w przeglądarce** —
+  ten sam wzorzec bilet+`GET /api/auth/browser-login`+popup "oczekujące żądanie z makra
+  CAD" co makra FreeCAD, **z jednym świadomym wyjątkiem**: jeśli dokument jest JUŻ
+  podpięty do elementu PDM (patrz punkt niżej), makro NIE otwiera przeglądarki wcale —
+  pyta lokalnie tylko o zgodę na nową rewizję, dokładnie jak przed tą zmianą. SolidWorks
+  zna wtedy element ze 100% pewnością, więc przeglądarka nic by tu nie dodała; FreeCAD
+  zawsze idzie do przeglądarki, bo nie ma tak niezawodnego mechanizmu lokalnego.
 - **Rozpoznawanie "już wysłanego" dokumentu** (`EasyPDMUpload.bas`): NIE przez etykietę/
   nazwę pliku (SolidWorks nie ma odpowiednika swobodnej etykiety FreeCAD) — przez
   **Właściwości niestandardowe** dokumentu (`EasyPDM_ItemId`, `EasyPDM_ItemNumber`),
   zapisywane w samym pliku po udanej wysyłce. To w rzeczywistości **trwalsze** podejście
-  niż w FreeCAD — działa też w NOWEJ sesji SolidWorks.
-- **Świadomie pominięte**: automatyczne wykrywanie i wysyłanie całego drzewa złożenia
-  naraz przy uploadzie (odpowiednik `App::Link`/`discover_component_tree` z FreeCAD, oparty
-  o `IAssemblyDoc`/`IComponent2` po stronie SolidWorks) — `EasyPDMUpload.bas` wysyła
-  **jeden aktywny dokument na raz**; strukturę BOM (podpięcie komponentów pod złożenie)
-  buduje się w aplikacji webowej. `EasyPDMDownload.bas` NIE ma tego ograniczenia w drugą
-  stronę — pobieranie złożenia ściąga cały jego BOM rekurencyjnie (patrz niżej), bo do
-  tego wystarczy tylko czytanie API, bez integracji z `IAssemblyDoc`.
+  niż w FreeCAD — działa też w NOWEJ sesji SolidWorks, i (nowość) jest teraz też
+  wykorzystywane dla KAŻDEGO komponentu złożenia z osobna (patrz "wykrywanie drzewa
+  złożenia" niżej), nie tylko dla dokumentu głównego.
+- **Nowe komponenty złożenia zbierane sekwencją `InputBox`, nie przez przeglądarkę** —
+  ten sam powód co natywny dialog komponentu w FreeCAD (N kart przeglądarki dla N nowych
+  komponentów złożenia byłoby gorszym UX niż jeden natywny prompt na komponent), tym
+  bardziej uzasadniony tutaj przez brak `UserForm` w ogóle w tym pliku.
+- **Eksport STEP dla ścieżek bez przeglądarki eksportuje się zawsze** (dokument już
+  podpięty; automatycznie wykryte komponenty złożenia) — nie ma tam formularza w
+  przeglądarce, w którym mógłby siedzieć checkbox. Tylko ścieżka przez bilet (nowy
+  element/duplikat/dograj do istniejącego) ma checkbox STEP w przeglądarce, tak jak w
+  FreeCAD.
 
 ## Co robi `EasyPDMUpload.bas`
 
@@ -59,19 +75,34 @@ inaczej:
    ponowne logowanie, dopóki sesja jest ważna (30 dni).
 2. **Zapisuje aktywny dokument**, jeśli jeszcze nie był zapisany (standardowe okno "Zapisz
    jako" SolidWorks).
-3. Sprawdza **Właściwości niestandardowe** dokumentu — jeśli dokument był już kiedyś
-   wysłany tym makrem (ma zapisane `EasyPDM_ItemId`), od razu proponuje dogranie nowej
-   wersji do tego elementu.
-4. W przeciwnym razie pyta: **nowy element w PDM**, czy **już istniejący** (wyszukiwany po
-   numerze widocznym w PDM, np. "67" z nazwy "67 (Nazwa)").
-   - **Nowy**: projekt PDM (lista numerowana), nazwa (domyślnie nazwa pliku), typ
-     (Część/Złożenie/Plik — zgadywany z typu dokumentu SolidWorks), rodzaj i zależne od
-     niego pola — te same reguły co `PartPropertyForm`/`add-node-dialog` w aplikacji
-     webowej (Wykonywana → Materiał; Zakupowa → Producent/Numery zamówieniowe/Masa;
-     Normalia → Materiał/Norma; Klienta → brak dodatkowych pól; dla Złożenia rodzaj jest
-     opcjonalny, bez "Klienta", Materiał/Masa zawsze widoczne).
-   - **Istniejący ze statusem "Wydany"**: pyta o zgodę na nową rewizję i opcjonalny
-     komentarz — dokładnie ten sam mechanizm co w aplikacji webowej.
+3. **Jeśli aktywny dokument to Złożenie**: wykrywa jego drzewo komponentów
+   (`IAssemblyDoc.GetComponents`, rekurencyjnie) i pyta, czy wysłać automatycznie razem z
+   nim wszystkie komponenty, które NIE są jeszcze podpięte do PDM (rozpoznawane przez
+   Właściwości niestandardowe na KAŻDYM komponencie z osobna, patrz niżej) — liście
+   najpierw, ten dokument na końcu. Dla każdego nowego komponentu: krótka sekwencja
+   `InputBox` (Projekt → Typ → Nazwa → Rodzaj i pola zależne — te same reguły co niżej),
+   NIE przeglądarka (patrz "Różnice względem makr FreeCAD"). Nowo utworzone komponenty
+   od razu dostają eksport STEP i własny wpis `EasyPDM_ItemId`, i są automatycznie
+   podpinane pod swojego rodzica w strukturze BOM.
+4. Sprawdza **Właściwości niestandardowe** dokumentu głównego:
+   - **Już podpięty** (ma zapisane `EasyPDM_ItemId`) — pyta lokalnie o zgodę na dogranie
+     bieżącej wersji jako nowej rewizji, bez otwierania przeglądarki (patrz "Różnice
+     względem makr FreeCAD"). Eksport STEP następuje zawsze.
+   - **Jeszcze niepodpięty** — otwiera przeglądarkę systemową (już zalogowaną, most
+     token→ciasteczko) na popupie "oczekujące żądanie z makra CAD", z trzema opcjami do
+     wyboru TAM: **Nowy element** (projekt, opcjonalnie rodzic, typ, nazwa, rodzaj i
+     zależne od niego pola — Wykonywana → Materiał; Zakupowa → Producent/Numery
+     zamówieniowe/Masa; Normalia → Materiał/Norma; Klienta → brak dodatkowych pól; dla
+     Złożenia rodzaj opcjonalny, bez "Klienta", Materiał/Masa zawsze widoczne — plus
+     checkbox eksportu STEP), **Duplikuj** (wskazuje istniejący element, kopiuje jego
+     właściwości do nowego, bez plików) albo **Dograj do istniejącego** (wyszukiwarka po
+     całej bazie + ten sam checkbox STEP). Makro czeka (odpytuje co ~2s, limit 10 minut,
+     Escape anuluje, postęp w pasku stanu SolidWorks) i kontynuuje automatycznie, gdy
+     wybór zostanie zatwierdzony w przeglądarce.
+   - **Istniejący element ze statusem "Wydany"** (obie ścieżki wyżej): pyta o zgodę na
+     nową rewizję i opcjonalny komentarz — dokładnie ten sam mechanizm co w aplikacji
+     webowej, jedyna decyzja świadomie zostająca lokalna nawet na ścieżce przez
+     przeglądarkę.
 5. **Kopiuje** bieżący plik dokumentu do PDM pod nazwą `numer (nazwa).REWIZJA.rozszerzenie`
    (ta sama konwencja co w aplikacji webowej i makrach FreeCAD). **Lokalny plik NIE jest
    ruszany** — nie jest ani przenoszony, ani usuwany. Jeśli magazyn PDM jest widoczny
@@ -81,15 +112,24 @@ inaczej:
    użytkownicy Windows — magazyn jest w `C:\ProgramData\...`, do którego zwykły
    użytkownik zwykle nie ma prawa zapisu), zwykły upload HTTP (fallback bez zachowania
    historii rewizji) — **to nie błąd**, tylko poprawnie zadziałane zabezpieczenie.
-6. Zapisuje `EasyPDM_ItemId`/`EasyPDM_ItemNumber` we Właściwościach niestandardowych
+6. Gdy eksport STEP jest włączony (checkbox w przeglądarce, albo zawsze dla ścieżek bez
+   przeglądarki — patrz p.4): eksportuje widoczną geometrię do tymczasowego pliku `.step`
+   (`IModelDocExtension.SaveAs`) i wgrywa jako załącznik z rolą `"step"`, zastępując
+   poprzedni załącznik tej samej roli — zasila stały podgląd 3D w aplikacji webowej.
+   Błąd eksportu (np. brak widocznej geometrii) NIE przerywa reszty operacji.
+7. Zapisuje `EasyPDM_ItemId`/`EasyPDM_ItemNumber` we Właściwościach niestandardowych
    dokumentu i pokazuje potwierdzenie.
 
 ## Co robi `EasyPDMDownload.bas`
 
 1. **Logowanie** — jak wyżej (sesja współdzielona z `EasyPDMUpload.bas`).
-2. Pyta o **numer elementu w PDM** (Część/Złożenie) i **folder docelowy** (domyślnie
-   podpowiada ostatnio użyty — ta sama preferencja co folder docelowy w
-   `EasyPDMUpload.bas`, więc wysłane i pobrane pliki mogą lądować w jednym miejscu).
+2. **Wybór elementu do pobrania odbywa się w przeglądarce** — ten sam popup "oczekujące
+   żądanie z makra CAD" co przy wysyłaniu, tyle że od razu z samą wyszukiwarką (bez
+   wyboru Nowy/Duplikuj, nieistotnego przy pobieraniu). Makro czeka tak samo jak przy
+   wysyłaniu (Escape anuluje, limit 10 minut). Jedyne, co zostaje lokalnym `InputBox`, to
+   **folder docelowy** (domyślnie podpowiada ostatnio użyty — ta sama preferencja co
+   folder docelowy w `EasyPDMUpload.bas`, więc wysłane i pobrane pliki mogą lądować w
+   jednym miejscu).
 3. Dla Złożenia: pobiera też **wszystkie jego składniki rekurencyjnie** (bezpośrednie
    dzieci, potem ich dzieci, i tak dalej — cały BOM), do TEGO SAMEGO folderu co plik
    główny. Bez tego złożenie oparte o zewnętrzne odnośniki do zapisanych plików (typowe w
@@ -181,36 +221,68 @@ niesprawdzony kod — regex, rekurencyjne pobieranie, `OpenDoc6`):
    niepoprawny") przy uploadzie przez fallback HTTP. Naprawione przez opakowanie bajtów
    w binarny `ADODB.Stream` i wysłanie strumienia zamiast tablicy.
 
-## Znane ryzyka / miejsca do sprawdzenia w pierwszej kolejności (`EasyPDMDownload.bas`)
+## Znane ryzyka / miejsca do sprawdzenia w pierwszej kolejności
 
-Nieprzetestowane jeszcze fragmenty, specyficzne dla tego pliku (reszta infrastruktury —
-logowanie/JSON/HTTP — jest tą samą, już zweryfikowaną bazą co w `EasyPDMUpload.bas`):
+Nieprzetestowane jeszcze fragmenty — napisane bez dostępu do SolidWorks/kompilatora VBA,
+więc nawet SKŁADNIA nie została sprawdzona automatycznie (w odróżnieniu od makr FreeCAD,
+gdzie `py_compile` dawał realną weryfikację). Sugerowana kolejność testów: zwykła Część
+jeszcze niepodpięta → ta sama Część ponownie (ścieżka natywna) → Dograj/Duplikuj w
+przeglądarce → Złożenie z nowymi komponentami → Escape/timeout w trakcie oczekiwania →
+`EasyPDMDownload.bas`.
 
-1. **`swApp.OpenDoc6`** — sygnatura (`FileName, Type, Options, Configuration, Errors,
+**Współdzielone przez oba pliki (nowe w tej rundzie):**
+1. **`WaitForTicket`** — pętla `Sleep`/`DoEvents`/`GetAsyncKeyState(VK_ESCAPE)` +
+   odpytywanie `GET /create-tickets/{ticket}` co ~2s, `swApp.Frame.SetStatusBarText` do
+   pokazania postępu. Mechanizm (Win32 API przez `Declare`, brak `UserForm`) nie ma
+   bezpośredniego odpowiednika gdzie indziej w tym repo — do sprawdzenia: czy Escape
+   faktycznie przerywa pętlę, czy pasek stanu się aktualizuje/czyści poprawnie, czy
+   SolidWorks zostaje responsywny (`DoEvents`) przez cały czas oczekiwania.
+2. **`Scriptlet.TypeLib.Guid`** (`NewGuid`) i ręczny `UrlEncode` (percent-encoding przez
+   `ADODB.Stream` do UTF-8 + ręczne omijanie BOM) — oba standardowe, udokumentowane
+   obejścia braku wbudowanego GUID/URL-encodera w VBA, ale nieprzetestowane w tym
+   konkretnym zastosowaniu (nazwa dokumentu z polskimi znakami w `name=` warto sprawdzić
+   osobno).
+
+**`EasyPDMUpload.bas` (nowe w tej rundzie):**
+3. **`IModelDocExtension.SaveAs` do `.step`** (`UploadStepAttachment`) — dokładna liczba/
+   znaczenie parametrów (`SaveAsVersion`/`SaveAsOptions`) napisane z dokumentacji API, NIE
+   przetestowane — jeśli SolidWorks zgłosi błąd argumentów, sprawdzić w edytorze VBA (F1
+   na `SaveAs`) dokładną sygnaturę zainstalowanej wersji.
+4. **`IAssemblyDoc.GetComponents`/`IComponent2.GetModelDoc2`/`Name2`/`GetTitle`**
+   (`VisitAssemblyComponents`/`ProcessAssemblyTree`) — zakłada, że późno wiązany
+   `ModelDoc2` dla Złożenia można wywoływać bezpośrednio metodami `IAssemblyDoc` (typowy,
+   udokumentowany wzorzec w makrach SolidWorks, ale nieprzetestowany tutaj). Zawieszone/
+   nierozwiązane/wirtualne komponenty są pomijane przez sprawdzenie `GetModelDoc2() Is
+   Nothing`/pusty `GetPathName()` zamiast sztywnej wartości enuma zawieszenia — do
+   potwierdzenia, że to faktycznie wystarcza.
+
+**`EasyPDMDownload.bas` (bez zmian od poprzedniej rundy):**
+5. **`swApp.OpenDoc6`** — sygnatura (`FileName, Type, Options, Configuration, Errors,
    Warnings`) jest dobrze udokumentowanym, standardowym API, ale nie została przetestowana
    na żywo. `Options = 0` (brak specjalnych flag) powinno być bezpieczną wartością
    domyślną.
-2. **`VBScript.RegExp`** (`NewRevisionRegex`) — używane do rozpoznawania konwencji nazw
+6. **`VBScript.RegExp`** (`NewRevisionRegex`) — używane do rozpoznawania konwencji nazw
    plików (`numer (nazwa).REWIZJA.rozszerzenie`) przy wykrywaniu aktualnej rewizji i
    starszych lokalnych kopii. Standardowy, stabilny mechanizm, ale nieprzetestowany w
    tym konkretnym zastosowaniu.
-3. **Rekurencyjne pobieranie składników złożenia** (`DownloadChildrenRecursive`) —
+7. **Rekurencyjne pobieranie składników złożenia** (`DownloadChildrenRecursive`) —
    analogiczne do `_download_children_recursive` w `EasyPDMDownload.FCMacro` (w tym ten sam
    kształt odpowiedzi `GET /items/{id}/children`: element zagnieżdżony pod kluczem
    `"item"`), ale nieprzetestowane po stronie SolidWorks.
-4. **`EnsureDirectory`** — ręczna implementacja tworzenia zagnieżdżonych folderów (VBA
+8. **`EnsureDirectory`** — ręczna implementacja tworzenia zagnieżdżonych folderów (VBA
    `MkDir` tworzy tylko jeden poziom naraz, w odróżnieniu od `os.makedirs`) — prosta
    logika, ale warto sprawdzić na ścieżce z kilkoma nieistniejącymi poziomami naraz.
 
 ## Ograniczenia (świadomie poza zakresem tej wersji)
 
-- `EasyPDMUpload.bas`: brak automatycznego wykrywania i wysyłania całego drzewa złożenia
-  naraz — strukturę BOM buduje się ręcznie w aplikacji webowej.
 - `EasyPDMDownload.bas`: nie próbuje pobierać KONKRETNEJ starszej rewizji — zawsze celuje
   w aktualną. Wszystkie pliki (główny + składniki) lądują płasko w jednym folderze, bez
   odtwarzania struktury BOM jako podfolderów.
+- Brak odpowiednika FreeCAD-owego "folderu docelowego na lokalne kopie" —
+  `RenameAndUpload` kopiuje/wysyła plik prosto do magazynu PDM, nie zostawia zmienionej
+  nazwy kopii obok plików roboczych użytkownika.
 - Hasło przy logowaniu nie jest maskowane (zwykły `InputBox`, bez własnego `UserForm`).
-- Wybór projektu/elementu przez numer w liście tekstowej, nie przez wyszukiwarkę z
-  podpowiedziami jak w FreeCAD.
+- Folder docelowy pobierania to zwykły `InputBox` z tekstem ścieżki, nie przeglądarka
+  systemowa plików.
 - Kopiowanie/rejestrowanie/pobieranie pliku przez `storage/` zakłada, że ten folder jest
   widoczny w systemie plików tej maszyny — tak samo jak w makrach FreeCAD.

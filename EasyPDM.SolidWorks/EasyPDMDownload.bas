@@ -6,24 +6,29 @@ Option Explicit
 ' opens it.
 '
 ' This is the COUNTERPART of EasyPDM.FreeCad/EasyPDMDownload.FCMacro, not a 1:1 port -- see
-' EasyPDMUpload.bas's header for the general reasons (own minimal JSON, plain InputBox/
-' MsgBox instead of a real search dialog -- VBA UserForms are separate binary resources,
-' not embeddable in a plain .bas text file, so this uses the same InputBox-based picker
-' pattern as "existing item" lookup in EasyPDMUpload.bas).
+' EasyPDMUpload.bas's header for the general reasons (own minimal JSON, no UserForm
+' anywhere -- VBA UserForms are separate binary resources, not embeddable in a plain .bas
+' text file).
 '
 ' This file is fully SELF-CONTAINED (does not depend on EasyPDMUpload.bas being present in
-' the same VBA project) -- it duplicates the login/JSON/HTTP helpers rather than importing
-' them, the same way EasyPDM.FreeCad/EasyPDMDownload.FCMacro duplicates rather than imports
-' from EasyPDMUpload.FCMacro. The API address, session token and download folder are
-' shared with EasyPDMUpload.bas through the SAME Windows registry keys (identical constants
-' below) -- logging in from one macro is enough for both.
+' the same VBA project) -- it duplicates the login/JSON/HTTP/browser-ticket helpers rather
+' than importing them, the same way EasyPDM.FreeCad/EasyPDMDownload.FCMacro duplicates
+' rather than imports from EasyPDMUpload.FCMacro. The API address, session token and
+' download folder are shared with EasyPDMUpload.bas through the SAME Windows registry keys
+' (identical constants below) -- logging in from one macro is enough for both.
 '
 ' All comments/strings are plain English (ASCII only) -- VBA's file import does not
 ' reliably handle UTF-8 (confirmed in practice while building EasyPDMUpload.bas).
 '
 ' What it does:
-'   1. Asks for the PDM item number (Part/Assembly) to download, and the target folder
-'      (defaults to the last one used -- shared with EasyPDMUpload.bas's target folder).
+'   1. Picks WHICH item to download the SAME way EasyPDMUpload.bas picks a new item's
+'      home -- opens the system browser, already logged in (token->cookie bridge), on the
+'      "pending request from a CAD macro" popup (mode=download), where a search box picks
+'      the Part/Assembly, exactly like EasyPDMDownload.FCMacro. The macro waits
+'      (WaitForTicket, polling GET /create-tickets/{ticket}; Escape cancels, no UserForm
+'      needed) and then re-fetches the full item (GET /items/{id}) once resolved. Only the
+'      TARGET FOLDER stays a native InputBox (defaults to the last one used -- shared with
+'      EasyPDMUpload.bas's target folder).
 '   2. For an Assembly: also downloads ALL of its components recursively (direct children,
 '      then their children, and so on -- the whole BOM), into the SAME folder as the main
 '      file. Without this, an assembly built on links to external, saved files would have
@@ -78,6 +83,19 @@ Private Const ERR_API As Long = vbObjectError + 1002
 Private Const SW_DOC_PART As Long = 1        ' swDocumentTypes_e.swDocPART
 Private Const SW_DOC_ASSEMBLY As Long = 2    ' swDocumentTypes_e.swDocASSEMBLY
 Private Const SW_DOC_DRAWING As Long = 3     ' swDocumentTypes_e.swDocDRAWING
+
+' Win32 API used ONLY by WaitForTicket (below) to poll the ticket endpoint while keeping
+' SolidWorks responsive and letting the user cancel with Escape -- see EasyPDMUpload.bas's
+' copy of this same block for the full reasoning (duplicated here per this file's own
+' self-containment rule, see file header).
+#If VBA7 Then
+    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Private Declare PtrSafe Function GetAsyncKeyState Lib "user32" (ByVal vKey As Long) As Integer
+#Else
+    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Private Declare Function GetAsyncKeyState Lib "user32" (ByVal vKey As Long) As Integer
+#End If
+Private Const VK_ESCAPE As Long = &H1B
 
 ' SolidWorks application object -- declared and assigned at the start of Sub main(), same
 ' reasoning as EasyPDMUpload.bas ("swApp" is only auto-provided in the module SolidWorks
@@ -474,6 +492,146 @@ Function ApiPostJson(ByVal path As String, ByVal bodyJson As String) As Object
 NetErr:
     LogLine "POST " & path & " -> NO CONNECTION: " & Err.Description
     Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+End Function
+
+
+' ============================================================================
+' Browser ticket flow -- lets the web app pick WHICH item to download instead of a native
+' number-entry InputBox, exactly like EasyPDM.FreeCad/EasyPDMDownload.FCMacro. Duplicated
+' from EasyPDMUpload.bas (see file header for why this file does not import from it) --
+' BuildBrowserDownloadUrl differs (mode=download, no "name" hint), WaitForTicket/NewGuid/
+' UrlEncode/OpenUrlInBrowser are identical copies.
+' ============================================================================
+
+Function NewGuid() As String
+    Dim raw As String
+    raw = CreateObject("Scriptlet.TypeLib").Guid
+
+    Dim openBrace As Long, closeBrace As Long
+    openBrace = InStr(raw, "{")
+    closeBrace = InStr(raw, "}")
+    If openBrace > 0 And closeBrace > openBrace Then
+        raw = Mid(raw, openBrace + 1, closeBrace - openBrace - 1)
+    End If
+    If Len(raw) > 36 Then raw = Left(raw, 36)
+    NewGuid = LCase(raw)
+End Function
+
+Function UrlEncode(ByVal s As String) As String
+    If Len(s) = 0 Then
+        UrlEncode = ""
+        Exit Function
+    End If
+
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+    stream.Type = 2 ' adTypeText
+    stream.Charset = "utf-8"
+    stream.Open
+    stream.WriteText s
+    stream.Position = 0
+    stream.Type = 1 ' adTypeBinary
+    Dim bytes() As Byte
+    bytes = stream.Read
+    stream.Close
+
+    ' ADODB.Stream prepends a UTF-8 BOM (EF BB BF) when converting text->binary this way
+    ' (confirmed in practice) -- must be stripped, or it corrupts the very first encoded
+    ' character.
+    If UBound(bytes) >= 2 Then
+        If bytes(0) = &HEF And bytes(1) = &HBB And bytes(2) = &HBF Then
+            Dim trimmed() As Byte
+            ReDim trimmed(0 To UBound(bytes) - 3)
+            Dim k As Long
+            For k = 3 To UBound(bytes)
+                trimmed(k - 3) = bytes(k)
+            Next k
+            bytes = trimmed
+        End If
+    End If
+
+    Dim result As String
+    Dim i As Long, b As Byte
+    result = ""
+    For i = LBound(bytes) To UBound(bytes)
+        b = bytes(i)
+        If (b >= 65 And b <= 90) Or (b >= 97 And b <= 122) Or (b >= 48 And b <= 57) _
+           Or b = 45 Or b = 95 Or b = 46 Or b = 126 Then ' A-Z a-z 0-9 - _ . ~
+            result = result & Chr(b)
+        Else
+            result = result & "%" & Right("0" & Hex(b), 2)
+        End If
+    Next i
+    UrlEncode = result
+End Function
+
+Sub OpenUrlInBrowser(ByVal url As String)
+    CreateObject("WScript.Shell").Run """" & url & """", 1, False
+End Sub
+
+' Address that logs the browser in (token->cookie bridge) and deep-links straight to the
+' "pending request from a CAD macro" popup for THIS ticket, in DOWNLOAD mode -- the popup
+' shows a search box immediately (no "new/duplicate/attach" choice, that only applies to
+' uploading) and completes the ticket via the SAME attach-existing endpoint used by
+' EasyPDMUpload.bas's "Attach to existing" -- it does not create or change anything, only
+' tells the macro WHICH item was picked.
+Function BuildBrowserDownloadUrl(ByVal ticket As String) As String
+    Dim redirectPath As String
+    redirectPath = "/?ticket=" & UrlEncode(ticket) & "&mode=download"
+    BuildBrowserDownloadUrl = GetBaseUrl() & "/auth/browser-login?token=" & UrlEncode(GetSessionToken()) & "&redirect=" & UrlEncode(redirectPath)
+End Function
+
+' Polls GET /create-tickets/{ticket} until the user picks an item in the browser, the wait
+' times out (10 minutes), or the user presses Escape -- identical to EasyPDMUpload.bas's
+' copy, see there for the full reasoning (no UserForm in this file, status bar text
+' instead of a dialog, tick/poll counters instead of Timer() to avoid a midnight rollover).
+Function WaitForTicket(ByVal ticket As String) As Object
+    Const TICK_MS As Long = 400
+    Const POLL_EVERY_MS As Long = 2000
+    Const TIMEOUT_MS As Long = 600000 ' 10 minutes, same as EasyPDMDownload.FCMacro
+
+    Dim elapsedMs As Long, sincePollMs As Long
+    elapsedMs = 0
+    sincePollMs = POLL_EVERY_MS ' poll right away on the very first tick
+
+    On Error Resume Next
+    swApp.Frame.SetStatusBarText "EasyPDM: waiting for the browser... (Esc to cancel)"
+    On Error GoTo 0
+
+    Do While elapsedMs < TIMEOUT_MS
+        Sleep TICK_MS
+        DoEvents
+        elapsedMs = elapsedMs + TICK_MS
+        sincePollMs = sincePollMs + TICK_MS
+
+        If (GetAsyncKeyState(VK_ESCAPE) And &H8000) <> 0 Then
+            LogLine "WaitForTicket: cancelled by Escape."
+            GoTo TimedOutOrCancelled
+        End If
+
+        If sincePollMs >= POLL_EVERY_MS Then
+            sincePollMs = 0
+            Dim data As Object
+            Set data = Nothing
+            On Error Resume Next
+            Set data = ApiGet("/create-tickets/" & ticket)
+            On Error GoTo 0
+            If Not data Is Nothing Then
+                If JsonGetString(data, "itemId", "") <> "" Then
+                    Set WaitForTicket = data
+                    GoTo Cleanup
+                End If
+            End If
+        End If
+    Loop
+    LogLine "WaitForTicket: timed out after " & (TIMEOUT_MS \ 1000) & "s."
+
+TimedOutOrCancelled:
+    Set WaitForTicket = Nothing
+Cleanup:
+    On Error Resume Next
+    swApp.Frame.SetStatusBarText ""
+    On Error GoTo 0
 End Function
 
 
@@ -965,41 +1123,6 @@ End Sub
 
 
 ' ============================================================================
-' Item lookup -- same InputBox-based pattern as PromptForExistingItem in EasyPDMUpload.bas
-' (a real searchable dialog would need a VBA UserForm, a separate binary resource not
-' embeddable in a plain .bas file).
-' ============================================================================
-
-Function PromptForItem() As Object
-    Dim numberText As String
-    numberText = InputBox("PDM item number to download (visible e.g. in the name ""67 (Name)""):", "Download from PDM")
-    If Trim(numberText) = "" Then
-        Set PromptForItem = Nothing
-        Exit Function
-    End If
-    Dim targetNumber As Long
-    targetNumber = Val(numberText)
-
-    Dim items As Object
-    Set items = ApiGet("/items")
-    Dim it As Variant
-    For Each it In items
-        If JsonGetLong(it, "itemNumber", -1) = targetNumber Then
-            Dim itemType As String
-            itemType = JsonGetString(it, "itemType", "")
-            If itemType = "part" Or itemType = "assembly" Then
-                Set PromptForItem = it
-                Exit Function
-            End If
-        End If
-    Next it
-
-    MsgBox "No Part/Assembly found with number " & targetNumber & ".", vbExclamation, "EasyPDM"
-    Set PromptForItem = Nothing
-End Function
-
-
-' ============================================================================
 ' Entry point -- run via Tools -> Macro -> Run (or F5 in the VBA editor, with the cursor
 ' inside Sub "main").
 ' ============================================================================
@@ -1026,9 +1149,27 @@ Sub main()
         Exit Sub
     End If
 
+    ' Which item to download is picked in the browser, not a native InputBox -- exactly
+    ' like EasyPDM.FreeCad/EasyPDMDownload.FCMacro (see BuildBrowserDownloadUrl/
+    ' WaitForTicket above).
+    Dim ticket As String
+    ticket = NewGuid()
+    OpenUrlInBrowser BuildBrowserDownloadUrl(ticket)
+
+    Dim ticketData As Object
+    Set ticketData = WaitForTicket(ticket)
+    If ticketData Is Nothing Then
+        MsgBox "Cancelled -- nothing was downloaded.", vbInformation, "EasyPDM"
+        LogLine "=== Finished: browser ticket cancelled/timed out ==="
+        Exit Sub
+    End If
+
     Dim topItem As Object
-    Set topItem = PromptForItem()
-    If topItem Is Nothing Then Exit Sub
+    Set topItem = ApiGet("/items/" & JsonGetString(ticketData, "itemId", ""))
+    If topItem Is Nothing Then
+        MsgBox "The selected item could not be loaded.", vbExclamation, "EasyPDM"
+        Exit Sub
+    End If
 
     Dim defaultFolder As String
     defaultFolder = GetDownloadFolder()
