@@ -371,6 +371,69 @@ static class SettingsEndpoints
 
             return Results.Ok(new { rodzaj, prefix });
         });
+
+        // GET /api/settings/item-number-sequence
+        // Podgląd stanu sekwencji numerów elementów -- jaki numer dostałby KOLEJNY nowo
+        // utworzony element teraz (bez konsumowania go -- last_value/is_called to
+        // standardowy, nie-mutujący sposób odczytu sekwencji w Postgresie) i jaki jest
+        // najwyższy numer faktycznie przypisany dziś istniejącemu elementowi (kontekst do
+        // podjęcia decyzji w POST .../reset niżej -- np. "mam elementy do #3, chcę cofnąć
+        // numerację żeby kolejny znów był #4" dopiero po zobaczeniu, że nic wyżej nie istnieje).
+        app.MapGet("/api/settings/item-number-sequence", async (HttpContext ctx) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var seqCmd = new NpgsqlCommand(
+                "SELECT last_value + CASE WHEN is_called THEN 1 ELSE 0 END FROM item_number_seq;", conn);
+            var nextNumber = (long)(await seqCmd.ExecuteScalarAsync())!;
+
+            await using var maxCmd = new NpgsqlCommand("SELECT MAX(item_number) FROM items;", conn);
+            var maxResult = await maxCmd.ExecuteScalarAsync();
+            int? maxAssignedNumber = maxResult is null or DBNull ? null : (int)maxResult;
+
+            return Results.Ok(new { nextNumber, maxAssignedNumber });
+        });
+
+        // POST /api/settings/item-number-sequence/reset   body: { "nextNumber": 4 }
+        // Cofa sekwencję numerów elementów (item_number_seq) tak, żeby KOLEJNY nowo
+        // utworzony element dostał dokładnie "nextNumber" -- WYŁĄCZNIE gdy żaden już
+        // istniejący element nie ma numeru RÓWNEGO LUB WYŻSZEGO niż "nextNumber", inaczej
+        // powstałaby kolizja (numer jest globalnie unikalny niezależnie od prefiksu --
+        // wszystkie rodzaje dzielą JEDNĄ sekwencję). Elementy z numerem NIŻSZYM niż
+        // "nextNumber" zostają nietknięte -- to pozwala odzyskać tylko "ogon" numeracji po
+        // usuniętych elementach testowych (np. istnieją #1-#3, usunięto #4-#10 -> cofnięcie
+        // do nextNumber=4 sprawia, że kolejny element znów dostanie #4), a nie tylko pełny
+        // reset całej bazy do 1 (nextNumber=1 nadal działa -- to szczególny przypadek tej
+        // samej reguły, wymagający braku JAKIEGOKOLWIEK numeru w bazie).
+        app.MapPost("/api/settings/item-number-sequence/reset", async (HttpContext ctx, ResetItemNumberSequenceRequest body) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+            if (body.NextNumber < 1)
+                return Results.BadRequest("Numer musi być dodatnią liczbą całkowitą.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var countCmd = new NpgsqlCommand(
+                "SELECT COUNT(*) FROM items WHERE item_number >= @nextNumber;", conn);
+            countCmd.Parameters.AddWithValue("nextNumber", body.NextNumber);
+            var count = (long)(await countCmd.ExecuteScalarAsync())!;
+            if (count > 0)
+                return Results.BadRequest(
+                    $"Nie można cofnąć numeracji do {body.NextNumber} -- w bazie jest już element z numerem " +
+                    $"{body.NextNumber} lub wyższym. Usuń go (albo wybierz niższy numer) i spróbuj ponownie.");
+
+            await using var resetCmd = new NpgsqlCommand(
+                $"ALTER SEQUENCE item_number_seq RESTART WITH {body.NextNumber};", conn);
+            await resetCmd.ExecuteNonQueryAsync();
+
+            return Results.Ok();
+        });
     }
 
     // Pierwsze 4 to te same wartości co PART_KINDS/ASSEMBLY_KINDS w EasyPDMUpload.FCMacro i
@@ -536,3 +599,4 @@ record BackupScheduleRequest(
     bool Enabled, string Frequency, int? DayOfWeek, int? DayOfMonth, int Hour, int Minute, int RetentionCount);
 
 record ItemNumberPrefixRequest(string? Prefix);
+record ResetItemNumberSequenceRequest(int NextNumber);
