@@ -393,6 +393,18 @@ export const api = {
       body: JSON.stringify({ prefix }),
     }).then((r) => handleResponse<{ rodzaj: string; prefix: string | null }>(r)),
 
+  getItemNumberSequence: () =>
+    fetch(`${BASE}/settings/item-number-sequence`).then((r) =>
+      handleResponse<{ nextNumber: number; maxAssignedNumber: number | null }>(r)
+    ),
+
+  resetItemNumberSequence: (nextNumber: number) =>
+    fetch(`${BASE}/settings/item-number-sequence/reset`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nextNumber }),
+    }).then((r) => handleResponse<void>(r)),
+
   restoreBackup: (file: File) => {
     const formData = new FormData()
     formData.append("file", file)

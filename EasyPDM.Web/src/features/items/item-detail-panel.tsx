@@ -268,7 +268,7 @@ function ItemDetailPanel({
             </div>
           )}
 
-          {item.itemType === "part" && (
+          {(item.itemType === "part" || item.itemType === "assembly") && (
             <div className="mt-3">
               <PartSummaryFields item={item} onChanged={refreshAfterAction} />
             </div>

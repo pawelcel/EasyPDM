@@ -21,19 +21,19 @@ function ProjectSelect({
 
   return (
     <Select
-      value={value || "all"}
-      onValueChange={(v) => onChange(v === "all" ? "" : (v as string))}
+      value={value || "none"}
+      onValueChange={(v) => onChange(v === "none" ? "" : (v as string))}
     >
       <SelectTrigger className="min-w-44">
         <SelectValue>
           {(v: string) => {
             const project = projects.find((p) => p.id === v)
-            return project ? `${project.name} (${project.itemCount})` : t("project.allProjects")
+            return project ? `${project.name} (${project.itemCount})` : t("addNode.selectProjectPlaceholder")
           }}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">{t("project.allProjects")}</SelectItem>
+        <SelectItem value="none">{t("addNode.selectProjectPlaceholder")}</SelectItem>
         {projects.map((p) => (
           <SelectItem key={p.id} value={p.id}>
             {p.name} ({p.itemCount})

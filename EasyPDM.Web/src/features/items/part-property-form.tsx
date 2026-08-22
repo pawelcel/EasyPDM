@@ -96,14 +96,16 @@ function PartSummaryFields({
         >
           {t("part.kindStandard")}
         </Button>
-        <Button
-          size="sm"
-          variant={rodzaj === "Klienta" ? "default" : "outline"}
-          disabled={locked}
-          onClick={() => changeRodzaj("Klienta")}
-        >
-          {t("part.kindClient")}
-        </Button>
+        {!isAssembly && (
+          <Button
+            size="sm"
+            variant={rodzaj === "Klienta" ? "default" : "outline"}
+            disabled={locked}
+            onClick={() => changeRodzaj("Klienta")}
+          >
+            {t("part.kindClient")}
+          </Button>
+        )}
       </div>
 
       <Label htmlFor="part-name">{t("common.name")}</Label>

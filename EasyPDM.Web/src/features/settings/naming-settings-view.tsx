@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
 
-import { api } from "@/api/client"
+import { api, ApiError } from "@/api/client"
+import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
@@ -103,6 +105,121 @@ function NamingSettingsView() {
 
         <FormError>{error}</FormError>
       </div>
+
+      <ResetSequenceSection />
+    </div>
+  )
+}
+
+// Cofa numerację elementów (item_number_seq) tak, żeby KOLEJNY nowo utworzony element
+// dostał wskazany numer -- tylko gdy żaden już istniejący element nie ma numeru równego
+// lub wyższego (backend to sprawdza i odmawia, jeśli nie). Elementy z numerem NIŻSZYM
+// zostają nietknięte, więc to pozwala odzyskać sam "ogon" numeracji po usuniętych
+// elementach testowych (np. istnieją #1-#3, usunięto #4-#10 -> cofnięcie do 4 sprawia, że
+// kolejny element znów dostanie #4) -- pełny reset do 1 to tylko szczególny przypadek tej
+// samej reguły, wymagający pustej bazy.
+function ResetSequenceSection() {
+  const { t } = useLanguage()
+  const [nextNumber, setNextNumber] = useState<number | null>(null)
+  const [maxAssigned, setMaxAssigned] = useState<number | null>(null)
+  const [target, setTarget] = useState("")
+  const [loadError, setLoadError] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState(false)
+
+  function refresh() {
+    api
+      .getItemNumberSequence()
+      .then((data) => {
+        setNextNumber(data.nextNumber)
+        setMaxAssigned(data.maxAssignedNumber)
+        setTarget(String(data.nextNumber))
+        setLoadError(false)
+      })
+      .catch(() => setLoadError(true))
+  }
+
+  useEffect(refresh, [])
+
+  const targetValue = Number(target)
+  const targetValid = target.trim() !== "" && Number.isInteger(targetValue) && targetValue >= 1
+
+  async function performReset() {
+    setConfirmOpen(false)
+    setResetting(true)
+    setError("")
+    setSuccess(false)
+    try {
+      await api.resetItemNumberSequence(targetValue)
+      setSuccess(true)
+      refresh()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("naming.resetSequenceFailed"))
+    } finally {
+      setResetting(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+      <SectionLabel>{t("naming.resetSequenceTitle")}</SectionLabel>
+      <Hint>{t("naming.resetSequenceHint")}</Hint>
+
+      {loadError ? (
+        <Hint>{t("database.loadError")}</Hint>
+      ) : (
+        <>
+          <div className="mt-2 text-[13px] text-muted-foreground">
+            {t("naming.resetSequenceCurrentNext", { number: nextNumber ?? "…" })}
+            {" · "}
+            {maxAssigned === null
+              ? t("naming.resetSequenceNoneAssigned")
+              : t("naming.resetSequenceMaxAssigned", { number: maxAssigned })}
+          </div>
+
+          <div className="mt-2 flex items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="reset-sequence-target">{t("naming.resetSequenceTargetLabel")}</Label>
+              <Input
+                id="reset-sequence-target"
+                type="number"
+                min={1}
+                step={1}
+                value={target}
+                disabled={resetting}
+                className="w-28 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                onChange={(e) => setTarget(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="destructive"
+              onClick={() => setConfirmOpen(true)}
+              disabled={resetting || !targetValid}
+            >
+              {t("naming.resetSequenceButton")}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {success && (
+        <div className="mt-2">
+          <Hint>{t("naming.resetSequenceSuccess", { number: targetValue })}</Hint>
+        </div>
+      )}
+      <FormError>{error}</FormError>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title={t("naming.resetSequenceConfirmTitle")}
+        description={t("naming.resetSequenceConfirmDescription", { number: targetValue })}
+        confirmLabel={t("naming.resetSequenceButton")}
+        variant="destructive"
+        onConfirm={performReset}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   )
 }
