@@ -175,7 +175,8 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   (ten sam format, który makro samo nadaje po wysłaniu) — jeśli taki numer istnieje w PDM,
   komponent NIE jest tworzony ponownie, tylko podpinany do BOM-u z wyliczoną ilością.
 - **Nowe komponenty**: dla każdego jeszcze nie wysłanego pliku pokazuje się osobne, krótkie
-  **natywne** okno (Projekt/Typ/Nazwa/Rodzaj i zależne od rodzaju pola — te same reguły co
+  **natywne** okno (Projekt/Typ/Nazwa i — TYLKO dla Części — Rodzaj i zależne od niego
+  pola; Złożenie nie ma rodzaju w ogóle, dostaje tylko opcjonalną Masę — te same reguły co
   formularz w przeglądarce dla pojedynczego nowego elementu, patrz wyżej) — **celowo bez
   przeglądarki**, żeby wysłanie złożenia z wieloma nowymi komponentami nie wymagało tylu
   samo okien przeglądarki co komponentów; typ (Część/Złożenie) jest podpowiadany na

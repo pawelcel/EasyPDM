@@ -427,10 +427,10 @@ def sanitize_filename(name):
 
 
 # Cztery rodzaje Części — dokładnie te same i w tej samej kolejności co PartKindSelect/
-# add-node-dialog w aplikacji webowej. Złożenie ma te same rodzaje minus "Klienta" (patrz
-# add-node-dialog.tsx — okno tworzenia złożenia nie oferuje tej opcji).
+# add-node-dialog w aplikacji webowej. "Rodzaj" to koncepcja WYŁĄCZNIE Części — Złożenie
+# nie ma rodzaju w ogóle (patrz add-node-dialog.tsx — okno tworzenia złożenia nie oferuje
+# tego pola; ta sama zasada dotyczy tu NewComponentDialog dla nowych komponentów-złożeń).
 PART_KINDS = ["Wykonywana", "Zakupowa", "Normalia", "Klienta"]
-ASSEMBLY_KINDS = ["Wykonywana", "Zakupowa", "Normalia"]
 
 
 def kind_field_visibility(is_part, rodzaj):
@@ -440,9 +440,8 @@ def kind_field_visibility(is_part, rodzaj):
     teraz przez formularz w przeglądarce, zob. submit_via_browser). Dokładnie te same
     reguły co PartPropertyForm/add-node-dialog w aplikacji webowej: Wykonywana -> Materiał;
     Zakupowa -> Producent/Numery zamówieniowe/Masa; Normalia -> Materiał/Norma; Klienta ->
-    brak dodatkowych pól. Złożenie: Masa zawsze widoczna niezależnie od rodzaju; Materiał
-    NIGDY (tylko Część go ma — Złożenie może mieć masę, ale nie materiał); Norma dotyczy
-    tylko Części."""
+    brak dodatkowych pól. Złożenie NIE MA rodzaju (rodzaj zawsze "" dla is_part=False) —
+    dostaje tylko Masę, zawsze widoczną; Materiał/Numery/Norma nigdy."""
     wykonywana = rodzaj == "Wykonywana"
     zakupowa = rodzaj == "Zakupowa"
     normalia = rodzaj == "Normalia"
@@ -1087,9 +1086,10 @@ class NewComponentDialog(QtWidgets.QDialog):
         self.name_edit = QtWidgets.QLineEdit(suggested_name)
         form.addRow("Nazwa:", self.name_edit)
 
+        self.rodzaj_label = QtWidgets.QLabel("Rodzaj:")
         self.rodzaj_combo = QtWidgets.QComboBox()
         self.rodzaj_combo.currentIndexChanged.connect(self.on_rodzaj_changed)
-        form.addRow("Rodzaj:", self.rodzaj_combo)
+        form.addRow(self.rodzaj_label, self.rodzaj_combo)
 
         self.material_label = QtWidgets.QLabel("Materiał:")
         self.material_combo = QtWidgets.QComboBox()
@@ -1135,14 +1135,12 @@ class NewComponentDialog(QtWidgets.QDialog):
 
     def on_type_changed(self):
         is_part = self.type_combo.currentText() == "Część"
+        self.rodzaj_label.setVisible(is_part)
+        self.rodzaj_combo.setVisible(is_part)
         self.rodzaj_combo.blockSignals(True)
         self.rodzaj_combo.clear()
         if is_part:
             self.rodzaj_combo.addItems(PART_KINDS)
-        else:
-            self.rodzaj_combo.addItem("(nie wybrano)", "")
-            for k in ASSEMBLY_KINDS:
-                self.rodzaj_combo.addItem(k, k)
         self.rodzaj_combo.blockSignals(False)
         self.on_rodzaj_changed()
 
@@ -1190,8 +1188,6 @@ class NewComponentDialog(QtWidgets.QDialog):
         is_part = self.type_combo.currentText() == "Część"
         item_type = "part" if is_part else "assembly"
         rodzaj = self.rodzaj_combo.currentText()
-        if rodzaj == "(nie wybrano)":
-            rodzaj = ""
 
         properties = {}
         if rodzaj:

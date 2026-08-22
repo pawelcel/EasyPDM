@@ -35,8 +35,10 @@ function PartSummaryFields({
   const { t } = useLanguage()
   const { user } = useAuth()
   const rodzaj = typeof item.properties.rodzaj === "string" ? item.properties.rodzaj : ""
-  // Materiał dotyczy tylko Części — Złożenia mogą mieć Masę, ale nie Materiał (w
-  // odróżnieniu od reszty pól zależnych od "rodzaju", które dla obu typów działają tak samo).
+  // "Rodzaj" (i pola od niego zależne, w tym Materiał) to koncepcja WYŁĄCZNIE Części —
+  // Złożenia go nie mają w ogóle, dostają tu tylko pole nazwy (i ewentualnie Masę, patrz
+  // add-node-dialog.tsx przy tworzeniu — do edycji Masy istniejącego Złożenia służy
+  // generyczny PropertyEditor w sekcji "Właściwości").
   const isAssembly = item.itemType === "assembly"
   const statusLocked = isLocked(item)
   const ownerBlocked = user ? !canEditOwnerLocked(item, user.id) : false
@@ -70,43 +72,45 @@ function PartSummaryFields({
       {statusLocked && <Hint>{t("part.lockedHint")}</Hint>}
       {ownerBlocked && !statusLocked && <Hint>{t("item.ownerLockedHint")}</Hint>}
 
-      <Label>{t("part.kind")}</Label>
-      <div className="flex flex-wrap gap-1.5">
-        <Button
-          size="sm"
-          variant={rodzaj === "Wykonywana" ? "default" : "outline"}
-          disabled={locked}
-          onClick={() => changeRodzaj("Wykonywana")}
-        >
-          {t("part.kindManufactured")}
-        </Button>
-        <Button
-          size="sm"
-          variant={rodzaj === "Zakupowa" ? "default" : "outline"}
-          disabled={locked}
-          onClick={() => changeRodzaj("Zakupowa")}
-        >
-          {t("part.kindPurchased")}
-        </Button>
-        <Button
-          size="sm"
-          variant={rodzaj === "Normalia" ? "default" : "outline"}
-          disabled={locked}
-          onClick={() => changeRodzaj("Normalia")}
-        >
-          {t("part.kindStandard")}
-        </Button>
-        {!isAssembly && (
-          <Button
-            size="sm"
-            variant={rodzaj === "Klienta" ? "default" : "outline"}
-            disabled={locked}
-            onClick={() => changeRodzaj("Klienta")}
-          >
-            {t("part.kindClient")}
-          </Button>
-        )}
-      </div>
+      {!isAssembly && (
+        <>
+          <Label>{t("part.kind")}</Label>
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              size="sm"
+              variant={rodzaj === "Wykonywana" ? "default" : "outline"}
+              disabled={locked}
+              onClick={() => changeRodzaj("Wykonywana")}
+            >
+              {t("part.kindManufactured")}
+            </Button>
+            <Button
+              size="sm"
+              variant={rodzaj === "Zakupowa" ? "default" : "outline"}
+              disabled={locked}
+              onClick={() => changeRodzaj("Zakupowa")}
+            >
+              {t("part.kindPurchased")}
+            </Button>
+            <Button
+              size="sm"
+              variant={rodzaj === "Normalia" ? "default" : "outline"}
+              disabled={locked}
+              onClick={() => changeRodzaj("Normalia")}
+            >
+              {t("part.kindStandard")}
+            </Button>
+            <Button
+              size="sm"
+              variant={rodzaj === "Klienta" ? "default" : "outline"}
+              disabled={locked}
+              onClick={() => changeRodzaj("Klienta")}
+            >
+              {t("part.kindClient")}
+            </Button>
+          </div>
+        </>
+      )}
 
       <Label htmlFor="part-name">{t("common.name")}</Label>
       <Input
@@ -120,7 +124,7 @@ function PartSummaryFields({
         }}
       />
 
-      {(rodzaj === "Wykonywana" || rodzaj === "Normalia") && !isAssembly && (
+      {!isAssembly && (rodzaj === "Wykonywana" || rodzaj === "Normalia") && (
         <MaterialField
           value={typeof item.properties.material === "string" ? item.properties.material : ""}
           onSave={saveField}
@@ -128,7 +132,7 @@ function PartSummaryFields({
         />
       )}
 
-      {!rodzaj && <Hint>{t("part.selectKindHint")}</Hint>}
+      {!isAssembly && !rodzaj && <Hint>{t("part.selectKindHint")}</Hint>}
     </div>
   )
 }

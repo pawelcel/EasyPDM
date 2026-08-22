@@ -80,8 +80,9 @@ inaczej:
    nim wszystkie komponenty, które NIE są jeszcze podpięte do PDM (rozpoznawane przez
    Właściwości niestandardowe na KAŻDYM komponencie z osobna, patrz niżej) — liście
    najpierw, ten dokument na końcu. Dla każdego nowego komponentu: krótka sekwencja
-   `InputBox` (Projekt → Typ → Nazwa → Rodzaj i pola zależne — te same reguły co niżej),
-   NIE przeglądarka (patrz "Różnice względem makr FreeCAD"). Nowo utworzone komponenty
+   `InputBox` (Projekt → Typ → Nazwa, a dla Części dodatkowo Rodzaj i pola zależne — te
+   same reguły co niżej; Złożenie nie ma rodzaju, tylko opcjonalną Masę), NIE przeglądarka
+   (patrz "Różnice względem makr FreeCAD"). Nowo utworzone komponenty
    od razu dostają eksport STEP i własny wpis `EasyPDM_ItemId`, i są automatycznie
    podpinane pod swojego rodzica w strukturze BOM.
 4. Sprawdza **Właściwości niestandardowe** dokumentu głównego:
@@ -90,10 +91,10 @@ inaczej:
      względem makr FreeCAD"). Eksport STEP następuje zawsze.
    - **Jeszcze niepodpięty** — otwiera przeglądarkę systemową (już zalogowaną, most
      token→ciasteczko) na popupie "oczekujące żądanie z makra CAD", z trzema opcjami do
-     wyboru TAM: **Nowy element** (projekt, opcjonalnie rodzic, typ, nazwa, rodzaj i
-     zależne od niego pola — Wykonywana → Materiał; Zakupowa → Producent/Numery
-     zamówieniowe/Masa; Normalia → Materiał/Norma; Klienta → brak dodatkowych pól; dla
-     Złożenia rodzaj opcjonalny, bez "Klienta", Materiał/Masa zawsze widoczne — plus
+     wyboru TAM: **Nowy element** (projekt, opcjonalnie rodzic, typ, nazwa — dla Części
+     dodatkowo rodzaj i zależne od niego pola: Wykonywana → Materiał; Zakupowa →
+     Producent/Numery zamówieniowe/Masa; Normalia → Materiał/Norma; Klienta → brak
+     dodatkowych pól; **Złożenie nie ma rodzaju w ogóle** — tylko opcjonalna Masa — plus
      checkbox eksportu STEP), **Duplikuj** (wskazuje istniejący element, kopiuje jego
      właściwości do nowego, bez plików) albo **Dograj do istniejącego** (wyszukiwarka po
      całej bazie + ten sam checkbox STEP). Makro czeka (odpytuje co ~2s, limit 10 minut,
