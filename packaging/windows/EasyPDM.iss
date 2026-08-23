@@ -58,6 +58,18 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 WizardStyle=modern
 
+[Languages]
+; Te same trzy języki co aplikacja webowa (pl/en/de) — Inno Setup POKAZUJE OKNO WYBORU
+; JĘZYKA na samym początku instalacji automatycznie, gdy zdefiniowany jest więcej niż
+; jeden język (domyślne ShowLanguageDialog=auto, nieustawione tutaj celowo — nie trzeba
+; nic dodatkowo konfigurować). Tłumaczy to WBUDOWANE strony kreatora Inno Setup (Witaj,
+; Wybór katalogu, Gotowy do instalacji...) — własne strony/komunikaty z [Code] (hasło
+; PostgreSQL, błędy) są tłumaczone OSOBNO przez [CustomMessages] niżej i CustomMessage()
+; w Pascal Script, bo Inno Setup nie robi tego automatycznie za nas.
+Name: "en"; MessagesFile: "compiler:Default.isl"
+Name: "pl"; MessagesFile: "compiler:Languages\Polish.isl"
+Name: "de"; MessagesFile: "compiler:Languages\German.isl"
+
 [Files]
 Source: "publish\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 Source: "..\..\db\schema.sql"; DestDir: "{app}\db"; Flags: ignoreversion
@@ -69,6 +81,47 @@ Source: "..\..\db\schema.sql"; DestDir: "{app}\db"; Flags: ignoreversion
 ; przeglądarki bez zakładania, jaka to przeglądarka.
 Name: "{group}\{#MyAppName}"; Filename: "{win}\explorer.exe"; Parameters: "http://localhost:5000"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{win}\explorer.exe"; Parameters: "http://localhost:5000"; IconFilename: "{app}\{#MyAppExeName}"
+
+[CustomMessages]
+; Tłumaczenia własnych stron/komunikatów z [Code] (strona hasła PostgreSQL, MsgBoxy) —
+; [Languages] wyżej tłumaczy tylko WBUDOWANE strony kreatora Inno Setup, tych własnych
+; nie dotyka, więc trzeba je zdefiniować osobno i odwoływać się do nich przez
+; CustomMessage('Klucz') w Pascal Script zamiast wpisywać literały na stałe.
+en.PgPageCaption=PostgreSQL Connection
+en.PgPageSubCaption=Superuser password for "postgres"
+en.PgPageDescription=EasyPDM needs it ONCE, to create its own role (pdm_user) and database (pdm) — it is not stored anywhere.
+en.PgFieldLabel=Password for "postgres":
+en.PgNotFoundConfirm=No installed PostgreSQL found (required, version 18 recommended). Open the download page? Run this installer again after installing it.
+en.PgPasswordRequired=Enter the "postgres" superuser password.
+en.PgConnectionFailed=Could not connect to PostgreSQL with this password. Please try again.
+en.PgRoleConfigFailed=Could not configure the PostgreSQL database role (pdm_user). Check the "postgres" superuser password and whether another PostgreSQL instance is running on this port (5432). Details in the log:
+en.PgDatabaseCreateFailed=Could not create the PostgreSQL database "pdm". Details in the log:
+en.PgSchemaLoadFailed=Could not load the database schema. Details in the log:
+en.ServiceDescription=Local PDM server
+
+pl.PgPageCaption=Połączenie z PostgreSQL
+pl.PgPageSubCaption=Hasło superużytkownika "postgres"
+pl.PgPageDescription=EasyPDM potrzebuje go JEDNORAZOWO, żeby założyć własną rolę (pdm_user) i bazę danych (pdm) — nie jest nigdzie zapisywane.
+pl.PgFieldLabel=Hasło "postgres":
+pl.PgNotFoundConfirm=Nie znaleziono zainstalowanego PostgreSQL (wymagany, wersja 18 zalecana). Otworzyć stronę pobierania? Po instalacji uruchom ten instalator ponownie.
+pl.PgPasswordRequired=Podaj hasło superużytkownika "postgres".
+pl.PgConnectionFailed=Nie udało się połączyć z PostgreSQL tym hasłem. Spróbuj ponownie.
+pl.PgRoleConfigFailed=Nie udało się skonfigurować roli bazy danych PostgreSQL (pdm_user). Sprawdź hasło superużytkownika "postgres" oraz czy na tym porcie (5432) nie działa inna instancja PostgreSQL. Szczegóły w logu:
+pl.PgDatabaseCreateFailed=Nie udało się utworzyć bazy danych PostgreSQL "pdm". Szczegóły w logu:
+pl.PgSchemaLoadFailed=Nie udało się załadować schematu bazy danych. Szczegóły w logu:
+pl.ServiceDescription=Lokalny serwer PDM
+
+de.PgPageCaption=PostgreSQL-Verbindung
+de.PgPageSubCaption=Passwort des Superusers "postgres"
+de.PgPageDescription=EasyPDM benötigt es EINMALIG, um seine eigene Rolle (pdm_user) und Datenbank (pdm) anzulegen — es wird nirgendwo gespeichert.
+de.PgFieldLabel=Passwort für "postgres":
+de.PgNotFoundConfirm=Keine PostgreSQL-Installation gefunden (erforderlich, Version 18 empfohlen). Download-Seite öffnen? Starten Sie dieses Installationsprogramm nach der Installation erneut.
+de.PgPasswordRequired=Geben Sie das Passwort des Superusers "postgres" ein.
+de.PgConnectionFailed=Verbindung zu PostgreSQL mit diesem Passwort fehlgeschlagen. Bitte versuchen Sie es erneut.
+de.PgRoleConfigFailed=Die PostgreSQL-Datenbankrolle (pdm_user) konnte nicht konfiguriert werden. Überprüfen Sie das Passwort des Superusers "postgres" und ob auf diesem Port (5432) eine andere PostgreSQL-Instanz läuft. Details im Protokoll:
+de.PgDatabaseCreateFailed=Die PostgreSQL-Datenbank "pdm" konnte nicht erstellt werden. Details im Protokoll:
+de.PgSchemaLoadFailed=Das Datenbankschema konnte nicht geladen werden. Details im Protokoll:
+de.ServiceDescription=Lokaler PDM-Server
 
 [Code]
 const
@@ -276,11 +329,10 @@ end;
 procedure InitializeWizard();
 begin
   PostgresPasswordPage := CreateInputQueryPage(wpSelectDir,
-    'Połączenie z PostgreSQL',
-    'Hasło superużytkownika "postgres"',
-    'EasyPDM potrzebuje go JEDNORAZOWO, żeby założyć własną rolę (pdm_user) i bazę danych ' +
-    '(pdm) — nie jest nigdzie zapisywane.');
-  PostgresPasswordPage.Add('Hasło "postgres":', True);
+    CustomMessage('PgPageCaption'),
+    CustomMessage('PgPageSubCaption'),
+    CustomMessage('PgPageDescription'));
+  PostgresPasswordPage.Add(CustomMessage('PgFieldLabel'), True);
 end;
 
 { Hasło superużytkownika "postgres" podane z góry przez /PGPASSWORD=... w wierszu poleceń —
@@ -314,9 +366,7 @@ begin
       przydarzyło się w CI po dodaniu analogicznych MsgBox w CurStepChanged poniżej). }
     if not WizardSilent then
     begin
-      if MsgBox('Nie znaleziono zainstalowanego PostgreSQL (wymagany, wersja 18 zalecana). ' +
-                'Otworzyć stronę pobierania? Po instalacji uruchom ten instalator ponownie.',
-                mbConfirmation, MB_YESNO) = IDYES then
+      if MsgBox(CustomMessage('PgNotFoundConfirm'), mbConfirmation, MB_YESNO) = IDYES then
         ShellExec('open', 'https://www.postgresql.org/download/windows/', '', '', SW_SHOW, ewNoWait, ResultCode);
     end;
     Result := False;
@@ -332,12 +382,12 @@ begin
   begin
     if PostgresPasswordPage.Values[0] = '' then
     begin
-      MsgBox('Podaj hasło superużytkownika "postgres".', mbError, MB_OK);
+      MsgBox(CustomMessage('PgPasswordRequired'), mbError, MB_OK);
       Result := False;
     end
     else if not RunPsql(PostgresPasswordPage.Values[0], '-U postgres -c "SELECT 1;" postgres', 'test polaczenia') then
     begin
-      MsgBox('Nie udało się połączyć z PostgreSQL tym hasłem. Spróbuj ponownie.', mbError, MB_OK);
+      MsgBox(CustomMessage('PgConnectionFailed'), mbError, MB_OK);
       Result := False;
     end;
   end;
@@ -382,9 +432,7 @@ begin
   begin
     LogInstall('BLAD KRYTYCZNY: nie udalo sie zalozyc/zaktualizowac roli pdm_user - przerywam konfiguracje bazy.');
     if not WizardSilent then
-      MsgBox('Nie udało się skonfigurować roli bazy danych PostgreSQL (pdm_user). ' +
-        'Sprawdź hasło superużytkownika "postgres" oraz czy na tym porcie (5432) nie działa ' +
-        'inna instancja PostgreSQL. Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
+      MsgBox(CustomMessage('PgRoleConfigFailed') + ' ' + DebugLogPath, mbError, MB_OK);
     exit;
   end;
 
@@ -399,7 +447,7 @@ begin
     begin
       LogInstall('BLAD KRYTYCZNY: nie udalo sie utworzyc bazy danych pdm.');
       if not WizardSilent then
-        MsgBox('Nie udało się utworzyć bazy danych PostgreSQL "pdm". Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
+        MsgBox(CustomMessage('PgDatabaseCreateFailed') + ' ' + DebugLogPath, mbError, MB_OK);
       exit;
     end;
 
@@ -408,7 +456,7 @@ begin
     begin
       LogInstall('BLAD KRYTYCZNY: nie udalo sie zaladowac schema.sql do bazy pdm.');
       if not WizardSilent then
-        MsgBox('Nie udało się załadować schematu bazy danych. Szczegóły w logu: ' + DebugLogPath, mbError, MB_OK);
+        MsgBox(CustomMessage('PgSchemaLoadFailed') + ' ' + DebugLogPath, mbError, MB_OK);
       exit;
     end;
   end;
@@ -465,7 +513,7 @@ begin
       '" start= auto DisplayName= "EasyPDM"',
       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     LogInstall('sc create {#MyServiceName} -> kod wyjscia ' + IntToStr(ResultCode));
-    Exec(ExpandConstant('{sys}\sc.exe'), 'description {#MyServiceName} "Lokalny serwer PDM"',
+    Exec(ExpandConstant('{sys}\sc.exe'), 'description {#MyServiceName} "' + CustomMessage('ServiceDescription') + '"',
       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
   Exec(ExpandConstant('{sys}\sc.exe'), 'start {#MyServiceName}',
