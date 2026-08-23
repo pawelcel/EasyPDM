@@ -177,6 +177,343 @@ except ImportError:
         from PySide import QtGui as QtWidgets  # bardzo stare FreeCAD (Qt4)
 
 
+def _match_lang(raw):
+    raw = (raw or "").strip().lower()
+    if not raw:
+        return None
+    if raw.startswith("pl") or "polish" in raw or "polski" in raw:
+        return "pl"
+    if raw.startswith("de") or "german" in raw or "deutsch" in raw:
+        return "de"
+    if raw.startswith("en") or "english" in raw:
+        return "en"
+    return None
+
+
+def _detect_language():
+    """Auto-wykrycie języka: najpierw własne ustawienie FreeCAD (Preferences -> General ->
+    Language) — bywa zapisane jako nazwa ("Polish"/"German") albo jako kod locale
+    ("pl"/"pl_PL"/"de_DE" — stąd dopasowanie i po nazwie, i po prefiksie kodu), a jeśli to
+    niejednoznaczne (pusty string albo coś spoza pl/en/de), sprawdzamy locale systemu
+    operacyjnego ($LANGUAGE/$LC_ALL/$LANG — na Linuksie zwykle "pl_PL.UTF-8"). Fallback na
+    angielski, jeśli nic nie pasuje albo odczyt się nie powiedzie."""
+    try:
+        raw = App.ParamGet("User parameter:BaseApp/Preferences/General").GetString("Language", "")
+    except Exception:
+        raw = ""
+    lang = _match_lang(raw)
+    if lang:
+        return lang
+    raw_os = os.environ.get("LANGUAGE") or os.environ.get("LC_ALL") or os.environ.get("LANG") or ""
+    return _match_lang(raw_os) or "en"
+
+
+LANG = _detect_language()
+
+
+TRANSLATIONS = {
+    "pl": {
+        "no_connection": "Brak połączenia z {url}: {reason}",
+        "login_failed_no_session": "Logowanie nie powiodło się — serwer nie zwrócił sesji.",
+        "pdm_title": "PDM",
+        "login_dialog_title": "Logowanie do PDM",
+        "api_address_label": "Adres API:",
+        "username_label": "Nazwa użytkownika:",
+        "password_label": "Hasło:",
+        "login_button": "Zaloguj",
+        "cancel_button": "Anuluj",
+        "login_missing_fields": "Podaj nazwę użytkownika i hasło.",
+        "target_folder_dialog_title": "Wyślij do PDM",
+        "logged_in_as": "Zalogowano jako: {name}",
+        "logout_button": "Wyloguj",
+        "account_label": "Konto:",
+        "target_folder_hint": (
+            "Gdzie mają trafić lokalne kopie wysyłanych dokumentów (ten sam plik pod "
+            "nazwą PDM, zamiast oryginalnej)? To samo miejsce co folder pobierania w "
+            "EasyPDMDownload.FCMacro — warto ustawić jednakowo."
+        ),
+        "choose_target_folder_caption": "Wybierz folder docelowy",
+        "indicate_folder": "Wskaż folder.",
+        "cannot_use_folder": "Nie można użyć tego folderu: {error}",
+        "logged_out_message": "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie.",
+        "new_revision_title": "Nowa rewizja",
+        "new_revision_body": (
+            'Ten element ma status "Wydany" — nie można do niego dogrywać plików.\n\n'
+            'Czy chcesz stworzyć nową rewizję (status zmieni się na "W pracy")?'
+        ),
+        "revision_comment_label": "Komentarz do rewizji (opcjonalnie):",
+        "revision_comment_placeholder": "Co zmieniło się w tej rewizji…",
+        "create_revision_button": "Stwórz rewizję",
+        "new_component_title": "Nowy komponent złożenia",
+        "project_label": "Projekt:",
+        "type_label": "Typ:",
+        "type_part": "Część",
+        "type_assembly": "Złożenie",
+        "name_label": "Nazwa:",
+        "kind_label": "Rodzaj:",
+        "kind_manufactured": "Wykonywana",
+        "kind_purchased": "Zakupowa",
+        "kind_standard": "Normalia",
+        "kind_client": "Klienta",
+        "material_label": "Materiał:",
+        "mass_label": "Masa [kg]:",
+        "manufacturer_label": "Producent:",
+        "order1_label": "Numer zamówieniowy 1:",
+        "order2_label": "Numer zamówieniowy 2:",
+        "norm_label": "Norma:",
+        "choose_project_error": "Wybierz projekt.",
+        "name_required_error": "Nazwa jest wymagana.",
+        "select_kind_error": "Dla Części wybierz rodzaj: {manufactured}, {purchased}, {standard} albo {client}.",
+        "usage_prefix": "Używane: ",
+        "usage_entry": "{qty}× w {file}",
+        "assembly_detected_title": "Wykryto złożenie",
+        "assembly_detected_body": (
+            "Ten dokument linkuje do {count} innych plików (części/pod-złożeń):\n\n"
+            "{summary}\n\n"
+            "Wysłać je automatycznie razem z tym dokumentem (najpierw części/pod-złożenia, "
+            "na końcu ten dokument)?\n\n"
+            "\"Nie\" wyśle TYLKO ten dokument, tak jak dotychczas — bez podelementów."
+        ),
+        "fetch_items_failed": "Nie udało się pobrać listy elementów: {error}",
+        "fetch_projects_failed": "Nie udało się pobrać listy projektów: {error}",
+        "upload_component_failed": "Nie udało się wysłać {file}: {error}",
+        "link_child_failed": "Utworzono {child}, ale nie udało się podpiąć go pod {parent}: {error}",
+        "open_browser_failed": "Nie udało się otworzyć przeglądarki: {error}",
+        "wait_ticket_title": "Czekam na przeglądarkę",
+        "wait_ticket_body": (
+            "Otworzono przeglądarkę — uzupełnij dane elementu i zapisz.\n\n"
+            "To okno samo się zamknie, gdy element zostanie utworzony."
+        ),
+        "wait_timeout": "Upłynął czas oczekiwania.",
+        "no_active_document": "Brak otwartego dokumentu.",
+        "document_not_saved": "Dokument nie jest jeszcze zapisany — wskaż, gdzie go zapisać.",
+        "save_failed": "Nie udało się zapisać dokumentu: {error}",
+        "cancelled_upload": "Przerwano — anulowano wysyłkę.",
+        "nothing_sent": "Anulowano — nic nie zostało wysłane.",
+        "link_subitem_failed": "Nie udało się podpiąć jednego z podelementów pod główny element: {error}",
+        "local_renamed_line": (
+            "Lokalny plik zapisany pod nazwą PDM (Save As), stary plik pod oryginalną "
+            "nazwą pozostał nietknięty:\n{path}"
+        ),
+        "local_already_named_line": (
+            "Lokalny plik już był pod właściwą nazwą PDM — nic nie trzeba było przenosić:\n{path}"
+        ),
+        "upload_success_sent": "Wysłano do PDM jako {number}",
+        "upload_success_with_subitems": " razem z {count} podelementami",
+        "upload_success_tail": ".\nKopia w magazynie PDM:\n{path}\n\n{local}",
+        "status_revision_mismatch": (
+            "Status/rewizja elementu #{number} zostały już zmienione na "
+            "serwerze (rewizja {revision}, status 'w_pracy'), ale dogranie pliku się nie "
+            "powiodło: {error}\n\nElement w PDM ma teraz nową rewizję, lecz wciąż plik "
+            "poprzedniej wersji — popraw to ręcznie w aplikacji webowej (dograj plik "
+            "ponownie) albo spróbuj ponownie z tego makra."
+        ),
+    },
+    "en": {
+        "no_connection": "Could not connect to {url}: {reason}",
+        "login_failed_no_session": "Login failed — the server did not return a session.",
+        "pdm_title": "PDM",
+        "login_dialog_title": "Log in to PDM",
+        "api_address_label": "API address:",
+        "username_label": "Username:",
+        "password_label": "Password:",
+        "login_button": "Log in",
+        "cancel_button": "Cancel",
+        "login_missing_fields": "Enter your username and password.",
+        "target_folder_dialog_title": "Send to PDM",
+        "logged_in_as": "Logged in as: {name}",
+        "logout_button": "Log out",
+        "account_label": "Account:",
+        "target_folder_hint": (
+            "Where should local copies of uploaded documents go (the same file under the "
+            "PDM name, instead of the original)? This is the same location as the download "
+            "folder in EasyPDMDownload.FCMacro — it's a good idea to set them the same."
+        ),
+        "choose_target_folder_caption": "Choose target folder",
+        "indicate_folder": "Choose a folder.",
+        "cannot_use_folder": "Cannot use this folder: {error}",
+        "logged_out_message": "Logged out. The next time you run the macro, it will ask you to log in again.",
+        "new_revision_title": "New revision",
+        "new_revision_body": (
+            'This item has the status "Released" — files cannot be added to it.\n\n'
+            'Do you want to create a new revision (the status will change to "In progress")?'
+        ),
+        "revision_comment_label": "Revision comment (optional):",
+        "revision_comment_placeholder": "What changed in this revision…",
+        "create_revision_button": "Create revision",
+        "new_component_title": "New assembly component",
+        "project_label": "Project:",
+        "type_label": "Type:",
+        "type_part": "Part",
+        "type_assembly": "Assembly",
+        "name_label": "Name:",
+        "kind_label": "Kind:",
+        "kind_manufactured": "Manufactured",
+        "kind_purchased": "Purchased",
+        "kind_standard": "Standard part",
+        "kind_client": "Client's",
+        "material_label": "Material:",
+        "mass_label": "Mass [kg]:",
+        "manufacturer_label": "Manufacturer:",
+        "order1_label": "Order number 1:",
+        "order2_label": "Order number 2:",
+        "norm_label": "Standard:",
+        "choose_project_error": "Choose a project.",
+        "name_required_error": "Name is required.",
+        "select_kind_error": "For a Part, choose a kind: {manufactured}, {purchased}, {standard}, or {client}.",
+        "usage_prefix": "Used: ",
+        "usage_entry": "{qty}× in {file}",
+        "assembly_detected_title": "Assembly detected",
+        "assembly_detected_body": (
+            "This document links to {count} other files (parts/sub-assemblies):\n\n"
+            "{summary}\n\n"
+            "Send them automatically together with this document (parts/sub-assemblies "
+            "first, this document last)?\n\n"
+            "\"No\" will send ONLY this document, as before — without sub-items."
+        ),
+        "fetch_items_failed": "Failed to fetch the list of items: {error}",
+        "fetch_projects_failed": "Failed to fetch the list of projects: {error}",
+        "upload_component_failed": "Failed to send {file}: {error}",
+        "link_child_failed": "Created {child}, but failed to link it under {parent}: {error}",
+        "open_browser_failed": "Failed to open the browser: {error}",
+        "wait_ticket_title": "Waiting for the browser",
+        "wait_ticket_body": (
+            "The browser has been opened — fill in the item details and save.\n\n"
+            "This window will close automatically once the item is created."
+        ),
+        "wait_timeout": "The waiting time has expired.",
+        "no_active_document": "No document is open.",
+        "document_not_saved": "The document has not been saved yet — choose where to save it.",
+        "save_failed": "Failed to save the document: {error}",
+        "cancelled_upload": "Cancelled — the upload was aborted.",
+        "nothing_sent": "Cancelled — nothing was sent.",
+        "link_subitem_failed": "Failed to link one of the sub-items under the main item: {error}",
+        "local_renamed_line": (
+            "Local file saved under the PDM name (Save As); the old file under the "
+            "original name was left untouched:\n{path}"
+        ),
+        "local_already_named_line": (
+            "The local file was already under the correct PDM name — nothing needed to be moved:\n{path}"
+        ),
+        "upload_success_sent": "Sent to PDM as {number}",
+        "upload_success_with_subitems": " together with {count} sub-items",
+        "upload_success_tail": ".\nCopy in PDM storage:\n{path}\n\n{local}",
+        "status_revision_mismatch": (
+            "The status/revision of item #{number} has already been changed on the "
+            "server (revision {revision}, status 'w_pracy'), but uploading the file failed: "
+            "{error}\n\nThe item in PDM now has a new revision, but still has the file from "
+            "the previous version — fix this manually in the web application (upload the "
+            "file again) or try again from this macro."
+        ),
+    },
+    "de": {
+        "no_connection": "Keine Verbindung zu {url}: {reason}",
+        "login_failed_no_session": "Anmeldung fehlgeschlagen — der Server hat keine Sitzung zurückgegeben.",
+        "pdm_title": "PDM",
+        "login_dialog_title": "Anmeldung bei PDM",
+        "api_address_label": "API-Adresse:",
+        "username_label": "Benutzername:",
+        "password_label": "Passwort:",
+        "login_button": "Anmelden",
+        "cancel_button": "Abbrechen",
+        "login_missing_fields": "Geben Sie Benutzername und Passwort ein.",
+        "target_folder_dialog_title": "An PDM senden",
+        "logged_in_as": "Angemeldet als: {name}",
+        "logout_button": "Abmelden",
+        "account_label": "Konto:",
+        "target_folder_hint": (
+            "Wohin sollen lokale Kopien der hochgeladenen Dokumente abgelegt werden "
+            "(dieselbe Datei unter dem PDM-Namen statt des Originals)? Das ist derselbe "
+            "Ort wie der Download-Ordner in EasyPDMDownload.FCMacro — es empfiehlt sich, "
+            "beide gleich einzustellen."
+        ),
+        "choose_target_folder_caption": "Zielordner auswählen",
+        "indicate_folder": "Wählen Sie einen Ordner.",
+        "cannot_use_folder": "Dieser Ordner kann nicht verwendet werden: {error}",
+        "logged_out_message": "Abgemeldet. Beim nächsten Ausführen des Makros werden Sie erneut zur Anmeldung aufgefordert.",
+        "new_revision_title": "Neue Revision",
+        "new_revision_body": (
+            'Dieses Element hat den Status "Freigegeben" — es können keine Dateien '
+            'hinzugefügt werden.\n\nMöchten Sie eine neue Revision erstellen (der Status '
+            'wechselt zu "In Bearbeitung")?'
+        ),
+        "revision_comment_label": "Revisionskommentar (optional):",
+        "revision_comment_placeholder": "Was hat sich in dieser Revision geändert…",
+        "create_revision_button": "Revision erstellen",
+        "new_component_title": "Neue Baugruppenkomponente",
+        "project_label": "Projekt:",
+        "type_label": "Typ:",
+        "type_part": "Teil",
+        "type_assembly": "Baugruppe",
+        "name_label": "Name:",
+        "kind_label": "Art:",
+        "kind_manufactured": "Gefertigt",
+        "kind_purchased": "Zugekauft",
+        "kind_standard": "Normteil",
+        "kind_client": "Kundenteil",
+        "material_label": "Material:",
+        "mass_label": "Masse [kg]:",
+        "manufacturer_label": "Hersteller:",
+        "order1_label": "Bestellnummer 1:",
+        "order2_label": "Bestellnummer 2:",
+        "norm_label": "Norm:",
+        "choose_project_error": "Wählen Sie ein Projekt.",
+        "name_required_error": "Name ist erforderlich.",
+        "select_kind_error": "Wählen Sie für ein Teil eine Art: {manufactured}, {purchased}, {standard} oder {client}.",
+        "usage_prefix": "Verwendet: ",
+        "usage_entry": "{qty}× in {file}",
+        "assembly_detected_title": "Baugruppe erkannt",
+        "assembly_detected_body": (
+            "Dieses Dokument verknüpft mit {count} anderen Dateien (Teile/Unterbaugruppen):\n\n"
+            "{summary}\n\n"
+            "Sollen sie automatisch zusammen mit diesem Dokument gesendet werden (zuerst "
+            "Teile/Unterbaugruppen, zuletzt dieses Dokument)?\n\n"
+            "\"Nein\" sendet NUR dieses Dokument, wie bisher — ohne Unterelemente."
+        ),
+        "fetch_items_failed": "Die Elementliste konnte nicht abgerufen werden: {error}",
+        "fetch_projects_failed": "Die Projektliste konnte nicht abgerufen werden: {error}",
+        "upload_component_failed": "{file} konnte nicht gesendet werden: {error}",
+        "link_child_failed": "{child} wurde erstellt, konnte aber nicht unter {parent} verknüpft werden: {error}",
+        "open_browser_failed": "Der Browser konnte nicht geöffnet werden: {error}",
+        "wait_ticket_title": "Warte auf den Browser",
+        "wait_ticket_body": (
+            "Der Browser wurde geöffnet — füllen Sie die Elementdaten aus und speichern Sie.\n\n"
+            "Dieses Fenster schließt sich automatisch, sobald das Element erstellt wurde."
+        ),
+        "wait_timeout": "Die Wartezeit ist abgelaufen.",
+        "no_active_document": "Kein Dokument geöffnet.",
+        "document_not_saved": "Das Dokument wurde noch nicht gespeichert — wählen Sie einen Speicherort.",
+        "save_failed": "Das Dokument konnte nicht gespeichert werden: {error}",
+        "cancelled_upload": "Abgebrochen — der Upload wurde abgebrochen.",
+        "nothing_sent": "Abgebrochen — es wurde nichts gesendet.",
+        "link_subitem_failed": "Eines der Unterelemente konnte nicht unter dem Hauptelement verknüpft werden: {error}",
+        "local_renamed_line": (
+            "Lokale Datei unter dem PDM-Namen gespeichert (Speichern unter); die alte "
+            "Datei unter dem ursprünglichen Namen blieb unverändert:\n{path}"
+        ),
+        "local_already_named_line": (
+            "Die lokale Datei trug bereits den richtigen PDM-Namen — es musste nichts verschoben werden:\n{path}"
+        ),
+        "upload_success_sent": "An PDM gesendet als {number}",
+        "upload_success_with_subitems": " zusammen mit {count} Unterelementen",
+        "upload_success_tail": ".\nKopie im PDM-Speicher:\n{path}\n\n{local}",
+        "status_revision_mismatch": (
+            "Status/Revision von Element #{number} wurden bereits auf dem Server geändert "
+            "(Revision {revision}, Status 'w_pracy'), aber das Hochladen der Datei ist "
+            "fehlgeschlagen: {error}\n\nDas Element in PDM hat jetzt eine neue Revision, "
+            "aber immer noch die Datei der vorherigen Version — korrigieren Sie dies "
+            "manuell in der Webanwendung (Datei erneut hochladen) oder versuchen Sie es "
+            "erneut mit diesem Makro."
+        ),
+    },
+}
+
+
+def t(key, **kwargs):
+    text = TRANSLATIONS.get(LANG, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"].get(key, key))
+    return text.format(**kwargs) if kwargs else text
+
+
 PARAM_GROUP = "User parameter:BaseApp/EasyPDM"
 DEFAULT_BASE_URL = "http://localhost:5000/api"
 SESSION_COOKIE_NAME = "pdm_session"
@@ -258,7 +595,7 @@ def api_get(path):
     except error.HTTPError as e:
         _raise_for_http_error(e)
     except error.URLError as e:
-        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
 
 def api_post_json(path, payload):
@@ -273,7 +610,7 @@ def api_post_json(path, payload):
     except error.HTTPError as e:
         _raise_for_http_error(e)
     except error.URLError as e:
-        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
 
 def api_upload_file(path, file_path, field_name="file", override_filename=None, extra_fields=None):
@@ -306,7 +643,7 @@ def api_upload_file(path, file_path, field_name="file", override_filename=None, 
     except error.HTTPError as e:
         _raise_for_http_error(e)
     except error.URLError as e:
-        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
 
 def api_patch_json(path, payload):
@@ -321,7 +658,7 @@ def api_patch_json(path, payload):
     except error.HTTPError as e:
         _raise_for_http_error(e)
     except error.URLError as e:
-        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
 
 def api_delete(path):
@@ -333,7 +670,7 @@ def api_delete(path):
     except error.HTTPError as e:
         _raise_for_http_error(e)
     except error.URLError as e:
-        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
 
 def api_register_attachment(item_id, file_path):
@@ -360,7 +697,7 @@ def api_login(username, password):
     except error.HTTPError as e:
         raise RuntimeError(_read_error_body(e))
     except error.URLError as e:
-        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
     token = None
     for part in set_cookie_header.split(";"):
@@ -369,7 +706,7 @@ def api_login(username, password):
             token = part[len(SESSION_COOKIE_NAME) + 1:]
             break
     if not token:
-        raise RuntimeError("Logowanie nie powiodło się — serwer nie zwrócił sesji.")
+        raise RuntimeError(t("login_failed_no_session"))
 
     set_session_token(token)
     set_saved_username(user.get("displayName") or user.get("username") or username)
@@ -431,6 +768,18 @@ def sanitize_filename(name):
 # nie ma rodzaju w ogóle (patrz add-node-dialog.tsx — okno tworzenia złożenia nie oferuje
 # tego pola; ta sama zasada dotyczy tu NewComponentDialog dla nowych komponentów-złożeń).
 PART_KINDS = ["Wykonywana", "Zakupowa", "Normalia", "Klienta"]
+
+# Klucz tłumaczenia wyświetlanej etykiety dla każdej wartości "rodzaj" — sama WARTOŚĆ
+# (properties["rodzaj"], zob. NewComponentDialog.result_data) zostaje nietłumaczonym,
+# stałym literałem wire (tak samo jak w aplikacji webowej — PartKindSelect trzyma
+# value="Wykonywana" itd., tłumacząc tylko WIDOCZNY tekst opcji), tylko ETYKIETA w
+# ComboBoxie jest tłumaczona.
+PART_KIND_LABEL_KEYS = {
+    "Wykonywana": "kind_manufactured",
+    "Zakupowa": "kind_purchased",
+    "Normalia": "kind_standard",
+    "Klienta": "kind_client",
+}
 
 
 def kind_field_visibility(is_part, rodzaj):
@@ -594,11 +943,11 @@ def _usage_hint_for(file_path, edges):
     """Czytelny opis "używane Nx w pliku Y" do okna nowego komponentu — komponent może być
     używany w kilku miejscach drzewa naraz (współdzielona część)."""
     parts = [
-        f"{qty}× w {os.path.basename(parent)}"
+        t("usage_entry", qty=qty, file=os.path.basename(parent))
         for parent, child, qty in edges
         if child == file_path
     ]
-    return "Używane: " + ", ".join(parts) if parts else ""
+    return t("usage_prefix") + ", ".join(parts) if parts else ""
 
 
 def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=None, export_step=True):
@@ -846,11 +1195,12 @@ def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None
             # w ItemEndpoints.cs) — więc zamiast cichej/mylącej próby cofnięcia, głośno mówimy
             # dokładnie co się stało i co zrobić ręcznie.
             raise RuntimeError(
-                f"Status/rewizja elementu #{item.get('itemNumber')} zostały już zmienione na "
-                f"serwerze (rewizja {revision}, status 'w_pracy'), ale dogranie pliku się nie "
-                f"powiodło: {exc}\n\nElement w PDM ma teraz nową rewizję, lecz wciąż plik "
-                f"poprzedniej wersji — popraw to ręcznie w aplikacji webowej (dograj plik "
-                f"ponownie) albo spróbuj ponownie z tego makra."
+                t(
+                    "status_revision_mismatch",
+                    number=item.get("itemNumber"),
+                    revision=revision,
+                    error=exc,
+                )
             ) from exc
         raise
 
@@ -863,7 +1213,7 @@ class LoginDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Logowanie do PDM")
+        self.setWindowTitle(t("login_dialog_title"))
         self.setMinimumWidth(360)
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -871,14 +1221,14 @@ class LoginDialog(QtWidgets.QDialog):
         layout.addLayout(form)
 
         self.server_edit = QtWidgets.QLineEdit(get_base_url())
-        form.addRow("Adres API:", self.server_edit)
+        form.addRow(t("api_address_label"), self.server_edit)
 
         self.username_edit = QtWidgets.QLineEdit()
-        form.addRow("Nazwa użytkownika:", self.username_edit)
+        form.addRow(t("username_label"), self.username_edit)
 
         self.password_edit = QtWidgets.QLineEdit()
         self.password_edit.setEchoMode(QtWidgets.QLineEdit.Password)
-        form.addRow("Hasło:", self.password_edit)
+        form.addRow(t("password_label"), self.password_edit)
 
         self.error_label = QtWidgets.QLabel("")
         self.error_label.setStyleSheet("color: #c0392b;")
@@ -888,8 +1238,8 @@ class LoginDialog(QtWidgets.QDialog):
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
         )
-        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText("Zaloguj")
-        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText("Anuluj")
+        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText(t("login_button"))
+        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText(t("cancel_button"))
         buttons.accepted.connect(self._try_login)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -900,7 +1250,7 @@ class LoginDialog(QtWidgets.QDialog):
         username = self.username_edit.text().strip()
         password = self.password_edit.text()
         if not username or not password:
-            self.error_label.setText("Podaj nazwę użytkownika i hasło.")
+            self.error_label.setText(t("login_missing_fields"))
             return
         try:
             api_login(username, password)
@@ -927,7 +1277,7 @@ class TargetFolderDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.result_folder = None
 
-        self.setWindowTitle("Wyślij do PDM")
+        self.setWindowTitle(t("target_folder_dialog_title"))
         self.setMinimumWidth(440)
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -936,24 +1286,18 @@ class TargetFolderDialog(QtWidgets.QDialog):
         layout.addLayout(top_form)
 
         self.server_edit = QtWidgets.QLineEdit(get_base_url())
-        top_form.addRow("Adres API:", self.server_edit)
+        top_form.addRow(t("api_address_label"), self.server_edit)
 
         account_row = QtWidgets.QHBoxLayout()
-        self.account_label = QtWidgets.QLabel(f"Zalogowano jako: {get_saved_username() or '?'}")
+        self.account_label = QtWidgets.QLabel(t("logged_in_as", name=get_saved_username() or "?"))
         account_row.addWidget(self.account_label)
-        logout_btn = QtWidgets.QPushButton("Wyloguj")
+        logout_btn = QtWidgets.QPushButton(t("logout_button"))
         logout_btn.clicked.connect(self.on_logout)
         account_row.addWidget(logout_btn)
         account_row.addStretch(1)
-        top_form.addRow("Konto:", account_row)
+        top_form.addRow(t("account_label"), account_row)
 
-        layout.addWidget(
-            QtWidgets.QLabel(
-                "Gdzie mają trafić lokalne kopie wysyłanych dokumentów (ten sam plik pod "
-                "nazwą PDM, zamiast oryginalnej)? To samo miejsce co folder pobierania w "
-                "EasyPDMDownload.FCMacro — warto ustawić jednakowo."
-            )
-        )
+        layout.addWidget(QtWidgets.QLabel(t("target_folder_hint")))
 
         row = QtWidgets.QHBoxLayout()
         default_folder = get_download_folder() or (os.path.dirname(doc.FileName) if doc.FileName else "")
@@ -980,13 +1324,13 @@ class TargetFolderDialog(QtWidgets.QDialog):
     def on_logout(self):
         api_logout()
         QtWidgets.QMessageBox.information(
-            self, "PDM", "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie."
+            self, t("pdm_title"), t("logged_out_message")
         )
         self.reject()
 
     def on_browse(self):
         start = self.folder_edit.text().strip() or os.path.expanduser("~")
-        chosen = QtWidgets.QFileDialog.getExistingDirectory(self, "Wybierz folder docelowy", start)
+        chosen = QtWidgets.QFileDialog.getExistingDirectory(self, t("choose_target_folder_caption"), start)
         if chosen:
             self.folder_edit.setText(chosen)
 
@@ -994,12 +1338,12 @@ class TargetFolderDialog(QtWidgets.QDialog):
         set_base_url(self.server_edit.text().strip())
         folder = self.folder_edit.text().strip()
         if not folder:
-            self.error_label.setText("Wskaż folder.")
+            self.error_label.setText(t("indicate_folder"))
             return
         try:
             os.makedirs(folder, exist_ok=True)
         except OSError as e:
-            self.error_label.setText(f"Nie można użyć tego folderu: {e}")
+            self.error_label.setText(t("cannot_use_folder", error=e))
             return
         set_download_folder(folder)
         self.result_folder = folder
@@ -1012,29 +1356,26 @@ class NewRevisionDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Nowa rewizja")
+        self.setWindowTitle(t("new_revision_title"))
         self.setMinimumWidth(380)
 
         layout = QtWidgets.QVBoxLayout(self)
 
-        label = QtWidgets.QLabel(
-            'Ten element ma status "Wydany" — nie można do niego dogrywać plików.\n\n'
-            'Czy chcesz stworzyć nową rewizję (status zmieni się na "W pracy")?'
-        )
+        label = QtWidgets.QLabel(t("new_revision_body"))
         label.setWordWrap(True)
         layout.addWidget(label)
 
-        layout.addWidget(QtWidgets.QLabel("Komentarz do rewizji (opcjonalnie):"))
+        layout.addWidget(QtWidgets.QLabel(t("revision_comment_label")))
         self.comment_edit = QtWidgets.QPlainTextEdit()
         self.comment_edit.setFixedHeight(70)
-        self.comment_edit.setPlaceholderText("Co zmieniło się w tej rewizji…")
+        self.comment_edit.setPlaceholderText(t("revision_comment_placeholder"))
         layout.addWidget(self.comment_edit)
 
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
         )
-        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText("Stwórz rewizję")
-        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText("Anuluj")
+        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText(t("create_revision_button"))
+        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText(t("cancel_button"))
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -1057,7 +1398,7 @@ class NewComponentDialog(QtWidgets.QDialog):
 
     def __init__(self, file_path, suggested_name, suggested_is_assembly, usage_hint, projects, materials, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Nowy komponent złożenia")
+        self.setWindowTitle(t("new_component_title"))
         self.setMinimumWidth(440)
 
         outer = QtWidgets.QVBoxLayout(self)
@@ -1075,23 +1416,27 @@ class NewComponentDialog(QtWidgets.QDialog):
         self.project_combo = QtWidgets.QComboBox()
         for p in projects:
             self.project_combo.addItem(p["name"], p["id"])
-        form.addRow("Projekt:", self.project_combo)
+        form.addRow(t("project_label"), self.project_combo)
 
+        # Wyświetlana etykieta jest tłumaczona, ale userData zostaje przy stałych,
+        # nietłumaczonych wartościach wire ("part"/"assembly", zob. result_data) — dokładnie
+        # ten sam wzorzec co project_combo wyżej (tekst do pokazania, dane do logiki).
         self.type_combo = QtWidgets.QComboBox()
-        self.type_combo.addItems(["Część", "Złożenie"])
+        self.type_combo.addItem(t("type_part"), "part")
+        self.type_combo.addItem(t("type_assembly"), "assembly")
         self.type_combo.setCurrentIndex(1 if suggested_is_assembly else 0)
         self.type_combo.currentIndexChanged.connect(self.on_type_changed)
-        form.addRow("Typ:", self.type_combo)
+        form.addRow(t("type_label"), self.type_combo)
 
         self.name_edit = QtWidgets.QLineEdit(suggested_name)
-        form.addRow("Nazwa:", self.name_edit)
+        form.addRow(t("name_label"), self.name_edit)
 
-        self.rodzaj_label = QtWidgets.QLabel("Rodzaj:")
+        self.rodzaj_label = QtWidgets.QLabel(t("kind_label"))
         self.rodzaj_combo = QtWidgets.QComboBox()
         self.rodzaj_combo.currentIndexChanged.connect(self.on_rodzaj_changed)
         form.addRow(self.rodzaj_label, self.rodzaj_combo)
 
-        self.material_label = QtWidgets.QLabel("Materiał:")
+        self.material_label = QtWidgets.QLabel(t("material_label"))
         self.material_combo = QtWidgets.QComboBox()
         self.material_combo.setEditable(True)
         self.material_combo.addItem("", "")
@@ -1099,23 +1444,23 @@ class NewComponentDialog(QtWidgets.QDialog):
             self.material_combo.addItem(m["name"], m["name"])
         form.addRow(self.material_label, self.material_combo)
 
-        self.mass_label = QtWidgets.QLabel("Masa [kg]:")
+        self.mass_label = QtWidgets.QLabel(t("mass_label"))
         self.mass_edit = QtWidgets.QLineEdit()
         form.addRow(self.mass_label, self.mass_edit)
 
-        self.manufacturer_label = QtWidgets.QLabel("Producent:")
+        self.manufacturer_label = QtWidgets.QLabel(t("manufacturer_label"))
         self.manufacturer_edit = QtWidgets.QLineEdit()
         form.addRow(self.manufacturer_label, self.manufacturer_edit)
 
-        self.order1_label = QtWidgets.QLabel("Numer zamówieniowy 1:")
+        self.order1_label = QtWidgets.QLabel(t("order1_label"))
         self.order1_edit = QtWidgets.QLineEdit()
         form.addRow(self.order1_label, self.order1_edit)
 
-        self.order2_label = QtWidgets.QLabel("Numer zamówieniowy 2:")
+        self.order2_label = QtWidgets.QLabel(t("order2_label"))
         self.order2_edit = QtWidgets.QLineEdit()
         form.addRow(self.order2_label, self.order2_edit)
 
-        self.norm_label = QtWidgets.QLabel("Norma:")
+        self.norm_label = QtWidgets.QLabel(t("norm_label"))
         self.norm_edit = QtWidgets.QLineEdit()
         form.addRow(self.norm_label, self.norm_edit)
 
@@ -1134,19 +1479,20 @@ class NewComponentDialog(QtWidgets.QDialog):
         self.on_type_changed()
 
     def on_type_changed(self):
-        is_part = self.type_combo.currentText() == "Część"
+        is_part = self.type_combo.currentData() == "part"
         self.rodzaj_label.setVisible(is_part)
         self.rodzaj_combo.setVisible(is_part)
         self.rodzaj_combo.blockSignals(True)
         self.rodzaj_combo.clear()
         if is_part:
-            self.rodzaj_combo.addItems(PART_KINDS)
+            for kind in PART_KINDS:
+                self.rodzaj_combo.addItem(t(PART_KIND_LABEL_KEYS[kind]), kind)
         self.rodzaj_combo.blockSignals(False)
         self.on_rodzaj_changed()
 
     def on_rodzaj_changed(self):
-        is_part = self.type_combo.currentText() == "Część"
-        rodzaj = self.rodzaj_combo.currentText()
+        is_part = self.type_combo.currentData() == "part"
+        rodzaj = self.rodzaj_combo.currentData()
         vis = kind_field_visibility(is_part, rodzaj)
 
         for w in (self.material_label, self.material_combo):
@@ -1168,16 +1514,22 @@ class NewComponentDialog(QtWidgets.QDialog):
     def _try_accept(self):
         self.error_label.setText("")
         if not self.project_combo.currentData():
-            self.error_label.setText("Wybierz projekt.")
+            self.error_label.setText(t("choose_project_error"))
             return
         if not self.name_edit.text().strip():
-            self.error_label.setText("Nazwa jest wymagana.")
+            self.error_label.setText(t("name_required_error"))
             return
-        is_part = self.type_combo.currentText() == "Część"
-        rodzaj = self.rodzaj_combo.currentText()
+        is_part = self.type_combo.currentData() == "part"
+        rodzaj = self.rodzaj_combo.currentData()
         if is_part and rodzaj not in PART_KINDS:
             self.error_label.setText(
-                "Dla Części wybierz rodzaj: Wykonywana, Zakupowa, Normalia albo Klienta."
+                t(
+                    "select_kind_error",
+                    manufactured=t("kind_manufactured"),
+                    purchased=t("kind_purchased"),
+                    standard=t("kind_standard"),
+                    client=t("kind_client"),
+                )
             )
             return
         self.accept()
@@ -1185,9 +1537,9 @@ class NewComponentDialog(QtWidgets.QDialog):
     def result_data(self):
         """Zwraca (project_id, item_type, name, properties) — do przekazania do
         push_new_item_to_pdm."""
-        is_part = self.type_combo.currentText() == "Część"
-        item_type = "part" if is_part else "assembly"
-        rodzaj = self.rodzaj_combo.currentText()
+        is_part = self.type_combo.currentData() == "part"
+        item_type = self.type_combo.currentData()
+        rodzaj = self.rodzaj_combo.currentData()
 
         properties = {}
         if rodzaj:
@@ -1240,14 +1592,11 @@ class WaitForTicketDialog(QtWidgets.QDialog):
         self._elapsed_ms = 0
         self._timeout_ms = timeout_seconds * 1000
 
-        self.setWindowTitle("Czekam na przeglądarkę")
+        self.setWindowTitle(t("wait_ticket_title"))
         self.setMinimumWidth(380)
 
         layout = QtWidgets.QVBoxLayout(self)
-        label = QtWidgets.QLabel(
-            "Otworzono przeglądarkę — uzupełnij dane elementu i zapisz.\n\n"
-            "To okno samo się zamknie, gdy element zostanie utworzony."
-        )
+        label = QtWidgets.QLabel(t("wait_ticket_body"))
         label.setWordWrap(True)
         layout.addWidget(label)
 
@@ -1257,7 +1606,7 @@ class WaitForTicketDialog(QtWidgets.QDialog):
         layout.addWidget(self.error_label)
 
         buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel)
-        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText("Anuluj")
+        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText(t("cancel_button"))
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
@@ -1277,7 +1626,7 @@ class WaitForTicketDialog(QtWidgets.QDialog):
     def _poll(self):
         self._elapsed_ms += self.POLL_INTERVAL_MS
         if self._elapsed_ms >= self._timeout_ms:
-            self.error_label.setText("Upłynął czas oczekiwania.")
+            self.error_label.setText(t("wait_timeout"))
             self.reject()
             return
         try:
@@ -1326,7 +1675,7 @@ def submit_via_browser(doc, target_folder):
     try:
         webbrowser.open(url)
     except Exception as e:
-        QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się otworzyć przeglądarki: {e}")
+        QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
         return None
 
     wait_dlg = WaitForTicketDialog(ticket)
@@ -1379,12 +1728,8 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True):
     summary = "\n".join(f"- {os.path.basename(f)}" for f in order)
     choice = QtWidgets.QMessageBox.question(
         None,
-        "Wykryto złożenie",
-        f"Ten dokument linkuje do {len(order)} innych plików (części/pod-złożeń):\n\n"
-        f"{summary}\n\n"
-        "Wysłać je automatycznie razem z tym dokumentem (najpierw części/pod-złożenia, "
-        "na końcu ten dokument)?\n\n"
-        "\"Nie\" wyśle TYLKO ten dokument, tak jak dotychczas — bez podelementów.",
+        t("assembly_detected_title"),
+        t("assembly_detected_body", count=len(order), summary=summary),
         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel,
         QtWidgets.QMessageBox.Yes,
     )
@@ -1396,12 +1741,12 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True):
     try:
         existing_items = api_get("/items") or []
     except Exception as e:
-        QtWidgets.QMessageBox.warning(None, "PDM", f"Nie udało się pobrać listy elementów: {e}")
+        QtWidgets.QMessageBox.warning(None, t("pdm_title"), t("fetch_items_failed", error=e))
         existing_items = []
     try:
         projects = api_get("/projects") or []
     except Exception as e:
-        QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się pobrać listy projektów: {e}")
+        QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("fetch_projects_failed", error=e))
         return [], True
     try:
         materials = api_get("/materials") or []
@@ -1437,7 +1782,7 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True):
                 )
             except Exception as e:
                 QtWidgets.QMessageBox.critical(
-                    None, "PDM", f"Nie udało się wysłać {os.path.basename(file_path)}: {e}"
+                    None, t("pdm_title"), t("upload_component_failed", file=os.path.basename(file_path), error=e)
                 )
                 return [], True
             doc_to_item_id[file_path] = result["itemId"]
@@ -1463,9 +1808,13 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True):
             except Exception as e:
                 QtWidgets.QMessageBox.warning(
                     None,
-                    "PDM",
-                    f"Utworzono {os.path.basename(child_file)}, ale nie udało się podpiąć go "
-                    f"pod {os.path.basename(parent_file)}: {e}",
+                    t("pdm_title"),
+                    t(
+                        "link_child_failed",
+                        child=os.path.basename(child_file),
+                        parent=os.path.basename(parent_file),
+                        error=e,
+                    ),
                 )
 
     # Relacje, w których rodzicem jest top_doc SAMO W SOBIE, nie mogły zostać podpięte
@@ -1488,13 +1837,13 @@ def run():
 
     doc = App.ActiveDocument
     if doc is None:
-        QtWidgets.QMessageBox.warning(None, "PDM", "Brak otwartego dokumentu.")
+        QtWidgets.QMessageBox.warning(None, t("pdm_title"), t("no_active_document"))
         return
 
     # Krok 1: zapisz element przed wrzuceniem do PDM.
     if not doc.FileName:
         QtWidgets.QMessageBox.information(
-            None, "PDM", "Dokument nie jest jeszcze zapisany — wskaż, gdzie go zapisać."
+            None, t("pdm_title"), t("document_not_saved")
         )
         import FreeCADGui as Gui
 
@@ -1510,7 +1859,7 @@ def run():
             doc.recompute()
             doc.save()
         except Exception as e:
-            QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się zapisać dokumentu: {e}")
+            QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("save_failed", error=e))
             return
 
     # Krok 1a-0: folder docelowy dla lokalnych kopii (Save As) — pytamy RAZ, na samym
@@ -1532,7 +1881,7 @@ def run():
     # znalezione przez App::Link, w kolejności liście-najpierw.
     edges_for_top, cancelled = process_assembly_tree(doc, target_folder, export_step)
     if cancelled:
-        QtWidgets.QMessageBox.information(None, "PDM", "Przerwano — anulowano wysyłkę.")
+        QtWidgets.QMessageBox.information(None, t("pdm_title"), t("cancelled_upload"))
         return
 
     # Krok 2: nowy element czy dogranie do istniejącego? Makro już o to w ogóle nie pyta —
@@ -1542,7 +1891,7 @@ def run():
     if info is None:
         # Anulowano/upłynął czas oczekiwania na przeglądarkę, albo element był "Wydany" i
         # użytkownik odmówił stworzenia nowej rewizji — w obu przypadkach nic nie wysłano.
-        QtWidgets.QMessageBox.information(None, "PDM", "Anulowano — nic nie zostało wysłane.")
+        QtWidgets.QMessageBox.information(None, t("pdm_title"), t("nothing_sent"))
         return
 
     # Krok 3: podepnij pod TEN element podelementy odkryte w kroku 1a (BOM) — dopiero teraz
@@ -1554,7 +1903,7 @@ def run():
             )
         except Exception as e:
             QtWidgets.QMessageBox.warning(
-                None, "PDM", f"Nie udało się podpiąć jednego z podelementów pod główny element: {e}"
+                None, t("pdm_title"), t("link_subitem_failed", error=e)
             )
 
     # Mimo że doc już przeszedł przez _rename_and_upload (Label + saveAs), FreeCAD potrafi
@@ -1571,18 +1920,16 @@ def run():
             pass
 
     if info.get("localRenamed"):
-        local_line = f"Lokalny plik zapisany pod nazwą PDM (Save As), stary plik pod oryginalną nazwą pozostał nietknięty:\n{doc.FileName}"
+        local_line = t("local_renamed_line", path=doc.FileName)
     else:
-        local_line = f"Lokalny plik już był pod właściwą nazwą PDM — nic nie trzeba było przenosić:\n{doc.FileName}"
+        local_line = t("local_already_named_line", path=doc.FileName)
 
     QtWidgets.QMessageBox.information(
         None,
-        "PDM",
-        f"Wysłano do PDM jako {info['itemNumber']}"
-        + (f" razem z {len(edges_for_top)} podelementami" if edges_for_top else "")
-        + ".\n"
-        f"Kopia w magazynie PDM:\n{info['newPath']}\n\n"
-        f"{local_line}",
+        t("pdm_title"),
+        t("upload_success_sent", number=info["itemNumber"])
+        + (t("upload_success_with_subitems", count=len(edges_for_top)) if edges_for_top else "")
+        + t("upload_success_tail", path=info["newPath"], local=local_line),
     )
 
 

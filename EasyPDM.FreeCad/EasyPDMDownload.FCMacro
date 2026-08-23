@@ -93,6 +93,204 @@ except ImportError:
         from PySide import QtGui as QtWidgets  # bardzo stare FreeCAD (Qt4)
 
 
+def _match_lang(raw):
+    raw = (raw or "").strip().lower()
+    if not raw:
+        return None
+    if raw.startswith("pl") or "polish" in raw or "polski" in raw:
+        return "pl"
+    if raw.startswith("de") or "german" in raw or "deutsch" in raw:
+        return "de"
+    if raw.startswith("en") or "english" in raw:
+        return "en"
+    return None
+
+
+def _detect_language():
+    """Auto-wykrycie języka: najpierw własne ustawienie FreeCAD (Preferences -> General ->
+    Language) — bywa zapisane jako nazwa ("Polish"/"German") albo jako kod locale
+    ("pl"/"pl_PL"/"de_DE" — stąd dopasowanie i po nazwie, i po prefiksie kodu), a jeśli to
+    niejednoznaczne (pusty string albo coś spoza pl/en/de), sprawdzamy locale systemu
+    operacyjnego ($LANGUAGE/$LC_ALL/$LANG — na Linuksie zwykle "pl_PL.UTF-8"). Fallback na
+    angielski, jeśli nic nie pasuje albo odczyt się nie powiedzie."""
+    try:
+        raw = App.ParamGet("User parameter:BaseApp/Preferences/General").GetString("Language", "")
+    except Exception:
+        raw = ""
+    lang = _match_lang(raw)
+    if lang:
+        return lang
+    raw_os = os.environ.get("LANGUAGE") or os.environ.get("LC_ALL") or os.environ.get("LANG") or ""
+    return _match_lang(raw_os) or "en"
+
+
+LANG = _detect_language()
+
+
+TRANSLATIONS = {
+    "pl": {
+        "no_connection": "Brak połączenia z {url}: {reason}",
+        "login_failed_no_session": "Logowanie nie powiodło się — serwer nie zwrócił sesji.",
+        "pdm_title": "PDM",
+        "easypdm_title": "EasyPDM",
+        "easypdm_error_title": "EasyPDM — błąd",
+        "login_dialog_title": "Logowanie do PDM",
+        "api_address_label": "Adres API:",
+        "username_label": "Nazwa użytkownika:",
+        "password_label": "Hasło:",
+        "login_button": "Zaloguj",
+        "cancel_button": "Anuluj",
+        "login_missing_fields": "Podaj nazwę użytkownika i hasło.",
+        "download_folder_dialog_title": "Pobierz z PDM",
+        "logged_in_as": "Zalogowano jako: {name}",
+        "logout_button": "Wyloguj",
+        "account_label": "Konto:",
+        "target_dir_label": "Folder docelowy:",
+        "choose_download_folder_caption": "Wybierz folder pobierania",
+        "indicate_target_folder": "Wskaż folder docelowy.",
+        "cannot_use_folder": "Nie można użyć tego folderu: {error}",
+        "logged_out_message": "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie.",
+        "wait_ticket_title": "Czekam na przeglądarkę",
+        "wait_ticket_download_body": (
+            "Otworzono przeglądarkę — wybierz Część/Złożenie do pobrania i zatwierdź.\n\n"
+            "To okno samo się zamknie, gdy wybór zostanie zatwierdzony."
+        ),
+        "wait_timeout": "Upłynął czas oczekiwania.",
+        "log_no_attachments_list": "  {label}: nie udało się pobrać listy załączników ({error}).",
+        "log_no_cad_files": "  {label}: brak plików CAD do pobrania (element nie ma żadnych załączników).",
+        "log_already_present": "  {label}: już jest w folderze (aktualna rewizja), pomijam.",
+        "newer_revision_title": "Nowsza rewizja",
+        "newer_revision_body": (
+            "W folderze jest już {label} w rewizji {rev_list}, a na serwerze aktualna "
+            "jest rewizja {wanted}.\n\nPobrać najnowszą wersję?"
+        ),
+        "log_keeping_local_revision": "  {label}: zostawiam istniejącą lokalną rewizję ({rev_list}).",
+        "log_downloading": "  Pobieram {file}...",
+        "log_download_error": "  {label}: BŁĄD pobierania {file} ({error}).",
+        "log_saved": "  Zapisano: {file}",
+        "log_no_children_list": "  {label}: nie udało się pobrać listy składników ({error}).",
+        "log_downloading_top": "Pobieram {number} ({name}) do {dir}...",
+        "log_opened": "Otwarto: {path}",
+        "log_open_failed": "Nie udało się otworzyć {path} w FreeCAD: {error}",
+        "log_no_main_file": "Nie udało się ustalić pliku głównego do otwarcia.",
+        "open_browser_failed": "Nie udało się otworzyć przeglądarki: {error}",
+        "fetch_selected_item_failed": "Nie udało się pobrać danych wybranego elementu: {error}",
+        "item_no_longer_exists": "Wybrany element już nie istnieje.",
+        "download_interrupted": "Pobieranie przerwane nieoczekiwanym błędem:\n\n",
+        "log_so_far": "\n\nDotychczasowy log:\n",
+    },
+    "en": {
+        "no_connection": "Could not connect to {url}: {reason}",
+        "login_failed_no_session": "Login failed — the server did not return a session.",
+        "pdm_title": "PDM",
+        "easypdm_title": "EasyPDM",
+        "easypdm_error_title": "EasyPDM — Error",
+        "login_dialog_title": "Log in to PDM",
+        "api_address_label": "API address:",
+        "username_label": "Username:",
+        "password_label": "Password:",
+        "login_button": "Log in",
+        "cancel_button": "Cancel",
+        "login_missing_fields": "Enter your username and password.",
+        "download_folder_dialog_title": "Download from PDM",
+        "logged_in_as": "Logged in as: {name}",
+        "logout_button": "Log out",
+        "account_label": "Account:",
+        "target_dir_label": "Target folder:",
+        "choose_download_folder_caption": "Choose download folder",
+        "indicate_target_folder": "Choose a target folder.",
+        "cannot_use_folder": "Cannot use this folder: {error}",
+        "logged_out_message": "Logged out. The next time you run the macro, it will ask you to log in again.",
+        "wait_ticket_title": "Waiting for the browser",
+        "wait_ticket_download_body": (
+            "The browser has been opened — choose the Part/Assembly to download and confirm.\n\n"
+            "This window will close automatically once the selection is confirmed."
+        ),
+        "wait_timeout": "The waiting time has expired.",
+        "log_no_attachments_list": "  {label}: failed to fetch the attachment list ({error}).",
+        "log_no_cad_files": "  {label}: no CAD files to download (the item has no attachments).",
+        "log_already_present": "  {label}: already in the folder (current revision), skipping.",
+        "newer_revision_title": "Newer revision",
+        "newer_revision_body": (
+            "The folder already has {label} in revision {rev_list}, and the current "
+            "revision on the server is {wanted}.\n\nDownload the newest version?"
+        ),
+        "log_keeping_local_revision": "  {label}: keeping the existing local revision ({rev_list}).",
+        "log_downloading": "  Downloading {file}...",
+        "log_download_error": "  {label}: ERROR downloading {file} ({error}).",
+        "log_saved": "  Saved: {file}",
+        "log_no_children_list": "  {label}: failed to fetch the list of children ({error}).",
+        "log_downloading_top": "Downloading {number} ({name}) to {dir}...",
+        "log_opened": "Opened: {path}",
+        "log_open_failed": "Failed to open {path} in FreeCAD: {error}",
+        "log_no_main_file": "Failed to determine the main file to open.",
+        "open_browser_failed": "Failed to open the browser: {error}",
+        "fetch_selected_item_failed": "Failed to fetch the selected item's data: {error}",
+        "item_no_longer_exists": "The selected item no longer exists.",
+        "download_interrupted": "Download interrupted by an unexpected error:\n\n",
+        "log_so_far": "\n\nLog so far:\n",
+    },
+    "de": {
+        "no_connection": "Keine Verbindung zu {url}: {reason}",
+        "login_failed_no_session": "Anmeldung fehlgeschlagen — der Server hat keine Sitzung zurückgegeben.",
+        "pdm_title": "PDM",
+        "easypdm_title": "EasyPDM",
+        "easypdm_error_title": "EasyPDM — Fehler",
+        "login_dialog_title": "Anmeldung bei PDM",
+        "api_address_label": "API-Adresse:",
+        "username_label": "Benutzername:",
+        "password_label": "Passwort:",
+        "login_button": "Anmelden",
+        "cancel_button": "Abbrechen",
+        "login_missing_fields": "Geben Sie Benutzername und Passwort ein.",
+        "download_folder_dialog_title": "Von PDM herunterladen",
+        "logged_in_as": "Angemeldet als: {name}",
+        "logout_button": "Abmelden",
+        "account_label": "Konto:",
+        "target_dir_label": "Zielordner:",
+        "choose_download_folder_caption": "Download-Ordner auswählen",
+        "indicate_target_folder": "Wählen Sie einen Zielordner.",
+        "cannot_use_folder": "Dieser Ordner kann nicht verwendet werden: {error}",
+        "logged_out_message": "Abgemeldet. Beim nächsten Ausführen des Makros werden Sie erneut zur Anmeldung aufgefordert.",
+        "wait_ticket_title": "Warte auf den Browser",
+        "wait_ticket_download_body": (
+            "Der Browser wurde geöffnet — wählen Sie das herunterzuladende Teil/die "
+            "Baugruppe aus und bestätigen Sie.\n\nDieses Fenster schließt sich automatisch, "
+            "sobald die Auswahl bestätigt wurde."
+        ),
+        "wait_timeout": "Die Wartezeit ist abgelaufen.",
+        "log_no_attachments_list": "  {label}: Anhangsliste konnte nicht abgerufen werden ({error}).",
+        "log_no_cad_files": "  {label}: keine CAD-Dateien zum Herunterladen (das Element hat keine Anhänge).",
+        "log_already_present": "  {label}: bereits im Ordner vorhanden (aktuelle Revision), wird übersprungen.",
+        "newer_revision_title": "Neuere Revision",
+        "newer_revision_body": (
+            "Im Ordner befindet sich bereits {label} in Revision {rev_list}, und die "
+            "aktuelle Revision auf dem Server ist {wanted}.\n\nSoll die neueste Version "
+            "heruntergeladen werden?"
+        ),
+        "log_keeping_local_revision": "  {label}: die vorhandene lokale Revision wird beibehalten ({rev_list}).",
+        "log_downloading": "  Lade {file} herunter...",
+        "log_download_error": "  {label}: FEHLER beim Herunterladen von {file} ({error}).",
+        "log_saved": "  Gespeichert: {file}",
+        "log_no_children_list": "  {label}: Liste der Unterelemente konnte nicht abgerufen werden ({error}).",
+        "log_downloading_top": "Lade {number} ({name}) nach {dir} herunter...",
+        "log_opened": "Geöffnet: {path}",
+        "log_open_failed": "{path} konnte nicht in FreeCAD geöffnet werden: {error}",
+        "log_no_main_file": "Die zu öffnende Hauptdatei konnte nicht ermittelt werden.",
+        "open_browser_failed": "Der Browser konnte nicht geöffnet werden: {error}",
+        "fetch_selected_item_failed": "Die Daten des ausgewählten Elements konnten nicht abgerufen werden: {error}",
+        "item_no_longer_exists": "Das ausgewählte Element existiert nicht mehr.",
+        "download_interrupted": "Download durch einen unerwarteten Fehler unterbrochen:\n\n",
+        "log_so_far": "\n\nBisheriges Protokoll:\n",
+    },
+}
+
+
+def t(key, **kwargs):
+    text = TRANSLATIONS.get(LANG, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"].get(key, key))
+    return text.format(**kwargs) if kwargs else text
+
+
 # Ta sama grupa preferencji co EasyPDMUpload.FCMacro — adres API i sesja logowania są
 # współdzielone między oboma makrami (zalogowanie się w jednym starcza dla drugiego).
 PARAM_GROUP = "User parameter:BaseApp/EasyPDM"
@@ -186,7 +384,7 @@ def api_get(path):
     except error.HTTPError as e:
         _raise_for_http_error(e)
     except error.URLError as e:
-        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
 
 def api_get_binary(path):
@@ -199,7 +397,7 @@ def api_get_binary(path):
     except error.HTTPError as e:
         _raise_for_http_error(e)
     except error.URLError as e:
-        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
 
 def api_login(username, password):
@@ -216,7 +414,7 @@ def api_login(username, password):
     except error.HTTPError as e:
         raise RuntimeError(_read_error_body(e))
     except error.URLError as e:
-        raise RuntimeError(f"Brak połączenia z {get_base_url()}: {e.reason}")
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
     token = None
     for part in set_cookie_header.split(";"):
@@ -225,7 +423,7 @@ def api_login(username, password):
             token = part[len(SESSION_COOKIE_NAME) + 1:]
             break
     if not token:
-        raise RuntimeError("Logowanie nie powiodło się — serwer nie zwrócił sesji.")
+        raise RuntimeError(t("login_failed_no_session"))
 
     set_session_token(token)
     set_saved_username(user.get("displayName") or user.get("username") or username)
@@ -346,12 +544,12 @@ def _download_item(item, target_dir, log):
     try:
         attachments = api_get(f"/items/{item['id']}/attachments") or []
     except Exception as e:
-        log(f"  {label}: nie udało się pobrać listy załączników ({e}).")
+        log(t("log_no_attachments_list", label=label, error=e))
         return None
 
     current = _find_current_attachment(item, attachments)
     if current is None:
-        log(f"  {label}: brak plików CAD do pobrania (element nie ma żadnych załączników).")
+        log(t("log_no_cad_files", label=label))
         return None
 
     target_path = os.path.join(target_dir, current["fileName"])
@@ -362,7 +560,7 @@ def _download_item(item, target_dir, log):
         except OSError:
             same_size = False
         if same_size:
-            log(f"  {label}: już jest w folderze (aktualna rewizja), pomijam.")
+            log(t("log_already_present", label=label))
             return target_path
 
     older = [
@@ -375,26 +573,25 @@ def _download_item(item, target_dir, log):
         wanted = revision_label(item["revisionNumber"]) if item.get("revisionNumber") else "?"
         answer = QtWidgets.QMessageBox.question(
             None,
-            "Nowsza rewizja",
-            f"W folderze jest już {label} w rewizji {rev_list}, a na serwerze aktualna "
-            f"jest rewizja {wanted}.\n\nPobrać najnowszą wersję?",
+            t("newer_revision_title"),
+            t("newer_revision_body", label=label, rev_list=rev_list, wanted=wanted),
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
         )
         if answer != QtWidgets.QMessageBox.Yes:
-            log(f"  {label}: zostawiam istniejącą lokalną rewizję ({rev_list}).")
+            log(t("log_keeping_local_revision", label=label, rev_list=rev_list))
             return older[0][1] if len(older) == 1 else None
 
-    log(f"  Pobieram {current['fileName']}...")
+    log(t("log_downloading", file=current["fileName"]))
     try:
         content = api_get_binary(f"/attachments/{current['id']}/file")
     except Exception as e:
-        log(f"  {label}: BŁĄD pobierania {current['fileName']} ({e}).")
+        log(t("log_download_error", label=label, file=current["fileName"], error=e))
         return None
 
     os.makedirs(target_dir, exist_ok=True)
     with open(target_path, "wb") as f:
         f.write(content)
-    log(f"  Zapisano: {current['fileName']}")
+    log(t("log_saved", file=current["fileName"]))
     return target_path
 
 
@@ -406,7 +603,7 @@ def _download_children_recursive(item, target_dir, log, seen):
         rows = api_get(f"/items/{item['id']}/children") or []
     except Exception as e:
         label = f"{item.get('itemNumber')} ({item.get('fileName')})"
-        log(f"  {label}: nie udało się pobrać listy składników ({e}).")
+        log(t("log_no_children_list", label=label, error=e))
         return
     # UWAGA: odpowiedź to lista {"item": {...}, "quantity": ..., "position": ...} — sam
     # element jest ZAGNIEŻDŻONY pod kluczem "item" (ta sama konwencja co childEntries
@@ -428,7 +625,7 @@ class LoginDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Logowanie do PDM")
+        self.setWindowTitle(t("login_dialog_title"))
         self.setMinimumWidth(360)
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -436,14 +633,14 @@ class LoginDialog(QtWidgets.QDialog):
         layout.addLayout(form)
 
         self.server_edit = QtWidgets.QLineEdit(get_base_url())
-        form.addRow("Adres API:", self.server_edit)
+        form.addRow(t("api_address_label"), self.server_edit)
 
         self.username_edit = QtWidgets.QLineEdit()
-        form.addRow("Nazwa użytkownika:", self.username_edit)
+        form.addRow(t("username_label"), self.username_edit)
 
         self.password_edit = QtWidgets.QLineEdit()
         self.password_edit.setEchoMode(QtWidgets.QLineEdit.Password)
-        form.addRow("Hasło:", self.password_edit)
+        form.addRow(t("password_label"), self.password_edit)
 
         self.error_label = QtWidgets.QLabel("")
         self.error_label.setStyleSheet("color: #c0392b;")
@@ -453,8 +650,8 @@ class LoginDialog(QtWidgets.QDialog):
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
         )
-        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText("Zaloguj")
-        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText("Anuluj")
+        buttons.button(QtWidgets.QDialogButtonBox.Ok).setText(t("login_button"))
+        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText(t("cancel_button"))
         buttons.accepted.connect(self._try_login)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -465,7 +662,7 @@ class LoginDialog(QtWidgets.QDialog):
         username = self.username_edit.text().strip()
         password = self.password_edit.text()
         if not username or not password:
-            self.error_label.setText("Podaj nazwę użytkownika i hasło.")
+            self.error_label.setText(t("login_missing_fields"))
             return
         try:
             api_login(username, password)
@@ -486,7 +683,7 @@ class DownloadFolderDialog(QtWidgets.QDialog):
         super().__init__(parent)
         self.result_folder = None
 
-        self.setWindowTitle("Pobierz z PDM")
+        self.setWindowTitle(t("download_folder_dialog_title"))
         self.setMinimumWidth(440)
 
         outer = QtWidgets.QVBoxLayout(self)
@@ -494,13 +691,13 @@ class DownloadFolderDialog(QtWidgets.QDialog):
         outer.addLayout(form)
 
         account_row = QtWidgets.QHBoxLayout()
-        self.account_label = QtWidgets.QLabel(f"Zalogowano jako: {get_saved_username() or '?'}")
+        self.account_label = QtWidgets.QLabel(t("logged_in_as", name=get_saved_username() or "?"))
         account_row.addWidget(self.account_label)
-        logout_btn = QtWidgets.QPushButton("Wyloguj")
+        logout_btn = QtWidgets.QPushButton(t("logout_button"))
         logout_btn.clicked.connect(self.on_logout)
         account_row.addWidget(logout_btn)
         account_row.addStretch(1)
-        form.addRow("Konto:", account_row)
+        form.addRow(t("account_label"), account_row)
 
         folder_row = QtWidgets.QHBoxLayout()
         self.folder_edit = QtWidgets.QLineEdit(get_download_folder() or "")
@@ -509,7 +706,7 @@ class DownloadFolderDialog(QtWidgets.QDialog):
         browse_btn.setMaximumWidth(32)
         browse_btn.clicked.connect(self.on_browse)
         folder_row.addWidget(browse_btn)
-        form.addRow("Folder docelowy:", folder_row)
+        form.addRow(t("target_dir_label"), folder_row)
 
         self.error_label = QtWidgets.QLabel("")
         self.error_label.setStyleSheet("color: #c0392b;")
@@ -526,13 +723,13 @@ class DownloadFolderDialog(QtWidgets.QDialog):
     def on_logout(self):
         api_logout()
         QtWidgets.QMessageBox.information(
-            self, "PDM", "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie."
+            self, t("pdm_title"), t("logged_out_message")
         )
         self.reject()
 
     def on_browse(self):
         start = self.folder_edit.text().strip() or os.path.expanduser("~")
-        chosen = QtWidgets.QFileDialog.getExistingDirectory(self, "Wybierz folder pobierania", start)
+        chosen = QtWidgets.QFileDialog.getExistingDirectory(self, t("choose_download_folder_caption"), start)
         if chosen:
             self.folder_edit.setText(chosen)
 
@@ -540,12 +737,12 @@ class DownloadFolderDialog(QtWidgets.QDialog):
         self.error_label.setText("")
         folder = self.folder_edit.text().strip()
         if not folder:
-            self.error_label.setText("Wskaż folder docelowy.")
+            self.error_label.setText(t("indicate_target_folder"))
             return
         try:
             os.makedirs(folder, exist_ok=True)
         except OSError as e:
-            self.error_label.setText(f"Nie można użyć tego folderu: {e}")
+            self.error_label.setText(t("cannot_use_folder", error=e))
             return
         set_download_folder(folder)
         self.result_folder = folder
@@ -568,14 +765,11 @@ class WaitForTicketDialog(QtWidgets.QDialog):
         self._elapsed_ms = 0
         self._timeout_ms = timeout_seconds * 1000
 
-        self.setWindowTitle("Czekam na przeglądarkę")
+        self.setWindowTitle(t("wait_ticket_title"))
         self.setMinimumWidth(380)
 
         layout = QtWidgets.QVBoxLayout(self)
-        label = QtWidgets.QLabel(
-            "Otworzono przeglądarkę — wybierz Część/Złożenie do pobrania i zatwierdź.\n\n"
-            "To okno samo się zamknie, gdy wybór zostanie zatwierdzony."
-        )
+        label = QtWidgets.QLabel(t("wait_ticket_download_body"))
         label.setWordWrap(True)
         layout.addWidget(label)
 
@@ -585,7 +779,7 @@ class WaitForTicketDialog(QtWidgets.QDialog):
         layout.addWidget(self.error_label)
 
         buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel)
-        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText("Anuluj")
+        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText(t("cancel_button"))
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
@@ -605,7 +799,7 @@ class WaitForTicketDialog(QtWidgets.QDialog):
     def _poll(self):
         self._elapsed_ms += self.POLL_INTERVAL_MS
         if self._elapsed_ms >= self._timeout_ms:
-            self.error_label.setText("Upłynął czas oczekiwania.")
+            self.error_label.setText(t("wait_timeout"))
             self.reject()
             return
         try:
@@ -626,7 +820,7 @@ def _run_download(top_item, target_dir, log):
     z pełnym tracebackiem, a nie cichym zniknięciem makra bez żadnego okna na końcu
     (dokładnie to przydarzyło się w praktyce, zanim doszło to zabezpieczenie — zob. też
     poprawiony _download_children_recursive, gdzie leżała PIERWOTNA przyczyna)."""
-    log(f"Pobieram {top_item['itemNumber']} ({top_item['fileName']}) do {target_dir}...")
+    log(t("log_downloading_top", number=top_item["itemNumber"], name=top_item["fileName"], dir=target_dir))
 
     seen = {top_item["id"]}
     top_path = _download_item(top_item, target_dir, log)
@@ -636,11 +830,11 @@ def _run_download(top_item, target_dir, log):
     if top_path and os.path.exists(top_path):
         try:
             App.openDocument(top_path)
-            log(f"Otwarto: {top_path}")
+            log(t("log_opened", path=top_path))
         except Exception as e:
-            log(f"Nie udało się otworzyć {top_path} w FreeCAD: {e}")
+            log(t("log_open_failed", path=top_path, error=e))
     else:
-        log("Nie udało się ustalić pliku głównego do otwarcia.")
+        log(t("log_no_main_file"))
 
 
 def main():
@@ -659,7 +853,7 @@ def main():
     try:
         webbrowser.open(url)
     except Exception as e:
-        QtWidgets.QMessageBox.critical(None, "PDM", f"Nie udało się otworzyć przeglądarki: {e}")
+        QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
         return
 
     wait_dlg = WaitForTicketDialog(ticket)
@@ -672,11 +866,11 @@ def main():
         top_item = api_get(f"/items/{ticket_data['itemId']}")
     except Exception as e:
         QtWidgets.QMessageBox.critical(
-            None, "PDM", f"Nie udało się pobrać danych wybranego elementu: {e}"
+            None, t("pdm_title"), t("fetch_selected_item_failed", error=e)
         )
         return
     if top_item is None:
-        QtWidgets.QMessageBox.critical(None, "PDM", "Wybrany element już nie istnieje.")
+        QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("item_no_longer_exists"))
         return
 
     log_lines = []
@@ -694,15 +888,15 @@ def main():
         App.Console.PrintError(tb + "\n")
         QtWidgets.QMessageBox.critical(
             None,
-            "EasyPDM — błąd",
-            "Pobieranie przerwane nieoczekiwanym błędem:\n\n"
+            t("easypdm_error_title"),
+            t("download_interrupted")
             + tb
-            + "\n\nDotychczasowy log:\n"
+            + t("log_so_far")
             + "\n".join(log_lines[-15:]),
         )
         return
 
-    QtWidgets.QMessageBox.information(None, "EasyPDM", "\n".join(log_lines[-25:]))
+    QtWidgets.QMessageBox.information(None, t("easypdm_title"), "\n".join(log_lines[-25:]))
 
 
 if __name__ == "__main__":
