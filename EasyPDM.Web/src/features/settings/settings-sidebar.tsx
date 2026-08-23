@@ -33,35 +33,46 @@ function SettingsSidebar({
 }) {
   const { t } = useLanguage()
   const options = SETTINGS_OPTIONS.filter((opt) => !opt.adminOnly || isAdmin)
+  // "Autor" ma być OSTATNIĄ pozycją na liście — "Moje projekty" (dynamiczna etykieta,
+  // spoza SETTINGS_OPTIONS bo to nazwa zalogowanego użytkownika, nie stały klucz
+  // tłumaczenia) wstawiamy tuż PRZED nim, zamiast zawsze na końcu.
+  const authorIndex = options.findIndex((opt) => opt.id === "author")
+  const entries = [
+    ...options.slice(0, authorIndex).map((opt) => ({ id: opt.id, label: t(opt.labelKey) })),
+    { id: "myProjects", label: myLabel },
+    ...options.slice(authorIndex).map((opt) => ({ id: opt.id, label: t(opt.labelKey) })),
+  ]
 
   return (
     <div className="flex w-44 shrink-0 flex-col gap-0.5 border-r bg-card p-1.5">
       <div className="px-2 py-1.5 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">
         {t("nav.settings")}
       </div>
-      {options.map((opt) => (
+      {entries.map((entry) => (
         <button
-          key={opt.id}
+          key={entry.id}
           type="button"
-          onClick={() => onSelect(opt.id)}
+          onClick={() => onSelect(entry.id)}
           className={cn(
-            "rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground",
-            activeId === opt.id && "bg-accent text-foreground"
+            "truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground",
+            activeId === entry.id && "bg-accent text-foreground"
           )}
         >
-          {t(opt.labelKey)}
+          {entry.label}
         </button>
       ))}
 
+      {/* Odstęp mniej więcej wysokości jednej pozycji, żeby "Wesprzyj" wizualnie odróżniało
+          się od zwykłych sekcji ustawień powyżej. */}
       <button
         type="button"
-        onClick={() => onSelect("myProjects")}
+        onClick={() => onSelect("support")}
         className={cn(
-          "truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground",
-          activeId === "myProjects" && "bg-accent text-foreground"
+          "mt-7 truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground",
+          activeId === "support" && "bg-accent text-foreground"
         )}
       >
-        {myLabel}
+        {t("settings.support")}
       </button>
     </div>
   )
