@@ -1,416 +1,172 @@
-# EasyPDM — system PDM dla plików CAD
+# EasyPDM — PDM System for CAD Files
 
-## Status
+**English** | [Polski](README.pl.md) | [Deutsch](README.de.md)
 
-Ręczne tworzenie projektów i elementów przez aplikację webową (upload pliku wprost do
-magazynu API) albo przez makro FreeCAD (`EasyPDM.FreeCad/`) lub SolidWorks
-(`EasyPDM.SolidWorks/`), które wołają to samo API.
-Wcześniejsze podejście ze skanowaniem dysku (`EasyPDM.Core`, `EasyPDM.Indexer`) zostało
-usunięte z repo — było niezgodne ze schematem od migracji `002` i nigdy nieużywane przez
-`Api`.
+[![Buy me a coffee on buycoffee.to](https://img.shields.io/badge/☕_Buy_me_a_coffee-buycoffee.to-FFDD00?style=for-the-badge)](https://buycoffee.to/easypdm)
 
-Frontend to osobna aplikacja **React 19 + Vite + TypeScript** (`EasyPDM.Web/`) budowana
-wprost do `EasyPDM.Api/wwwroot/`. Interfejs jest w pełni przetłumaczony (polski/angielski/
-niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, PostgreSQL 18.
+EasyPDM is where your Parts and Assemblies get one, shared order for the whole team:
+every item has its own number, revision, status and change history, and assemblies get
+a ready-made bill of materials (BOM). No more `bracket_v3_FINAL_FOR_REAL.SLDPRT` on a
+shared drive and the question "which version is the current one?". Ready-made macros
+for FreeCAD and SolidWorks send and fetch files straight from within the CAD program —
+everything else (the browser app, material/manufacturer catalogs, BOM) works the same
+regardless of what you design in.
 
-## Co tu jest
+I'm a mechanical design engineer and I knew exactly what such a tool should look like
+and how it should work day to day — what I was missing when working with CAD files.
+I didn't write the code myself: the whole application was written for me by Claude (an
+AI model from Anthropic) based on my requirements and descriptions. I built EasyPDM for
+my own use, and since it already exists and works — why not share it with others.
 
-- **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`027` dla już istniejącej bazy: projekty, typy
-  elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
-  kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
-  usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
-  użytkownik, właściciel/blokada elementu, usunięcie martwego schematu rewizji/checkout,
-  historia (status/rewizje/załączniki/blokada), harmonogram automatycznej kopii zapasowej,
-  śledzenie zastosowanych migracji. Od migracji 027 pliki z tego folderu są wbudowane
-  w program (embedded resources) i stosowane **automatycznie przy każdym starcie** — zob.
-  `MigrationRunner.cs` i "Jak uruchomić" niżej — nie trzeba ich już odpalać ręcznie przez psql.
-- **`EasyPDM.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
-  po funkcjach w `Endpoints/` — pełna lista niżej w "Endpointy API". Serwuje też zbudowany
-  frontend ze swojego `wwwroot/`. Własny `FileLoggerProvider` (bez dodatkowego pakietu NuGet)
-  zapisuje logi programu do `logs/` (rotacja dzienna, 30 dni retencji), widoczne w
-  Ustawienia → Logi.
-- **`EasyPDM.Web/`** — frontend: React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui
-  (komponenty na bazie Base UI, styl „base-nova”), i18n (pl/en/de), motyw jasny/ciemny.
-- **`EasyPDM.Api.Tests/`** — testy integracyjne (xUnit + `WebApplicationFactory`),
-  uruchamiają CAŁĄ aplikację przeciwko prawdziwemu PostgreSQL (osobny schemat `pdm_test` w
-  tej samej bazie, zerowany przed każdą klasą testową). Lokalnie: `dotnet test
-  EasyPDM.Api.Tests` (connection string domyślnie wskazuje na lokalny `pdm`/`pdm_user` —
-  nadpisywalny zmienną `EASYPDM_TEST_CONNECTION_STRING`, tak jak w CI).
-- **`EasyPDM.FreeCad/`** — dwa makra: `EasyPDMUpload.FCMacro` (uruchamiane z poziomu
-  FreeCAD, zapisuje aktywny dokument, pyta o dane — projekt, typ, rodzaj,
-  materiał/producent/numery zamówieniowe... — tworzy Część/Złożenie w PDM, dogrywa plik jako
-  załącznik i zmienia nazwę lokalnego pliku na `numer (nazwa)`) i `EasyPDMDownload.FCMacro`
-  (odwrotny kierunek: wyszukuje Część/Złożenie w PDM, pobiera je razem z CAŁYM drzewem
-  składników Złożenia — żeby odnośniki `App::Link` się rozwiązały — i od razu otwiera
-  w FreeCAD; pomija już pobrane pliki, pyta przed nadpisaniem starszej rewizji nowszą).
-  **Drugie makro nieprzetestowane na żywym FreeCAD** (zob. sekcja "Status weryfikacji"
-  w `EasyPDM.FreeCad/README.md`). Szczegóły obu w `EasyPDM.FreeCad/README.md`.
-- **`EasyPDM.SolidWorks/`** — odpowiednik powyższego dla SolidWorks (makro VBA
-  `EasyPDMUpload.bas`), bez automatycznego wykrywania całego drzewa złożenia i z prostszymi
-  oknami (`InputBox`/`MsgBox`) niż w FreeCAD. **Niezweryfikowane** — napisane bez dostępu do
-  SolidWorks/VBA, zob. `EasyPDM.SolidWorks/README.md` po szczegóły i znane ryzyka.
-- **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,
-  **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i **`packaging/windows/`**
-  (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez ręcznego składania z osobna
-  backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
-- **`.github/workflows/`** — cztery workflowy CI, wszystkie uruchamialne też ręcznie
-  (`workflow_dispatch`) albo przez `gh workflow run <plik>`:
-  - `build.yml` — przy każdym pushu/PR: build backendu + testy integracyjne
-    (`EasyPDM.Api.Tests`, przeciwko usłudze `postgres` w CI) i typy/lint/build frontendu.
-  - `build-windows-installer.yml` — buduje `EasyPDMSetup.exe` (zob. wyżej) i dodatkowo
-    **realnie go instaluje** na windowsowym runnerze (PostgreSQL przez Chocolatey,
-    `/VERYSILENT`), sprawdzając dwukrotnie (świeża instalacja + symulacja aktualizacji), że
-    usługa startuje i serwer odpowiada — jedyny sposób, żeby to sprawdzić bez posiadania
-    fizycznego/wirtualnego Windows.
-  - `test-linux-installer.yml` — uruchamia `install-easypdm-linux.sh` naprawdę na czystym
-    Ubuntu (świeża instalacja, "aktualizacja", `uninstall-easypdm-linux.sh`), czego lokalne
-    środowisko deweloperskie (bez hasła do `sudo` w tej sesji) nie pozwalało zrobić.
-  - `publish-docker-image.yml` — buduje i publikuje obrazy `api` i `postgres` (ten drugi
-    z wbudowanym `db/schema.sql`) do GitHub Container Registry (`ghcr.io/pawelcel/easypdm-api`,
-    `ghcr.io/pawelcel/easypdm-postgres`) przy każdym pushu dotykającym kodu serwera —
-    umożliwia wdrożenie Dockerem bez klonowania repo, zob. "Docker" niżej.
+## What it gives you
 
-### Model danych — elementy i struktura
+- **One number, one history** — every Part and Assembly gets an automatically assigned
+  number that no one else will ever get again. You can see who changed what and when,
+  who currently has an item "on their bench", and which revision is current.
+- **Instant bill of materials** — an assembly shows the list of its own components with
+  quantities, material, manufacturer, order numbers — ready to export to CSV.
+- **Shared material and manufacturer catalogs** — pick from a list instead of typing it
+  in by hand every time, so names don't drift apart between projects.
+- **Search across the whole company database**, not just the current project — handy
+  when you want to check whether a similar part already exists somewhere.
+- **Item locking** — while you're working on something, no one else (not even an
+  administrator) can overwrite your changes without your consent.
 
-Cztery typy elementów (`item_type`): **Folder** (czysty kontener), **Część**/**Złożenie**
-(mają numer z globalnej sekwencji, status, rewizję i właściciela), **Inny plik** (dowolny
-plik bez struktury pod sobą). Struktura drzewa/BOM-u to osobna tabela `item_relations`
-(`parent_id`, `child_id`, `quantity`, `position`) — pozwala tej samej Części/Złożeniu być
-współdzielonym komponentem w wielu złożeniach/projektach jednocześnie.
+## First run
 
-Co wolno dodać pod czym (wymuszane i backendowo, i we froncie):
+EasyPDM is installed ONCE — on a single computer in the company (not necessarily some
+special "server", an ordinary computer that's simply left switched on works fine too).
+From then on, everyone connects to it with a regular web browser, just like any
+website — only at an address visible exclusively inside your company network, not on
+the public internet.
 
-| Rodzic | Dozwolone dzieci |
+**If EasyPDM is already running at your company** — ask whoever installed it for the
+address (it will look something like `http://192.168.1.20:5000`, or
+`http://localhost:5000` if EasyPDM is running on your own computer). Type it into your
+browser's address bar, just like any other website address, and log in.
+
+**If nobody has installed it yet and it's up to you** — the simplest way (Windows, no
+IT knowledge required): go to the
+[Releases page of this repository](https://github.com/pawelcel/EasyPDM/releases),
+download the latest `EasyPDMSetup.exe` file and run it — the installation wizard will
+walk you through the rest step by step and leave a shortcut to EasyPDM on your desktop
+(the only thing it might ask about: whether you already have PostgreSQL installed, the
+program that stores the data — if not, it will point you to where to download it before
+it can continue). Other installation methods (Docker, Linux as a service) require
+server-administrator knowledge — described in [`TECHNICAL.md`](TECHNICAL.md).
+
+First login on a freshly installed EasyPDM: username `admin`, password `admin` — change
+this password right after logging in (Settings → Users → find the `admin` account in
+the list → change password).
+
+After logging in: pick a project (or create a new one, if you have permission) — that's
+the container for your files and assembly structure — and install the macro for your
+CAD program, see below.
+
+## Working from FreeCAD / SolidWorks
+
+The macros add two simple operations inside the CAD program: **Upload** (send the active
+document to the PDM) and **Download** (fetch a Part/Assembly from the PDM, together with
+the whole assembly, and open it in the program).
+
+Installation and details:
+- FreeCAD: [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
+- SolidWorks: [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
+
+**Upload** — you have a saved file open, you click Upload. Your browser opens
+(automatically logged in) and asks: new item, duplicate of an existing one (copies its
+properties, no files), or attach a new version to an already-existing item. You choose,
+confirm in the browser — the macro detects completion on its own and finishes the
+upload (renames the local file to the PDM number, attaches the file, exports a STEP
+preview). For a whole assembly with new, not-yet-uploaded components: the macro detects
+them on its own and asks for each one's data individually before sending the main file.
+
+**Download** — you click Download, and in the browser you point to the Part/Assembly to
+fetch. For an assembly, the ENTIRE component tree is fetched right away, and the main
+file opens automatically in the CAD program.
+
+## Working in the browser
+
+### Projects and structure
+
+Every project has a tree: Folders (plain containers for organizing), Parts and
+Assemblies (have a number/status/revision), and Other files (any document with no
+structure of its own underneath). An Assembly can contain Parts and other Assemblies
+(BOM) — the same component can be used in several assemblies and projects at once, so a
+change in one place is visible everywhere that component is used.
+
+An item can be **detached from the structure** (stays in the database, only disappears
+from that spot in the tree) or **deleted completely** (administrator only) — complete
+deletion is safe for shared components: an item with a parent outside the deleted
+subtree will not disappear along with it. A Part/Assembly can also be **duplicated** — the
+copy gets its own number and lands right next to the original, with its properties
+copied over.
+
+### Parts and Assemblies — kinds and properties
+
+A Part has one of four **kinds**, each with a different set of fields:
+
+| Kind | Additional fields |
 |---|---|
-| Projekt / Folder | wszystko (Folder, Część, Złożenie, Plik) |
-| Złożenie | tylko Część i Złożenie (BOM) |
-| Część / Plik | nic — to liście struktury |
+| Manufactured | Material, Price |
+| Purchased | Manufacturer, Order number 1/2, Mass, Price |
+| Standard | Material, Norm |
+| Client-supplied | (no additional fields) |
 
-Usuwanie elementu ma dwa tryby: **„Usuń ze struktury”** (odpina relację / chowa korzeń,
-rekord zostaje) i **„Usuń całkowicie”** (rekurencyjne, ale bezpieczne dla współdzielonych
-komponentów — element z rodzicem poza usuwanym poddrzewem nie znika; tylko administrator).
-Część/Złożenie da się też **zduplikować** (kopia dostaje nowy numer, świeży status i
-właściciela) — z poziomu drzewka kopia ląduje zaraz pod oryginałem.
+An Assembly has no kind — only an optional Mass.
 
-Część ma cztery **rodzaje** (`properties.rodzaj`), każdy z innym zestawem pól i inną ikoną
-w drzewku: **Wykonywana** (Materiał, Cena, Dodatkowe informacje), **Zakupowa** (Producent,
-Numer zamówieniowy 1/2, Masa, Cena, Dodatkowe informacje), **Normalia** (Materiał, Norma,
-Dodatkowe informacje), **Klienta** (bez dodatkowych pól poza Dodatkowymi informacjami).
+### Status and revisions
 
-Część/Złożenie mają maszynę stanów: `w_pracy → sprawdzany → (w_pracy | wydany) → w_pracy`
-(powrót z `wydany` podnosi numer rewizji, z opcjonalnym komentarzem do rewizji). Poza
-statusem `w_pracy` edycja nazwy/właściwości jest zablokowana — wyjątek: cena/waluta/typ
-ceny zawsze edytowalne. Na dole panelu właściwości Części/Złożenia pokazuje się
-**Historia**: kiedy i kto utworzył element, każda zmiana statusu (kiedy/kto/z-na), każda
-rewizja z komentarzem (kiedy/kto/opis), każde dodanie/usunięcie załącznika
-(kiedy/kto/nazwa pliku) i każde zablokowanie/zwolnienie właściciela (kiedy/kto), połączone
-w jedną chronologiczną listę.
+Parts/Assemblies move through three statuses: **in progress → under review → released**.
+In status "in progress" everything can be edited; outside of it, the name and
+properties are locked (price is always editable). Going back from "released" to "in
+progress" bumps the revision by one letter (A → B → C...) and lets you add a comment on
+what changed. At the bottom of an item's panel you can see the full **history**: who
+created it, every status change, every revision with its comment, every
+added/removed attachment, every lock/release.
 
-**Właściciel i blokada** (`owner_id`/`owner_locked`) — niezależne od statusu. Twórca
-Części/Złożenia staje się od razu jej właścicielem i element jest zablokowany: dopóki trwa
-blokada, tylko właściciel może go edytować (właściwości, nazwa, status, widoczność,
-przeniesienie do innego projektu, załączniki, struktura BOM pod nim) — **nawet
-administrator jej nie omija**. Każdy może zablokować zwolniony element, stając się jego
-nowym właścicielem; zwolnienie może wykonać tylko aktualny właściciel. Element w statusie
-`wydany` zawsze jest zwolniony i bez właściciela — nie da się go zablokować. W drzewku
-pokazuje to ikona kłódki: zielona (zablokowane przez Ciebie), żółta (przez kogoś innego),
-otwarta (zwolnione).
+### Who's editing — item locking
 
-BOM złożenia pokazuje: L.p. (edytowalne wpisaniem liczby całkowitej — musi być unikalna
-w tym BOM-ie — albo przeciągnięciem wiersza), Nazwa, Ilość, Materiał, Producent, Numer
-zamówieniowy 1/2 (brakujące pola jako „-”), razem z zagłębionymi elementami (części
-zagnieżdżonych złożeń, L.p. w formie `2.1`). Eksport do CSV w dwóch wariantach: pełny
-(każde wystąpienie osobno) i zsumowany (ten sam komponent użyty kilka razy w różnych
-miejscach — jeden wiersz z łączną, rozwiniętą przez cały łańcuch ilością).
+The creator of a Part/Assembly immediately becomes its owner, and the item is locked —
+while the lock lasts, only the owner can edit it (not even an administrator bypasses
+this). In the tree this is shown by the color of the lock icon: green — locked by you,
+yellow — by someone else, open — released (anyone can lock it). A released item is
+always released (unlocked).
 
-Załączniki (`item_attachments`) to osobny mechanizm od struktury — dowolny plik (np. CAD)
-można dopiąć do Części/Złożenia/Pliku z panelu właściwości; nie da się ich dodać ani usunąć
-przez drzewko po lewej. Z poziomu Projektu/Złożenia/Części da się pobrać **dokumentację** —
-ZIP zebrany ze wszystkich załączników w danym zakresie (cały projekt albo dane
-Złożenie/Część razem z poddrzewem), z wyborem, które rozszerzenia plików uwzględnić.
+### Bill of materials (BOM)
 
-### Logowanie, role i dostęp do projektów
+An Assembly shows the list of its components: position, name, quantity, material,
+manufacturer, order numbers — together with the components of nested assemblies. The
+position order can be changed by dragging or by typing a number directly. CSV export
+comes in two variants: full (every occurrence listed separately) or aggregated (the same
+component used several times — one row with the combined quantity).
 
-Każde żądanie do `/api/*` (poza `/api/auth/login`) wymaga zalogowania — sesja to losowy
-token w ciasteczku httpOnly (`pdm_session`, 30 dni ważności), zapisany w tabeli `sessions`.
-Hasła trzymane jako PBKDF2 (własna implementacja w `PasswordHasher.cs`, tylko
-`System.Security.Cryptography` — bez dodatkowych pakietów NuGet).
+### Materials and Manufacturers
 
-Dwie role (`users.role`): **administrator** (pełny dostęp, widzi wszystkie projekty) i
-**użytkownik** (dostęp tylko do przypisanych mu projektów — `project_users`, zarządzane w
-Ustawienia → Użytkownicy; nieprzypisany projekt jest dla niego niewidoczny na liście i bez
-struktury). Zwykły użytkownik może odpinać elementy ze struktury, ale nie usuwać ich
-całkowicie z bazy ani zarządzać kontami. System pilnuje, żeby zawsze zostawał co najmniej
-jeden administrator (nie da się usunąć ani zdegradować ostatniego). Ustawienia Języka i
-Wyglądu są dostępne dla każdego; Użytkownicy, Magazyn plików i Logi tylko dla administratora.
+Separate, company-wide catalogs (the **Materials list** and **Manufacturers** tabs in
+the main menu) — a material has a name and group/subgroup, a manufacturer has a name and
+contact people. You pick them from a list when filling in a Part's properties, instead
+of typing them in by hand.
 
-Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
-**`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
-po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
+### Search and the whole database
 
-### Endpointy API
+The **Whole database** tab searches all items regardless of project — by name, number,
+tags, kind. Found filters can be saved for reuse.
 
-| Metoda | Ścieżka | Co robi |
-|---|---|---|
-| POST | `/api/auth/login` \| `/logout` | logowanie / wylogowanie — login to jedyny endpoint bez wymaganej sesji |
-| GET/PATCH | `/api/auth/me` \| `/password` | dane zalogowanego użytkownika / zmiana WŁASNEGO hasła |
-| GET/POST/PATCH/DELETE | `/api/users[/{id}]` | zarządzanie kontami — **tylko administrator** |
-| GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | lista/tworzenie/edycja/usunięcie projektu (zapis — tylko administrator; lista filtrowana wg dostępu) |
-| GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | zarządzanie przypisaniami użytkowników do projektów — **tylko administrator** |
-| GET | `/api/items?search=&tag=&projectId=` | lista elementów z filtrami (filtrowana wg dostępu do projektu) |
-| GET | `/api/items/{id}` | szczegóły elementu |
-| POST | `/api/projects/{projectId}/nodes` | tworzy Folder/Część/Złożenie/Plik bez uploadu |
-| POST | `/api/projects/{projectId}/items` | **multipart/form-data**: upload pliku (opcjonalnie `parentId`) |
-| GET | `/api/items/{id}/file` | pobranie wgranego pliku |
-| POST | `/api/items/{id}/duplicate` | duplikuje Część/Złożenie (nowy numer, status, właściciel) |
-| PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | zmiana nazwy / widoczności w drzewku / statusu / przeniesienie do innego projektu |
-| POST | `/api/items/{id}/lock` \| `/release` | zablokowanie (przejęcie na własność) / zwolnienie elementu |
-| DELETE | `/api/items/{id}` | usunięcie całkowite (rekurencyjne, bezpieczne dla współdzielonych elementów) — **tylko administrator** |
-| GET | `/api/projects/{projectId}/relations` | relacje rodzic-dziecko (struktura/BOM) danego projektu |
-| POST/DELETE | `/api/items/{parentId}/children[/{childId}]` | dodanie/odpięcie podelementu |
-| PATCH | `/api/items/{parentId}/children/{childId}/position` \| `/reorder` | zmiana L.p. w BOM-ie (pojedyncza pozycja albo cała nowa kolejność) |
-| PATCH | `/api/projects/{projectId}/roots/reorder` | zmiana kolejności korzeni drzewka projektu |
-| GET | `/api/items/{id}/bom` \| `/bom/csv` \| `/bom/aggregated-csv` | zagłębiony BOM (JSON) / eksport CSV (pełny / zsumowany) |
-| GET | `/api/items/{id}/documentation/extensions`, `/documentation` | rozszerzenia plików dostępne do pobrania / ZIP z załącznikami (element + poddrzewo) |
-| GET | `/api/projects/{projectId}/documentation/extensions`, `/documentation` | to samo, dla całego projektu |
-| GET | `/api/tags` | lista tagów |
-| POST/DELETE | `/api/items/{id}/tags[/{tagName}]` | zarządzanie tagami |
-| PATCH/DELETE | `/api/items/{id}/properties[/{key}]` | zarządzanie właściwościami (zablokowane poza statusem `w_pracy` i poza blokadą właściciela — wyjątek: pola ceny) |
-| GET | `/api/items/{id}/revisions` | historia komentarzy rewizji (tylko rewizje z komentarzem) |
-| GET | `/api/items/{id}/history` | pełna historia: utworzenie, zmiany statusu, rewizje, dodanie/usunięcie załącznika, blokada/zwolnienie właściciela (kiedy/kto/opis), chronologicznie |
-| GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | katalog materiałów (nazwa + grupa/podgrupa) |
-| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]` | katalog producentów + osoby kontaktowe |
-| GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | załączniki (upload/rejestracja istniejącego pliku/lista/pobranie/usunięcie) |
-| GET/POST/DELETE | `/api/saved-filters[/{id}]` | zapisane zestawy filtrów widoku „Cała baza” (prywatne per użytkownik) |
-| GET | `/api/config` | lokalizacja magazynu plików (do użytku np. przez makro FreeCAD) |
-| GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | lokalizacja/statystyki magazynu, przeniesienie, backup (pg_dump + pliki w ZIP), przywrócenie z backupu — **tylko administrator** |
-| GET/PATCH | `/api/settings/backup-schedule` | harmonogram automatycznej kopii zapasowej (włącz/wyłącz, częstotliwość, dzień, godzina, liczba przechowywanych kopii) — **tylko administrator** |
-| GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | lista dni z zapisanym logiem, ostatnie N wierszy z danego dnia, pobranie pełnego pliku — **tylko administrator** |
+### Downloadable documentation
 
-## Jak uruchomić
+From a Project, Assembly or Part you can download the complete set of attached files as
+a ZIP (choosing which file extensions to include) — handy for e.g. sending a complete
+set of drawings to a client.
 
-Backend czyta prawdziwe dane dostępowe (hasło do bazy, ścieżka magazynu) z
-`EasyPDM.Api/appsettings.Local.json` — **plik NIE jest w repozytorium** (gitignored, bo
-zawiera hasło), więc na nowym klonie trzeba go założyć z wzoru:
+## Accounts and access
 
-```bash
-cp EasyPDM.Api/appsettings.Local.json.example EasyPDM.Api/appsettings.Local.json
-# ...i wpisać tam prawdziwe ConnectionString/StorageRoot dla tej maszyny.
-```
+Two roles: **administrator** (full access, sees all projects, manages accounts and
+server settings) and **user** (sees and works only in the projects they've been assigned
+to). Everyone manages their own interface language (Polish/English/German) and
+light/dark theme in Settings.
 
-Program **sam stosuje nowe migracje bazy przy każdym starcie** (wbudowane w plik
-wykonywalny jako embedded resources, śledzone w tabeli `schema_migrations` — zob.
-`MigrationRunner.cs`) — więc na już istniejącej, znanej bazie wystarczy zwyczajnie ją
-uruchomić, bez ręcznego dogania `db/migrations/`. Jedyny przypadek, kiedy trzeba coś zrobić
-ręcznie, to zupełnie **świeży, pusty** PostgreSQL — wtedy najpierw:
+## For administrators and developers
 
-```bash
-# Jeśli nie istnieje jeszcze rola/baza (świeży PostgreSQL):
-sudo -u postgres psql -c "CREATE ROLE pdm_user LOGIN PASSWORD 'twoje-haslo';"
-sudo -u postgres createdb -O pdm_user pdm
-
-# ...i podstawowy schemat (od tego miejsca program dogania resztę sam):
-psql -h localhost -U pdm_user -d pdm -f db/schema.sql
-
-# Backend (serwuje też zbudowany frontend z wwwroot/)
-cd EasyPDM.Api
-dotnet restore && dotnet build && dotnet run
-```
-
-Frontend — do pracy nad UI z podglądem na żywo (proxy `/api` → `http://localhost:5000`):
-
-```bash
-cd EasyPDM.Web
-npm install
-npm run dev      # http://localhost:5173
-```
-
-Do wdrożenia: `npm run build` w `EasyPDM.Web/` nadpisuje `EasyPDM.Api/wwwroot/` —
-`dotnet run` serwuje wynik pod `http://localhost:5000` bez dodatkowej konfiguracji.
-
-### Docker (zalecane do wdrożenia serwerowego)
-
-**Najprościej**: `./install-easypdm-docker.sh` — zakłada `.env` (generuje losowe hasło do
-bazy, jeśli nie podasz własnego), sam wybiera WOLNY port hosta (próbuje od 5000 wzwyż —
-przydatne na serwerze, gdzie inne usługi mogą już coś tam trzymać, co w praktyce jest częstym
-przypadkiem), buduje i uruchamia kontenery. Uruchom ten sam skrypt ponownie po `git pull`,
-żeby zaktualizować — wykrywa istniejący `.env` i niczego w nim nie nadpisuje.
-
-Albo ręcznie:
-
-```bash
-cp .env.example .env      # ustaw prawdziwe PDM_DB_PASSWORD
-docker compose up -d --build
-```
-
-Uruchamia dwa kontenery: `postgres` (obraz `postgres:18`, dane na wolumenie `pgdata`, schemat
-z `db/schema.sql` zakładany automatycznie przy pustym wolumenie) i `api` (budowany z
-`Dockerfile` w korzeniu repo — buduje frontend, publikuje backend, doinstalowuje
-`postgresql-client-18` dla funkcji backup/restore w Ustawieniach). Magazyn plików,
-automatyczne kopie zapasowe i logi trzymane są na wolumenie `pdm-data` (`/data` w
-kontenerze) — przetrwają przebudowanie obrazu przy aktualizacji. Po starcie:
-`http://localhost:5000`. Jeśli port 5000 jest już zajęty na tej maszynie, ustaw
-`PDM_HOST_PORT=inny_port` w `.env` (NIE przez `docker-compose.override.yml` — Compose
-DOKLEJA listy jak `ports` między plikami zamiast je zastępować, więc override z innym
-portem i tak próbowałby zbindować oba naraz i padłby na tym zajętym).
-
-**Aktualizacja**: `git pull && docker compose up -d --build` — nowy obraz `api` dostaje nowy
-kod, kontener się odtwarza, a program **sam stosuje nowe migracje bazy przy starcie**
-(wbudowane w plik wykonywalny, śledzone w tabeli `schema_migrations` — zob.
-`MigrationRunner.cs`) — nic więcej nie trzeba robić ręcznie. `docker-entrypoint-initdb.d`
-z `schema.sql` odpala się TYLKO przy pierwszym, zupełnie pustym starcie wolumenu `pgdata`
-(świeża instalacja); przy aktualizacji nie jest w ogóle dotykany, bo wolumen już istnieje.
-
-#### Wdrożenie BEZ klonowania repo (tylko gotowy obraz)
-
-`.github/workflows/publish-docker-image.yml` publikuje dwa gotowe obrazy do GitHub
-Container Registry — `ghcr.io/pawelcel/easypdm-api` i `ghcr.io/pawelcel/easypdm-postgres`
-(ten drugi to zwykły `postgres:18` z wbudowanym `db/schema.sql` — bez tego świeża baza
-zostałaby pusta, bo `MigrationRunner.cs` świadomie nie tworzy sam podstawowego schematu) —
-przy każdym pushu na main dotykającym kodu serwera. Więc do samego wdrożenia NIE trzeba
-klonować całego repo (ze wszystkimi makrami CAD/instalatorami/testami, których serwer
-w ogóle nie potrzebuje). Wystarczą dwa pliki:
-
-```bash
-mkdir easypdm-deploy && cd easypdm-deploy
-curl -O https://raw.githubusercontent.com/pawelcel/EasyPDM/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/pawelcel/EasyPDM/main/.env.example
-cp .env.example .env      # ustaw prawdziwe PDM_DB_PASSWORD
-docker compose pull
-docker compose up -d
-```
-
-> Dopóki repo (i pakiet w GHCR) jest prywatne, `curl` powyżej i `docker compose pull`
-> wymagają uwierzytelnienia — `curl` z nagłówkiem `Authorization: Bearer <token>`, a przed
-> `docker compose pull` dodatkowo `docker login ghcr.io -u <login> -p <token>` (token z
-> uprawnieniem `read:packages`). Po upublicznieniu repo/obrazu żadne logowanie nie będzie
-> już potrzebne.
->
-> **Jednorazowo, po pierwszej publikacji**: KAŻDY pakiet w GHCR domyślnie jest PRYWATNY
-> niezależnie od widoczności samego repo — trzeba je raz ręcznie przełączyć na publiczne,
-> OBA (GitHub → zakładka **Packages** przy repo → `easypdm-api` / `easypdm-postgres` →
-> **Package settings** → **Change visibility**), inaczej `docker compose pull` bez
-> wcześniejszego `docker login` dostanie 403/404 nawet na publicznym repo.
-
-**Aktualizacja** tą ścieżką: `docker compose pull && docker compose up -d` — bez `git pull`
-(nie ma czego pullować, nie masz tu repo), po prostu ściąga nowszy `latest`.
-
-### Linux — instalacja natywna jako usługa systemd (bez Dockera)
-
-```bash
-sudo ./install-easypdm-linux.sh
-```
-
-Jeden skrypt: instaluje PostgreSQL, jeśli go jeszcze nie ma (rozpoznaje `pacman`/`apt`/`dnf`
-— na Arch/CachyOS dodatkowo sam inicjalizuje klaster, bo tamtejszy pakiet, w odróżnieniu od
-Debiana/Fedory, nie robi tego automatycznie), zakłada rolę i bazę `pdm` (generuje losowe
-hasło, jeśli nie podasz własnego przez `PDM_DB_PASSWORD=... sudo -E ./install-easypdm-linux.sh`),
-buduje frontend i publikuje backend jako **self-contained pojedynczy plik wykonywalny**
-(`dotnet publish -r linux-x64 --self-contained -p:PublishSingleFile=true` — gotowa usługa
-NIE wymaga już zainstalowanego .NET-a, tylko sam czas budowy), zakłada dedykowane,
-nieuprzywilejowane konto systemowe `easypdm`, i instaluje usługę systemd
-(`easypdm.service`, autostart, `ProtectSystem=strict` + `ReadWritePaths` ograniczone do
-`/var/lib/easypdm` — usługa nie może pisać nigdzie indziej w systemie). Po instalacji:
-`http://localhost:5000`, status przez `systemctl status easypdm`, logi na żywo przez
-`journalctl -u easypdm -f` (niezależnie od własnego dziennika aplikacji w Ustawienia ->
-Logi). Odinstalowanie: `sudo ./uninstall-easypdm-linux.sh` (celowo NIE rusza samej bazy danych ani
-PostgreSQL — o tym decyduje się ręcznie, żeby nie skasować danych przez pomyłkę).
-
-**Aktualizacja**: `git pull`, potem `sudo ./install-easypdm-linux.sh` ponownie — wykrywa istniejącą
-bazę/konto (pomija ich zakładanie), przebudowuje i podmienia tylko aplikację, jawnie
-**restartuje usługę** (`systemctl restart`, nie tylko `enable --now`, które na już
-uruchomionej usłudze nic by nie zrobiło). Nowe migracje bazy program stosuje sam
-automatycznie przy starcie — nic dodatkowego nie trzeba robić ręcznie.
-
-> Skrypt buduje ze źródeł tego repozytorium (jak `run.sh`, tylko jako trwała usługa
-> zamiast procesu na pierwszym planie) — nie ma (jeszcze) osobnego, gotowego wydania
-> binarnego do pobrania. Sam self-contained publikowany plik wykonywalny był realnie
-> uruchomiony i sprawdzony (serwuje frontend, loguje), a treść jednostki systemd
-> zweryfikowana przez `systemd-analyze verify`; pełny przebieg skryptu (tworzenie
-> roli/bazy/konta systemowego przez `sudo`) nie był jeszcze wykonany end-to-end — przy
-> pierwszym uruchomieniu obserwuj wyjście i zgłoś, jeśli coś nie zagra.
-
-### Windows — instalator (`.exe`, Inno Setup)
-
-**Najprościej: `.github/workflows/build-windows-installer.yml`** buduje gotowy
-`EasyPDMSetup.exe` automatycznie na windowsowym runnerze GitHuba (ma Inno Setup Compiler
-fabrycznie) przy każdym pushu dotykającym backendu/frontendu/instalatora — nie trzeba mieć
-Windows ani Inno Setup lokalnie. Uruchom ręcznie przez `gh workflow run
-build-windows-installer.yml`, poczekaj (`gh run watch`), pobierz artefakt (`gh run download
-<id> -n EasyPDMSetup`).
-
-Alternatywnie, do zbudowania lokalnie na maszynie z Windows (.NET 10 SDK + Node.js +
-[Inno Setup Compiler](https://jrsoftware.org/isinfo.php)):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
-iscc packaging\windows\EasyPDM.iss
-```
-
-Powstaje `packaging\windows\Output\EasyPDMSetup.exe`. Instalator: sprawdza, czy
-PostgreSQL jest już zainstalowany (jeśli nie — kieruje na stronę pobierania i przerywa,
-świadomie NIE próbuje cicho doinstalować kilkusetmegabajtowego instalatora PostgreSQL w
-tle), pyta o hasło superużytkownika `postgres` (jednorazowo, do założenia własnej roli
-`pdm_user` i bazy `pdm` — samo hasło nigdzie nie jest zapisywane), zakłada schemat, zapisuje
-`appsettings.Production.json` z resztą ustawień (magazyn/kopie/logi w
-`%ProgramData%\EasyPDM`), rejestruje `EasyPDM.Api.exe` jako **usługę Windows**
-(autostart, działa w tle bez okna konsoli) i tworzy skrót otwierający
-`http://localhost:5000`. Odinstalowanie zatrzymuje i usuwa usługę (standardowy deinstalator
-Inno Setup) — tak samo jak na Linuksie, celowo nie rusza samej bazy danych.
-
-**Aktualizacja**: zbuduj nowy `EasyPDMSetup.exe` (jak wyżej) i uruchom go ponownie —
-`PrepareToInstall` w skrypcie `.iss` zatrzymuje usługę PRZED podmianą plików (inaczej
-Windows zablokowałby nadpisanie działającego `.exe`), instalator wykrywa istniejącą
-rolę/bazę (pomija zakładanie schematu) i istniejącą usługę (uruchamia ją z powrotem zamiast
-rejestrować od nowa). Nowe migracje bazy program stosuje sam automatycznie przy starcie.
-
-> Skrypt `.iss` faktycznie się kompiluje (zweryfikowane prawdziwym Inno Setup Compilerem w
-> CI, nie tylko przeglądem kodu) — po drodze złapane i poprawione 5 realnych błędów
-> specyficznych dla dialektu Pascal Script Inno Setup (m.in. brak lokalnych sekcji `const`
-> w funkcjach, `LoadStringFromFile` wymagające `AnsiString`, brak `Randomize`/`RandSeed`/
-> `GetTickCount` — nie ma żadnego udokumentowanego sposobu na ręczne zasianie wbudowanego
-> `Random`, więc korzysta z niego wprost). Sama instalacja end-to-end na żywej maszynie z
-> PostgreSQL nie była jeszcze ręcznie przetestowana — przy pierwszym uruchomieniu obserwuj
-> przebieg i zgłoś, co nie zagra.
-
-Pierwsze logowanie: **`admin` / `admin`** (konto zakładane automatycznie, jeśli tabela
-`users` jest pusta — zob. "Logowanie, role i dostęp do projektów" wyżej). Zmień hasło od
-razu po zalogowaniu.
-
-Workflow w przeglądarce: ekran logowania → strona startowa **„Witaj”** → **Projekty**
-(wybierz/utwórz projekt → buduj strukturę drzewa) albo **Cała baza** (przeszukaj wszystkie
-elementy niezależnie od projektu, z zapisywalnymi filtrami) albo **Materiały**/
-**Producenci** (katalogi) albo **Ustawienia** (Język i Wygląd dla każdego; Użytkownicy i
-Magazyn plików tylko dla administratora).
-
-## Znane ograniczenia
-
-1. **Brak walidacji rozmiaru/typu wgrywanego pliku i załącznika** — każdy plik przejdzie,
-   niezależnie od rozszerzenia czy wielkości.
-2. **Magazyn plików (`storage/`) to zwykły folder na dysku serwera.** Backup/restore z
-   poziomu Ustawień pakuje `pg_dump` bazy razem z magazynem plików w jeden ZIP; można go
-   pobrać ręcznie albo włączyć automatyczną kopię (Ustawienia -> Magazyn plików ->
-   Automatyczna kopia zapasowa) z wyborem częstotliwości (codziennie/co tydzień/co miesiąc)
-   oraz dnia i godziny — sprawdzane co minutę przez `ScheduledBackupService` w tle, zapisywane
-   do osobnego katalogu `backups/` (niezależnego od `storage/`, żeby kopia nie pakowała samej
-   siebie), z konfigurowalną liczbą przechowywanych ostatnich kopii (domyślnie 14 — starsze
-   są automatycznie kasowane). Wersjonowanie pliku przy zmianie
-   rewizji działa dziś tylko w przepływie makra FreeCAD (`storage/components/`, jeden plik na
-   rewizję, zob. `EasyPDM.FreeCad/README.md`) — zwykłe załączniki dodawane z aplikacji
-   webowej nie mają automatycznego powiązania z numerem rewizji.
-3. **Nie każda operacja zapisuje “kto to zrobił”** — utworzenie elementu (`created_by`),
-   zmiana statusu, komentarz do rewizji, dodanie/usunięcie załącznika i blokada/zwolnienie
-   właściciela już to robią (widać w „Historii"), ale np. zmiana właściwości/nazwy/tagów
-   nie zapisuje autora.
-4. **W Dockerze „Zmień lokalizację” magazynu plików (Ustawienia -> Magazyn plików) nie
-   przetrwa przebudowania obrazu** — ta operacja zapisuje nową ścieżkę do
-   `appsettings.json` wewnątrz kontenera `api` (poza wolumenem `pdm-data`), więc po
-   `docker compose up --build` wraca do wartości ze zmiennej środowiskowej `StorageRoot`
-   ustawionej w `Dockerfile`. Sama zmiana lokalizacji API działa poprawnie w trakcie życia
-   kontenera — problem dotyczy tylko trwałości tego ustawienia między przebudowaniami.
-
-## Następne kroki (proponowana kolejność)
-
-1. Walidacja uploadu (typ/rozmiar) dla elementów i załączników.
-2. Zapisywanie autora zmiany właściwości/nazwy/tagów (punkt 3 wyżej).
+Server installation (Docker / Linux / Windows), architecture, the full list of API
+endpoints, and known limitations — see [`TECHNICAL.md`](TECHNICAL.md).
