@@ -24,6 +24,7 @@ import { MyProjectsView } from "@/features/settings/my-projects-view"
 import { SettingsSidebar } from "@/features/settings/settings-sidebar"
 import { NamingSettingsView } from "@/features/settings/naming-settings-view"
 import { StorageSettingsView } from "@/features/settings/storage-settings-view"
+import { SupportSettingsView } from "@/features/settings/support-settings-view"
 import { TagFilterSelect } from "@/features/tags/tag-filter-select"
 import { useTags } from "@/features/tags/use-tags"
 import { ProjectTreeView } from "@/features/tree/project-tree-view"
@@ -253,6 +254,8 @@ function App() {
           {view === "settings" && settingsSection === "language" && <LanguageSettingsView />}
 
           {view === "settings" && settingsSection === "author" && <AuthorSettingsView />}
+
+          {view === "settings" && settingsSection === "support" && <SupportSettingsView />}
 
           {view === "settings" && settingsSection === "myProjects" && (
             <MyProjectsView displayName={user.displayName} projects={projects} />
