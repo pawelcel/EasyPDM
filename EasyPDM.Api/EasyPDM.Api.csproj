@@ -5,6 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>EasyPDM.Api</RootNamespace>
+    <!-- Ikona EasyPDM.Api.exe (skrót na pulpicie/w menu Start z instalatora, pasek zadań).
+         MSBuild osadza ją w pliku wykonywalnym tylko przy budowaniu na Windows (resource
+         compiler), więc na Linuksie/w Dockerze ten wpis jest nieszkodliwie ignorowany. -->
+    <ApplicationIcon>..\packaging\windows\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
