@@ -242,6 +242,7 @@ Private Function T_PL(ByVal key As String) As String
         Case "MustRunInsideSolidWorks": T_PL = "To makro musi byc uruchomione z poziomu SolidWorks."
         Case "NoActiveSavedDocument": T_PL = "Brak aktywnego, zapisanego dokumentu."
         Case "AlreadyLinkedConfirm": T_PL = "Ten dokument jest juz powiazany z elementem PDM. Podpiac biezaca wersje jako nowa rewizje/aktualizacje?"
+        Case "StaleLinkCleared": T_PL = "Element PDM, z ktorym ten dokument byl powiazany, juz nie istnieje (zostal usuniety) -- stary link zostal wyczyszczony, dokument zostanie potraktowany jako jeszcze niewyslany."
         Case "CancelledNothingSent": T_PL = "Anulowano -- nic nie zostalo wyslane."
         Case "FailedToAttachSubComponent": T_PL = "Nie udalo sie podpiac jednego z podkomponentow pod element glowny: "
         Case "UploadedSuccessPart1": T_PL = "Przeslano do EasyPDM: element nr "
@@ -308,6 +309,7 @@ Private Function T_EN(ByVal key As String) As String
         Case "MustRunInsideSolidWorks": T_EN = "This macro must be run from inside SolidWorks."
         Case "NoActiveSavedDocument": T_EN = "No active, saved document."
         Case "AlreadyLinkedConfirm": T_EN = "This document is already linked to a PDM item. Attach the current version as a new revision/update?"
+        Case "StaleLinkCleared": T_EN = "The PDM item this document was linked to no longer exists (it was deleted) -- the stale link has been cleared, this document will be treated as not yet sent."
         Case "CancelledNothingSent": T_EN = "Cancelled -- nothing was sent."
         Case "FailedToAttachSubComponent": T_EN = "Failed to attach one of the sub-components under the main element: "
         Case "UploadedSuccessPart1": T_EN = "Uploaded to EasyPDM: item #"
@@ -374,6 +376,7 @@ Private Function T_DE(ByVal key As String) As String
         Case "MustRunInsideSolidWorks": T_DE = "Dieses Makro muss innerhalb von SolidWorks ausgefuehrt werden."
         Case "NoActiveSavedDocument": T_DE = "Kein aktives, gespeichertes Dokument."
         Case "AlreadyLinkedConfirm": T_DE = "Dieses Dokument ist bereits mit einem PDM-Element verknuepft. Die aktuelle Version als neue Revision/Aktualisierung anhaengen?"
+        Case "StaleLinkCleared": T_DE = "Das PDM-Element, mit dem dieses Dokument verknuepft war, existiert nicht mehr (wurde geloescht) -- die veraltete Verknuepfung wurde entfernt, dieses Dokument wird als noch nicht gesendet behandelt."
         Case "CancelledNothingSent": T_DE = "Abgebrochen -- es wurde nichts gesendet."
         Case "FailedToAttachSubComponent": T_DE = "Eine der Unterkomponenten konnte nicht unter dem Hauptelement angehaengt werden: "
         Case "UploadedSuccessPart1": T_DE = "Zu EasyPDM hochgeladen: Element Nr. "
@@ -2063,6 +2066,13 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
 
         Dim existingItemId As String
         existingItemId = GetLinkedItemIdOn(childModel)
+        If existingItemId <> "" Then
+            If Not ItemStillExists(existingItemId) Then
+                LogLine "Component's linked PDM item " & existingItemId & " no longer exists (deleted?) -- clearing stale link: " & filePath
+                SetLinkedItemOn childModel, "", ""
+                existingItemId = ""
+            End If
+        End If
 
         If existingItemId <> "" Then
             pathToItemId.Add filePath, existingItemId
@@ -2232,6 +2242,34 @@ Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String)
     SetLinkedItemOn swApp.ActiveDoc, itemId, itemNumberText
 End Sub
 
+' Checks whether a linked PDM item still exists on the server -- recovers from a STALE
+' Custom Property link (e.g. the item was deleted in the web app after this document was
+' linked to it; deleting server-side does not touch the document's own Custom Property, so
+' the macro would otherwise keep "believing" the link is good and fail with a raw 404 the
+' moment it tries to use it, confirmed in practice). Only a genuine 404 counts as "gone" --
+' any other outcome (200, a different error, no connection) is treated as "still there", so
+' a transient network hiccup can never be misread as "deleted" and silently start a brand
+' new item instead of updating the real one.
+Function ItemStillExists(ByVal itemId As String) As Boolean
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open "GET", GetBaseUrl() & "/items/" & itemId, False
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+
+    On Error Resume Next
+    Err.Clear
+    http.send
+    If Err.Number <> 0 Then
+        ItemStillExists = True ' network error -- assume still there, don't guess
+        Exit Function
+    End If
+    On Error GoTo 0
+
+    ItemStillExists = (http.Status <> 404)
+End Function
+
 
 ' ============================================================================
 ' Entry point -- run via Tools -> Macro -> Run (or F5 in the VBA editor).
@@ -2299,6 +2337,15 @@ Sub main()
 
     Dim linkedItemId As String
     linkedItemId = GetLinkedItemId()
+
+    If linkedItemId <> "" Then
+        If Not ItemStillExists(linkedItemId) Then
+            LogLine "Linked PDM item " & linkedItemId & " no longer exists on the server (deleted?) -- clearing the stale local link, treating this document as not yet linked."
+            SetLinkedItem "", ""
+            MsgBox T("StaleLinkCleared"), vbInformation, T("AppTitle")
+            linkedItemId = ""
+        End If
+    End If
 
     Dim resultInfo As Object
 
