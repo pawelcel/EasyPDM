@@ -49,6 +49,14 @@ Option Explicit
 '     native prompt per component, and this file deliberately has no UserForm to build a
 '     richer one. Each new component gets linked via Custom Properties too, so re-running
 '     the macro on it later (alone or as part of another assembly) recognizes it as done.
+'   - Local "Save As" under the PDM name: every document actually uploaded (the top-level
+'     one AND every new assembly component) is also locally SAVED AS "number (name).
+'     REVISION.ext" in a target folder asked for ONCE at the very start of the run (see
+'     RenameAndUpload/GetDownloadFolder -- same shared folder as EasyPDMDownload.bas's
+'     download folder). Components are processed leaves-first (see "Assembly components"
+'     above), so by the time an assembly itself gets saved, its references to any
+'     just-processed component already point at the new path -- avoids the "Link broken"
+'     problem this exact ordering was designed to prevent in EasyPDMUpload.FCMacro.
 '
 ' Installation:
 '   SolidWorks -> Tools -> Macro -> New... (create any empty macro project),
@@ -210,6 +218,8 @@ Private Function T_PL(ByVal key As String) As String
         Case "PromptRevisionComment": T_PL = "Komentarz do nowej rewizji (opcjonalnie):"
         Case "NoProjectsAvailable": T_PL = "Brak dostepnych projektow w PDM."
         Case "TitleNewItemInPdm": T_PL = "Nowy element w PDM"
+        Case "PromptTargetFolder": T_PL = "Folder docelowy na lokalne kopie (nazwane pod numerem PDM):"
+        Case "TitleTargetFolder": T_PL = "Folder docelowy"
         Case "PromptPickProject": T_PL = "Wybierz projekt (numer):"
         Case "TitleNewComponent": T_PL = "Nowy komponent"
         Case "TypePromptText": T_PL = "Typ:" & vbCrLf & "1 - Czesc" & vbCrLf & "2 - Zlozenie"
@@ -274,6 +284,8 @@ Private Function T_EN(ByVal key As String) As String
         Case "PromptRevisionComment": T_EN = "New revision comment (optional):"
         Case "NoProjectsAvailable": T_EN = "No projects available in PDM."
         Case "TitleNewItemInPdm": T_EN = "New item in PDM"
+        Case "PromptTargetFolder": T_EN = "Target folder for local copies (named under the PDM number):"
+        Case "TitleTargetFolder": T_EN = "Target folder"
         Case "PromptPickProject": T_EN = "Pick a project (number):"
         Case "TitleNewComponent": T_EN = "New component"
         Case "TypePromptText": T_EN = "Type:" & vbCrLf & "1 - Part" & vbCrLf & "2 - Assembly"
@@ -338,6 +350,8 @@ Private Function T_DE(ByVal key As String) As String
         Case "PromptRevisionComment": T_DE = "Kommentar zur neuen Revision (optional):"
         Case "NoProjectsAvailable": T_DE = "Keine Projekte in PDM verfuegbar."
         Case "TitleNewItemInPdm": T_DE = "Neues Element in PDM"
+        Case "PromptTargetFolder": T_DE = "Zielordner fuer lokale Kopien (benannt nach der PDM-Nummer):"
+        Case "TitleTargetFolder": T_DE = "Zielordner"
         Case "PromptPickProject": T_DE = "Projekt auswaehlen (Nummer):"
         Case "TitleNewComponent": T_DE = "Neue Komponente"
         Case "TypePromptText": T_DE = "Typ:" & vbCrLf & "1 - Teil" & vbCrLf & "2 - Baugruppe"
@@ -430,6 +444,44 @@ End Function
 
 Sub SetSavedDisplayName(ByVal displayName As String)
     SaveSetting APP_SETTINGS_NAME, SETTINGS_SECTION, "DisplayName", displayName
+End Sub
+
+' Same registry key as the download folder in EasyPDMDownload.bas -- deliberately shared,
+' so uploaded (locally re-saved under the PDM name) and downloaded files land in the same
+' place by default.
+Function GetDownloadFolder() As String
+    GetDownloadFolder = GetSetting(APP_SETTINGS_NAME, SETTINGS_SECTION, "DownloadFolder", "")
+End Function
+
+Sub SetDownloadFolder(ByVal folder As String)
+    SaveSetting APP_SETTINGS_NAME, SETTINGS_SECTION, "DownloadFolder", folder
+End Sub
+
+' Recursively creates path and all missing parent directories -- identical to
+' EasyPDMDownload.bas's own copy (duplicated per this module's no-shared-import
+' convention, see file header).
+Sub EnsureDirectory(ByVal path As String)
+    If path = "" Then Exit Sub
+    If Dir(path, vbDirectory) <> "" Then Exit Sub
+
+    Dim parent As String
+    Dim sepPos As Long
+    Dim trimmed As String
+    trimmed = path
+    If Right(trimmed, 1) = "\" Then trimmed = Left(trimmed, Len(trimmed) - 1)
+    sepPos = InStrRev(trimmed, "\")
+    If sepPos > 0 Then
+        parent = Left(trimmed, sepPos - 1)
+        ' Stop recursing once we hit a drive root ("C:") or UNC root -- Dir()/MkDir cannot
+        ' go any higher than that anyway.
+        If Len(parent) > 2 And Right(parent, 1) <> ":" Then
+            EnsureDirectory parent
+        End If
+    End If
+
+    On Error Resume Next
+    MkDir trimmed
+    On Error GoTo 0
 End Sub
 
 
@@ -1412,11 +1464,16 @@ Function GetStorageRoot() As String
     GetStorageRoot = result
 End Function
 
-' Shared ending of both modes: COPIES the current document file into PDM under the name
-' "number (name).REVISION.extension" -- the same convention as itemDisplayLabel in the
-' frontend and _rename_and_upload in the FreeCAD macro. The LOCAL file is left untouched --
-' neither moved nor deleted.
-Function RenameAndUpload(ByVal filePath As String, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long) As Boolean
+' Shared ending of both modes: locally SAVES AS the current document under the name
+' "number (name).REVISION.extension" in targetFolder (same convention as itemDisplayLabel
+' in the frontend and _save_local_as_pdm_name/_rename_and_upload in the FreeCAD macro --
+' so that an assembly referencing this document, saved AFTER it in the same or a later
+' macro run, picks up the new file path automatically instead of reporting a broken link),
+' then uploads THAT (possibly just-renamed) file into PDM. Skips the Save As if the file is
+' ALREADY at the target path (re-uploading the same revision without a new one -- a no-op
+' Save As onto the document's own current path). The ORIGINAL file at its old path/name, if
+' different, is left on disk untouched -- neither moved nor deleted.
+Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long, ByVal targetFolder As String) As Boolean
     Dim ext As String
     Dim dotPos As Long
     dotPos = InStrRev(filePath, ".")
@@ -1424,6 +1481,32 @@ Function RenameAndUpload(ByVal filePath As String, ByVal itemId As String, ByVal
 
     Dim newFilename As String
     newFilename = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ext
+
+    ' UNVERIFIED against a live SolidWorks install for this SPECIFIC use (same-format
+    ' native Save As, as opposed to UploadStepAttachment's format-CONVERTING SaveAs) --
+    ' written from documented SolidWorks API behavior (IModelDocExtension.SaveAs to the
+    ' same file extension updates the open document's own identity/path, same as File ->
+    ' Save As). A failure here is logged but NOT fatal -- the upload below still proceeds
+    ' from the original path, matching the tolerant style already used for STEP export.
+    Dim newLocalPath As String
+    newLocalPath = targetFolder & "\" & newFilename
+    If LCase(newLocalPath) <> LCase(filePath) Then
+        Dim saveErrors As Long, saveWarnings As Long
+        Dim saveOk As Boolean
+        Dim saveAsErrNum As Long
+        On Error Resume Next
+        Err.Clear
+        saveOk = swModel.Extension.SaveAs(newLocalPath, 0, SW_SAVE_AS_SILENT, Nothing, saveErrors, saveWarnings)
+        saveAsErrNum = Err.Number
+        On Error GoTo 0
+        If saveOk And saveAsErrNum = 0 Then
+            LogLine "Saved local copy under PDM name: " & newLocalPath
+            filePath = newLocalPath
+        Else
+            LogLine "Local Save As to """ & newLocalPath & """ failed (errors=" & saveErrors & ", warnings=" & saveWarnings & ", err=" & saveAsErrNum & ") -- uploading from the original path instead."
+        End If
+    End If
+
     LogLine "RenameAndUpload: item #" & itemNumber & ", local file """ & filePath & """, new name """ & newFilename & """"
 
     Dim storageRoot As String
@@ -1574,7 +1657,7 @@ End Sub
 ' away at creation time -- used by ProcessAssemblyTree for auto-detected components; the
 ' top-level document (Sub main) never passes it, since its own parent relationships (if
 ' any) are attached separately AFTER it gets an item id (see main()'s "edgesForTop").
-Function PushNewItemToPdm(ByVal projectId As String, ByVal itemType As String, ByVal name As String, ByVal propertiesJson As String, ByVal filePath As String, Optional ByVal parentId As String = "") As Object
+Function PushNewItemToPdm(ByVal projectId As String, ByVal itemType As String, ByVal name As String, ByVal propertiesJson As String, ByVal filePath As String, ByVal swModel As Object, ByVal targetFolder As String, Optional ByVal parentId As String = "") As Object
     Dim bodyJson As String
     bodyJson = "{""name"":" & JsonStr(name) & ",""itemType"":" & JsonStr(itemType) & ",""properties"":" & propertiesJson
     If parentId <> "" Then bodyJson = bodyJson & ",""parentId"":" & JsonStr(parentId)
@@ -1588,7 +1671,7 @@ Function PushNewItemToPdm(ByVal projectId As String, ByVal itemType As String, B
     itemNumber = JsonGetLong(created, "itemNumber", 0)
     LogLine "Created new PDM item: #" & itemNumber & " (id " & itemId & "), project " & projectId & ", type " & itemType
 
-    RenameAndUpload filePath, itemId, itemNumber, name, 1
+    RenameAndUpload swModel, filePath, itemId, itemNumber, name, 1, targetFolder
 
     Dim result As Object
     Set result = CreateObject("Scripting.Dictionary")
@@ -1603,7 +1686,7 @@ End Function
 ' allow attaching files in that status), asks for consent to create a new revision plus an
 ' optional comment -- the exact same mechanism as in the web app (PATCH /items/{id}/status
 ' bumps the revision number). Returns Nothing if the user declined the new revision.
-Function PushToExistingItem(ByVal itemId As String, ByVal filePath As String) As Object
+Function PushToExistingItem(ByVal swModel As Object, ByVal itemId As String, ByVal filePath As String, ByVal targetFolder As String) As Object
     Dim item As Object
     Set item = ApiGet("/items/" & itemId)
 
@@ -1661,7 +1744,7 @@ Function PushToExistingItem(ByVal itemId As String, ByVal filePath As String) As
     Dim uploadErrNum As Long, uploadErrDesc As String
     On Error Resume Next
     Err.Clear
-    RenameAndUpload filePath, itemId, itemNumber, fileName, revision
+    RenameAndUpload swModel, filePath, itemId, itemNumber, fileName, revision, targetFolder
     uploadErrNum = Err.Number
     uploadErrDesc = Err.Description
     On Error GoTo 0
@@ -1917,7 +2000,7 @@ End Sub
 ' created before the cancellation -- like the rest of this macro, already-created PDM
 ' items are NOT rolled back). "edgesForTop" collects (childItemId, qty) pairs where the
 ' parent is topModel ITSELF, for the caller to attach once topModel has its own item id.
-Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Collection) As Boolean
+Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Collection, ByVal targetFolder As String) As Boolean
     ProcessAssemblyTree = False
     If topModel.GetType() <> SW_DOC_ASSEMBLY Then Exit Function
 
@@ -1984,7 +2067,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
 
             Dim created As Object
             On Error Resume Next
-            Set created = PushNewItemToPdm(outProjectId, outItemType, outName, outPropertiesJson, CStr(filePath))
+            Set created = PushNewItemToPdm(outProjectId, outItemType, outName, outPropertiesJson, CStr(filePath), childModel, targetFolder)
             Dim createErr As String
             createErr = Err.Description
             On Error GoTo 0
@@ -2160,14 +2243,33 @@ Sub main()
     End If
     LogLine "Active document: """ & filePath & """, detected type: " & itemTypeGuess
 
+    ' Target folder for local "Save As under the PDM name" copies -- asked ONCE, up front,
+    ' before Step 1, so it covers BOTH the auto-detected assembly components (leaves-first,
+    ' see ProcessAssemblyTree) AND the top-level document itself. Same registry key as
+    ' EasyPDMDownload.bas's download folder (see GetDownloadFolder) -- shared on
+    ' purpose, so uploaded and downloaded files land together by default, same as the
+    ' FreeCAD macros.
+    Dim targetFolder As String
+    targetFolder = Trim(InputBox(T("PromptTargetFolder"), T("TitleTargetFolder"), GetDownloadFolder()))
+    If targetFolder = "" Then
+        LogLine "Target folder prompt cancelled -- done."
+        Exit Sub
+    End If
+    If Right(targetFolder, 1) = "\" Then targetFolder = Left(targetFolder, Len(targetFolder) - 1)
+    EnsureDirectory targetFolder
+    SetDownloadFolder targetFolder
+
     On Error GoTo Failed
 
     ' Step 1: assembly component tree -- offer to auto-detect/send new components first
     ' (leaves-first), before deciding anything about the top-level document itself. See
-    ' file header / ProcessAssemblyTree for why this stays fully native (no browser).
+    ' file header / ProcessAssemblyTree for why this stays fully native (no browser). Each
+    ' new component gets its own local Save As (see RenameAndUpload) BEFORE this function
+    ' returns, so by the time the top-level document below is itself saved, any of its
+    ' references to a just-processed component already point at the new, PDM-named path.
     Dim edgesForTop As New Collection
     If itemTypeGuess = "assembly" Then
-        If ProcessAssemblyTree(swApp.ActiveDoc, edgesForTop) Then
+        If ProcessAssemblyTree(swApp.ActiveDoc, edgesForTop, targetFolder) Then
             LogLine "Cancelled during assembly tree processing -- done."
             Exit Sub
         End If
@@ -2188,7 +2290,7 @@ Sub main()
         Dim confirmUpdate As VbMsgBoxResult
         confirmUpdate = MsgBox(T("AlreadyLinkedConfirm"), vbYesNo + vbQuestion, T("AppTitle"))
         If confirmUpdate <> vbYes Then Exit Sub
-        Set resultInfo = PushToExistingItem(linkedItemId, filePath)
+        Set resultInfo = PushToExistingItem(swActiveModel, linkedItemId, filePath, targetFolder)
         If Not resultInfo Is Nothing Then UploadStepAttachment swActiveModel, linkedItemId
     Else
         ' Not yet linked -- "new item vs duplicate vs attach to existing" is decided in
@@ -2222,7 +2324,7 @@ Sub main()
         End If
 
         If isExisting Then
-            Set resultInfo = PushToExistingItem(ticketItemId, filePath)
+            Set resultInfo = PushToExistingItem(swActiveModel, ticketItemId, filePath, targetFolder)
             If resultInfo Is Nothing Then
                 MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
                 LogLine "=== Finished: existing item declined a new revision ==="
@@ -2239,7 +2341,7 @@ Sub main()
             Dim ticketName As String
             ticketName = JsonGetString(ticketData, "name", defaultName)
 
-            RenameAndUpload filePath, ticketItemId, ticketItemNumber, ticketName, 1
+            RenameAndUpload swActiveModel, filePath, ticketItemId, ticketItemNumber, ticketName, 1, targetFolder
             linkedItemId = ticketItemId
             Set resultInfo = CreateObject("Scripting.Dictionary")
             resultInfo.Add "itemId", ticketItemId
