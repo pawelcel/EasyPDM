@@ -1528,6 +1528,27 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
         End If
     End If
 
+    ' Embed the PDM link into the file itself BEFORE uploading -- setting the Custom
+    ' Property alone only changes the in-memory document; SolidWorks only writes it to disk
+    ' on the NEXT save, so without this extra save (even when no SaveAs happened above) the
+    ' copy of the file that lands on the server -- and therefore any later download of this
+    ' item via EasyPDMDownload.bas -- would never carry the link (confirmed in practice:
+    ' downloaded files were missing EasyPDM_ItemId/EasyPDM_ItemNumber entirely, because the
+    ' property used to be set only AFTER the upload already happened, from the caller's side
+    ' -- see main()/ProcessAssemblyTree, whose own SetLinkedItem/SetLinkedItemOn calls after
+    ' a successful upload are now a redundant final refresh, not the only place it happens).
+    ' A failure here is logged but NOT fatal, matching this function's existing tolerant
+    ' style -- the upload still proceeds even if the file ends up missing the embedded link.
+    SetLinkedItemOn swModel, itemId, CStr(itemNumber)
+    Dim linkSaveErrors As Long, linkSaveWarnings As Long
+    On Error Resume Next
+    Err.Clear
+    swModel.Save3 0, linkSaveErrors, linkSaveWarnings
+    If Err.Number <> 0 Then
+        LogLine "Warning: could not re-save after setting the PDM link Custom Property (" & Err.Description & ") -- the uploaded copy may be missing it."
+    End If
+    On Error GoTo 0
+
     LogLine "RenameAndUpload: item #" & itemNumber & ", local file """ & filePath & """, new name """ & newFilename & """"
 
     Dim storageRoot As String
@@ -2116,6 +2137,9 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             Dim newItemId As String
             newItemId = JsonGetString(created, "itemId", "")
             UploadStepAttachment childModel, newItemId
+            ' Redundant final refresh -- PushNewItemToPdm's own RenameAndUpload call already
+            ' set (and saved) this same Custom Property BEFORE uploading, so the file
+            ' actually sent to the server already carries it. Kept here as cheap insurance.
             SetLinkedItemOn childModel, newItemId, CStr(JsonGetLong(created, "itemNumber", 0))
             pathToItemId.Add filePath, newItemId
         Else
@@ -2475,6 +2499,10 @@ Sub main()
     End If
 
     If Not resultInfo Is Nothing Then
+        ' Redundant final refresh -- RenameAndUpload (called by whichever path produced
+        ' resultInfo above) already set and saved this same Custom Property BEFORE
+        ' uploading, so the file actually sent to the server already carries it. Kept here
+        ' as cheap insurance for the top-level document specifically.
         SetLinkedItem linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0))
         LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
                 ", revision " & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & " ==="
