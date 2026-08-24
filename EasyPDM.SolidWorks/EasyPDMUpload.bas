@@ -653,6 +653,13 @@ Private Function NewHttpRequest() As Object
     Set NewHttpRequest = CreateObject("MSXML2.XMLHTTP.6.0")
 End Function
 
+' Used ONLY by ApiUploadFile (binary/multipart body) -- see the comment there for why plain
+' MSXML2.XMLHTTP is not used for that one call. WinHttpRequest is a standard, universally
+' available Windows component (WinHTTP, present since Windows XP SP2/Server 2003).
+Private Function NewBinaryHttpRequest() As Object
+    Set NewBinaryHttpRequest = CreateObject("WinHttp.WinHttpRequest.5.1")
+End Function
+
 Private Function AuthCookieHeader() As String
     Dim token As String
     token = GetSessionToken()
@@ -830,35 +837,36 @@ Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional 
     CopyBytesInto body, offset, fileBytes
     CopyBytesInto body, offset, tailBytes
 
-    ' MSXML2.XMLHTTP.send() fails with "The parameter is incorrect" when given a raw Byte()
-    ' array directly (confirmed in practice) -- wrapping the bytes in a binary ADODB.Stream
-    ' and sending the Stream object instead is the standard, documented workaround for this
-    ' XMLHTTP limitation.
-    Dim bodyStream As Object
-    Set bodyStream = CreateObject("ADODB.Stream")
-    bodyStream.Type = 1 ' adTypeBinary
-    bodyStream.Open
-    If totalLen > 0 Then bodyStream.Write body
-    bodyStream.Position = 0
-
+    ' WinHttp.WinHttpRequest.5.1 (NOT MSXML2.XMLHTTP -- see NewHttpRequest/NewBinaryHttpRequest)
+    ' for this one call: MSXML2.XMLHTTP.send() rejects a raw Byte() array ("The parameter is
+    ' incorrect") and sending it wrapped in an ADODB.Stream instead -- the commonly documented
+    ' workaround for that -- was ITSELF unreliable in practice (a real upload failed with a
+    ' generic "NO CONNECTION"/WinINet-style error while plain JSON requests to the very same
+    ' server succeeded moments earlier, on a live SolidWorks 2026 install). WinHttpRequest
+    ' accepts a Byte() array directly via .Send and handles Content-Length for it reliably --
+    ' standard, well-documented approach for binary/multipart POST bodies from VBA.
     Dim http As Object
-    Set http = NewHttpRequest()
+    Set http = NewBinaryHttpRequest()
     http.Open "POST", GetBaseUrl() & path, False
-    http.setRequestHeader "Content-Type", "multipart/form-data; boundary=" & boundary
+    http.SetRequestHeader "Content-Type", "multipart/form-data; boundary=" & boundary
     Dim cookie As String
     cookie = AuthCookieHeader()
-    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+    If cookie <> "" Then http.SetRequestHeader "Cookie", cookie
 
     On Error GoTo NetErr
-    http.send bodyStream
+    If totalLen > 0 Then
+        http.Send body
+    Else
+        http.Send
+    End If
     On Error GoTo 0
 
     LogLine "POST (upload, " & totalLen & " B) " & path & " -> " & http.Status
-    RaiseForStatus http.Status, http.responseText
-    If Trim(http.responseText) = "" Then
+    RaiseForStatus http.Status, http.ResponseText
+    If Trim(http.ResponseText) = "" Then
         Set ApiUploadFile = Nothing
     Else
-        Set ApiUploadFile = JsonParse(http.responseText)
+        Set ApiUploadFile = JsonParse(http.ResponseText)
     End If
     Exit Function
 NetErr:
