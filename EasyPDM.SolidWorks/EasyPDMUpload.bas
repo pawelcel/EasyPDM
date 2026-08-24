@@ -49,6 +49,8 @@ Option Explicit
 '     native prompt per component, and this file deliberately has no UserForm to build a
 '     richer one. Each new component gets linked via Custom Properties too, so re-running
 '     the macro on it later (alone or as part of another assembly) recognizes it as done.
+'     Declining ("No") skips creating/uploading new components, but components ALREADY in
+'     PDM are still attached into the BOM structure -- "No" is not "send nothing at all".
 '   - Local "Save As" under the PDM name: every document actually uploaded (the top-level
 '     one AND every new assembly component) is also locally SAVED AS "number (name).
 '     REVISION.ext" in a target folder asked for ONCE at the very start of the run (see
@@ -231,7 +233,7 @@ Private Function T_PL(ByVal key As String) As String
         Case "AssemblyLinksPart1": T_PL = "To zlozenie odwoluje sie do "
         Case "AssemblyLinksPart2": T_PL = " innego(-ych) pliku(-ow) (czesci/podzespoly):"
         Case "AssemblyLinksPart3": T_PL = "Wyslac je automatycznie razem z tym dokumentem (najpierw liscie drzewa, ten dokument na koncu)?"
-        Case "AssemblyLinksPart4": T_PL = "'Nie' wysle TYLKO ten dokument, tak jak wczesniej -- bez komponentow."
+        Case "AssemblyLinksPart4": T_PL = "'Nie' nie wysle/nie utworzy ZADNYCH nowych komponentow -- ale komponenty JUZ istniejace w PDM i tak zostana podpiete do struktury tego zlozenia."
         Case "FailedToSendPrefix": T_PL = "Nie udalo sie wyslac "
         Case "CreatedButFailedAttachPart1": T_PL = "Utworzono "
         Case "CreatedButFailedAttachPart2": T_PL = ", ale nie udalo sie podpiac go pod "
@@ -297,7 +299,7 @@ Private Function T_EN(ByVal key As String) As String
         Case "AssemblyLinksPart1": T_EN = "This assembly links to "
         Case "AssemblyLinksPart2": T_EN = " other file(s) (parts/sub-assemblies):"
         Case "AssemblyLinksPart3": T_EN = "Send them automatically together with this document (leaves first, this document last)?"
-        Case "AssemblyLinksPart4": T_EN = "'No' sends ONLY this document, as before -- without components."
+        Case "AssemblyLinksPart4": T_EN = "'No' will not send/create any NEW components -- but components ALREADY in PDM will still be attached to this assembly's structure."
         Case "FailedToSendPrefix": T_EN = "Failed to send "
         Case "CreatedButFailedAttachPart1": T_EN = "Created "
         Case "CreatedButFailedAttachPart2": T_EN = ", but failed to attach it under "
@@ -363,7 +365,7 @@ Private Function T_DE(ByVal key As String) As String
         Case "AssemblyLinksPart1": T_DE = "Diese Baugruppe verweist auf "
         Case "AssemblyLinksPart2": T_DE = " weitere Datei(en) (Teile/Unterbaugruppen):"
         Case "AssemblyLinksPart3": T_DE = "Sollen sie automatisch zusammen mit diesem Dokument gesendet werden (zuerst die Blaetter, dieses Dokument zuletzt)?"
-        Case "AssemblyLinksPart4": T_DE = "'Nein' sendet NUR dieses Dokument, wie bisher -- ohne Komponenten."
+        Case "AssemblyLinksPart4": T_DE = "'Nein' sendet/erstellt KEINE neuen Komponenten -- aber bereits in PDM vorhandene Komponenten werden trotzdem in die Struktur dieser Baugruppe eingebunden."
         Case "FailedToSendPrefix": T_DE = "Senden fehlgeschlagen fuer "
         Case "CreatedButFailedAttachPart1": T_DE = "Erstellt "
         Case "CreatedButFailedAttachPart2": T_DE = ", aber die Zuordnung unter "
@@ -1820,12 +1822,13 @@ End Function
 ' EasyPDM.FreeCad/EasyPDMUpload.FCMacro's discover_component_tree/process_assembly_tree --
 ' except new components are collected through plain InputBoxes (see
 ' PromptNewComponentProperties), not a browser tab per component (see file header).
+' Confirmed working on a live SolidWorks 2026 install (late-bound GetComponents/
+' GetModelDoc2/Name2 all resolve fine without a type library reference, as expected).
 '
-' UNVERIFIED against a live SolidWorks install (no SolidWorks in this environment): calls
-' below assume that a late-bound ModelDoc2 Object for an Assembly document can be called
-' directly with IAssemblyDoc methods (GetComponents), and that IComponent2 exposes
-' GetModelDoc2/Name2 -- all documented, commonly used SolidWorks API members, but not
-' actually run here. Confirm on the first live test with a simple 2-3 component assembly.
+' Declining to send new components (MsgBox "No") does NOT skip the tree entirely -- see
+' "sendNewComponents" below: components ALREADY linked to PDM still get attached into the
+' BOM structure (no upload needed, nothing about them changed); only not-yet-linked ones
+' are skipped, and any relation involving one of those (as parent or child) is skipped too.
 ' ============================================================================
 
 ' Recursively visits DIRECT children of parentModel (if it is itself an Assembly), THEN
@@ -2026,7 +2029,14 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
         ProcessAssemblyTree = True
         Exit Function
     End If
-    If choice = vbNo Then Exit Function
+    ' "No" does NOT skip the whole tree -- it only skips CREATING/UPLOADING components not
+    ' yet in PDM. Components already linked still get attached into the BOM structure below
+    ' (no file upload needed for those, since nothing about them changed); a not-yet-linked
+    ' component with sendNewComponents=False is skipped entirely (never added to
+    ' pathToItemId below), so any relation involving it as parent or child is naturally
+    ' skipped too by the existing pathToItemId.Exists(...) guards further down.
+    Dim sendNewComponents As Boolean
+    sendNewComponents = (choice = vbYes)
 
     Dim models As Object
     Set models = tree("models")
@@ -2057,7 +2067,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
         If existingItemId <> "" Then
             pathToItemId.Add filePath, existingItemId
             LogLine "Component already linked to PDM item " & existingItemId & ": " & filePath
-        Else
+        ElseIf sendNewComponents Then
             Dim outProjectId As String, outItemType As String, outName As String, outPropertiesJson As String
             PromptNewComponentProperties CStr(filePath), childModel.GetTitle(), hasChildren.Exists(filePath), UsageHintFor(CStr(filePath), edges), outProjectId, outItemType, outName, outPropertiesJson
             If outProjectId = "" Then
@@ -2082,29 +2092,38 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             UploadStepAttachment childModel, newItemId
             SetLinkedItemOn childModel, newItemId, CStr(JsonGetLong(created, "itemNumber", 0))
             pathToItemId.Add filePath, newItemId
+        Else
+            ' Not yet linked and the user declined sending new components -- skip it
+            ' entirely (never added to pathToItemId), so it simply cannot take part in any
+            ' relation below, neither as parent nor as child.
+            LogLine "Component not yet linked, skipping (user declined sending new components): " & filePath
         End If
 
         ' Attach relations where THIS file is the parent, now that it has an item id --
         ' every child in "edges" at this point already has one too, since "order" is
         ' leaves-first (children were processed in earlier iterations of this same loop).
-        Dim edge2 As Variant
-        For Each edge2 In edges
-            If edge2("parent") = filePath Then
-                If pathToItemId.Exists(edge2("child")) Then
-                    Dim relErr As String
-                    relErr = ""
-                    On Error Resume Next
-                    Err.Clear
-                    ApiPostJson "/items/" & pathToItemId(filePath) & "/children", "{""childId"":" & JsonStr(pathToItemId(edge2("child"))) & ",""quantity"":" & edge2("qty") & "}"
-                    If Err.Number <> 0 Then relErr = Err.Description
-                    On Error GoTo 0
-                    If relErr <> "" Then
-                        MsgBox T("CreatedButFailedAttachPart1") & Mid(CStr(edge2("child")), InStrRev(CStr(edge2("child")), "\") + 1) & _
-                               T("CreatedButFailedAttachPart2") & Mid(filePath, InStrRev(filePath, "\") + 1) & T("CreatedButFailedAttachPart3") & relErr, vbExclamation, T("AppTitle")
+        ' Guarded by pathToItemId.Exists(filePath): a component skipped just above (declined
+        ' new component) never got an item id, so it cannot be a relation parent either.
+        If pathToItemId.Exists(filePath) Then
+            Dim edge2 As Variant
+            For Each edge2 In edges
+                If edge2("parent") = filePath Then
+                    If pathToItemId.Exists(edge2("child")) Then
+                        Dim relErr As String
+                        relErr = ""
+                        On Error Resume Next
+                        Err.Clear
+                        ApiPostJson "/items/" & pathToItemId(filePath) & "/children", "{""childId"":" & JsonStr(pathToItemId(edge2("child"))) & ",""quantity"":" & edge2("qty") & "}"
+                        If Err.Number <> 0 Then relErr = Err.Description
+                        On Error GoTo 0
+                        If relErr <> "" Then
+                            MsgBox T("CreatedButFailedAttachPart1") & Mid(CStr(edge2("child")), InStrRev(CStr(edge2("child")), "\") + 1) & _
+                                   T("CreatedButFailedAttachPart2") & Mid(filePath, InStrRev(filePath, "\") + 1) & T("CreatedButFailedAttachPart3") & relErr, vbExclamation, T("AppTitle")
+                        End If
                     End If
                 End If
-            End If
-        Next edge2
+            Next edge2
+        End If
     Next filePath
 
     ' Relations where topModel itself is the parent could not be attached above (topModel
