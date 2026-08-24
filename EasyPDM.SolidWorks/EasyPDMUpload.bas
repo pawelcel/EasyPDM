@@ -21,7 +21,17 @@ Option Explicit
 '     (EasyPDM_ItemId/EasyPDM_ItemNumber), written into the file itself after a successful
 '     upload. More durable than the FreeCAD approach (also works in a brand NEW session,
 '     no need to manually save after a label change) -- and reliable enough that THIS ONE
-'     decision point stays fully local/native, see "What it does" below.
+'     decision point stays fully local/native, see "What it does" below. CAVEAT (confirmed
+'     in practice, no code-level defense possible): SolidWorks's own native "Save As" (done
+'     manually by the user, outside this macro) COPIES Custom Properties along with
+'     everything else -- Save-As'ing an already-linked part to start a genuinely DIFFERENT
+'     part silently inherits the old EasyPDM_ItemId/EasyPDM_ItemNumber, so the macro would
+'     otherwise "recognize" the new part as the OLD item and overwrite its content on the
+'     next upload. The "already linked, attach as new revision?" confirmation (see "What it
+'     does" below) shows the linked item's own number/name specifically so the user has a
+'     chance to notice a mismatch before confirming -- if this ever happens, decline (No)
+'     and link the new part to the CORRECT item manually via the browser's "Attach to
+'     existing" instead of "already linked".
 '
 ' What it does (top-level document, Sub "main"):
 '   - Document ALREADY linked to a PDM item (Custom Property present): asks locally
@@ -242,6 +252,8 @@ Private Function T_PL(ByVal key As String) As String
         Case "MustRunInsideSolidWorks": T_PL = "To makro musi byc uruchomione z poziomu SolidWorks."
         Case "NoActiveSavedDocument": T_PL = "Brak aktywnego, zapisanego dokumentu."
         Case "AlreadyLinkedConfirm": T_PL = "Ten dokument jest juz powiazany z elementem PDM. Podpiac biezaca wersje jako nowa rewizje/aktualizacje?"
+        Case "AlreadyLinkedConfirmPrefix": T_PL = "Ten dokument jest juz powiazany z elementem PDM nr "
+        Case "AlreadyLinkedConfirmSuffix": T_PL = ". Jesli to NIE jest ta sama czesc (np. zrobiles 'Zapisz jako' z innej, juz podpietej czesci) -- kliknij Nie i podepnij ten plik recznie do wlasciwego elementu. Podpiac biezaca wersje jako nowa rewizje/aktualizacje TEGO elementu?"
         Case "StaleLinkCleared": T_PL = "Element PDM, z ktorym ten dokument byl powiazany, juz nie istnieje (zostal usuniety) -- stary link zostal wyczyszczony, dokument zostanie potraktowany jako jeszcze niewyslany."
         Case "CancelledNothingSent": T_PL = "Anulowano -- nic nie zostalo wyslane."
         Case "FailedToAttachSubComponent": T_PL = "Nie udalo sie podpiac jednego z podkomponentow pod element glowny: "
@@ -309,6 +321,8 @@ Private Function T_EN(ByVal key As String) As String
         Case "MustRunInsideSolidWorks": T_EN = "This macro must be run from inside SolidWorks."
         Case "NoActiveSavedDocument": T_EN = "No active, saved document."
         Case "AlreadyLinkedConfirm": T_EN = "This document is already linked to a PDM item. Attach the current version as a new revision/update?"
+        Case "AlreadyLinkedConfirmPrefix": T_EN = "This document is already linked to PDM item #"
+        Case "AlreadyLinkedConfirmSuffix": T_EN = ". If this is NOT the same part (e.g. you did a Save As from a different, already-linked part) -- click No and link this file manually to the correct item instead. Attach the current version as a new revision/update to THIS item?"
         Case "StaleLinkCleared": T_EN = "The PDM item this document was linked to no longer exists (it was deleted) -- the stale link has been cleared, this document will be treated as not yet sent."
         Case "CancelledNothingSent": T_EN = "Cancelled -- nothing was sent."
         Case "FailedToAttachSubComponent": T_EN = "Failed to attach one of the sub-components under the main element: "
@@ -376,6 +390,8 @@ Private Function T_DE(ByVal key As String) As String
         Case "MustRunInsideSolidWorks": T_DE = "Dieses Makro muss innerhalb von SolidWorks ausgefuehrt werden."
         Case "NoActiveSavedDocument": T_DE = "Kein aktives, gespeichertes Dokument."
         Case "AlreadyLinkedConfirm": T_DE = "Dieses Dokument ist bereits mit einem PDM-Element verknuepft. Die aktuelle Version als neue Revision/Aktualisierung anhaengen?"
+        Case "AlreadyLinkedConfirmPrefix": T_DE = "Dieses Dokument ist bereits mit PDM-Element Nr. "
+        Case "AlreadyLinkedConfirmSuffix": T_DE = " verknuepft. Falls dies NICHT dasselbe Teil ist (z. B. haben Sie ein 'Speichern unter' von einem anderen, bereits verknuepften Teil gemacht) -- klicken Sie Nein und verknuepfen Sie diese Datei stattdessen manuell mit dem richtigen Element. Die aktuelle Version als neue Revision/Aktualisierung DIESES Elements anhaengen?"
         Case "StaleLinkCleared": T_DE = "Das PDM-Element, mit dem dieses Dokument verknuepft war, existiert nicht mehr (wurde geloescht) -- die veraltete Verknuepfung wurde entfernt, dieses Dokument wird als noch nicht gesendet behandelt."
         Case "CancelledNothingSent": T_DE = "Abgebrochen -- es wurde nichts gesendet."
         Case "FailedToAttachSubComponent": T_DE = "Eine der Unterkomponenten konnte nicht unter dem Hauptelement angehaengt werden: "
@@ -2353,8 +2369,31 @@ Sub main()
         ' Already linked -- SolidWorks knows the target with certainty (Custom Property),
         ' no browser round-trip needed. STEP always exports here (no browser form to host
         ' a checkbox in for this path -- see UploadStepAttachment callers below).
+        '
+        ' Shows the LINKED ITEM'S OWN number/name in the confirmation, not just a generic
+        ' "already linked?" question -- SolidWorks's native "Save As" (done manually by the
+        ' user, not through this macro) COPIES Custom Properties along with everything else:
+        ' Save-As'ing an already-linked part to start a genuinely DIFFERENT part would
+        ' silently inherit the old EasyPDM_ItemId, and without this the user would have no
+        ' way to notice before overwriting the WRONG item's content with the new part's
+        ' file. Falls back to the generic wording if this lookup itself fails (a transient
+        ' error) -- the item's own existence was already confirmed moments ago above via
+        ' ItemStillExists.
+        Dim linkedItemInfo As Object
+        On Error Resume Next
+        Set linkedItemInfo = ApiGet("/items/" & linkedItemId)
+        On Error GoTo 0
+
+        Dim confirmText As String
+        If Not linkedItemInfo Is Nothing Then
+            confirmText = T("AlreadyLinkedConfirmPrefix") & JsonGetLong(linkedItemInfo, "itemNumber", 0) & _
+                          " (" & JsonGetString(linkedItemInfo, "fileName", "") & ")" & T("AlreadyLinkedConfirmSuffix")
+        Else
+            confirmText = T("AlreadyLinkedConfirm")
+        End If
+
         Dim confirmUpdate As VbMsgBoxResult
-        confirmUpdate = MsgBox(T("AlreadyLinkedConfirm"), vbYesNo + vbQuestion, T("AppTitle"))
+        confirmUpdate = MsgBox(confirmText, vbYesNo + vbQuestion, T("AppTitle"))
         If confirmUpdate <> vbYes Then Exit Sub
         Set resultInfo = PushToExistingItem(swActiveModel, linkedItemId, filePath, targetFolder)
         If Not resultInfo Is Nothing Then UploadStepAttachment swActiveModel, linkedItemId
