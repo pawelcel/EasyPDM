@@ -77,6 +77,20 @@ Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_ItemNumber"
 Private Const ERR_AUTH As Long = vbObjectError + 1001
 Private Const ERR_API As Long = vbObjectError + 1002
 
+' SolidWorks application object -- CONTRARY to this module's earlier (wrong) assumption,
+' "swApp" is NOT automatically visible in EVERY VBA module of the project, only in the one
+' SolidWorks itself generates via "Tools -> Macro -> New" (that one gets its own "Dim
+' swApp"). This file is imported as a SEPARATE module, so it needs its own declaration --
+' and its own assignment at the start of main() via "Application.SldWorks" (the standard
+' way to obtain the application object from VBA hosted inside SolidWorks itself). Declared
+' here, grouped with the module's other Private/Const declarations, all BEFORE any
+' Sub/Function -- moved back here (from after the T/T_PL/T_EN/T_DE Function blocks) as the
+' suspected fix for "Variable not defined" seen on swApp on a live SolidWorks 2026 install;
+' not yet confirmed which exact factor was the real cause, but this restores the same
+' "declarations before any Sub/Function" layout the module had before the translation
+' functions were inserted in between.
+Private swApp As Object
+
 ' Values from SolidWorks enums (swDocumentTypes_e, swCustomInfoType_e,
 ' swCustomPropertyAddOption_e) -- declared here EXPLICITLY as numbers instead of relying on
 ' the bare constant names (swDocPART, swCustomInfoText, ...) resolving on their own through
@@ -361,15 +375,6 @@ Private Function T_DE(ByVal key As String) As String
         Case "ItemAlreadyChangedPart4": T_DE = "Das Element in PDM hat jetzt eine neue Revision, aber immer noch die Datei der vorherigen Version -- beheben Sie dies manuell in der Web-App (Datei erneut anhaengen) oder versuchen Sie es erneut ueber dieses Makro."
     End Select
 End Function
-
-
-' SolidWorks application object -- CONTRARY to this module's earlier (wrong) assumption,
-' "swApp" is NOT automatically visible in EVERY VBA module of the project, only in the one
-' SolidWorks itself generates via "Tools -> Macro -> New" (that one gets its own "Dim
-' swApp"). This file is imported as a SEPARATE module, so it needs its own declaration --
-' and its own assignment at the start of main() via "Application.SldWorks" (the standard
-' way to obtain the application object from VBA hosted inside SolidWorks itself).
-Private swApp As Object
 
 
 ' ============================================================================
