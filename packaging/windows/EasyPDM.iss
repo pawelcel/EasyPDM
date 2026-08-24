@@ -57,7 +57,7 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 WizardStyle=modern
-SetupIconFile=app.ico
+SetupIconFile=..\..\EasyPDM.Api\app.ico
 
 [Languages]
 ; Te same trzy języki co aplikacja webowa (pl/en/de) — Inno Setup POKAZUJE OKNO WYBORU
