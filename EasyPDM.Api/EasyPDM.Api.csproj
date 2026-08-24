@@ -6,9 +6,12 @@
     <Nullable>enable</Nullable>
     <RootNamespace>EasyPDM.Api</RootNamespace>
     <!-- Ikona EasyPDM.Api.exe (skrót na pulpicie/w menu Start z instalatora, pasek zadań).
-         MSBuild osadza ją w pliku wykonywalnym tylko przy budowaniu na Windows (resource
+         Musi leżeć WEWNĄTRZ EasyPDM.Api/ (nie np. w packaging/windows/) — Dockerfile
+         kopiuje do kontekstu budowy tylko EasyPDM.Api/ i db/, więc ścieżka wychodząca poza
+         ten katalog nie istniałaby wewnątrz kontenera i wywaliłaby "dotnet publish".
+         MSBuild osadza ikonę w pliku wykonywalnym tylko przy budowaniu na Windows (resource
          compiler), więc na Linuksie/w Dockerze ten wpis jest nieszkodliwie ignorowany. -->
-    <ApplicationIcon>..\packaging\windows\app.ico</ApplicationIcon>
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
