@@ -176,6 +176,7 @@ const pl = {
   "support.heading": "Postaw autorowi kawę",
   "support.description": "EasyPDM jest darmowy i open source, rozwijany w wolnym czasie. Jeśli Ci się przydał, możesz postawić autorowi kawę — to w pełni dobrowolne i w żaden sposób nie wpływa na działanie programu.",
   "support.buttonLabel": "Postaw kawę na buycoffee.to",
+  "support.buyMeACoffeeLabel": "Postaw kawę na Buy Me a Coffee",
 
   "appearance.title": "Wygląd",
   "appearance.description": "Wybierz jasny lub ciemny motyw interfejsu. Zmiana obowiązuje od razu i zapamiętywana jest w tej przeglądarce.",
@@ -628,6 +629,7 @@ const en: Record<TranslationKey, string> = {
   "support.heading": "Buy the author a coffee",
   "support.description": "EasyPDM is free and open source, maintained in spare time. If it's been useful to you, you can buy the author a coffee — completely optional and has no effect on how the program works.",
   "support.buttonLabel": "Buy a coffee on buycoffee.to",
+  "support.buyMeACoffeeLabel": "Buy me a coffee",
 
   "appearance.title": "Appearance",
   "appearance.description": "Choose a light or dark interface theme. The change applies immediately and is remembered in this browser.",
@@ -1078,6 +1080,7 @@ const de: Record<TranslationKey, string> = {
   "support.heading": "Spendieren Sie dem Autor einen Kaffee",
   "support.description": "EasyPDM ist kostenlos und quelloffen, in der Freizeit gepflegt. Wenn es Ihnen nützlich war, können Sie dem Autor einen Kaffee spendieren — völlig freiwillig und ohne Auswirkung auf die Funktionsweise des Programms.",
   "support.buttonLabel": "Kaffee spendieren auf buycoffee.to",
+  "support.buyMeACoffeeLabel": "Kaffee spendieren auf Buy Me a Coffee",
 
   "appearance.title": "Erscheinungsbild",
   "appearance.description": "Wählen Sie ein helles oder dunkles Design der Benutzeroberfläche. Die Änderung wird sofort wirksam und in diesem Browser gespeichert.",
