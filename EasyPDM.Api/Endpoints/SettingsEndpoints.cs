@@ -92,6 +92,53 @@ static class SettingsEndpoints
             return Results.Ok(new { path = newPath, migratedFiles });
         });
 
+        // POST /api/settings/storage/clear-database — kasuje WSZYSTKIE projekty/elementy/
+        // załączniki/historię (pomocne przy testach, żeby zacząć od czystego stanu bez
+        // ręcznego usuwania elementu po elemencie). Zostają nietknięte: konta użytkowników,
+        // katalogi Materiały/Producenci, i ustawienia serwera (backup, prefiksy numeracji).
+        app.MapPost("/api/settings/storage/clear-database", async (HttpContext ctx) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            // DELETE FROM projects kaskadowo kasuje items (project_id ON DELETE CASCADE),
+            // a przez items dalej item_attachments/item_relations/item_tags/
+            // item_revision_comments/item_status_history/item_attachment_history/
+            // item_owner_history/project_users (wszystkie ON DELETE CASCADE, zob.
+            // schema.sql) — jedno zapytanie wystarcza, żeby wyczyścić wszystko powiązane
+            // z projektami/elementami na poziomie bazy.
+            int deletedProjects;
+            await using (var cmd = new NpgsqlCommand("DELETE FROM projects;", conn))
+                deletedProjects = await cmd.ExecuteNonQueryAsync();
+
+            // Kaskada powyżej NIE rusza fizycznych plików (ta sama lekcja co przy DELETE
+            // /api/items/{id}) — każdy plik elementu leży pod storage.Path (attachments/,
+            // components/), więc przy pełnym wyczyszczeniu prościej i pewniej jest skasować
+            // CAŁĄ zawartość tego katalogu (nie sam katalog), niż iterować pojedynczo po
+            // ścieżkach — nic nie może zostać przypadkiem pominięte jako sierota.
+            var deletedFiles = 0;
+            if (Directory.Exists(storage.Path))
+            {
+                foreach (var entry in Directory.EnumerateFileSystemEntries(storage.Path))
+                {
+                    try
+                    {
+                        if (Directory.Exists(entry))
+                            Directory.Delete(entry, recursive: true);
+                        else
+                            File.Delete(entry);
+                        deletedFiles++;
+                    }
+                    catch (IOException) { /* nie blokujemy reszty czyszczenia z powodu jednego pliku */ }
+                }
+            }
+
+            return Results.Ok(new { deletedProjects, deletedFiles });
+        });
+
         // GET /api/settings/backup — pg_dump bazy + magazyn plików spakowane w jeden ZIP.
         app.MapGet("/api/settings/backup", async (HttpContext ctx) =>
         {

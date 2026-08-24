@@ -166,6 +166,8 @@ function StorageSettingsView() {
         <RestoreSection />
 
         <AutoBackupSection />
+
+        <DangerZoneSection />
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={(next) => !moving && setConfirmOpen(next)}>
@@ -453,6 +455,96 @@ function AutoBackupSection() {
         <FormError>{error}</FormError>
         {saved && !error && <Hint>{t("backup.saved")}</Hint>}
       </div>
+    </>
+  )
+}
+
+function DangerZoneSection() {
+  const { t } = useLanguage()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [typedPhrase, setTypedPhrase] = useState("")
+  const [clearing, setClearing] = useState(false)
+  const [error, setError] = useState("")
+  const [result, setResult] = useState<{ deletedProjects: number; deletedFiles: number } | null>(null)
+
+  const phrase = t("storage.clearDatabasePhrase")
+
+  function openConfirm() {
+    setTypedPhrase("")
+    setError("")
+    setConfirmOpen(true)
+  }
+
+  async function performClear() {
+    setClearing(true)
+    setError("")
+    try {
+      const res = await api.clearDatabase()
+      setConfirmOpen(false)
+      setResult(res)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("storage.clearDatabaseFailed"))
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  return (
+    <>
+      <SectionLabel>{t("storage.dangerZoneLabel")}</SectionLabel>
+      {result ? (
+        <div className="flex flex-col gap-2">
+          <Hint>{t("storage.clearDatabaseSuccess", { projects: result.deletedProjects, files: result.deletedFiles })}</Hint>
+          <div>
+            <Button onClick={() => window.location.reload()}>{t("storage.reloadPageButton")}</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <Hint>{t("storage.clearDatabaseHint")}</Hint>
+          <div>
+            <Button variant="destructive" onClick={openConfirm}>
+              {t("storage.clearDatabaseButton")}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={confirmOpen} onOpenChange={(next) => !clearing && setConfirmOpen(next)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("storage.clearDatabaseConfirmTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("storage.clearDatabaseConfirmDescription", { phrase })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="clear-database-phrase">
+              {t("storage.clearDatabasePhraseLabel", { phrase })}
+            </Label>
+            <Input
+              id="clear-database-phrase"
+              value={typedPhrase}
+              onChange={(e) => setTypedPhrase(e.target.value)}
+              autoComplete="off"
+              disabled={clearing}
+            />
+            <FormError>{error}</FormError>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={clearing}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={performClear}
+              disabled={clearing || typedPhrase !== phrase}
+            >
+              {t("storage.clearDatabaseConfirmButton")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

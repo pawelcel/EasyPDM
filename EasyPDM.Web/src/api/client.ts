@@ -369,6 +369,11 @@ export const api = {
       handleResponse<{ path: string; migratedFiles: number }>(r)
     ),
 
+  clearDatabase: () =>
+    fetch(`${BASE}/settings/storage/clear-database`, { method: "POST" }).then((r) =>
+      handleResponse<{ deletedProjects: number; deletedFiles: number }>(r)
+    ),
+
   backupUrl: () => `${BASE}/settings/backup`,
 
   getBackupSchedule: () =>
