@@ -2,7 +2,7 @@
 
 **English** | [Polski](README.pl.md) | [Deutsch](README.de.md)
 
-[![Buy me a coffee on buycoffee.to](https://img.shields.io/badge/☕_Buy_me_a_coffee-buycoffee.to-FFDD00?style=for-the-badge)](https://buycoffee.to/easypdm)
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/easypdm)
 
 EasyPDM is where your Parts and Assemblies get one, shared order for the whole team:
 every item has its own number, revision, status and change history, and assemblies get

@@ -2,7 +2,7 @@
 
 [English](README.md) | [Polski](README.pl.md) | **Deutsch**
 
-[![Kaffee spendieren auf buycoffee.to](https://img.shields.io/badge/☕_Kaffee_spendieren-buycoffee.to-FFDD00?style=for-the-badge)](https://buycoffee.to/easypdm)
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/easypdm)
 
 EasyPDM ist der Ort, an dem Ihre Teile und Baugruppen eine einzige, für das ganze Team
 gemeinsame Ordnung erhalten: Jedes Element hat seine eigene Nummer, Revision, Status und
