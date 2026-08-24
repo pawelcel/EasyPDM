@@ -117,6 +117,16 @@ Private Const VK_ESCAPE As Long = &H1B
 
 Private g_Lang As String
 
+' Accumulates one run's progress messages (plain text, not a Collection -- fewer moving
+' parts), so DownloadItem/DownloadChildrenRecursive can report progress via AppendLog
+' (they call it directly since they live in the same module) and Sub main() can show it
+' all in one summary dialog at the end. Reset to "" at the start of every run. Declared
+' here, grouped with the module's other Private declarations, all BEFORE any Sub/Function
+' -- moved back here (from after the T/T_PL/T_EN/T_DE Function blocks) after "Variable not
+' defined" was seen on gLogText on a live SolidWorks 2026 install, matching the same
+' relocation already applied to EasyPDMUpload.bas's swApp for the same reason.
+Private gLogText As String
+
 Private Function DetectLanguage() As String
     Dim langId As Integer
     Dim primaryLang As Integer
@@ -298,13 +308,6 @@ Private Function T_DE(ByVal key As String) As String
         Case "Dl_CouldNotDetermineMainFile": T_DE = "Die zu oeffnende Hauptdatei konnte nicht ermittelt werden."
     End Select
 End Function
-
-
-' Accumulates one run's progress messages (plain text, not a Collection -- fewer moving
-' parts), so DownloadItem/DownloadChildrenRecursive can report progress via AppendLog
-' (they call it directly since they live in the same module) and Sub main() can show it
-' all in one summary dialog at the end. Reset to "" at the start of every run.
-Private gLogText As String
 
 
 ' ============================================================================
