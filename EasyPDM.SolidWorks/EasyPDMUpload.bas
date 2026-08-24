@@ -111,6 +111,258 @@ Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.
 #End If
 Private Const VK_ESCAPE As Long = &H1B
 
+' Auto-wykrycie jezyka interfejsu Windows (UI language, nie tylko regionalny locale) przez
+' Win32 API GetUserDefaultUILanguage -- zwraca LANGID (WORD); dolne 10 bitow to Primary
+' Language ID (stale z winnt.h: LANG_POLISH=&H15, LANG_GERMAN=&H07, LANG_ENGLISH=&H09).
+' Fallback na angielski dla kazdego innego jezyka albo bledu wywolania.
+#If VBA7 Then
+    Private Declare PtrSafe Function GetUserDefaultUILanguage Lib "kernel32" () As Integer
+#Else
+    Private Declare Function GetUserDefaultUILanguage Lib "kernel32" () As Integer
+#End If
+
+Private g_Lang As String
+
+Private Function DetectLanguage() As String
+    Dim langId As Integer
+    Dim primaryLang As Integer
+    On Error GoTo Fallback
+    langId = GetUserDefaultUILanguage()
+    primaryLang = langId And &H3FF
+    Select Case primaryLang
+        Case &H15
+            DetectLanguage = "pl"
+        Case &H7
+            DetectLanguage = "de"
+        Case Else
+            DetectLanguage = "en"
+    End Select
+    Exit Function
+Fallback:
+    DetectLanguage = "en"
+End Function
+
+Private Function GetLang() As String
+    If g_Lang = "" Then g_Lang = DetectLanguage()
+    GetLang = g_Lang
+End Function
+
+
+' ============================================================================
+' Translations (PL/EN/DE) -- every user-facing string literal (MsgBox/InputBox text and
+' titles, status bar text) goes through T(key), dispatching to T_PL/T_EN/T_DE based on the
+' auto-detected Windows UI language (see DetectLanguage above). Internal LogLine messages
+' stay hardcoded/untranslated on purpose (see LogLine's own comment) -- only what the user
+' actually sees in a dialog goes through this layer. Strings needing a dynamic value (an
+' item number, a file name, an error description, ...) keep only their static part here;
+' the call site concatenates the dynamic value with "&" exactly like before.
+'
+' T_PL/T_DE MUST stay plain ASCII (transliterate diacritics: a/c/e/l/n/o/s/z/z for Polish,
+' ae/oe/ue/ss for German) -- see the file-header note above ("Input past end of file" on
+' VBA import, confirmed in practice when this was violated once already).
+' ============================================================================
+
+Private Function T(ByVal key As String) As String
+    Select Case GetLang()
+        Case "pl": T = T_PL(key)
+        Case "de": T = T_DE(key)
+        Case Else: T = T_EN(key)
+    End Select
+End Function
+
+Private Function T_PL(ByVal key As String) As String
+    Select Case key
+        Case "StatusWaitingForBrowser": T_PL = "EasyPDM: oczekiwanie na przegladarke... (Esc anuluje)"
+        Case "TitleLoginToPdm": T_PL = "Logowanie do PDM"
+        Case "PromptApiAddress": T_PL = "Adres API EasyPDM:"
+        Case "PromptUsername": T_PL = "Nazwa uzytkownika:"
+        Case "PromptPassword": T_PL = "Haslo (UWAGA: to pole nie maskuje wpisywanych znakow):"
+        Case "LoggedInAsPrefix": T_PL = "Zalogowano jako "
+        Case "AppTitle": T_PL = "EasyPDM"
+        Case "LoginFailedPrefix": T_PL = "Logowanie nie powiodlo sie: "
+        Case "LoginFailedNoSession": T_PL = "Logowanie nie powiodlo sie -- serwer nie zwrocil sesji."
+        Case "TitleProperties": T_PL = "Wlasciwosci"
+        Case "KindPrompt": T_PL = "Rodzaj:" & vbCrLf & "1 - Wykonywana" & vbCrLf & "2 - Zakupowa" & vbCrLf & "3 - Normalia" & vbCrLf & "4 - Klienta"
+        Case "KindRequired": T_PL = "Rodzaj jest wymagany dla Czesci."
+        Case "PromptMaterial": T_PL = "Material (opcjonalnie):"
+        Case "PromptMass": T_PL = "Masa (opcjonalnie):"
+        Case "PromptManufacturer": T_PL = "Producent (opcjonalnie):"
+        Case "PromptOrderNumber1": T_PL = "Numer katalogowy 1 (opcjonalnie):"
+        Case "PromptOrderNumber2": T_PL = "Numer katalogowy 2 (opcjonalnie):"
+        Case "PromptNorm": T_PL = "Norma (opcjonalnie):"
+        Case "TitleNewRevision": T_PL = "Nowa rewizja"
+        Case "ItemStatusReleasedPrefix": T_PL = "Element nr "
+        Case "ItemStatusReleasedSuffix": T_PL = " ma status ""Wydany"" -- podpiecie pliku wymaga nowej rewizji. Utworzyc nowa rewizje?"
+        Case "PromptRevisionComment": T_PL = "Komentarz do nowej rewizji (opcjonalnie):"
+        Case "NoProjectsAvailable": T_PL = "Brak dostepnych projektow w PDM."
+        Case "TitleNewItemInPdm": T_PL = "Nowy element w PDM"
+        Case "PromptPickProject": T_PL = "Wybierz projekt (numer):"
+        Case "TitleNewComponent": T_PL = "Nowy komponent"
+        Case "TypePromptText": T_PL = "Typ:" & vbCrLf & "1 - Czesc" & vbCrLf & "2 - Zlozenie"
+        Case "NamePromptText": T_PL = "Nazwa:"
+        Case "NewComponentHeaderPrefix": T_PL = "Nowy komponent zlozenia: "
+        Case "UsedPrefix": T_PL = "Uzycie: "
+        Case "UsageHintJoiner": T_PL = "x w "
+        Case "AssemblyDetectedTitle": T_PL = "Wykryto zlozenie"
+        Case "AssemblyLinksPart1": T_PL = "To zlozenie odwoluje sie do "
+        Case "AssemblyLinksPart2": T_PL = " innego(-ych) pliku(-ow) (czesci/podzespoly):"
+        Case "AssemblyLinksPart3": T_PL = "Wyslac je automatycznie razem z tym dokumentem (najpierw liscie drzewa, ten dokument na koncu)?"
+        Case "AssemblyLinksPart4": T_PL = "'Nie' wysle TYLKO ten dokument, tak jak wczesniej -- bez komponentow."
+        Case "FailedToSendPrefix": T_PL = "Nie udalo sie wyslac "
+        Case "CreatedButFailedAttachPart1": T_PL = "Utworzono "
+        Case "CreatedButFailedAttachPart2": T_PL = ", ale nie udalo sie podpiac go pod "
+        Case "CreatedButFailedAttachPart3": T_PL = ": "
+        Case "FailedToSaveDocument": T_PL = "Nie udalo sie zapisac dokumentu -- zapisz go recznie (Ctrl+S) i uruchom makro ponownie."
+        Case "MustRunInsideSolidWorks": T_PL = "To makro musi byc uruchomione z poziomu SolidWorks."
+        Case "NoActiveSavedDocument": T_PL = "Brak aktywnego, zapisanego dokumentu."
+        Case "AlreadyLinkedConfirm": T_PL = "Ten dokument jest juz powiazany z elementem PDM. Podpiac biezaca wersje jako nowa rewizje/aktualizacje?"
+        Case "CancelledNothingSent": T_PL = "Anulowano -- nic nie zostalo wyslane."
+        Case "FailedToAttachSubComponent": T_PL = "Nie udalo sie podpiac jednego z podkomponentow pod element glowny: "
+        Case "UploadedSuccessPart1": T_PL = "Przeslano do EasyPDM: element nr "
+        Case "UploadedSuccessPart2": T_PL = " (rewizja "
+        Case "RunLogPrefix": T_PL = "Log przebiegu: "
+        Case "SessionExpiredPrompt": T_PL = "Sesja wygasla -- uruchom makro ponownie, aby sie zalogowac."
+        Case "ErrorPrefix": T_PL = "Blad: "
+        Case "LoggedOutMessage": T_PL = "Wylogowano z EasyPDM."
+        Case "ServerErrorPrefix": T_PL = "Blad serwera ("
+        Case "NoConnectionPrefix": T_PL = "Brak polaczenia z "
+        Case "AttachmentRegistrationFailedPrefix": T_PL = "Rejestracja zalacznika nie powiodla sie: "
+        Case "ItemAlreadyChangedPart1": T_PL = "Status/rewizja elementu nr "
+        Case "ItemAlreadyChangedPart2": T_PL = " zostaly juz zmienione na serwerze (rewizja "
+        Case "ItemAlreadyChangedPart3": T_PL = ", status 'w_pracy'), ale podpiecie pliku nie powiodlo sie: "
+        Case "ItemAlreadyChangedPart4": T_PL = "Element w PDM ma teraz nowa rewizje, ale nadal plik z poprzedniej wersji -- popraw to recznie w aplikacji webowej (podepnij plik ponownie) albo sprobuj ponownie z tego makra."
+    End Select
+End Function
+
+Private Function T_EN(ByVal key As String) As String
+    Select Case key
+        Case "StatusWaitingForBrowser": T_EN = "EasyPDM: waiting for the browser... (Esc to cancel)"
+        Case "TitleLoginToPdm": T_EN = "Log in to PDM"
+        Case "PromptApiAddress": T_EN = "EasyPDM API address:"
+        Case "PromptUsername": T_EN = "Username:"
+        Case "PromptPassword": T_EN = "Password (NOTE: this field does not mask typed characters):"
+        Case "LoggedInAsPrefix": T_EN = "Logged in as "
+        Case "AppTitle": T_EN = "EasyPDM"
+        Case "LoginFailedPrefix": T_EN = "Login failed: "
+        Case "LoginFailedNoSession": T_EN = "Login failed -- the server did not return a session."
+        Case "TitleProperties": T_EN = "Properties"
+        Case "KindPrompt": T_EN = "Kind:" & vbCrLf & "1 - Manufactured" & vbCrLf & "2 - Purchased" & vbCrLf & "3 - Standard" & vbCrLf & "4 - Client"
+        Case "KindRequired": T_EN = "Kind is required for a Part."
+        Case "PromptMaterial": T_EN = "Material (optional):"
+        Case "PromptMass": T_EN = "Mass (optional):"
+        Case "PromptManufacturer": T_EN = "Manufacturer (optional):"
+        Case "PromptOrderNumber1": T_EN = "Order number 1 (optional):"
+        Case "PromptOrderNumber2": T_EN = "Order number 2 (optional):"
+        Case "PromptNorm": T_EN = "Norm (optional):"
+        Case "TitleNewRevision": T_EN = "New revision"
+        Case "ItemStatusReleasedPrefix": T_EN = "Item #"
+        Case "ItemStatusReleasedSuffix": T_EN = " is in status ""Released"" -- attaching a file requires a new revision. Create a new revision?"
+        Case "PromptRevisionComment": T_EN = "New revision comment (optional):"
+        Case "NoProjectsAvailable": T_EN = "No projects available in PDM."
+        Case "TitleNewItemInPdm": T_EN = "New item in PDM"
+        Case "PromptPickProject": T_EN = "Pick a project (number):"
+        Case "TitleNewComponent": T_EN = "New component"
+        Case "TypePromptText": T_EN = "Type:" & vbCrLf & "1 - Part" & vbCrLf & "2 - Assembly"
+        Case "NamePromptText": T_EN = "Name:"
+        Case "NewComponentHeaderPrefix": T_EN = "New assembly component: "
+        Case "UsedPrefix": T_EN = "Used: "
+        Case "UsageHintJoiner": T_EN = "x in "
+        Case "AssemblyDetectedTitle": T_EN = "Assembly detected"
+        Case "AssemblyLinksPart1": T_EN = "This assembly links to "
+        Case "AssemblyLinksPart2": T_EN = " other file(s) (parts/sub-assemblies):"
+        Case "AssemblyLinksPart3": T_EN = "Send them automatically together with this document (leaves first, this document last)?"
+        Case "AssemblyLinksPart4": T_EN = "'No' sends ONLY this document, as before -- without components."
+        Case "FailedToSendPrefix": T_EN = "Failed to send "
+        Case "CreatedButFailedAttachPart1": T_EN = "Created "
+        Case "CreatedButFailedAttachPart2": T_EN = ", but failed to attach it under "
+        Case "CreatedButFailedAttachPart3": T_EN = ": "
+        Case "FailedToSaveDocument": T_EN = "Failed to save the document -- save it manually (Ctrl+S) and run the macro again."
+        Case "MustRunInsideSolidWorks": T_EN = "This macro must be run from inside SolidWorks."
+        Case "NoActiveSavedDocument": T_EN = "No active, saved document."
+        Case "AlreadyLinkedConfirm": T_EN = "This document is already linked to a PDM item. Attach the current version as a new revision/update?"
+        Case "CancelledNothingSent": T_EN = "Cancelled -- nothing was sent."
+        Case "FailedToAttachSubComponent": T_EN = "Failed to attach one of the sub-components under the main element: "
+        Case "UploadedSuccessPart1": T_EN = "Uploaded to EasyPDM: item #"
+        Case "UploadedSuccessPart2": T_EN = " (revision "
+        Case "RunLogPrefix": T_EN = "Run log: "
+        Case "SessionExpiredPrompt": T_EN = "Session expired -- run the macro again to log in."
+        Case "ErrorPrefix": T_EN = "Error: "
+        Case "LoggedOutMessage": T_EN = "Logged out of EasyPDM."
+        Case "ServerErrorPrefix": T_EN = "Server error ("
+        Case "NoConnectionPrefix": T_EN = "No connection to "
+        Case "AttachmentRegistrationFailedPrefix": T_EN = "Attachment registration failed: "
+        Case "ItemAlreadyChangedPart1": T_EN = "The status/revision of item #"
+        Case "ItemAlreadyChangedPart2": T_EN = " have already been changed on the server (revision "
+        Case "ItemAlreadyChangedPart3": T_EN = ", status 'w_pracy'), but attaching the file failed: "
+        Case "ItemAlreadyChangedPart4": T_EN = "The item in PDM now has a new revision, but still the file of the previous version -- fix this manually in the web app (attach the file again) or retry from this macro."
+    End Select
+End Function
+
+Private Function T_DE(ByVal key As String) As String
+    Select Case key
+        Case "StatusWaitingForBrowser": T_DE = "EasyPDM: Warten auf den Browser... (Esc zum Abbrechen)"
+        Case "TitleLoginToPdm": T_DE = "Anmeldung bei PDM"
+        Case "PromptApiAddress": T_DE = "EasyPDM-API-Adresse:"
+        Case "PromptUsername": T_DE = "Benutzername:"
+        Case "PromptPassword": T_DE = "Passwort (HINWEIS: Dieses Feld maskiert die eingegebenen Zeichen nicht):"
+        Case "LoggedInAsPrefix": T_DE = "Angemeldet als "
+        Case "AppTitle": T_DE = "EasyPDM"
+        Case "LoginFailedPrefix": T_DE = "Anmeldung fehlgeschlagen: "
+        Case "LoginFailedNoSession": T_DE = "Anmeldung fehlgeschlagen -- der Server hat keine Sitzung zurueckgegeben."
+        Case "TitleProperties": T_DE = "Eigenschaften"
+        Case "KindPrompt": T_DE = "Art:" & vbCrLf & "1 - Gefertigt" & vbCrLf & "2 - Zugekauft" & vbCrLf & "3 - Norm" & vbCrLf & "4 - Kunde"
+        Case "KindRequired": T_DE = "Fuer ein Teil ist die Art erforderlich."
+        Case "PromptMaterial": T_DE = "Material (optional):"
+        Case "PromptMass": T_DE = "Masse (optional):"
+        Case "PromptManufacturer": T_DE = "Hersteller (optional):"
+        Case "PromptOrderNumber1": T_DE = "Bestellnummer 1 (optional):"
+        Case "PromptOrderNumber2": T_DE = "Bestellnummer 2 (optional):"
+        Case "PromptNorm": T_DE = "Norm (optional):"
+        Case "TitleNewRevision": T_DE = "Neue Revision"
+        Case "ItemStatusReleasedPrefix": T_DE = "Element Nr. "
+        Case "ItemStatusReleasedSuffix": T_DE = " hat den Status ""Freigegeben"" -- das Anhaengen einer Datei erfordert eine neue Revision. Neue Revision erstellen?"
+        Case "PromptRevisionComment": T_DE = "Kommentar zur neuen Revision (optional):"
+        Case "NoProjectsAvailable": T_DE = "Keine Projekte in PDM verfuegbar."
+        Case "TitleNewItemInPdm": T_DE = "Neues Element in PDM"
+        Case "PromptPickProject": T_DE = "Projekt auswaehlen (Nummer):"
+        Case "TitleNewComponent": T_DE = "Neue Komponente"
+        Case "TypePromptText": T_DE = "Typ:" & vbCrLf & "1 - Teil" & vbCrLf & "2 - Baugruppe"
+        Case "NamePromptText": T_DE = "Name:"
+        Case "NewComponentHeaderPrefix": T_DE = "Neue Baugruppenkomponente: "
+        Case "UsedPrefix": T_DE = "Verwendet: "
+        Case "UsageHintJoiner": T_DE = "x in "
+        Case "AssemblyDetectedTitle": T_DE = "Baugruppe erkannt"
+        Case "AssemblyLinksPart1": T_DE = "Diese Baugruppe verweist auf "
+        Case "AssemblyLinksPart2": T_DE = " weitere Datei(en) (Teile/Unterbaugruppen):"
+        Case "AssemblyLinksPart3": T_DE = "Sollen sie automatisch zusammen mit diesem Dokument gesendet werden (zuerst die Blaetter, dieses Dokument zuletzt)?"
+        Case "AssemblyLinksPart4": T_DE = "'Nein' sendet NUR dieses Dokument, wie bisher -- ohne Komponenten."
+        Case "FailedToSendPrefix": T_DE = "Senden fehlgeschlagen fuer "
+        Case "CreatedButFailedAttachPart1": T_DE = "Erstellt "
+        Case "CreatedButFailedAttachPart2": T_DE = ", aber die Zuordnung unter "
+        Case "CreatedButFailedAttachPart3": T_DE = " ist fehlgeschlagen: "
+        Case "FailedToSaveDocument": T_DE = "Speichern des Dokuments fehlgeschlagen -- speichern Sie es manuell (Strg+S) und starten Sie das Makro erneut."
+        Case "MustRunInsideSolidWorks": T_DE = "Dieses Makro muss innerhalb von SolidWorks ausgefuehrt werden."
+        Case "NoActiveSavedDocument": T_DE = "Kein aktives, gespeichertes Dokument."
+        Case "AlreadyLinkedConfirm": T_DE = "Dieses Dokument ist bereits mit einem PDM-Element verknuepft. Die aktuelle Version als neue Revision/Aktualisierung anhaengen?"
+        Case "CancelledNothingSent": T_DE = "Abgebrochen -- es wurde nichts gesendet."
+        Case "FailedToAttachSubComponent": T_DE = "Eine der Unterkomponenten konnte nicht unter dem Hauptelement angehaengt werden: "
+        Case "UploadedSuccessPart1": T_DE = "Zu EasyPDM hochgeladen: Element Nr. "
+        Case "UploadedSuccessPart2": T_DE = " (Revision "
+        Case "RunLogPrefix": T_DE = "Ausfuehrungsprotokoll: "
+        Case "SessionExpiredPrompt": T_DE = "Sitzung abgelaufen -- fuehren Sie das Makro erneut aus, um sich anzumelden."
+        Case "ErrorPrefix": T_DE = "Fehler: "
+        Case "LoggedOutMessage": T_DE = "Von EasyPDM abgemeldet."
+        Case "ServerErrorPrefix": T_DE = "Serverfehler ("
+        Case "NoConnectionPrefix": T_DE = "Keine Verbindung zu "
+        Case "AttachmentRegistrationFailedPrefix": T_DE = "Registrierung des Anhangs fehlgeschlagen: "
+        Case "ItemAlreadyChangedPart1": T_DE = "Der Status/die Revision von Element Nr. "
+        Case "ItemAlreadyChangedPart2": T_DE = " wurden auf dem Server bereits geaendert (Revision "
+        Case "ItemAlreadyChangedPart3": T_DE = ", Status 'w_pracy'), aber das Anhaengen der Datei ist fehlgeschlagen: "
+        Case "ItemAlreadyChangedPart4": T_DE = "Das Element in PDM hat jetzt eine neue Revision, aber immer noch die Datei der vorherigen Version -- beheben Sie dies manuell in der Web-App (Datei erneut anhaengen) oder versuchen Sie es erneut ueber dieses Makro."
+    End Select
+End Function
+
+
 ' SolidWorks application object -- CONTRARY to this module's earlier (wrong) assumption,
 ' "swApp" is NOT automatically visible in EVERY VBA module of the project, only in the one
 ' SolidWorks itself generates via "Tools -> Macro -> New" (that one gets its own "Dim
@@ -410,7 +662,7 @@ Private Sub RaiseForStatus(ByVal status As Long, ByVal responseText As String)
     If status = 401 Then
         Err.Raise ERR_AUTH, "EasyPDM", responseText
     ElseIf status < 200 Or status >= 300 Then
-        Err.Raise ERR_API, "EasyPDM", "Server error (" & status & "): " & responseText
+        Err.Raise ERR_API, "EasyPDM", T("ServerErrorPrefix") & status & "): " & responseText
     End If
 End Sub
 
@@ -436,7 +688,7 @@ Function ApiGet(ByVal path As String) As Object
     Exit Function
 NetErr:
     LogLine "GET " & path & " -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
 Function ApiPostJson(ByVal path As String, ByVal bodyJson As String) As Object
@@ -462,7 +714,7 @@ Function ApiPostJson(ByVal path As String, ByVal bodyJson As String) As Object
     Exit Function
 NetErr:
     LogLine "POST " & path & " -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
 Function ApiPatchJson(ByVal path As String, ByVal bodyJson As String) As Object
@@ -488,7 +740,7 @@ Function ApiPatchJson(ByVal path As String, ByVal bodyJson As String) As Object
     Exit Function
 NetErr:
     LogLine "PATCH " & path & " -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
 Function ApiRegisterAttachment(ByVal itemId As String, ByVal filePath As String) As Object
@@ -606,7 +858,7 @@ Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional 
     Exit Function
 NetErr:
     LogLine "POST (upload) " & path & " -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
 Sub ApiDeleteRequest(ByVal path As String)
@@ -626,7 +878,7 @@ Sub ApiDeleteRequest(ByVal path As String)
     Exit Sub
 NetErr:
     LogLine "DELETE " & path & " -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Sub
 
 
@@ -748,7 +1000,7 @@ Function WaitForTicket(ByVal ticket As String) As Object
     sincePollMs = POLL_EVERY_MS ' poll right away on the very first tick
 
     On Error Resume Next
-    swApp.Frame.SetStatusBarText "EasyPDM: waiting for the browser... (Esc to cancel)"
+    swApp.Frame.SetStatusBarText T("StatusWaitingForBrowser")
     On Error GoTo 0
 
     Do While elapsedMs < TIMEOUT_MS
@@ -808,7 +1060,7 @@ Function ApiLogin(ByVal username As String, ByVal password As String) As Object
     LogLine "POST /auth/login -> " & http.Status & " (user: " & username & ")"
     If http.Status = 401 Or http.Status < 200 Or http.Status >= 300 Then
         LogLine "Login failed: " & http.responseText
-        Err.Raise ERR_API, "EasyPDM", "Login failed: " & http.responseText
+        Err.Raise ERR_API, "EasyPDM", T("LoginFailedPrefix") & http.responseText
     End If
 
     Dim user As Object
@@ -824,7 +1076,7 @@ Function ApiLogin(ByVal username As String, ByVal password As String) As Object
     If token = "" Then token = ExtractSessionCookie(http)
     If token = "" Then
         LogLine "Login: server responded 2xx, but no session token was found either in the response body or in the headers."
-        Err.Raise ERR_API, "EasyPDM", "Login failed -- the server did not return a session."
+        Err.Raise ERR_API, "EasyPDM", T("LoginFailedNoSession")
     End If
 
     SetSessionToken token
@@ -838,7 +1090,7 @@ Function ApiLogin(ByVal username As String, ByVal password As String) As Object
     Exit Function
 NetErr:
     LogLine "POST /auth/login -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
 ' getResponseHeader("Set-Cookie") is sometimes filtered out by MSXML/WinINet security
@@ -943,7 +1195,7 @@ End Function
 
 Private Function PromptLogin() As Boolean
     Dim serverUrl As String
-    serverUrl = InputBox("EasyPDM API address:", "Log in to PDM", GetBaseUrl())
+    serverUrl = InputBox(T("PromptApiAddress"), T("TitleLoginToPdm"), GetBaseUrl())
     If Trim(serverUrl) = "" Then
         PromptLogin = False
         Exit Function
@@ -953,14 +1205,14 @@ Private Function PromptLogin() As Boolean
     Dim attempt As Integer
     For attempt = 1 To 3
         Dim username As String, password As String
-        username = InputBox("Username:", "Log in to PDM")
+        username = InputBox(T("PromptUsername"), T("TitleLoginToPdm"))
         If Trim(username) = "" Then
             PromptLogin = False
             Exit Function
         End If
         ' A plain InputBox does not mask typed text with asterisks -- a limitation of this
         ' simplified macro (no custom UserForm with a password field).
-        password = InputBox("Password (NOTE: this field does not mask typed characters):", "Log in to PDM")
+        password = InputBox(T("PromptPassword"), T("TitleLoginToPdm"))
         If password = "" Then
             PromptLogin = False
             Exit Function
@@ -976,11 +1228,11 @@ Private Function PromptLogin() As Boolean
         On Error GoTo 0
 
         If loginErrNum = 0 Then
-            MsgBox "Logged in as " & JsonGetString(user, "displayName", username) & ".", vbInformation, "EasyPDM"
+            MsgBox T("LoggedInAsPrefix") & JsonGetString(user, "displayName", username) & ".", vbInformation, T("AppTitle")
             PromptLogin = True
             Exit Function
         Else
-            MsgBox "Login failed: " & loginErrDesc, vbExclamation, "EasyPDM"
+            MsgBox T("LoginFailedPrefix") & loginErrDesc, vbExclamation, T("AppTitle")
         End If
     Next attempt
     PromptLogin = False
@@ -1027,14 +1279,14 @@ End Function
 ' web app: Manufactured -> Material; Purchased -> Manufacturer/Order numbers/Mass;
 ' Standard -> Material/Norm; Client -> no extra fields. Assembly has NO "kind" at all
 ' (not asked here) -- it only ever gets an optional Mass, matching add-node-dialog.tsx /
-' NewComponentDialog in the FreeCAD macro (a Złożenie never has "rodzaj" or "material").
+' NewComponentDialog in the FreeCAD macro (a Zlozenie never has "rodzaj" or "material").
 Function PromptPartProperties(ByVal isPart As Boolean) As String
     Dim rodzaj As String
     rodzaj = ""
 
     If isPart Then
         Dim choice As String
-        choice = InputBox("Kind:" & vbCrLf & "1 - Manufactured" & vbCrLf & "2 - Purchased" & vbCrLf & "3 - Standard" & vbCrLf & "4 - Client", "Properties")
+        choice = InputBox(T("KindPrompt"), T("TitleProperties"))
         Select Case Trim(choice)
             Case "1": rodzaj = "Wykonywana"
             Case "2": rodzaj = "Zakupowa"
@@ -1044,7 +1296,7 @@ Function PromptPartProperties(ByVal isPart As Boolean) As String
         End Select
 
         If rodzaj = "" Then
-            MsgBox "Kind is required for a Part.", vbExclamation, "EasyPDM"
+            MsgBox T("KindRequired"), vbExclamation, T("AppTitle")
             PromptPartProperties = PromptPartProperties(isPart)
             Exit Function
         End If
@@ -1076,7 +1328,7 @@ Function PromptPartProperties(ByVal isPart As Boolean) As String
     Dim fieldValue As String
 
     If showMaterial Then
-        fieldValue = InputBox("Material (optional):", "Properties")
+        fieldValue = InputBox(T("PromptMaterial"), T("TitleProperties"))
         If Trim(fieldValue) <> "" Then
             If Not firstProp Then props = props & ","
             props = props & """material"":" & JsonStr(fieldValue)
@@ -1085,7 +1337,7 @@ Function PromptPartProperties(ByVal isPart As Boolean) As String
     End If
 
     If showMass Then
-        fieldValue = InputBox("Mass (optional):", "Properties")
+        fieldValue = InputBox(T("PromptMass"), T("TitleProperties"))
         If Trim(fieldValue) <> "" Then
             If Not firstProp Then props = props & ","
             props = props & """mass"":" & JsonStr(fieldValue)
@@ -1094,21 +1346,21 @@ Function PromptPartProperties(ByVal isPart As Boolean) As String
     End If
 
     If showPurchase Then
-        fieldValue = InputBox("Manufacturer (optional):", "Properties")
+        fieldValue = InputBox(T("PromptManufacturer"), T("TitleProperties"))
         If Trim(fieldValue) <> "" Then
             If Not firstProp Then props = props & ","
             props = props & """manufacturer"":" & JsonStr(fieldValue)
             firstProp = False
         End If
 
-        fieldValue = InputBox("Order number 1 (optional):", "Properties")
+        fieldValue = InputBox(T("PromptOrderNumber1"), T("TitleProperties"))
         If Trim(fieldValue) <> "" Then
             If Not firstProp Then props = props & ","
             props = props & """orderNumber"":" & JsonStr(fieldValue)
             firstProp = False
         End If
 
-        fieldValue = InputBox("Order number 2 (optional):", "Properties")
+        fieldValue = InputBox(T("PromptOrderNumber2"), T("TitleProperties"))
         If Trim(fieldValue) <> "" Then
             If Not firstProp Then props = props & ","
             props = props & """orderNumber2"":" & JsonStr(fieldValue)
@@ -1117,7 +1369,7 @@ Function PromptPartProperties(ByVal isPart As Boolean) As String
     End If
 
     If showNorm Then
-        fieldValue = InputBox("Norm (optional):", "Properties")
+        fieldValue = InputBox(T("PromptNorm"), T("TitleProperties"))
         If Trim(fieldValue) <> "" Then
             If Not firstProp Then props = props & ","
             props = props & """norm"":" & JsonStr(fieldValue)
@@ -1237,7 +1489,7 @@ Function RenameAndUpload(ByVal filePath As String, ByVal itemId As String, ByVal
                 On Error Resume Next
                 Kill targetPath
                 On Error GoTo 0
-                Err.Raise ERR_API, "EasyPDM", "Attachment registration failed: " & registerErrDesc
+                Err.Raise ERR_API, "EasyPDM", T("AttachmentRegistrationFailedPrefix") & registerErrDesc
             End If
             LogLine "Registered attachment: " & targetPath
         End If
@@ -1358,14 +1610,14 @@ Function PushToExistingItem(ByVal itemId As String, ByVal filePath As String) As
 
     If currentStatus = "wydany" Then
         Dim proceed As VbMsgBoxResult
-        proceed = MsgBox("Item #" & itemNumber & " is in status ""Released"" -- attaching a file requires a new revision. Create a new revision?", vbYesNo + vbQuestion, "New revision")
+        proceed = MsgBox(T("ItemStatusReleasedPrefix") & itemNumber & T("ItemStatusReleasedSuffix"), vbYesNo + vbQuestion, T("TitleNewRevision"))
         If proceed <> vbYes Then
             Set PushToExistingItem = Nothing
             Exit Function
         End If
 
         Dim comment As String
-        comment = InputBox("New revision comment (optional):", "New revision")
+        comment = InputBox(T("PromptRevisionComment"), T("TitleNewRevision"))
 
         Dim statusBody As String
         If Trim(comment) <> "" Then
@@ -1411,11 +1663,10 @@ Function PushToExistingItem(ByVal itemId As String, ByVal filePath As String) As
             ' allow a direct "w_pracy" -> "wydany" transition -- so instead of a silent/
             ' confusing rollback attempt, we state loudly exactly what happened.
             Err.Raise ERR_API, "EasyPDM", _
-                "The status/revision of item #" & itemNumber & " have already been changed on the server " & _
-                "(revision " & revision & ", status 'w_pracy'), but attaching the file failed: " & _
+                T("ItemAlreadyChangedPart1") & itemNumber & T("ItemAlreadyChangedPart2") & _
+                revision & T("ItemAlreadyChangedPart3") & _
                 uploadErrDesc & vbCrLf & vbCrLf & _
-                "The item in PDM now has a new revision, but still the file of the previous version -- fix " & _
-                "this manually in the web app (attach the file again) or retry from this macro."
+                T("ItemAlreadyChangedPart4")
         Else
             Err.Raise ERR_API, "EasyPDM", uploadErrDesc
         End If
@@ -1433,7 +1684,7 @@ Function PromptForProject() As String
     Dim projects As Object
     Set projects = ApiGet("/projects")
     If projects Is Nothing Or projects.Count = 0 Then
-        MsgBox "No projects available in PDM.", vbExclamation, "EasyPDM"
+        MsgBox T("NoProjectsAvailable"), vbExclamation, T("AppTitle")
         PromptForProject = ""
         Exit Function
     End If
@@ -1451,7 +1702,7 @@ Function PromptForProject() As String
     Next p
 
     Dim choice As String
-    choice = InputBox("Pick a project (number):" & vbCrLf & listText, "New item in PDM")
+    choice = InputBox(T("PromptPickProject") & vbCrLf & listText, T("TitleNewItemInPdm"))
     Dim idx As Long
     idx = Val(choice)
     If idx < 1 Or idx > projects.Count Then
@@ -1593,10 +1844,10 @@ Private Function UsageHintFor(ByVal filePath As String, ByVal edges As Collectio
             Dim parentName As String
             parentName = Mid(edge("parent"), InStrRev(edge("parent"), "\") + 1)
             If result <> "" Then result = result & ", "
-            result = result & edge("qty") & "x in " & parentName
+            result = result & edge("qty") & T("UsageHintJoiner") & parentName
         End If
     Next edge
-    If result <> "" Then result = "Used: " & result
+    If result <> "" Then result = T("UsedPrefix") & result
     UsageHintFor = result
 End Function
 
@@ -1612,7 +1863,7 @@ Sub PromptNewComponentProperties(ByVal filePath As String, ByVal suggestedName A
     outProjectId = ""
 
     Dim header As String
-    header = "New assembly component: " & Mid(filePath, InStrRev(filePath, "\") + 1)
+    header = T("NewComponentHeaderPrefix") & Mid(filePath, InStrRev(filePath, "\") + 1)
     If usageHint <> "" Then header = header & vbCrLf & usageHint
 
     Dim projectId As String
@@ -1620,12 +1871,12 @@ Sub PromptNewComponentProperties(ByVal filePath As String, ByVal suggestedName A
     If projectId = "" Then Exit Sub
 
     Dim typeChoice As String
-    typeChoice = InputBox(header & vbCrLf & vbCrLf & "Type:" & vbCrLf & "1 - Part" & vbCrLf & "2 - Assembly", "New component", IIf(suggestedIsAssembly, "2", "1"))
+    typeChoice = InputBox(header & vbCrLf & vbCrLf & T("TypePromptText"), T("TitleNewComponent"), IIf(suggestedIsAssembly, "2", "1"))
     Dim isPart As Boolean
     isPart = (Trim(typeChoice) <> "2")
 
     Dim name As String
-    name = InputBox(header & vbCrLf & vbCrLf & "Name:", "New component", suggestedName)
+    name = InputBox(header & vbCrLf & vbCrLf & T("NamePromptText"), T("TitleNewComponent"), suggestedName)
     If Trim(name) = "" Then Exit Sub
 
     Dim propertiesJson As String
@@ -1670,11 +1921,11 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     Next p
 
     Dim choice As VbMsgBoxResult
-    choice = MsgBox("This assembly links to " & order.Count & " other file(s) (parts/sub-assemblies):" & vbCrLf & vbCrLf & _
+    choice = MsgBox(T("AssemblyLinksPart1") & order.Count & T("AssemblyLinksPart2") & vbCrLf & vbCrLf & _
                      summary & vbCrLf & _
-                     "Send them automatically together with this document (leaves first, this document last)?" & vbCrLf & vbCrLf & _
-                     "'No' sends ONLY this document, as before -- without components.", _
-                     vbYesNoCancel + vbQuestion, "Assembly detected")
+                     T("AssemblyLinksPart3") & vbCrLf & vbCrLf & _
+                     T("AssemblyLinksPart4"), _
+                     vbYesNoCancel + vbQuestion, T("AssemblyDetectedTitle"))
     If choice = vbCancel Then
         ProcessAssemblyTree = True
         Exit Function
@@ -1725,7 +1976,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             createErr = Err.Description
             On Error GoTo 0
             If created Is Nothing Then
-                MsgBox "Failed to send " & Mid(filePath, InStrRev(filePath, "\") + 1) & ": " & createErr, vbCritical, "EasyPDM"
+                MsgBox T("FailedToSendPrefix") & Mid(filePath, InStrRev(filePath, "\") + 1) & ": " & createErr, vbCritical, T("AppTitle")
                 ProcessAssemblyTree = True
                 Exit Function
             End If
@@ -1752,8 +2003,8 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
                     If Err.Number <> 0 Then relErr = Err.Description
                     On Error GoTo 0
                     If relErr <> "" Then
-                        MsgBox "Created " & Mid(CStr(edge2("child")), InStrRev(CStr(edge2("child")), "\") + 1) & _
-                               ", but failed to attach it under " & Mid(filePath, InStrRev(filePath, "\") + 1) & ": " & relErr, vbExclamation, "EasyPDM"
+                        MsgBox T("CreatedButFailedAttachPart1") & Mid(CStr(edge2("child")), InStrRev(CStr(edge2("child")), "\") + 1) & _
+                               T("CreatedButFailedAttachPart2") & Mid(filePath, InStrRev(filePath, "\") + 1) & T("CreatedButFailedAttachPart3") & relErr, vbExclamation, T("AppTitle")
                     End If
                 End If
             End If
@@ -1799,7 +2050,7 @@ Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As Strin
     Dim saveOk As Boolean
     saveOk = swModel.Save3(0, saveErr, saveWarn)
     If Not saveOk Then
-        MsgBox "Failed to save the document -- save it manually (Ctrl+S) and run the macro again.", vbExclamation, "EasyPDM"
+        MsgBox T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
         GetActiveDocInfo = False
         Exit Function
     End If
@@ -1879,7 +2130,7 @@ Sub main()
     On Error GoTo 0
 
     If swApp Is Nothing Then
-        MsgBox "This macro must be run from inside SolidWorks.", vbCritical, "EasyPDM"
+        MsgBox T("MustRunInsideSolidWorks"), vbCritical, T("AppTitle")
         Exit Sub
     End If
 
@@ -1890,7 +2141,7 @@ Sub main()
 
     Dim filePath As String, itemTypeGuess As String, defaultName As String
     If Not GetActiveDocInfo(filePath, itemTypeGuess, defaultName) Then
-        MsgBox "No active, saved document.", vbExclamation, "EasyPDM"
+        MsgBox T("NoActiveSavedDocument"), vbExclamation, T("AppTitle")
         LogLine "No active/saved document -- done."
         Exit Sub
     End If
@@ -1922,7 +2173,7 @@ Sub main()
         ' no browser round-trip needed. STEP always exports here (no browser form to host
         ' a checkbox in for this path -- see UploadStepAttachment callers below).
         Dim confirmUpdate As VbMsgBoxResult
-        confirmUpdate = MsgBox("This document is already linked to a PDM item. Attach the current version as a new revision/update?", vbYesNo + vbQuestion, "EasyPDM")
+        confirmUpdate = MsgBox(T("AlreadyLinkedConfirm"), vbYesNo + vbQuestion, T("AppTitle"))
         If confirmUpdate <> vbYes Then Exit Sub
         Set resultInfo = PushToExistingItem(linkedItemId, filePath)
         If Not resultInfo Is Nothing Then UploadStepAttachment swActiveModel, linkedItemId
@@ -1937,7 +2188,7 @@ Sub main()
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)
         If ticketData Is Nothing Then
-            MsgBox "Cancelled -- nothing was sent.", vbInformation, "EasyPDM"
+            MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
             LogLine "=== Finished: browser ticket cancelled/timed out ==="
             Exit Sub
         End If
@@ -1960,7 +2211,7 @@ Sub main()
         If isExisting Then
             Set resultInfo = PushToExistingItem(ticketItemId, filePath)
             If resultInfo Is Nothing Then
-                MsgBox "Cancelled -- nothing was sent.", vbInformation, "EasyPDM"
+                MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
                 LogLine "=== Finished: existing item declined a new revision ==="
                 Exit Sub
             End If
@@ -1998,7 +2249,7 @@ Sub main()
             If Err.Number <> 0 Then topRelErr = Err.Description
             On Error GoTo 0
             If topRelErr <> "" Then
-                MsgBox "Failed to attach one of the sub-components under the main element: " & topRelErr, vbExclamation, "EasyPDM"
+                MsgBox T("FailedToAttachSubComponent") & topRelErr, vbExclamation, T("AppTitle")
             End If
         Next edgeVariant
     End If
@@ -2007,9 +2258,9 @@ Sub main()
         SetLinkedItem linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0))
         LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
                 ", revision " & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & " ==="
-        MsgBox "Uploaded to EasyPDM: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
-               " (revision " & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & ")." & vbCrLf & vbCrLf & _
-               "Run log: " & LogFilePath(), vbInformation, "EasyPDM"
+        MsgBox T("UploadedSuccessPart1") & JsonGetLong(resultInfo, "itemNumber", 0) & _
+               T("UploadedSuccessPart2") & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & ")." & vbCrLf & vbCrLf & _
+               T("RunLogPrefix") & LogFilePath(), vbInformation, T("AppTitle")
     Else
         LogLine "=== Finished without uploading (cancelled or no new revision) ==="
     End If
@@ -2018,11 +2269,11 @@ Sub main()
 Failed:
     LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
     If Err.Number = ERR_AUTH Then
-        MsgBox "Session expired -- run the macro again to log in." & vbCrLf & vbCrLf & _
-               "Run log: " & LogFilePath(), vbExclamation, "EasyPDM"
+        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & _
+               T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
         SetSessionToken ""
     Else
-        MsgBox "Error: " & Err.Description & vbCrLf & vbCrLf & "Run log: " & LogFilePath(), vbCritical, "EasyPDM"
+        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
     End If
 End Sub
 
@@ -2030,5 +2281,5 @@ End Sub
 ' without running the whole upload flow (the next run of "main" will ask to log in again).
 Sub Logout()
     ApiLogout
-    MsgBox "Logged out of EasyPDM.", vbInformation, "EasyPDM"
+    MsgBox T("LoggedOutMessage"), vbInformation, T("AppTitle")
 End Sub

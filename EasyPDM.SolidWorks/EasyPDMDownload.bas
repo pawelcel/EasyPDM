@@ -97,6 +97,201 @@ Private Const SW_DOC_DRAWING As Long = 3     ' swDocumentTypes_e.swDocDRAWING
 #End If
 Private Const VK_ESCAPE As Long = &H1B
 
+' Auto-wykrycie jezyka interfejsu Windows (UI language, nie tylko regionalny locale) przez
+' Win32 API GetUserDefaultUILanguage -- zwraca LANGID (WORD); dolne 10 bitow to Primary
+' Language ID (stale z winnt.h: LANG_POLISH=&H15, LANG_GERMAN=&H07, LANG_ENGLISH=&H09).
+' Fallback na angielski dla kazdego innego jezyka albo bledu wywolania.
+#If VBA7 Then
+    Private Declare PtrSafe Function GetUserDefaultUILanguage Lib "kernel32" () As Integer
+#Else
+    Private Declare Function GetUserDefaultUILanguage Lib "kernel32" () As Integer
+#End If
+
+Private g_Lang As String
+
+Private Function DetectLanguage() As String
+    Dim langId As Integer
+    Dim primaryLang As Integer
+    On Error GoTo Fallback
+    langId = GetUserDefaultUILanguage()
+    primaryLang = langId And &H3FF
+    Select Case primaryLang
+        Case &H15
+            DetectLanguage = "pl"
+        Case &H7
+            DetectLanguage = "de"
+        Case Else
+            DetectLanguage = "en"
+    End Select
+    Exit Function
+Fallback:
+    DetectLanguage = "en"
+End Function
+
+Private Function GetLang() As String
+    If g_Lang = "" Then g_Lang = DetectLanguage()
+    GetLang = g_Lang
+End Function
+
+
+' ============================================================================
+' Translations (PL/EN/DE) -- every user-facing string literal (MsgBox/InputBox text and
+' titles, status bar text, and the AppendLog progress lines that end up in the final
+' summary MsgBox) goes through T(key), dispatching to T_PL/T_EN/T_DE based on the
+' auto-detected Windows UI language (see DetectLanguage above). LogLine-only messages stay
+' hardcoded/untranslated on purpose -- only what the user actually sees goes through this
+' layer. Strings needing a dynamic value keep only their static part here; the call site
+' concatenates the dynamic value with "&" exactly like before.
+'
+' T_PL/T_DE MUST stay plain ASCII (transliterate diacritics: a/c/e/l/n/o/s/z/z for Polish,
+' ae/oe/ue/ss for German) -- see the file-header note above ("Input past end of file" on
+' VBA import, confirmed in practice when this was violated once already).
+' ============================================================================
+
+Private Function T(ByVal key As String) As String
+    Select Case GetLang()
+        Case "pl": T = T_PL(key)
+        Case "de": T = T_DE(key)
+        Case Else: T = T_EN(key)
+    End Select
+End Function
+
+Private Function T_PL(ByVal key As String) As String
+    Select Case key
+        Case "StatusWaitingForBrowser": T_PL = "EasyPDM: oczekiwanie na przegladarke... (Esc anuluje)"
+        Case "TitleLoginToPdm": T_PL = "Logowanie do PDM"
+        Case "PromptApiAddress": T_PL = "Adres API EasyPDM:"
+        Case "PromptUsername": T_PL = "Nazwa uzytkownika:"
+        Case "PromptPassword": T_PL = "Haslo (UWAGA: to pole nie maskuje wpisywanych znakow):"
+        Case "LoggedInAsPrefix": T_PL = "Zalogowano jako "
+        Case "AppTitle": T_PL = "EasyPDM"
+        Case "LoginFailedPrefix": T_PL = "Logowanie nie powiodlo sie: "
+        Case "LoginFailedNoSession": T_PL = "Logowanie nie powiodlo sie -- serwer nie zwrocil sesji."
+        Case "ServerErrorPrefix": T_PL = "Blad serwera ("
+        Case "NoConnectionPrefix": T_PL = "Brak polaczenia z "
+        Case "SessionExpiredError": T_PL = "Sesja wygasla."
+        Case "MustRunInsideSolidWorks": T_PL = "To makro musi byc uruchomione z poziomu SolidWorks."
+        Case "SessionExpiredPrompt": T_PL = "Sesja wygasla -- uruchom makro ponownie, aby sie zalogowac."
+        Case "RunLogPrefix": T_PL = "Log przebiegu: "
+        Case "ErrorPrefix": T_PL = "Blad: "
+        Case "LoggedOutMessage": T_PL = "Wylogowano z EasyPDM."
+        Case "CancelledNothingDownloaded": T_PL = "Anulowano -- nic nie zostalo pobrane."
+        Case "SelectedItemLoadFailed": T_PL = "Nie udalo sie wczytac wybranego elementu."
+        Case "PromptTargetFolder": T_PL = "Folder docelowy:"
+        Case "TitleDownloadFromPdm": T_PL = "Pobieranie z PDM"
+        Case "TitleNewerRevision": T_PL = "Nowsza rewizja"
+        Case "NewerRevisionPart1": T_PL = "Folder zawiera juz "
+        Case "NewerRevisionPart2": T_PL = " w rewizji "
+        Case "NewerRevisionPart3": T_PL = ", ale biezaca wersja na serwerze to rewizja "
+        Case "DownloadNewestQuestion": T_PL = "Pobrac najnowsza wersje?"
+        Case "Dl_FetchAttachmentsFailed": T_PL = ": nie udalo sie pobrac listy zalacznikow."
+        Case "Dl_NoAttachments": T_PL = ": brak plikow CAD do pobrania (element nie ma zalacznikow)."
+        Case "Dl_AlreadyInFolder": T_PL = ": juz jest w folderze (biezaca rewizja), pomijanie."
+        Case "Dl_KeepingExistingRevisionPrefix": T_PL = ": zachowywanie istniejacej lokalnej rewizji ("
+        Case "Dl_DownloadingPrefix": T_PL = "  Pobieranie "
+        Case "Dl_ErrorDownloadingMid": T_PL = ": BLAD podczas pobierania "
+        Case "Dl_Saved": T_PL = "  Zapisano: "
+        Case "Dl_FetchChildrenFailed": T_PL = "): nie udalo sie pobrac listy komponentow."
+        Case "Dl_DownloadingToPrefix": T_PL = "Pobieranie "
+        Case "Dl_DownloadingToMiddle": T_PL = ") do "
+        Case "Dl_FailedToOpenPrefix": T_PL = "Nie udalo sie otworzyc "
+        Case "Dl_FailedToOpenSuffix": T_PL = " w SolidWorks (kod bledu "
+        Case "Dl_Opened": T_PL = "Otwarto: "
+        Case "Dl_CouldNotDetermineMainFile": T_PL = "Nie udalo sie ustalic glownego pliku do otwarcia."
+    End Select
+End Function
+
+Private Function T_EN(ByVal key As String) As String
+    Select Case key
+        Case "StatusWaitingForBrowser": T_EN = "EasyPDM: waiting for the browser... (Esc to cancel)"
+        Case "TitleLoginToPdm": T_EN = "Log in to PDM"
+        Case "PromptApiAddress": T_EN = "EasyPDM API address:"
+        Case "PromptUsername": T_EN = "Username:"
+        Case "PromptPassword": T_EN = "Password (NOTE: this field does not mask typed characters):"
+        Case "LoggedInAsPrefix": T_EN = "Logged in as "
+        Case "AppTitle": T_EN = "EasyPDM"
+        Case "LoginFailedPrefix": T_EN = "Login failed: "
+        Case "LoginFailedNoSession": T_EN = "Login failed -- the server did not return a session."
+        Case "ServerErrorPrefix": T_EN = "Server error ("
+        Case "NoConnectionPrefix": T_EN = "No connection to "
+        Case "SessionExpiredError": T_EN = "Session expired."
+        Case "MustRunInsideSolidWorks": T_EN = "This macro must be run from inside SolidWorks."
+        Case "SessionExpiredPrompt": T_EN = "Session expired -- run the macro again to log in."
+        Case "RunLogPrefix": T_EN = "Run log: "
+        Case "ErrorPrefix": T_EN = "Error: "
+        Case "LoggedOutMessage": T_EN = "Logged out of EasyPDM."
+        Case "CancelledNothingDownloaded": T_EN = "Cancelled -- nothing was downloaded."
+        Case "SelectedItemLoadFailed": T_EN = "The selected item could not be loaded."
+        Case "PromptTargetFolder": T_EN = "Target folder:"
+        Case "TitleDownloadFromPdm": T_EN = "Download from PDM"
+        Case "TitleNewerRevision": T_EN = "Newer revision"
+        Case "NewerRevisionPart1": T_EN = "The folder already has "
+        Case "NewerRevisionPart2": T_EN = " at revision "
+        Case "NewerRevisionPart3": T_EN = ", but the current one on the server is revision "
+        Case "DownloadNewestQuestion": T_EN = "Download the newest version?"
+        Case "Dl_FetchAttachmentsFailed": T_EN = ": failed to fetch the attachment list."
+        Case "Dl_NoAttachments": T_EN = ": no CAD files to download (the item has no attachments)."
+        Case "Dl_AlreadyInFolder": T_EN = ": already in the folder (current revision), skipping."
+        Case "Dl_KeepingExistingRevisionPrefix": T_EN = ": keeping the existing local revision ("
+        Case "Dl_DownloadingPrefix": T_EN = "  Downloading "
+        Case "Dl_ErrorDownloadingMid": T_EN = ": ERROR downloading "
+        Case "Dl_Saved": T_EN = "  Saved: "
+        Case "Dl_FetchChildrenFailed": T_EN = "): failed to fetch the component list."
+        Case "Dl_DownloadingToPrefix": T_EN = "Downloading "
+        Case "Dl_DownloadingToMiddle": T_EN = ") to "
+        Case "Dl_FailedToOpenPrefix": T_EN = "Failed to open "
+        Case "Dl_FailedToOpenSuffix": T_EN = " in SolidWorks (error code "
+        Case "Dl_Opened": T_EN = "Opened: "
+        Case "Dl_CouldNotDetermineMainFile": T_EN = "Could not determine the main file to open."
+    End Select
+End Function
+
+Private Function T_DE(ByVal key As String) As String
+    Select Case key
+        Case "StatusWaitingForBrowser": T_DE = "EasyPDM: Warten auf den Browser... (Esc zum Abbrechen)"
+        Case "TitleLoginToPdm": T_DE = "Anmeldung bei PDM"
+        Case "PromptApiAddress": T_DE = "EasyPDM-API-Adresse:"
+        Case "PromptUsername": T_DE = "Benutzername:"
+        Case "PromptPassword": T_DE = "Passwort (HINWEIS: Dieses Feld maskiert die eingegebenen Zeichen nicht):"
+        Case "LoggedInAsPrefix": T_DE = "Angemeldet als "
+        Case "AppTitle": T_DE = "EasyPDM"
+        Case "LoginFailedPrefix": T_DE = "Anmeldung fehlgeschlagen: "
+        Case "LoginFailedNoSession": T_DE = "Anmeldung fehlgeschlagen -- der Server hat keine Sitzung zurueckgegeben."
+        Case "ServerErrorPrefix": T_DE = "Serverfehler ("
+        Case "NoConnectionPrefix": T_DE = "Keine Verbindung zu "
+        Case "SessionExpiredError": T_DE = "Sitzung abgelaufen."
+        Case "MustRunInsideSolidWorks": T_DE = "Dieses Makro muss innerhalb von SolidWorks ausgefuehrt werden."
+        Case "SessionExpiredPrompt": T_DE = "Sitzung abgelaufen -- fuehren Sie das Makro erneut aus, um sich anzumelden."
+        Case "RunLogPrefix": T_DE = "Ausfuehrungsprotokoll: "
+        Case "ErrorPrefix": T_DE = "Fehler: "
+        Case "LoggedOutMessage": T_DE = "Von EasyPDM abgemeldet."
+        Case "CancelledNothingDownloaded": T_DE = "Abgebrochen -- es wurde nichts heruntergeladen."
+        Case "SelectedItemLoadFailed": T_DE = "Das ausgewaehlte Element konnte nicht geladen werden."
+        Case "PromptTargetFolder": T_DE = "Zielordner:"
+        Case "TitleDownloadFromPdm": T_DE = "Download von PDM"
+        Case "TitleNewerRevision": T_DE = "Neuere Revision"
+        Case "NewerRevisionPart1": T_DE = "Der Ordner enthaelt bereits "
+        Case "NewerRevisionPart2": T_DE = " in Revision "
+        Case "NewerRevisionPart3": T_DE = ", aber die aktuelle Version auf dem Server ist Revision "
+        Case "DownloadNewestQuestion": T_DE = "Neueste Version herunterladen?"
+        Case "Dl_FetchAttachmentsFailed": T_DE = ": Abrufen der Anhangsliste fehlgeschlagen."
+        Case "Dl_NoAttachments": T_DE = ": keine CAD-Dateien zum Herunterladen (das Element hat keine Anhaenge)."
+        Case "Dl_AlreadyInFolder": T_DE = ": bereits im Ordner vorhanden (aktuelle Revision), wird uebersprungen."
+        Case "Dl_KeepingExistingRevisionPrefix": T_DE = ": vorhandene lokale Revision wird beibehalten ("
+        Case "Dl_DownloadingPrefix": T_DE = "  Herunterladen von "
+        Case "Dl_ErrorDownloadingMid": T_DE = ": FEHLER beim Herunterladen von "
+        Case "Dl_Saved": T_DE = "  Gespeichert: "
+        Case "Dl_FetchChildrenFailed": T_DE = "): Abrufen der Komponentenliste fehlgeschlagen."
+        Case "Dl_DownloadingToPrefix": T_DE = "Herunterladen von "
+        Case "Dl_DownloadingToMiddle": T_DE = ") nach "
+        Case "Dl_FailedToOpenPrefix": T_DE = "Oeffnen von "
+        Case "Dl_FailedToOpenSuffix": T_DE = " in SolidWorks fehlgeschlagen (Fehlercode "
+        Case "Dl_Opened": T_DE = "Geoeffnet: "
+        Case "Dl_CouldNotDetermineMainFile": T_DE = "Die zu oeffnende Hauptdatei konnte nicht ermittelt werden."
+    End Select
+End Function
+
+
 ' SolidWorks application object -- declared and assigned at the start of Sub main(), same
 ' reasoning as EasyPDMUpload.bas ("swApp" is only auto-provided in the module SolidWorks
 ' itself generates via "Tools -> Macro -> New", not in an imported module like this one).
@@ -410,7 +605,7 @@ Private Sub RaiseForStatus(ByVal status As Long, ByVal responseText As String)
     If status = 401 Then
         Err.Raise ERR_AUTH, "EasyPDM", responseText
     ElseIf status < 200 Or status >= 300 Then
-        Err.Raise ERR_API, "EasyPDM", "Server error (" & status & "): " & responseText
+        Err.Raise ERR_API, "EasyPDM", T("ServerErrorPrefix") & status & "): " & responseText
     End If
 End Sub
 
@@ -436,7 +631,7 @@ Function ApiGet(ByVal path As String) As Object
     Exit Function
 NetErr:
     LogLine "GET " & path & " -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
 ' Like ApiGet, but returns the raw response bytes -- for downloading file (attachment)
@@ -456,16 +651,16 @@ Function ApiGetBinary(ByVal path As String) As Byte()
 
     LogLine "GET (binary) " & path & " -> " & http.Status
     If http.Status = 401 Then
-        Err.Raise ERR_AUTH, "EasyPDM", "Session expired."
+        Err.Raise ERR_AUTH, "EasyPDM", T("SessionExpiredError")
     ElseIf http.Status < 200 Or http.Status >= 300 Then
-        Err.Raise ERR_API, "EasyPDM", "Server error (" & http.Status & ")."
+        Err.Raise ERR_API, "EasyPDM", T("ServerErrorPrefix") & http.Status & ")."
     End If
 
     ApiGetBinary = http.responseBody
     Exit Function
 NetErr:
     LogLine "GET (binary) " & path & " -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
 Function ApiPostJson(ByVal path As String, ByVal bodyJson As String) As Object
@@ -491,7 +686,7 @@ Function ApiPostJson(ByVal path As String, ByVal bodyJson As String) As Object
     Exit Function
 NetErr:
     LogLine "POST " & path & " -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
 
@@ -595,7 +790,7 @@ Function WaitForTicket(ByVal ticket As String) As Object
     sincePollMs = POLL_EVERY_MS ' poll right away on the very first tick
 
     On Error Resume Next
-    swApp.Frame.SetStatusBarText "EasyPDM: waiting for the browser... (Esc to cancel)"
+    swApp.Frame.SetStatusBarText T("StatusWaitingForBrowser")
     On Error GoTo 0
 
     Do While elapsedMs < TIMEOUT_MS
@@ -656,7 +851,7 @@ Function ApiLogin(ByVal username As String, ByVal password As String) As Object
     LogLine "POST /auth/login -> " & http.Status & " (user: " & username & ")"
     If http.Status = 401 Or http.Status < 200 Or http.Status >= 300 Then
         LogLine "Login failed: " & http.responseText
-        Err.Raise ERR_API, "EasyPDM", "Login failed: " & http.responseText
+        Err.Raise ERR_API, "EasyPDM", T("LoginFailedPrefix") & http.responseText
     End If
 
     Dim user As Object
@@ -667,7 +862,7 @@ Function ApiLogin(ByVal username As String, ByVal password As String) As Object
     If token = "" Then token = ExtractSessionCookie(http)
     If token = "" Then
         LogLine "Login: server responded 2xx, but no session token was found either in the response body or in the headers."
-        Err.Raise ERR_API, "EasyPDM", "Login failed -- the server did not return a session."
+        Err.Raise ERR_API, "EasyPDM", T("LoginFailedNoSession")
     End If
 
     SetSessionToken token
@@ -681,7 +876,7 @@ Function ApiLogin(ByVal username As String, ByVal password As String) As Object
     Exit Function
 NetErr:
     LogLine "POST /auth/login -> NO CONNECTION: " & Err.Description
-    Err.Raise ERR_API, "EasyPDM", "No connection to " & GetBaseUrl() & ": " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
 Private Function ExtractSessionCookie(ByVal http As Object) As String
@@ -777,7 +972,7 @@ End Function
 
 Private Function PromptLogin() As Boolean
     Dim serverUrl As String
-    serverUrl = InputBox("EasyPDM API address:", "Log in to PDM", GetBaseUrl())
+    serverUrl = InputBox(T("PromptApiAddress"), T("TitleLoginToPdm"), GetBaseUrl())
     If Trim(serverUrl) = "" Then
         PromptLogin = False
         Exit Function
@@ -787,12 +982,12 @@ Private Function PromptLogin() As Boolean
     Dim attempt As Integer
     For attempt = 1 To 3
         Dim username As String, password As String
-        username = InputBox("Username:", "Log in to PDM")
+        username = InputBox(T("PromptUsername"), T("TitleLoginToPdm"))
         If Trim(username) = "" Then
             PromptLogin = False
             Exit Function
         End If
-        password = InputBox("Password (NOTE: this field does not mask typed characters):", "Log in to PDM")
+        password = InputBox(T("PromptPassword"), T("TitleLoginToPdm"))
         If password = "" Then
             PromptLogin = False
             Exit Function
@@ -808,11 +1003,11 @@ Private Function PromptLogin() As Boolean
         On Error GoTo 0
 
         If loginErrNum = 0 Then
-            MsgBox "Logged in as " & JsonGetString(user, "displayName", username) & ".", vbInformation, "EasyPDM"
+            MsgBox T("LoggedInAsPrefix") & JsonGetString(user, "displayName", username) & ".", vbInformation, T("AppTitle")
             PromptLogin = True
             Exit Function
         Else
-            MsgBox "Login failed: " & loginErrDesc, vbExclamation, "EasyPDM"
+            MsgBox T("LoginFailedPrefix") & loginErrDesc, vbExclamation, T("AppTitle")
         End If
     Next attempt
     PromptLogin = False
@@ -1002,14 +1197,14 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
     Set attachments = ApiGet("/items/" & JsonGetString(item, "id", "") & "/attachments")
     On Error GoTo 0
     If attachments Is Nothing Then
-        AppendLog "  " & label & ": failed to fetch the attachment list."
+        AppendLog "  " & label & T("Dl_FetchAttachmentsFailed")
         Exit Function
     End If
 
     Dim current As Object
     Set current = FindCurrentAttachment(item, attachments)
     If current Is Nothing Then
-        AppendLog "  " & label & ": no CAD files to download (the item has no attachments)."
+        AppendLog "  " & label & T("Dl_NoAttachments")
         Exit Function
     End If
 
@@ -1024,7 +1219,7 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
         sameSize = (FileLen(targetPath) = JsonGetLong(current, "fileSize", -1))
         On Error GoTo 0
         If sameSize Then
-            AppendLog "  " & label & ": already in the folder (current revision), skipping."
+            AppendLog "  " & label & T("Dl_AlreadyInFolder")
             DownloadItem = targetPath
             Exit Function
         End If
@@ -1053,11 +1248,11 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
 
         Dim answer As VbMsgBoxResult
         answer = MsgBox( _
-            "The folder already has " & label & " at revision " & revLabels & _
-            ", but the current one on the server is revision " & wanted & "." & vbCrLf & vbCrLf & _
-            "Download the newest version?", vbYesNo, "Newer revision")
+            T("NewerRevisionPart1") & label & T("NewerRevisionPart2") & revLabels & _
+            T("NewerRevisionPart3") & wanted & "." & vbCrLf & vbCrLf & _
+            T("DownloadNewestQuestion"), vbYesNo, T("TitleNewerRevision"))
         If answer <> vbYes Then
-            AppendLog "  " & label & ": keeping the existing local revision (" & revLabels & ")."
+            AppendLog "  " & label & T("Dl_KeepingExistingRevisionPrefix") & revLabels & ")."
             If olderOtherRevision.Count = 1 Then
                 DownloadItem = olderOtherRevision(1)(1)
             End If
@@ -1065,7 +1260,7 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
         End If
     End If
 
-    AppendLog "  Downloading " & currentName & "..."
+    AppendLog T("Dl_DownloadingPrefix") & currentName & "..."
     Dim bytes() As Byte
     On Error Resume Next
     Err.Clear
@@ -1075,13 +1270,13 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
     dlErrDesc = Err.Description
     On Error GoTo 0
     If dlErrNum <> 0 Then
-        AppendLog "  " & label & ": ERROR downloading " & currentName & " (" & dlErrDesc & ")."
+        AppendLog "  " & label & T("Dl_ErrorDownloadingMid") & currentName & " (" & dlErrDesc & ")."
         Exit Function
     End If
 
     EnsureDirectory targetDir
     WriteBytesToFile bytes, targetPath
-    AppendLog "  Saved: " & currentName
+    AppendLog T("Dl_Saved") & currentName
     DownloadItem = targetPath
 End Function
 
@@ -1096,7 +1291,7 @@ Sub DownloadChildrenRecursive(ByVal item As Object, ByVal targetDir As String, B
     Set rows = ApiGet("/items/" & JsonGetString(item, "id", "") & "/children")
     On Error GoTo 0
     If rows Is Nothing Then
-        AppendLog "  " & JsonGetLong(item, "itemNumber", 0) & " (" & JsonGetString(item, "fileName", "") & "): failed to fetch the component list."
+        AppendLog "  " & JsonGetLong(item, "itemNumber", 0) & " (" & JsonGetString(item, "fileName", "") & T("Dl_FetchChildrenFailed")
         Exit Sub
     End If
 
@@ -1140,7 +1335,7 @@ Sub main()
     On Error GoTo 0
 
     If swApp Is Nothing Then
-        MsgBox "This macro must be run from inside SolidWorks.", vbCritical, "EasyPDM"
+        MsgBox T("MustRunInsideSolidWorks"), vbCritical, T("AppTitle")
         Exit Sub
     End If
 
@@ -1159,7 +1354,7 @@ Sub main()
     Dim ticketData As Object
     Set ticketData = WaitForTicket(ticket)
     If ticketData Is Nothing Then
-        MsgBox "Cancelled -- nothing was downloaded.", vbInformation, "EasyPDM"
+        MsgBox T("CancelledNothingDownloaded"), vbInformation, T("AppTitle")
         LogLine "=== Finished: browser ticket cancelled/timed out ==="
         Exit Sub
     End If
@@ -1167,14 +1362,14 @@ Sub main()
     Dim topItem As Object
     Set topItem = ApiGet("/items/" & JsonGetString(ticketData, "itemId", ""))
     If topItem Is Nothing Then
-        MsgBox "The selected item could not be loaded.", vbExclamation, "EasyPDM"
+        MsgBox T("SelectedItemLoadFailed"), vbExclamation, T("AppTitle")
         Exit Sub
     End If
 
     Dim defaultFolder As String
     defaultFolder = GetDownloadFolder()
     Dim targetDir As String
-    targetDir = InputBox("Target folder:", "Download from PDM", defaultFolder)
+    targetDir = InputBox(T("PromptTargetFolder"), T("TitleDownloadFromPdm"), defaultFolder)
     targetDir = Trim(targetDir)
     If targetDir = "" Then Exit Sub
     If Right(targetDir, 1) = "\" Then targetDir = Left(targetDir, Len(targetDir) - 1)
@@ -1184,7 +1379,7 @@ Sub main()
     SetDownloadFolder targetDir
 
     gLogText = ""
-    AppendLog "Downloading " & JsonGetLong(topItem, "itemNumber", 0) & " (" & JsonGetString(topItem, "fileName", "") & ") to " & targetDir & "..."
+    AppendLog T("Dl_DownloadingToPrefix") & JsonGetLong(topItem, "itemNumber", 0) & " (" & JsonGetString(topItem, "fileName", "") & T("Dl_DownloadingToMiddle") & targetDir & "..."
 
     Dim seen As Object
     Set seen = CreateObject("Scripting.Dictionary")
@@ -1211,31 +1406,31 @@ Sub main()
         Dim opened As Object
         Set opened = swApp.OpenDoc6(topPath, docType, 0, "", openErrors, openWarnings)
         If opened Is Nothing Then
-            AppendLog "Failed to open " & topPath & " in SolidWorks (error code " & openErrors & ")."
+            AppendLog T("Dl_FailedToOpenPrefix") & topPath & T("Dl_FailedToOpenSuffix") & openErrors & ")."
         Else
-            AppendLog "Opened: " & topPath
+            AppendLog T("Dl_Opened") & topPath
         End If
     Else
-        AppendLog "Could not determine the main file to open."
+        AppendLog T("Dl_CouldNotDetermineMainFile")
     End If
 
-    MsgBox gLogText, vbInformation, "EasyPDM"
+    MsgBox gLogText, vbInformation, T("AppTitle")
     LogLine "=== Finished ==="
     Exit Sub
 
 Failed:
     LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
     If Err.Number = ERR_AUTH Then
-        MsgBox "Session expired -- run the macro again to log in." & vbCrLf & vbCrLf & _
-               "Run log: " & LogFilePath(), vbExclamation, "EasyPDM"
+        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & _
+               T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
         SetSessionToken ""
     Else
-        MsgBox "Error: " & Err.Description & vbCrLf & vbCrLf & "Run log: " & LogFilePath(), vbCritical, "EasyPDM"
+        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
     End If
 End Sub
 
 ' Separate Sub -- can be bound to your own toolbar button/shortcut to log out of EasyPDM.
 Sub Logout()
     ApiLogout
-    MsgBox "Logged out of EasyPDM.", vbInformation, "EasyPDM"
+    MsgBox T("LoggedOutMessage"), vbInformation, T("AppTitle")
 End Sub
