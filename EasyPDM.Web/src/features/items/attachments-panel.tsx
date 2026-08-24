@@ -16,6 +16,11 @@ function formatSize(size: number | null): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function formatUploadedAt(uploadedAt: string | null): string {
+  if (!uploadedAt) return ""
+  return new Date(uploadedAt).toLocaleString("pl-PL")
+}
+
 // Miejsce "PDF"/"STEP" — jeden załącznik na rolę, widoczny osobno OD załączników
 // ogólnych, żeby było od razu jasne, KTÓRY plik zasila stały podgląd 2D/3D w nagłówku
 // panelu (ItemPreviewBox), zamiast szukać go wśród zwykłych załączników.
@@ -221,7 +226,11 @@ function AttachmentsPanel({
                 {attachment.fileName}
               </a>
               <div className="flex shrink-0 items-center gap-2">
-                <span className="text-muted-foreground">{formatSize(attachment.fileSize)}</span>
+                <span className="text-muted-foreground">
+                  {formatUploadedAt(attachment.uploadedAt)}
+                  {attachment.uploadedAt && attachment.fileSize !== null && " · "}
+                  {formatSize(attachment.fileSize)}
+                </span>
                 {previewKindOf(attachment.fileName) && (
                   <Button
                     size="icon-sm"
