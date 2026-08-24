@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.Features;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,18 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 // Windows Service Control Manager (instalator Windows rejestruje go jako usługę) — na
 // Linux/macOS/Dockerze/zwykłym "dotnet run" to zwykły no-op.
 builder.Host.UseWindowsService();
+// Kestrel domyślnie odcina żądania powyżej ~30 MB (MaxRequestBodySize) -- za mało dla
+// realnych plików CAD (złożenia/eksporty STEP potrafią ważyć grubo ponad 100 MB,
+// potwierdzone w praktyce: upload 133 MB kończył się 413 przy uploadzie z makra
+// SolidWorks). Limit wyłączony całkowicie -- to zaufane, wewnętrzne narzędzie firmowe za
+// logowaniem, nie publiczny serwis, więc nie ma sensu zgadywać arbitralnego górnego limitu,
+// który i tak kiedyś okaże się za mały dla jakiegoś większego złożenia.
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = null);
+// ReadFormAsync() (used by the attachment-upload endpoint) has its OWN separate default
+// limit (128 MB, MultipartBodyLengthLimit) independent of Kestrel's -- raising only the
+// Kestrel one above would still 413 on anything bigger than 128 MB. Same reasoning as
+// Kestrel's limit: no sane fixed cap for arbitrary CAD files, so it's removed too.
+builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = long.MaxValue);
 var app = builder.Build();
 
 string connectionString = app.Configuration["ConnectionString"]
