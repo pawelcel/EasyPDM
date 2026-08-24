@@ -76,6 +76,14 @@ Private Const SESSION_COOKIE_NAME As String = "pdm_session"
 Private Const ERR_AUTH As Long = vbObjectError + 1001
 Private Const ERR_API As Long = vbObjectError + 1002
 
+' SolidWorks application object -- declared and assigned at the start of Sub main(), same
+' reasoning as EasyPDMUpload.bas ("swApp" is only auto-provided in the module SolidWorks
+' itself generates via "Tools -> Macro -> New", not in an imported module like this one).
+' Grouped here with the module's other Private/Const declarations, all BEFORE any
+' Sub/Function, matching the same relocation applied to EasyPDMUpload.bas after "Variable
+' not defined" was seen on swApp there when it sat after several Function blocks instead.
+Private swApp As Object
+
 ' Values from the SolidWorks swDocumentTypes_e enum -- declared explicitly as numbers, same
 ' reasoning as EasyPDMUpload.bas (late binding + Option Explicit -> bare constant names
 ' with no type library reference fail to compile as "Variable not defined", confirmed in
@@ -291,11 +299,6 @@ Private Function T_DE(ByVal key As String) As String
     End Select
 End Function
 
-
-' SolidWorks application object -- declared and assigned at the start of Sub main(), same
-' reasoning as EasyPDMUpload.bas ("swApp" is only auto-provided in the module SolidWorks
-' itself generates via "Tools -> Macro -> New", not in an imported module like this one).
-Private swApp As Object
 
 ' Accumulates one run's progress messages (plain text, not a Collection -- fewer moving
 ' parts), so DownloadItem/DownloadChildrenRecursive can report progress via AppendLog
