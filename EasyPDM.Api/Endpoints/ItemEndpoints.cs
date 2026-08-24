@@ -962,6 +962,20 @@ static class ItemEndpoints
                 }
             }
 
+            // Część/Złożenie trzymają swój plik CAD (i podgląd STEP/PDF) w item_attachments,
+            // NIE w items.file_path (to pole jest tylko dla Plików) -- bez tego te pliki
+            // zostawałyby sierotami na dysku na zawsze: ON DELETE CASCADE kasuje wiersze
+            // item_attachments razem z items, ale samych plików fizycznie nie rusza.
+            // Zapytanie MUSI polecieć przed DELETE FROM items (kaskada skasuje wiersze).
+            await using (var attachmentsCmd = new NpgsqlCommand(
+                "SELECT file_path FROM item_attachments WHERE item_id = ANY(@ids);", conn))
+            {
+                attachmentsCmd.Parameters.AddWithValue("ids", idsToDelete.ToArray());
+                await using var reader = await attachmentsCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    filePaths.Add(reader.GetString(0));
+            }
+
             await using (var deleteCmd = new NpgsqlCommand("DELETE FROM items WHERE id = ANY(@ids);", conn))
             {
                 deleteCmd.Parameters.AddWithValue("ids", idsToDelete.ToArray());
