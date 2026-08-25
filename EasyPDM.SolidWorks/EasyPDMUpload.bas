@@ -1498,6 +1498,30 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
         Exit Function
     End If
 
+    ' Unlike the register path above (which overwrites the SAME physical file in place via
+    ' FileCopy, so re-registering an unchanged name is correctly a no-op), a plain HTTP
+    ' upload always lands at a BRAND NEW server-generated path with no relation to
+    ' "newFilename" -- without this check, repeated uploads while the revision letter stays
+    ' the same (e.g. several saves in a row while still "w_pracy", no status change) would
+    ' each add ANOTHER "cad" attachment instead of replacing the one for THIS revision,
+    ' accumulating indefinitely (confirmed in practice). Delete any previous attachment with
+    ' the exact same name first, so re-uploading the same revision replaces it instead.
+    Dim existingCadAttachments As Object
+    On Error Resume Next
+    Set existingCadAttachments = ApiGet("/items/" & itemId & "/attachments")
+    On Error GoTo 0
+    If Not existingCadAttachments Is Nothing Then
+        Dim existingCad As Variant
+        For Each existingCad In existingCadAttachments
+            If JsonGetString(existingCad, "fileName", "") = newFilename Then
+                On Error Resume Next
+                ApiDeleteRequest "/attachments/" & JsonGetString(existingCad, "id", "")
+                On Error GoTo 0
+                Exit For
+            End If
+        Next existingCad
+    End If
+
     LogLine "Plain HTTP upload: /items/" & itemId & "/attachments as """ & newFilename & """"
     ApiUploadFile "/items/" & itemId & "/attachments", filePath, newFilename, "role", "cad"
     RenameAndUpload = True
