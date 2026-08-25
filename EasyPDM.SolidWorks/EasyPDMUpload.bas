@@ -1786,6 +1786,17 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     ProcessAssemblyTree = False
     If topModel.GetType() <> SW_DOC_ASSEMBLY Then Exit Function
 
+    ' Force full resolution of any Lightweight components BEFORE walking the tree --
+    ' IComponent2.GetModelDoc2() returns Nothing for a component that is still Lightweight
+    ' (a SolidWorks performance optimization: only partial data loaded, unrelated to whether
+    ' it LOOKS fully displayed in the graphics area), which otherwise makes every lightweight
+    ' part silently indistinguishable from "no components at all" -- confirmed in practice
+    ' (GetComponents(True) found 2 components, GetModelDoc2() returned Nothing for both).
+    ' Recursive: resolves the whole tree, not just this assembly's direct children.
+    On Error Resume Next
+    topModel.Extension.ResolveAllLightWeightComponents True
+    On Error GoTo 0
+
     Dim tree As Object
     Set tree = DiscoverComponentTree(topModel)
     Dim order As Collection
