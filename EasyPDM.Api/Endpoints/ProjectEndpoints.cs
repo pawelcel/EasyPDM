@@ -19,14 +19,15 @@ static class ProjectEndpoints
             await conn.OpenAsync();
 
             const string sql = """
-                SELECT p.id, p.name, p.description, p.client, p.start_date, p.end_date,
-                       p.created_at, COUNT(i.id) AS item_count
+                SELECT p.id, p.name, p.description, p.client, p.client_id, c.name, c.name2,
+                       p.start_date, p.end_date, p.created_at, COUNT(i.id) AS item_count
                 FROM projects p
                 LEFT JOIN items i ON i.project_id = p.id
+                LEFT JOIN clients c ON c.id = p.client_id
                 WHERE @isAdmin OR EXISTS (
                     SELECT 1 FROM project_users pu WHERE pu.project_id = p.id AND pu.user_id = @userId
                 )
-                GROUP BY p.id
+                GROUP BY p.id, c.id
                 ORDER BY p.name;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -51,14 +52,17 @@ static class ProjectEndpoints
             await conn.OpenAsync();
 
             const string sql = """
-                INSERT INTO projects (name, description, client, start_date, end_date)
-                VALUES (@name, @description, @client, @startDate, @endDate)
-                RETURNING id, name, description, client, start_date, end_date, created_at;
+                INSERT INTO projects (name, description, client_id, start_date, end_date)
+                VALUES (@name, @description, @clientId, @startDate, @endDate)
+                RETURNING id, name, description, client, client_id,
+                    (SELECT name FROM clients WHERE clients.id = client_id) AS client_name,
+                    (SELECT name2 FROM clients WHERE clients.id = client_id) AS client_name2,
+                    start_date, end_date, created_at;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("name", body.Name.Trim());
             cmd.Parameters.AddWithValue("description", (object?)body.Description ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("client", (object?)body.Client ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("clientId", (object?)body.ClientId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("startDate", (object?)body.StartDate ?? DBNull.Value);
             cmd.Parameters.AddWithValue("endDate", (object?)body.EndDate ?? DBNull.Value);
 
@@ -89,18 +93,21 @@ static class ProjectEndpoints
                 UPDATE projects SET
                     name = @name,
                     description = @description,
-                    client = @client,
+                    client_id = @clientId,
                     start_date = @startDate,
                     end_date = @endDate
                 WHERE id = @id
-                RETURNING id, name, description, client, start_date, end_date, created_at,
+                RETURNING id, name, description, client, client_id,
+                    (SELECT name FROM clients WHERE clients.id = client_id) AS client_name,
+                    (SELECT name2 FROM clients WHERE clients.id = client_id) AS client_name2,
+                    start_date, end_date, created_at,
                     (SELECT COUNT(*) FROM items WHERE items.project_id = projects.id);
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("name", body.Name.Trim());
             cmd.Parameters.AddWithValue("description", (object?)body.Description ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("client", (object?)body.Client ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("clientId", (object?)body.ClientId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("startDate", (object?)body.StartDate ?? DBNull.Value);
             cmd.Parameters.AddWithValue("endDate", (object?)body.EndDate ?? DBNull.Value);
 
@@ -162,13 +169,16 @@ static class ProjectEndpoints
         name = reader.GetString(1),
         description = reader.IsDBNull(2) ? null : reader.GetString(2),
         client = reader.IsDBNull(3) ? null : reader.GetString(3),
-        startDate = reader.IsDBNull(4) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(4),
-        endDate = reader.IsDBNull(5) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(5),
-        createdAt = reader.GetDateTime(6),
-        itemCount = itemCount ?? reader.GetInt64(7)
+        clientId = reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4),
+        clientName = reader.IsDBNull(5) ? null : reader.GetString(5),
+        clientName2 = reader.IsDBNull(6) ? null : reader.GetString(6),
+        startDate = reader.IsDBNull(7) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(7),
+        endDate = reader.IsDBNull(8) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(8),
+        createdAt = reader.GetDateTime(9),
+        itemCount = itemCount ?? reader.GetInt64(10)
     };
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }
 
-record ProjectRequest(string Name, string? Description, string? Client, DateOnly? StartDate, DateOnly? EndDate);
+record ProjectRequest(string Name, string? Description, int? ClientId, DateOnly? StartDate, DateOnly? EndDate);

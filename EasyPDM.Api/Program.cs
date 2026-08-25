@@ -104,6 +104,7 @@ app.MapDocumentationEndpoints(connectionString);
 app.MapHistoryEndpoints(connectionString);
 app.MapMaterialEndpoints(connectionString);
 app.MapManufacturerEndpoints(connectionString);
+app.MapClientEndpoints(connectionString, storage);
 app.MapSavedFilterEndpoints(connectionString);
 app.MapAttachmentEndpoints(connectionString, storage);
 app.MapConfigEndpoints(storage);

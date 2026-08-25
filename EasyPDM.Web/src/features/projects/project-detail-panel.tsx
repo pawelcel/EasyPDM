@@ -1,21 +1,30 @@
 import { useEffect, useState } from "react"
 
 import { api } from "@/api/client"
-import type { Project } from "@/api/types"
+import type { Client, Project } from "@/api/types"
 import { Button } from "@/components/ui/button"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
+import { useClients } from "@/features/clients/use-clients"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { useLanguage } from "@/i18n/use-language"
 
 type ProjectForm = {
   name: string
   description: string
-  client: string
+  clientId: number | null
   startDate: string
   endDate: string
 }
@@ -24,10 +33,17 @@ function formFromProject(project: Project): ProjectForm {
   return {
     name: project.name,
     description: project.description ?? "",
-    client: project.client ?? "",
+    clientId: project.clientId,
     startDate: project.startDate ?? "",
     endDate: project.endDate ?? "",
   }
+}
+
+// Nazwa + (jeśli jest) Nazwa 2, do etykiety w wyszukiwarce Klienta -- ten sam wzorzec co
+// wyszukiwanie po Nazwie i Nazwie 2 w zakładce "Klienci".
+function clientLabel(client: Client | undefined): string {
+  if (!client) return ""
+  return client.name2 ? `${client.name} — ${client.name2}` : client.name
 }
 
 function ProjectDetailPanel({
@@ -44,6 +60,7 @@ function ProjectDetailPanel({
   onNavigateToProject?: () => void
 }) {
   const { t } = useLanguage()
+  const { clients } = useClients("")
   const [form, setForm] = useState(() => formFromProject(project))
   const [error, setError] = useState("")
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -62,7 +79,7 @@ function ProjectDetailPanel({
       await api.updateProject(project.id, {
         name: next.name.trim(),
         description: next.description.trim() || null,
-        client: next.client.trim() || null,
+        clientId: next.clientId,
         startDate: next.startDate || null,
         endDate: next.endDate || null,
       })
@@ -142,14 +159,36 @@ function ProjectDetailPanel({
         )}
 
         <Label htmlFor="project-client">{t("project.client")}</Label>
-        <Input
-          id="project-client"
-          value={form.client}
-          disabled={!isAdmin}
-          onChange={(e) => setForm((f) => ({ ...f, client: e.target.value }))}
-          onBlur={() => save(form)}
-          placeholder={isAdmin ? t("project.nonePlaceholder") : undefined}
-        />
+        {clients.length > 0 ? (
+          <Combobox
+            items={clients.map((c) => c.id)}
+            value={form.clientId}
+            onValueChange={(v) => {
+              const next = { ...form, clientId: (v as number | null) ?? null }
+              setForm(next)
+              save(next)
+            }}
+            itemToStringLabel={(id: number) => clientLabel(clients.find((c) => c.id === id))}
+            disabled={!isAdmin}
+          >
+            <ComboboxInput id="project-client" placeholder={t("part.searchPlaceholder")} showClear />
+            <ComboboxContent>
+              <ComboboxEmpty>{t("client.noMatchingClients")}</ComboboxEmpty>
+              <ComboboxList>
+                {(id: number) => (
+                  <ComboboxItem key={id} value={id}>
+                    {clientLabel(clients.find((c) => c.id === id))}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        ) : (
+          <Hint>{t("project.noClientsHint")}</Hint>
+        )}
+        {!form.clientId && project.client && (
+          <Hint>{t("project.legacyClientValue", { value: project.client })}</Hint>
+        )}
 
         <div className="flex gap-2">
           <div className="flex flex-1 flex-col gap-2">

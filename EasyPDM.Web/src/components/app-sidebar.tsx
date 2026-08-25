@@ -1,5 +1,6 @@
 import { useState } from "react"
 import {
+  Building2,
   ChevronLeft,
   ChevronRight,
   Database,
@@ -28,6 +29,7 @@ const OPTIONS: SidebarOption[] = [
   { id: "database", labelKey: "nav.database", icon: Database },
   { id: "materials", labelKey: "nav.materials", icon: Layers },
   { id: "manufacturers", labelKey: "nav.manufacturers", icon: Factory },
+  { id: "clients", labelKey: "nav.clients", icon: Building2 },
 ]
 
 const SETTINGS_OPTION: SidebarOption = { id: "settings", labelKey: "nav.settings", icon: Settings }
