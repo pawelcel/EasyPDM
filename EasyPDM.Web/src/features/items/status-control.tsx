@@ -2,23 +2,18 @@ import { useEffect, useState } from "react"
 
 import { api } from "@/api/client"
 import { revisionLabel, STATUS_LABEL_KEYS, type Item, type ItemStatus, type RevisionComment } from "@/api/types"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button-variants"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useLanguage } from "@/i18n/use-language"
+import { cn } from "@/lib/utils"
 
 const NEXT_STATUSES: Record<ItemStatus, ItemStatus[]> = {
   w_pracy: ["sprawdzany"],
   sprawdzany: ["w_pracy", "wydany"],
   wydany: ["w_pracy"],
-}
-
-const BADGE_VARIANT: Record<ItemStatus, "secondary" | "outline" | "default"> = {
-  w_pracy: "default",
-  sprawdzany: "outline",
-  wydany: "default",
 }
 
 function StatusControl({
@@ -54,7 +49,9 @@ function StatusControl({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Badge variant={BADGE_VARIANT[status]}>{t(STATUS_LABEL_KEYS[status])}</Badge>
+      <span className={cn(buttonVariants({ variant: "default", size: "sm" }))}>
+        {t(STATUS_LABEL_KEYS[status])}
+      </span>
       <div className="flex gap-1.5">
         {NEXT_STATUSES[status].map((next) => (
           <Button

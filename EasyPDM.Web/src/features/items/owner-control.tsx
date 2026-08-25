@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { useAuth } from "@/features/auth/use-auth"
 import { useLanguage } from "@/i18n/use-language"
+import { cn } from "@/lib/utils"
 
 // Właściciel Części/Złożenia — niezależne od statusu 'w_pracy'/isLocked. Dopóki
 // ownerLocked=true, tylko ownerId może edytować element (nawet administrator nie omija
@@ -52,7 +53,7 @@ function OwnerControl({ item, onChanged }: { item: Item; onChanged: () => void |
 
   return (
     <div className="mt-2 flex flex-col gap-1">
-      <span className="text-[12.5px] text-muted-foreground">
+      <span className={cn("text-[12.5px]", isIssued && "text-muted-foreground")}>
         {t("item.owner")}: {ownerName ?? t("item.ownerNone")}
       </span>
 
