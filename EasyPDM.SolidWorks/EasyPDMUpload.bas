@@ -1873,6 +1873,17 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     Dim pathToItemId As Object
     Set pathToItemId = CreateObject("Scripting.Dictionary")
 
+    ' Paths CREATED in this run (as opposed to already-linked components merely being
+    ' referenced) -- once such an item's relation to its real parent is attached below, it
+    ' gets hidden from the project root (show_in_tree=false). It was never an independent
+    ' item; its creation here is purely a side effect of the leaves-first upload order
+    ' (create the leaf, THEN attach it under its actual parent). An ALREADY-linked component
+    ' is a pre-existing, possibly intentionally independent catalog item -- attaching it here
+    ' must NOT touch its existing root visibility (same reasoning as linking an existing item
+    ' to an assembly from the web UI).
+    Dim newlyCreatedPaths As Object
+    Set newlyCreatedPaths = CreateObject("Scripting.Dictionary")
+
     Dim filePath As Variant
     For Each filePath In order
         Dim childModel As Object
@@ -1969,6 +1980,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             ' insurance.
             SetLinkedItemOn childModel, newItemId, CStr(JsonGetLong(created, "itemNumber", 0))
             pathToItemId.Add filePath, newItemId
+            newlyCreatedPaths.Add filePath, True
         Else
             ' Not yet linked and the user declined sending new components -- skip it
             ' entirely (never added to pathToItemId), so it simply cannot take part in any
@@ -1996,6 +2008,14 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
                         If relErr <> "" Then
                             MsgBox T("CreatedButFailedAttachPart1") & Mid(CStr(edge2("child")), InStrRev(CStr(edge2("child")), "\") + 1) & _
                                    T("CreatedButFailedAttachPart2") & Mid(filePath, InStrRev(filePath, "\") + 1) & T("CreatedButFailedAttachPart3") & relErr, vbExclamation, T("AppTitle")
+                        ElseIf newlyCreatedPaths.Exists(edge2("child")) Then
+                            ' Now properly nested under its real parent -- hide it from the
+                            ' project root (see "newlyCreatedPaths" comment above). Left
+                            ' visible at root if the attach above failed, so it can still be
+                            ' found and fixed manually.
+                            On Error Resume Next
+                            ApiPatchJson "/items/" & pathToItemId(edge2("child")) & "/visibility", "{""showInTree"":false}"
+                            On Error GoTo 0
                         End If
                     End If
                 End If
@@ -2012,7 +2032,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     For Each edge3 In edges
         If edge3("parent") = topPath Then
             If pathToItemId.Exists(edge3("child")) Then
-                edgesForTop.Add Array(pathToItemId(edge3("child")), edge3("qty"))
+                edgesForTop.Add Array(pathToItemId(edge3("child")), edge3("qty"), newlyCreatedPaths.Exists(edge3("child")))
             End If
         End If
     Next edge3
@@ -2329,6 +2349,14 @@ Sub main()
             On Error GoTo 0
             If topRelErr <> "" Then
                 MsgBox T("FailedToAttachSubComponent") & topRelErr, vbExclamation, T("AppTitle")
+            ElseIf edgeVariant(2) Then
+                ' Newly created purely as a leaves-first side effect of this upload (see
+                ' ProcessAssemblyTree's "newlyCreatedPaths") -- now properly nested under
+                ' THIS document, hide it from the project root. Left visible if the attach
+                ' above failed, so it can still be found and fixed manually.
+                On Error Resume Next
+                ApiPatchJson "/items/" & edgeVariant(0) & "/visibility", "{""showInTree"":false}"
+                On Error GoTo 0
             End If
         Next edgeVariant
     End If
