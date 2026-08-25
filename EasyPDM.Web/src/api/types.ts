@@ -187,6 +187,7 @@ export interface BomEntry {
   itemNumber: number | null
   itemNumberPrefix: string | null
   fileName: string
+  revisionNumber: number | null
   properties: Record<string, unknown>
 }
 

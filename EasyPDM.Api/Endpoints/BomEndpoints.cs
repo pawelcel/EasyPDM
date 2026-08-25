@@ -36,6 +36,7 @@ static class BomEndpoints
                     itemNumber = r.ItemNumber,
                     itemNumberPrefix = r.ItemNumberPrefix,
                     fileName = r.FileName,
+                    revisionNumber = r.RevisionNumber,
                     properties = JsonDocument.Parse(r.PropertiesJson).RootElement
                 });
 
@@ -192,7 +193,7 @@ static class BomEndpoints
                 WHERE NOT (ir.parent_id = ANY(b.visited))
             )
             SELECT b.child_id, b.quantity, b.extended_quantity, b.depth, b.path,
-                   i.item_number, i.item_number_prefix, i.file_name, i.properties
+                   i.item_number, i.item_number_prefix, i.file_name, i.revision_number, i.properties
             FROM bom b
             JOIN items i ON i.id = b.child_id
             ORDER BY b.path;
@@ -213,12 +214,13 @@ static class BomEndpoints
                 ItemNumber: reader.IsDBNull(5) ? null : reader.GetInt32(5),
                 ItemNumberPrefix: reader.IsDBNull(6) ? null : reader.GetString(6),
                 FileName: reader.GetString(7),
-                PropertiesJson: reader.GetFieldValue<string>(8)));
+                RevisionNumber: reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                PropertiesJson: reader.GetFieldValue<string>(9)));
         }
         return rows;
     }
 
     private record BomRow(
         Guid ChildId, decimal Quantity, decimal ExtendedQuantity, int Depth, int[] Path,
-        int? ItemNumber, string? ItemNumberPrefix, string FileName, string PropertiesJson);
+        int? ItemNumber, string? ItemNumberPrefix, string FileName, int? RevisionNumber, string PropertiesJson);
 }

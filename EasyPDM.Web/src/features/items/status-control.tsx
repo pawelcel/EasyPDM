@@ -55,9 +55,6 @@ function StatusControl({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Badge variant={BADGE_VARIANT[status]}>{t(STATUS_LABEL_KEYS[status])}</Badge>
-      {item.revisionNumber !== null && (
-        <span className="text-[12.5px] text-muted-foreground">rev. {revisionLabel(item.revisionNumber)}</span>
-      )}
       <div className="flex gap-1.5">
         {NEXT_STATUSES[status].map((next) => (
           <Button
