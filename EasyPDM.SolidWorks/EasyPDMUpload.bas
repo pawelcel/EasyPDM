@@ -49,10 +49,14 @@ Option Explicit
 '     component, see next point), whether to export EACH of STEP and PDF is its OWN,
 '     independent checkbox in the browser (same as FreeCAD for STEP; PDF is checked
 '     separately and defaults to off, unlike STEP which defaults to on) -- see
-'     UploadStepAttachment/UploadPdfAttachment. For the "already linked"/"already in PDM"
-'     native paths, where there is no browser round-trip to host a checkbox in, STEP always
-'     exports (matching FreeCAD's own rule) but PDF does NOT -- there is no captured user
-'     intent for it there, unlike STEP's pre-existing "always on" default.
+'     UploadStepAttachment/UploadPdfAttachment. For the "already linked" native path (top-
+'     level document only), where there is no browser round-trip to host a checkbox in,
+'     the SAME two choices are instead asked as plain native Yes/No questions right after
+'     the "attach as new revision?" confirmation -- a couple of native prompts for a SINGLE
+'     document is not the "opening N popups" problem that drove the assembly components
+'     over to the browser ticket flow (next point). Components already in PDM discovered
+'     while walking an assembly tree are never re-uploaded at all (nothing about them is
+'     assumed to have changed), so this question does not apply to them.
 '   - Assembly components: if the active document is an Assembly, the macro first walks
 '     its component tree (IAssemblyDoc.GetComponents, recursively) and offers to send any
 '     component NOT yet linked to a PDM item, leaves-first -- same idea as FreeCAD's
@@ -237,6 +241,8 @@ Private Function T_PL(ByVal key As String) As String
         Case "FailedToSaveDocument": T_PL = "Nie udalo sie zapisac dokumentu -- zapisz go recznie (Ctrl+S) i uruchom makro ponownie."
         Case "MustRunInsideSolidWorks": T_PL = "To makro musi byc uruchomione z poziomu SolidWorks."
         Case "NoActiveSavedDocument": T_PL = "Brak aktywnego, zapisanego dokumentu."
+        Case "ExportStepPrompt": T_PL = "Wyeksportowac i wyslac model STEP (podglad 3D)?"
+        Case "ExportPdfPrompt": T_PL = "Wyeksportowac i wyslac plik PDF?"
         Case "AlreadyLinkedConfirm": T_PL = "Ten dokument jest juz powiazany z elementem PDM. Podpiac biezaca wersje jako nowa rewizje/aktualizacje?"
         Case "AlreadyLinkedConfirmPrefix": T_PL = "Ten dokument jest juz powiazany z elementem PDM nr "
         Case "AlreadyLinkedConfirmSuffix": T_PL = ". Jesli to NIE jest ta sama czesc (np. zrobiles 'Zapisz jako' z innej, juz podpietej czesci) -- kliknij Nie i podepnij ten plik recznie do wlasciwego elementu. Podpiac biezaca wersje jako nowa rewizje/aktualizacje TEGO elementu?"
@@ -289,6 +295,8 @@ Private Function T_EN(ByVal key As String) As String
         Case "FailedToSaveDocument": T_EN = "Failed to save the document -- save it manually (Ctrl+S) and run the macro again."
         Case "MustRunInsideSolidWorks": T_EN = "This macro must be run from inside SolidWorks."
         Case "NoActiveSavedDocument": T_EN = "No active, saved document."
+        Case "ExportStepPrompt": T_EN = "Export and upload STEP model (3D preview)?"
+        Case "ExportPdfPrompt": T_EN = "Export and upload a PDF file?"
         Case "AlreadyLinkedConfirm": T_EN = "This document is already linked to a PDM item. Attach the current version as a new revision/update?"
         Case "AlreadyLinkedConfirmPrefix": T_EN = "This document is already linked to PDM item #"
         Case "AlreadyLinkedConfirmSuffix": T_EN = ". If this is NOT the same part (e.g. you did a Save As from a different, already-linked part) -- click No and link this file manually to the correct item instead. Attach the current version as a new revision/update to THIS item?"
@@ -341,6 +349,8 @@ Private Function T_DE(ByVal key As String) As String
         Case "FailedToSaveDocument": T_DE = "Speichern des Dokuments fehlgeschlagen -- speichern Sie es manuell (Strg+S) und starten Sie das Makro erneut."
         Case "MustRunInsideSolidWorks": T_DE = "Dieses Makro muss innerhalb von SolidWorks ausgefuehrt werden."
         Case "NoActiveSavedDocument": T_DE = "Kein aktives, gespeichertes Dokument."
+        Case "ExportStepPrompt": T_DE = "STEP-Modell exportieren und hochladen (3D-Vorschau)?"
+        Case "ExportPdfPrompt": T_DE = "PDF-Datei exportieren und hochladen?"
         Case "AlreadyLinkedConfirm": T_DE = "Dieses Dokument ist bereits mit einem PDM-Element verknuepft. Die aktuelle Version als neue Revision/Aktualisierung anhaengen?"
         Case "AlreadyLinkedConfirmPrefix": T_DE = "Dieses Dokument ist bereits mit PDM-Element Nr. "
         Case "AlreadyLinkedConfirmSuffix": T_DE = " verknuepft. Falls dies NICHT dasselbe Teil ist (z. B. haben Sie ein 'Speichern unter' von einem anderen, bereits verknuepften Teil gemacht) -- klicken Sie Nein und verknuepfen Sie diese Datei stattdessen manuell mit dem richtigen Element. Die aktuelle Version als neue Revision/Aktualisierung DIESES Elements anhaengen?"
@@ -2325,8 +2335,11 @@ Sub main()
 
     If linkedItemId <> "" Then
         ' Already linked -- SolidWorks knows the target with certainty (Custom Property),
-        ' no browser round-trip needed. STEP always exports here (no browser form to host
-        ' a checkbox in for this path -- see UploadStepAttachment callers below).
+        ' no browser round-trip needed. Whether to export STEP/PDF is asked here as two
+        ' plain native Yes/No questions instead -- unlike the per-component assembly tree
+        ' walk (see file header), this happens ONCE per run for a single document, so a
+        ' couple of native prompts is not the "opening N popups" problem that drove the
+        ' assembly components over to the browser ticket flow.
         '
         ' Shows the LINKED ITEM'S OWN number/name in the confirmation, not just a generic
         ' "already linked?" question -- SolidWorks's native "Save As" (done manually by the
@@ -2353,8 +2366,20 @@ Sub main()
         Dim confirmUpdate As VbMsgBoxResult
         confirmUpdate = MsgBox(confirmText, vbYesNo + vbQuestion, T("AppTitle"))
         If confirmUpdate <> vbYes Then Exit Sub
+
+        ' Defaults match the browser checkboxes' own defaults (STEP on, PDF off) via
+        ' vbDefaultButton1/2 -- Enter alone picks the same answer the browser form would
+        ' start with.
+        Dim nativeExportStep As Boolean
+        nativeExportStep = (MsgBox(T("ExportStepPrompt"), vbYesNo + vbQuestion + vbDefaultButton1, T("AppTitle")) = vbYes)
+        Dim nativeExportPdf As Boolean
+        nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
+
         Set resultInfo = PushToExistingItem(swActiveModel, linkedItemId, filePath, targetFolder)
-        If Not resultInfo Is Nothing Then UploadStepAttachment swActiveModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+        If Not resultInfo Is Nothing Then
+            If nativeExportStep Then UploadStepAttachment swActiveModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+            If nativeExportPdf Then UploadPdfAttachment swActiveModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+        End If
     Else
         ' Not yet linked -- "new item vs duplicate vs attach to existing" is decided in
         ' the browser, not locally, exactly like EasyPDMUpload.FCMacro's
