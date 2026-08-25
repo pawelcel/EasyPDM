@@ -16,7 +16,7 @@ const NEXT_STATUSES: Record<ItemStatus, ItemStatus[]> = {
 }
 
 const BADGE_VARIANT: Record<ItemStatus, "secondary" | "outline" | "default"> = {
-  w_pracy: "secondary",
+  w_pracy: "default",
   sprawdzany: "outline",
   wydany: "default",
 }
