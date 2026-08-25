@@ -32,7 +32,7 @@ CREATE TABLE projects (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        TEXT NOT NULL UNIQUE,
     description TEXT,
-    client      TEXT,
+    client      TEXT,  -- wolny tekst, historyczny -- nowe projekty łączy się z klientem przez client_id (patrz sekcja Klienci, kolumna dołożona niżej przez ALTER TABLE, bo clients jest zdefiniowane dalej w pliku)
     start_date  DATE,
     end_date    DATE,
     created_at  TIMESTAMPTZ DEFAULT now()
@@ -132,6 +132,54 @@ CREATE TABLE manufacturer_contacts (
 );
 
 CREATE INDEX idx_manufacturer_contacts_manufacturer ON manufacturer_contacts (manufacturer_id);
+
+-- ============================================================
+-- Klienci (katalog z osobami kontaktowymi i własną strukturą plików, zarządzany z panelu
+-- bocznego) -- celowo izolowane od items/item_relations, patrz komentarz przy client_nodes.
+-- ============================================================
+CREATE TABLE clients (
+    id       SERIAL PRIMARY KEY,
+    name     TEXT NOT NULL UNIQUE,
+    name2    TEXT,
+    location TEXT
+);
+
+CREATE TABLE client_contacts (
+    id         SERIAL PRIMARY KEY,
+    client_id  INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    first_name TEXT,
+    last_name  TEXT,
+    phone      TEXT,
+    position   TEXT,
+    email      TEXT
+);
+CREATE INDEX idx_client_contacts_client ON client_contacts (client_id);
+
+-- Jedna tabela z node_type CHECK ('folder'/'file'), analogicznie do items.item_type, ale
+-- bez part/assembly/status/rewizji/właściciela/BOM -- tylko to, co faktycznie potrzebne
+-- dla prostego drzewka dokumentów klienta (np. norm).
+CREATE TABLE client_nodes (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id  INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    parent_id  UUID REFERENCES client_nodes(id) ON DELETE CASCADE,
+    node_type  TEXT NOT NULL CHECK (node_type IN ('folder', 'file')),
+    name       TEXT NOT NULL,
+    file_path  TEXT UNIQUE,   -- NULL dla folderów
+    file_size  BIGINT,
+    file_hash  TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (node_type = 'folder' OR file_path IS NOT NULL)
+);
+CREATE INDEX idx_client_nodes_client ON client_nodes (client_id);
+CREATE INDEX idx_client_nodes_parent ON client_nodes (parent_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON clients, client_contacts, client_nodes TO pdm_user;
+
+-- projects.client_id dokłada się tutaj (ALTER, nie inline w CREATE TABLE projects wyżej),
+-- bo clients musi już istnieć, żeby FK zadziałało -- projects jest zdefiniowane wcześniej
+-- w tym pliku.
+ALTER TABLE projects ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL;
+CREATE INDEX idx_projects_client ON projects (client_id);
 
 CREATE TABLE item_tags (
     item_id UUID REFERENCES items(id) ON DELETE CASCADE,
@@ -296,4 +344,5 @@ INSERT INTO schema_migrations (filename) VALUES
     ('023_attachment_history.sql'), ('024_owner_lock_history.sql'),
     ('025_backup_schedule.sql'), ('026_backup_retention.sql'),
     ('027_schema_migrations_tracking.sql'), ('028_attachment_preview_role.sql'),
-    ('029_item_number_prefix.sql'), ('030_attachment_cad_role.sql');
+    ('029_item_number_prefix.sql'), ('030_attachment_cad_role.sql'),
+    ('031_clients.sql');

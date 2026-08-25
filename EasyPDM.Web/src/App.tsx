@@ -16,6 +16,7 @@ import { PendingTicketBanner } from "@/features/items/pending-ticket-banner"
 import { useItems } from "@/features/items/use-items"
 import { MaterialsView } from "@/features/materials/materials-view"
 import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
+import { ClientsView } from "@/features/clients/clients-view"
 import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
 import { AuthorSettingsView } from "@/features/settings/author-settings-view"
 import { LanguageSettingsView } from "@/features/settings/language-settings-view"
@@ -34,7 +35,7 @@ import { LanguageSelect } from "@/i18n/language-select"
 import { useLanguage } from "@/i18n/use-language"
 import { APP_VERSION } from "@/version"
 
-type View = "welcome" | "projects" | "database" | "materials" | "manufacturers" | "settings"
+type View = "welcome" | "projects" | "database" | "materials" | "manufacturers" | "clients" | "settings"
 
 function App() {
   const { user, loading: authLoading, refetch: refetchAuth, logout } = useAuth()
@@ -232,6 +233,8 @@ function App() {
           {view === "materials" && <MaterialsView />}
 
           {view === "manufacturers" && <ManufacturersView />}
+
+          {view === "clients" && <ClientsView />}
 
           {view === "settings" &&
             settingsSection === "users" &&

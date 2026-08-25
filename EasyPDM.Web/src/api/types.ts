@@ -35,7 +35,12 @@ export interface Project {
   id: string
   name: string
   description: string | null
+  // Wolny tekst, historyczny -- nowe projekty łączy się ze strukturalnym Klientem przez
+  // clientId (patrz Client/ClientDetail niżej), ten string zostaje tylko do odczytu.
   client: string | null
+  clientId: number | null
+  clientName: string | null
+  clientName2: string | null
   startDate: string | null
   endDate: string | null
   createdAt: string
@@ -226,6 +231,54 @@ export interface ManufacturerDetail {
   id: number
   name: string
   contacts: ManufacturerContact[]
+}
+
+// Lekki wpis do listy/wyszukiwarki klientów (zakładka "Klienci") — bez osób kontaktowych
+// (te dociągane są osobno, dopiero po zaznaczeniu konkretnego klienta). Osobny typ od
+// Manufacturer mimo podobieństwa — Klient ma dodatkowo name2/location i własne drzewko
+// plików (ClientNode), więc moduły są celowo niezależne.
+export interface Client {
+  id: number
+  name: string
+  name2: string | null
+  location: string | null
+  contactCount: number
+}
+
+export interface ClientContact {
+  id: number
+  firstName: string | null
+  lastName: string | null
+  phone: string | null
+  position: string | null
+  email: string | null
+}
+
+export interface ClientDetail {
+  id: number
+  name: string
+  name2: string | null
+  location: string | null
+  contacts: ClientContact[]
+}
+
+export type ClientNodeType = "folder" | "file"
+
+// Węzeł struktury dokumentów klienta (folder albo plik) — płaska lista, front buduje
+// drzewo po parentId, tak samo jak drzewo projektu z płaskiej listy ItemRelation.
+export interface ClientNode {
+  id: string
+  parentId: string | null
+  nodeType: ClientNodeType
+  name: string
+  fileSize: number | null
+  createdAt: string
+}
+
+// Trafienie wyszukiwarki plików klienta — "path" to pełna ścieżka (breadcrumb) od korzenia.
+export interface ClientFileSearchResult {
+  id: string
+  path: string
 }
 
 export interface StorageInfo {

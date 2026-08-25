@@ -2,6 +2,10 @@ import type {
   Attachment,
   BackupSchedule,
   BomEntry,
+  Client,
+  ClientDetail,
+  ClientFileSearchResult,
+  ClientNode,
   CurrentUser,
   HistoryEntry,
   Item,
@@ -33,7 +37,7 @@ const BASE = "/api"
 type ProjectWriteBody = {
   name: string
   description: string | null
-  client: string | null
+  clientId: number | null
   startDate: string | null
   endDate: string | null
 }
@@ -50,6 +54,12 @@ type ContactWriteBody = {
   phone: string | null
   position: string | null
   email: string | null
+}
+
+type ClientWriteBody = {
+  name: string
+  name2: string | null
+  location: string | null
 }
 
 export class ApiError extends Error {
@@ -350,6 +360,79 @@ export const api = {
     fetch(`${BASE}/manufacturers/${manufacturerId}/contacts/${contactId}`, {
       method: "DELETE",
     }).then((r) => handleResponse<void>(r)),
+
+  getClients: (search?: string) =>
+    fetch(`${BASE}/clients${search ? `?search=${encodeURIComponent(search)}` : ""}`).then((r) =>
+      handleResponse<Client[]>(r)
+    ),
+
+  getClient: (id: number) => fetch(`${BASE}/clients/${id}`).then((r) => handleResponse<ClientDetail>(r)),
+
+  createClient: (body: ClientWriteBody) =>
+    fetch(`${BASE}/clients`, json(body)).then((r) => handleResponse<{ id: number }>(r)),
+
+  updateClient: (id: number, body: ClientWriteBody) =>
+    fetch(`${BASE}/clients/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeClient: (id: number) =>
+    fetch(`${BASE}/clients/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  addClientContact: (clientId: number, body: ContactWriteBody) =>
+    fetch(`${BASE}/clients/${clientId}/contacts`, json(body)).then((r) =>
+      handleResponse<{ id: number }>(r)
+    ),
+
+  updateClientContact: (clientId: number, contactId: number, body: ContactWriteBody) =>
+    fetch(`${BASE}/clients/${clientId}/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeClientContact: (clientId: number, contactId: number) =>
+    fetch(`${BASE}/clients/${clientId}/contacts/${contactId}`, {
+      method: "DELETE",
+    }).then((r) => handleResponse<void>(r)),
+
+  getClientNodes: (clientId: number) =>
+    fetch(`${BASE}/clients/${clientId}/nodes`).then((r) => handleResponse<ClientNode[]>(r)),
+
+  createClientFolder: (clientId: number, parentId: string | null, name: string) =>
+    fetch(`${BASE}/clients/${clientId}/nodes/folder`, json({ parentId, name })).then((r) =>
+      handleResponse<ClientNode>(r)
+    ),
+
+  uploadClientFile: (clientId: number, parentId: string | null, file: File) => {
+    const formData = new FormData()
+    formData.append("file", file)
+    if (parentId) formData.append("parentId", parentId)
+    return fetch(`${BASE}/clients/${clientId}/nodes/file`, { method: "POST", body: formData }).then(
+      (r) => handleResponse<ClientNode>(r)
+    )
+  },
+
+  renameClientNode: (clientId: number, nodeId: string, name: string) =>
+    fetch(`${BASE}/clients/${clientId}/nodes/${nodeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeClientNode: (clientId: number, nodeId: string) =>
+    fetch(`${BASE}/clients/${clientId}/nodes/${nodeId}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
+    ),
+
+  clientNodeDownloadUrl: (clientId: number, nodeId: string) => `${BASE}/clients/${clientId}/nodes/${nodeId}/file`,
+
+  searchClientFiles: (clientId: number, query: string) =>
+    fetch(`${BASE}/clients/${clientId}/nodes/search?query=${encodeURIComponent(query)}`).then((r) =>
+      handleResponse<ClientFileSearchResult[]>(r)
+    ),
 
   getSavedFilters: () =>
     fetch(`${BASE}/saved-filters`).then((r) => handleResponse<SavedFilter[]>(r)),
