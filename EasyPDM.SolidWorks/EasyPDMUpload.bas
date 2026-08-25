@@ -45,20 +45,20 @@ Option Explicit
 '     waits (WaitForTicket, polling GET /create-tickets/{ticket}; Escape cancels, no
 '     UserForm needed) and then finishes the job: rename+upload the file, and (see below)
 '     export+upload a STEP attachment.
-'   - STEP export: for the ticket path, whether to export is a checkbox in the browser
-'     (same as FreeCAD); for the "already linked" native path and for auto-detected
-'     assembly components (next point), STEP always exports -- there is no browser
-'     round-trip there to host a checkbox in, matching FreeCAD's own rule.
+'   - STEP export: for any ticket path (top-level document OR an auto-detected assembly
+'     component, see next point), whether to export is a checkbox in the browser (same as
+'     FreeCAD); for the "already linked"/"already in PDM" native paths, where there is no
+'     browser round-trip to host a checkbox in, STEP always exports, matching FreeCAD's
+'     own rule.
 '   - Assembly components: if the active document is an Assembly, the macro first walks
 '     its component tree (IAssemblyDoc.GetComponents, recursively) and offers to send any
 '     component NOT yet linked to a PDM item, leaves-first -- same idea as FreeCAD's
-'     App::Link auto-detection, except each new component is collected through a short
-'     SEQUENCE OF InputBoxes (Project/Type/Name, then -- for a Part only -- Kind and its
-'     dependent fields; an Assembly has no Kind at all, just an optional Mass) instead of
-'     the browser -- opening N browser tabs for N new components would be worse UX than one
-'     native prompt per component, and this file deliberately has no UserForm to build a
-'     richer one. Each new component gets linked via Custom Properties too, so re-running
-'     the macro on it later (alone or as part of another assembly) recognizes it as done.
+'     App::Link auto-detection. Each new component gets the SAME browser ticket flow as
+'     the top-level document above (New item/Duplicate/Attach to existing decided in the
+'     browser) -- opened ONE TAB AT A TIME, one component after another, never several at
+'     once (confusing to juggle); cancelling any single ticket aborts the whole remaining
+'     walk. Each new component gets linked via Custom Properties too, so re-running the
+'     macro on it later (alone or as part of another assembly) recognizes it as done.
 '     Declining ("No") skips creating/uploading new components, but components ALREADY in
 '     PDM are still attached into the BOM structure -- "No" is not "send nothing at all".
 '   - Local "Save As" under the PDM name: every document actually uploaded (the top-level
@@ -215,36 +215,17 @@ Private Function T_PL(ByVal key As String) As String
         Case "AppTitle": T_PL = "EasyPDM"
         Case "LoginFailedPrefix": T_PL = "Logowanie nie powiodlo sie: "
         Case "LoginFailedNoSession": T_PL = "Logowanie nie powiodlo sie -- serwer nie zwrocil sesji."
-        Case "TitleProperties": T_PL = "Wlasciwosci"
-        Case "KindPrompt": T_PL = "Rodzaj:" & vbCrLf & "1 - Wykonywana" & vbCrLf & "2 - Zakupowa" & vbCrLf & "3 - Normalia" & vbCrLf & "4 - Klienta"
-        Case "KindRequired": T_PL = "Rodzaj jest wymagany dla Czesci."
-        Case "PromptMaterial": T_PL = "Material (opcjonalnie):"
-        Case "PromptMass": T_PL = "Masa (opcjonalnie):"
-        Case "PromptManufacturer": T_PL = "Producent (opcjonalnie):"
-        Case "PromptOrderNumber1": T_PL = "Numer katalogowy 1 (opcjonalnie):"
-        Case "PromptOrderNumber2": T_PL = "Numer katalogowy 2 (opcjonalnie):"
-        Case "PromptNorm": T_PL = "Norma (opcjonalnie):"
         Case "TitleNewRevision": T_PL = "Nowa rewizja"
         Case "ItemStatusReleasedPrefix": T_PL = "Element nr "
         Case "ItemStatusReleasedSuffix": T_PL = " ma status ""Wydany"" -- podpiecie pliku wymaga nowej rewizji. Utworzyc nowa rewizje?"
         Case "PromptRevisionComment": T_PL = "Komentarz do nowej rewizji (opcjonalnie):"
-        Case "NoProjectsAvailable": T_PL = "Brak dostepnych projektow w PDM."
-        Case "TitleNewItemInPdm": T_PL = "Nowy element w PDM"
         Case "PromptTargetFolder": T_PL = "Folder docelowy na lokalne kopie (nazwane pod numerem PDM):"
         Case "TitleTargetFolder": T_PL = "Folder docelowy"
-        Case "PromptPickProject": T_PL = "Wybierz projekt (numer):"
-        Case "TitleNewComponent": T_PL = "Nowy komponent"
-        Case "TypePromptText": T_PL = "Typ:" & vbCrLf & "1 - Czesc" & vbCrLf & "2 - Zlozenie"
-        Case "NamePromptText": T_PL = "Nazwa:"
-        Case "NewComponentHeaderPrefix": T_PL = "Nowy komponent zlozenia: "
-        Case "UsedPrefix": T_PL = "Uzycie: "
-        Case "UsageHintJoiner": T_PL = "x w "
         Case "AssemblyDetectedTitle": T_PL = "Wykryto zlozenie"
         Case "AssemblyLinksPart1": T_PL = "To zlozenie odwoluje sie do "
         Case "AssemblyLinksPart2": T_PL = " innego(-ych) pliku(-ow) (czesci/podzespoly):"
         Case "AssemblyLinksPart3": T_PL = "Wyslac je automatycznie razem z tym dokumentem (najpierw liscie drzewa, ten dokument na koncu)?"
         Case "AssemblyLinksPart4": T_PL = "'Nie' nie wysle/nie utworzy ZADNYCH nowych komponentow -- ale komponenty JUZ istniejace w PDM i tak zostana podpiete do struktury tego zlozenia."
-        Case "FailedToSendPrefix": T_PL = "Nie udalo sie wyslac "
         Case "CreatedButFailedAttachPart1": T_PL = "Utworzono "
         Case "CreatedButFailedAttachPart2": T_PL = ", ale nie udalo sie podpiac go pod "
         Case "CreatedButFailedAttachPart3": T_PL = ": "
@@ -284,36 +265,17 @@ Private Function T_EN(ByVal key As String) As String
         Case "AppTitle": T_EN = "EasyPDM"
         Case "LoginFailedPrefix": T_EN = "Login failed: "
         Case "LoginFailedNoSession": T_EN = "Login failed -- the server did not return a session."
-        Case "TitleProperties": T_EN = "Properties"
-        Case "KindPrompt": T_EN = "Kind:" & vbCrLf & "1 - Manufactured" & vbCrLf & "2 - Purchased" & vbCrLf & "3 - Standard" & vbCrLf & "4 - Client"
-        Case "KindRequired": T_EN = "Kind is required for a Part."
-        Case "PromptMaterial": T_EN = "Material (optional):"
-        Case "PromptMass": T_EN = "Mass (optional):"
-        Case "PromptManufacturer": T_EN = "Manufacturer (optional):"
-        Case "PromptOrderNumber1": T_EN = "Order number 1 (optional):"
-        Case "PromptOrderNumber2": T_EN = "Order number 2 (optional):"
-        Case "PromptNorm": T_EN = "Norm (optional):"
         Case "TitleNewRevision": T_EN = "New revision"
         Case "ItemStatusReleasedPrefix": T_EN = "Item #"
         Case "ItemStatusReleasedSuffix": T_EN = " is in status ""Released"" -- attaching a file requires a new revision. Create a new revision?"
         Case "PromptRevisionComment": T_EN = "New revision comment (optional):"
-        Case "NoProjectsAvailable": T_EN = "No projects available in PDM."
-        Case "TitleNewItemInPdm": T_EN = "New item in PDM"
         Case "PromptTargetFolder": T_EN = "Target folder for local copies (named under the PDM number):"
         Case "TitleTargetFolder": T_EN = "Target folder"
-        Case "PromptPickProject": T_EN = "Pick a project (number):"
-        Case "TitleNewComponent": T_EN = "New component"
-        Case "TypePromptText": T_EN = "Type:" & vbCrLf & "1 - Part" & vbCrLf & "2 - Assembly"
-        Case "NamePromptText": T_EN = "Name:"
-        Case "NewComponentHeaderPrefix": T_EN = "New assembly component: "
-        Case "UsedPrefix": T_EN = "Used: "
-        Case "UsageHintJoiner": T_EN = "x in "
         Case "AssemblyDetectedTitle": T_EN = "Assembly detected"
         Case "AssemblyLinksPart1": T_EN = "This assembly links to "
         Case "AssemblyLinksPart2": T_EN = " other file(s) (parts/sub-assemblies):"
         Case "AssemblyLinksPart3": T_EN = "Send them automatically together with this document (leaves first, this document last)?"
         Case "AssemblyLinksPart4": T_EN = "'No' will not send/create any NEW components -- but components ALREADY in PDM will still be attached to this assembly's structure."
-        Case "FailedToSendPrefix": T_EN = "Failed to send "
         Case "CreatedButFailedAttachPart1": T_EN = "Created "
         Case "CreatedButFailedAttachPart2": T_EN = ", but failed to attach it under "
         Case "CreatedButFailedAttachPart3": T_EN = ": "
@@ -353,36 +315,17 @@ Private Function T_DE(ByVal key As String) As String
         Case "AppTitle": T_DE = "EasyPDM"
         Case "LoginFailedPrefix": T_DE = "Anmeldung fehlgeschlagen: "
         Case "LoginFailedNoSession": T_DE = "Anmeldung fehlgeschlagen -- der Server hat keine Sitzung zurueckgegeben."
-        Case "TitleProperties": T_DE = "Eigenschaften"
-        Case "KindPrompt": T_DE = "Art:" & vbCrLf & "1 - Gefertigt" & vbCrLf & "2 - Zugekauft" & vbCrLf & "3 - Norm" & vbCrLf & "4 - Kunde"
-        Case "KindRequired": T_DE = "Fuer ein Teil ist die Art erforderlich."
-        Case "PromptMaterial": T_DE = "Material (optional):"
-        Case "PromptMass": T_DE = "Masse (optional):"
-        Case "PromptManufacturer": T_DE = "Hersteller (optional):"
-        Case "PromptOrderNumber1": T_DE = "Bestellnummer 1 (optional):"
-        Case "PromptOrderNumber2": T_DE = "Bestellnummer 2 (optional):"
-        Case "PromptNorm": T_DE = "Norm (optional):"
         Case "TitleNewRevision": T_DE = "Neue Revision"
         Case "ItemStatusReleasedPrefix": T_DE = "Element Nr. "
         Case "ItemStatusReleasedSuffix": T_DE = " hat den Status ""Freigegeben"" -- das Anhaengen einer Datei erfordert eine neue Revision. Neue Revision erstellen?"
         Case "PromptRevisionComment": T_DE = "Kommentar zur neuen Revision (optional):"
-        Case "NoProjectsAvailable": T_DE = "Keine Projekte in PDM verfuegbar."
-        Case "TitleNewItemInPdm": T_DE = "Neues Element in PDM"
         Case "PromptTargetFolder": T_DE = "Zielordner fuer lokale Kopien (benannt nach der PDM-Nummer):"
         Case "TitleTargetFolder": T_DE = "Zielordner"
-        Case "PromptPickProject": T_DE = "Projekt auswaehlen (Nummer):"
-        Case "TitleNewComponent": T_DE = "Neue Komponente"
-        Case "TypePromptText": T_DE = "Typ:" & vbCrLf & "1 - Teil" & vbCrLf & "2 - Baugruppe"
-        Case "NamePromptText": T_DE = "Name:"
-        Case "NewComponentHeaderPrefix": T_DE = "Neue Baugruppenkomponente: "
-        Case "UsedPrefix": T_DE = "Verwendet: "
-        Case "UsageHintJoiner": T_DE = "x in "
         Case "AssemblyDetectedTitle": T_DE = "Baugruppe erkannt"
         Case "AssemblyLinksPart1": T_DE = "Diese Baugruppe verweist auf "
         Case "AssemblyLinksPart2": T_DE = " weitere Datei(en) (Teile/Unterbaugruppen):"
         Case "AssemblyLinksPart3": T_DE = "Sollen sie automatisch zusammen mit diesem Dokument gesendet werden (zuerst die Blaetter, dieses Dokument zuletzt)?"
         Case "AssemblyLinksPart4": T_DE = "'Nein' sendet/erstellt KEINE neuen Komponenten -- aber bereits in PDM vorhandene Komponenten werden trotzdem in die Struktur dieser Baugruppe eingebunden."
-        Case "FailedToSendPrefix": T_DE = "Senden fehlgeschlagen fuer "
         Case "CreatedButFailedAttachPart1": T_DE = "Erstellt "
         Case "CreatedButFailedAttachPart2": T_DE = ", aber die Zuordnung unter "
         Case "CreatedButFailedAttachPart3": T_DE = " ist fehlgeschlagen: "
@@ -1363,114 +1306,6 @@ Function RevisionLabel(ByVal n As Long) As String
     RevisionLabel = label
 End Function
 
-' Collects Part/Assembly properties from the user using the SAME rules as
-' kind_field_visibility() in the FreeCAD macro / PartPropertyForm+add-node-dialog in the
-' web app: Manufactured -> Material; Purchased -> Manufacturer/Order numbers/Mass;
-' Standard -> Material/Norm; Client -> no extra fields. Assembly has NO "kind" at all
-' (not asked here) -- it only ever gets an optional Mass, matching add-node-dialog.tsx /
-' NewComponentDialog in the FreeCAD macro (a Zlozenie never has "rodzaj" or "material").
-Function PromptPartProperties(ByVal isPart As Boolean) As String
-    Dim rodzaj As String
-    rodzaj = ""
-
-    If isPart Then
-        Dim choice As String
-        choice = InputBox(T("KindPrompt"), T("TitleProperties"))
-        Select Case Trim(choice)
-            Case "1": rodzaj = "Wykonywana"
-            Case "2": rodzaj = "Zakupowa"
-            Case "3": rodzaj = "Normalia"
-            Case "4": rodzaj = "Klienta"
-            Case Else: rodzaj = ""
-        End Select
-
-        If rodzaj = "" Then
-            MsgBox T("KindRequired"), vbExclamation, T("AppTitle")
-            PromptPartProperties = PromptPartProperties(isPart)
-            Exit Function
-        End If
-    End If
-
-    Dim props As String
-    Dim firstProp As Boolean
-    props = "{"
-    firstProp = True
-
-    If rodzaj <> "" Then
-        props = props & """rodzaj"":" & JsonStr(rodzaj)
-        firstProp = False
-    End If
-
-    Dim showMaterial As Boolean, showMass As Boolean, showPurchase As Boolean, showNorm As Boolean
-    If isPart Then
-        showMaterial = (rodzaj = "Wykonywana" Or rodzaj = "Normalia")
-        showMass = (rodzaj = "Zakupowa")
-        showPurchase = (rodzaj = "Zakupowa")
-        showNorm = (rodzaj = "Normalia")
-    Else
-        showMaterial = False
-        showMass = True
-        showPurchase = False
-        showNorm = False
-    End If
-
-    Dim fieldValue As String
-
-    If showMaterial Then
-        fieldValue = InputBox(T("PromptMaterial"), T("TitleProperties"))
-        If Trim(fieldValue) <> "" Then
-            If Not firstProp Then props = props & ","
-            props = props & """material"":" & JsonStr(fieldValue)
-            firstProp = False
-        End If
-    End If
-
-    If showMass Then
-        fieldValue = InputBox(T("PromptMass"), T("TitleProperties"))
-        If Trim(fieldValue) <> "" Then
-            If Not firstProp Then props = props & ","
-            props = props & """mass"":" & JsonStr(fieldValue)
-            firstProp = False
-        End If
-    End If
-
-    If showPurchase Then
-        fieldValue = InputBox(T("PromptManufacturer"), T("TitleProperties"))
-        If Trim(fieldValue) <> "" Then
-            If Not firstProp Then props = props & ","
-            props = props & """manufacturer"":" & JsonStr(fieldValue)
-            firstProp = False
-        End If
-
-        fieldValue = InputBox(T("PromptOrderNumber1"), T("TitleProperties"))
-        If Trim(fieldValue) <> "" Then
-            If Not firstProp Then props = props & ","
-            props = props & """orderNumber"":" & JsonStr(fieldValue)
-            firstProp = False
-        End If
-
-        fieldValue = InputBox(T("PromptOrderNumber2"), T("TitleProperties"))
-        If Trim(fieldValue) <> "" Then
-            If Not firstProp Then props = props & ","
-            props = props & """orderNumber2"":" & JsonStr(fieldValue)
-            firstProp = False
-        End If
-    End If
-
-    If showNorm Then
-        fieldValue = InputBox(T("PromptNorm"), T("TitleProperties"))
-        If Trim(fieldValue) <> "" Then
-            If Not firstProp Then props = props & ","
-            props = props & """norm"":" & JsonStr(fieldValue)
-            firstProp = False
-        End If
-    End If
-
-    props = props & "}"
-    PromptPartProperties = props
-End Function
-
-
 ' ============================================================================
 ' PDM file storage -- if visible in this machine's file system (client and server on the
 ' same disk), the copy goes directly there and is REGISTERED without a second HTTP
@@ -1701,35 +1536,6 @@ End Sub
 ' PDM core: new item / attach to an existing item (with revision handling).
 ' ============================================================================
 
-' Creates a NEW item in PDM, then attaches the current document as its file. A new item
-' always starts at revision 1. "parentId" (new, optional) attaches it as a child right
-' away at creation time -- used by ProcessAssemblyTree for auto-detected components; the
-' top-level document (Sub main) never passes it, since its own parent relationships (if
-' any) are attached separately AFTER it gets an item id (see main()'s "edgesForTop").
-Function PushNewItemToPdm(ByVal projectId As String, ByVal itemType As String, ByVal name As String, ByVal propertiesJson As String, ByVal filePath As String, ByVal swModel As Object, ByVal targetFolder As String, Optional ByVal parentId As String = "") As Object
-    Dim bodyJson As String
-    bodyJson = "{""name"":" & JsonStr(name) & ",""itemType"":" & JsonStr(itemType) & ",""properties"":" & propertiesJson
-    If parentId <> "" Then bodyJson = bodyJson & ",""parentId"":" & JsonStr(parentId)
-    bodyJson = bodyJson & "}"
-
-    Dim created As Object
-    Set created = ApiPostJson("/projects/" & projectId & "/nodes", bodyJson)
-
-    Dim itemId As String, itemNumber As Long
-    itemId = JsonGetString(created, "id", "")
-    itemNumber = JsonGetLong(created, "itemNumber", 0)
-    LogLine "Created new PDM item: #" & itemNumber & " (id " & itemId & "), project " & projectId & ", type " & itemType
-
-    RenameAndUpload swModel, filePath, itemId, itemNumber, name, 1, targetFolder
-
-    Dim result As Object
-    Set result = CreateObject("Scripting.Dictionary")
-    result.Add "itemId", itemId
-    result.Add "itemNumber", itemNumber
-    result.Add "revision", 1
-    Set PushNewItemToPdm = result
-End Function
-
 ' Attaches the current document as the current file of an ALREADY EXISTING Part/Assembly --
 ' without creating a new record. If the item's status is "wydany" (released -- PDM does not
 ' allow attaching files in that status), asks for consent to create a new revision plus an
@@ -1825,38 +1631,6 @@ Function PushToExistingItem(ByVal swModel As Object, ByVal itemId As String, ByV
     Set PushToExistingItem = result
 End Function
 
-Function PromptForProject() As String
-    Dim projects As Object
-    Set projects = ApiGet("/projects")
-    If projects Is Nothing Or projects.Count = 0 Then
-        MsgBox T("NoProjectsAvailable"), vbExclamation, T("AppTitle")
-        PromptForProject = ""
-        Exit Function
-    End If
-
-    Dim ids() As String
-    ReDim ids(1 To projects.Count)
-    Dim listText As String
-    Dim i As Long
-    i = 0
-    Dim p As Variant
-    For Each p In projects
-        i = i + 1
-        ids(i) = JsonGetString(p, "id", "")
-        listText = listText & i & " - " & JsonGetString(p, "name", "") & vbCrLf
-    Next p
-
-    Dim choice As String
-    choice = InputBox(T("PromptPickProject") & vbCrLf & listText, T("TitleNewItemInPdm"))
-    Dim idx As Long
-    idx = Val(choice)
-    If idx < 1 Or idx > projects.Count Then
-        PromptForProject = ""
-    Else
-        PromptForProject = ids(idx)
-    End If
-End Function
-
 ' Looks up a Part/Assembly by the number visible to the user (e.g. in the name
 ' "67 (Name)") -- NOT by GUID, which a regular user never sees anywhere. Searches the
 ' WHOLE database, not just the current project -- a component can be used across multiple
@@ -1867,8 +1641,8 @@ End Function
 ' every SolidWorks assembly is inherently built from separate component documents) and
 ' offers to send any component not yet linked to a PDM item, leaves-first, exactly like
 ' EasyPDM.FreeCad/EasyPDMUpload.FCMacro's discover_component_tree/process_assembly_tree --
-' except new components are collected through plain InputBoxes (see
-' PromptNewComponentProperties), not a browser tab per component (see file header).
+' each new component gets the SAME browser ticket flow as the top-level document (one tab
+' at a time, never several at once -- see file header and ProcessAssemblyTree below).
 ' Confirmed working on a live SolidWorks 2026 install (late-bound GetComponents/
 ' GetModelDoc2/Name2 all resolve fine without a type library reference, as expected).
 '
@@ -1978,65 +1752,6 @@ Function DiscoverComponentTree(ByVal topModel As Object) As Object
     Set DiscoverComponentTree = result
 End Function
 
-' Human-readable "used Nx in Parent.SLDASM[, ...]" summary for a component that can appear
-' under several parents at once (a shared part) -- shown in PromptNewComponentProperties
-' for context. Mirrors _usage_hint_for.
-Private Function UsageHintFor(ByVal filePath As String, ByVal edges As Collection) As String
-    Dim result As String
-    result = ""
-    Dim edge As Variant
-    For Each edge In edges
-        If edge("child") = filePath Then
-            Dim parentName As String
-            parentName = Mid(edge("parent"), InStrRev(edge("parent"), "\") + 1)
-            If result <> "" Then result = result & ", "
-            result = result & edge("qty") & T("UsageHintJoiner") & parentName
-        End If
-    Next edge
-    If result <> "" Then result = T("UsedPrefix") & result
-    UsageHintFor = result
-End Function
-
-' Collects Project/Type/Name/Kind + dependent fields for ONE new (not yet in PDM) assembly
-' component, through a sequence of InputBoxes -- the field set and visibility rules are
-' the SAME as PromptPartProperties/kind_field_visibility (Manufactured->Material,
-' Purchased->Manufacturer/Order numbers/Mass, Standard->Material/Norm, Client->nothing
-' extra; Assembly: Material/Mass always, kind optional without Client). Returns "" if the
-' user cancelled at any step; otherwise returns projectId, itemType, name and propertiesJson
-' via ByRef out-parameters and "" is never a valid projectId, so callers only need to check
-' that one.
-Sub PromptNewComponentProperties(ByVal filePath As String, ByVal suggestedName As String, ByVal suggestedIsAssembly As Boolean, ByVal usageHint As String, ByRef outProjectId As String, ByRef outItemType As String, ByRef outName As String, ByRef outPropertiesJson As String)
-    outProjectId = ""
-
-    Dim header As String
-    header = T("NewComponentHeaderPrefix") & Mid(filePath, InStrRev(filePath, "\") + 1)
-    If usageHint <> "" Then header = header & vbCrLf & usageHint
-
-    Dim projectId As String
-    projectId = PromptForProject()
-    If projectId = "" Then Exit Sub
-
-    Dim typeChoice As String
-    typeChoice = InputBox(header & vbCrLf & vbCrLf & T("TypePromptText"), T("TitleNewComponent"), IIf(suggestedIsAssembly, "2", "1"))
-    Dim isPart As Boolean
-    isPart = (Trim(typeChoice) <> "2")
-
-    Dim name As String
-    name = InputBox(header & vbCrLf & vbCrLf & T("NamePromptText"), T("TitleNewComponent"), suggestedName)
-    If Trim(name) = "" Then Exit Sub
-
-    Dim propertiesJson As String
-    propertiesJson = PromptPartProperties(isPart)
-    If propertiesJson = "" Then Exit Sub ' PromptPartProperties never actually returns ""
-                                          ' today (Part requires a kind, retries on empty),
-                                          ' kept here defensively in case that ever changes.
-
-    outProjectId = projectId
-    outItemType = IIf(isPart, "part", "assembly")
-    outName = Trim(name)
-    outPropertiesJson = propertiesJson
-End Sub
-
 ' If topModel is an Assembly, discovers its component tree and (on user consent) sends
 ' every component NOT yet linked to a PDM item (leaves-first), wiring up parent-child
 ' relations as it goes -- mirrors process_assembly_tree. Newly created components are
@@ -2095,14 +1810,6 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     Dim pathToItemId As Object
     Set pathToItemId = CreateObject("Scripting.Dictionary")
 
-    ' Files that themselves have further children -> suggest "Assembly" as the type.
-    Dim hasChildren As Object
-    Set hasChildren = CreateObject("Scripting.Dictionary")
-    Dim e As Variant
-    For Each e In edges
-        If Not hasChildren.Exists(e("parent")) Then hasChildren.Add e("parent"), True
-    Next e
-
     Dim filePath As Variant
     For Each filePath In order
         Dim childModel As Object
@@ -2122,31 +1829,70 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             pathToItemId.Add filePath, existingItemId
             LogLine "Component already linked to PDM item " & existingItemId & ": " & filePath
         ElseIf sendNewComponents Then
-            Dim outProjectId As String, outItemType As String, outName As String, outPropertiesJson As String
-            PromptNewComponentProperties CStr(filePath), childModel.GetTitle(), hasChildren.Exists(filePath), UsageHintFor(CStr(filePath), edges), outProjectId, outItemType, outName, outPropertiesJson
-            If outProjectId = "" Then
+            ' Same "let the browser decide new/duplicate/attach-existing" flow as the
+            ' top-level document (BuildBrowserCreateUrl/WaitForTicket, see file header) --
+            ' opened ONE TAB AT A TIME, one component after another in the same
+            ' leaves-first order as everything else here (never several tabs at once --
+            ' confusing to juggle). Cancelling any single ticket aborts the whole
+            ' remaining tree walk, same as every other hiccup in this loop.
+            Dim compTicket As String
+            compTicket = NewGuid()
+            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, BaseNameFromPath(CStr(filePath)))
+
+            Dim compTicketData As Object
+            Set compTicketData = WaitForTicket(compTicket)
+            If compTicketData Is Nothing Then
                 ProcessAssemblyTree = True
                 Exit Function
             End If
 
+            Dim compExportStep As Boolean
+            compExportStep = True
+            If compTicketData.Exists("exportStep") Then
+                If Not IsNull(compTicketData.Item("exportStep")) Then compExportStep = CBool(compTicketData.Item("exportStep"))
+            End If
+
+            Dim compIsExisting As Boolean
+            compIsExisting = False
+            If compTicketData.Exists("existing") Then
+                If compTicketData.Item("existing") = True Then compIsExisting = True
+            End If
+
+            Dim compTicketItemId As String
+            compTicketItemId = JsonGetString(compTicketData, "itemId", "")
+
             Dim created As Object
-            On Error Resume Next
-            Set created = PushNewItemToPdm(outProjectId, outItemType, outName, outPropertiesJson, CStr(filePath), childModel, targetFolder)
-            Dim createErr As String
-            createErr = Err.Description
-            On Error GoTo 0
-            If created Is Nothing Then
-                MsgBox T("FailedToSendPrefix") & Mid(filePath, InStrRev(filePath, "\") + 1) & ": " & createErr, vbCritical, T("AppTitle")
-                ProcessAssemblyTree = True
-                Exit Function
+            If compIsExisting Then
+                Set created = PushToExistingItem(childModel, compTicketItemId, CStr(filePath), targetFolder)
+                If created Is Nothing Then
+                    ' Existing item is "wydany" and the user declined a new revision --
+                    ' treat like any other cancellation here (see comment above).
+                    ProcessAssemblyTree = True
+                    Exit Function
+                End If
+            Else
+                ' New item -- it already exists server-side (the browser called POST
+                ' /nodes with this ticket), so finish DIRECTLY with the file upload;
+                ' creating another item here through the API would create a SECOND item --
+                ' same reasoning as the top-level document's own ticket handling in main().
+                Dim compTicketItemNumber As Long
+                compTicketItemNumber = JsonGetLong(compTicketData, "itemNumber", 0)
+                Dim compTicketName As String
+                compTicketName = JsonGetString(compTicketData, "name", BaseNameFromPath(CStr(filePath)))
+
+                RenameAndUpload childModel, CStr(filePath), compTicketItemId, compTicketItemNumber, compTicketName, 1, targetFolder
+                Set created = CreateObject("Scripting.Dictionary")
+                created.Add "itemId", compTicketItemId
+                created.Add "itemNumber", compTicketItemNumber
             End If
 
             Dim newItemId As String
             newItemId = JsonGetString(created, "itemId", "")
-            UploadStepAttachment childModel, newItemId
-            ' Redundant final refresh -- PushNewItemToPdm's own RenameAndUpload call already
-            ' set (and saved) this same Custom Property BEFORE uploading, so the file
-            ' actually sent to the server already carries it. Kept here as cheap insurance.
+            If compExportStep Then UploadStepAttachment childModel, newItemId
+            ' Redundant final refresh -- RenameAndUpload/PushToExistingItem's own upload
+            ' path already set (and saved) this same Custom Property BEFORE uploading, so
+            ' the file actually sent to the server already carries it. Kept here as cheap
+            ' insurance.
             SetLinkedItemOn childModel, newItemId, CStr(JsonGetLong(created, "itemNumber", 0))
             pathToItemId.Add filePath, newItemId
         Else
@@ -2209,6 +1955,18 @@ End Function
 ' SolidWorks document type, and a default name (file name without extension). Saves the
 ' document if it was not saved yet -- the user must then choose a path via SolidWorks's
 ' standard "Save As" dialog (Save3 with an empty file name opens it automatically).
+' Strips the directory and extension from a full file path -- "C:\...\a.SLDPRT" -> "a".
+' Used for the suggested/default name shown to the user: SolidWorks's own GetTitle() and a
+' raw path both include the extension, which does not belong in a PDM item name.
+Function BaseNameFromPath(ByVal path As String) As String
+    Dim baseName As String
+    baseName = Mid(path, InStrRev(path, "\") + 1)
+    Dim dotPos As Long
+    dotPos = InStrRev(baseName, ".")
+    If dotPos > 0 Then baseName = Left(baseName, dotPos - 1)
+    BaseNameFromPath = baseName
+End Function
+
 Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As String, ByRef defaultName As String) As Boolean
     Dim swModel As Object
     Set swModel = swApp.ActiveDoc
@@ -2241,12 +1999,7 @@ Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As Strin
             itemTypeGuess = "file"
     End Select
 
-    Dim baseName As String
-    baseName = Mid(filePath, InStrRev(filePath, "\") + 1)
-    Dim dotPos As Long
-    dotPos = InStrRev(baseName, ".")
-    If dotPos > 0 Then baseName = Left(baseName, dotPos - 1)
-    defaultName = baseName
+    defaultName = BaseNameFromPath(filePath)
 
     GetActiveDocInfo = True
 End Function
@@ -2367,10 +2120,11 @@ Sub main()
 
     ' Step 1: assembly component tree -- offer to auto-detect/send new components first
     ' (leaves-first), before deciding anything about the top-level document itself. See
-    ' file header / ProcessAssemblyTree for why this stays fully native (no browser). Each
-    ' new component gets its own local Save As (see RenameAndUpload) BEFORE this function
-    ' returns, so by the time the top-level document below is itself saved, any of its
-    ' references to a just-processed component already point at the new, PDM-named path.
+    ' file header / ProcessAssemblyTree for the one-browser-tab-at-a-time ticket flow used
+    ' for each new component. Each new component gets its own local Save As (see
+    ' RenameAndUpload) BEFORE this function returns, so by the time the top-level document
+    ' below is itself saved, any of its references to a just-processed component already
+    ' point at the new, PDM-named path.
     Dim edgesForTop As New Collection
     If itemTypeGuess = "assembly" Then
         If ProcessAssemblyTree(swApp.ActiveDoc, edgesForTop, targetFolder) Then
@@ -2470,8 +2224,8 @@ Sub main()
             If exportStep Then UploadStepAttachment swActiveModel, ticketItemId
         Else
             ' New item -- it already exists server-side (the browser called POST /nodes
-            ' with this ticket), so finish DIRECTLY with the file upload; calling
-            ' PushNewItemToPdm here would create a SECOND item.
+            ' with this ticket), so finish DIRECTLY with the file upload; creating another
+            ' item here through the API would create a SECOND item.
             Dim ticketItemNumber As Long
             ticketItemNumber = JsonGetLong(ticketData, "itemNumber", 0)
             Dim ticketName As String
