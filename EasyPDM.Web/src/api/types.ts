@@ -278,5 +278,5 @@ export interface Attachment {
   fileName: string
   fileSize: number | null
   uploadedAt: string | null
-  role: "pdf" | "step" | null
+  role: "pdf" | "step" | "cad" | null
 }
