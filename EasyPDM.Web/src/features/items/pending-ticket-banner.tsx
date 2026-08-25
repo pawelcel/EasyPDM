@@ -52,6 +52,7 @@ function PendingTicketBanner() {
   const [items, setItems] = useState<Item[]>([])
   const [itemId, setItemId] = useState("")
   const [exportStep, setExportStep] = useState(true)
+  const [exportPdf, setExportPdf] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
 
@@ -96,7 +97,12 @@ function PendingTicketBanner() {
     setSubmitting(true)
     setError("")
     try {
-      await api.attachExistingToTicket(pendingTicket!.ticket, itemId, isDownload ? undefined : exportStep)
+      await api.attachExistingToTicket(
+        pendingTicket!.ticket,
+        itemId,
+        isDownload ? undefined : exportStep,
+        isDownload ? undefined : exportPdf
+      )
       clearPendingCreateTicket()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("addNode.addFailed"))
@@ -173,15 +179,26 @@ function PendingTicketBanner() {
                 </Combobox>
 
                 {screen === "attach" && !isDownload && (
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={exportStep}
-                      onChange={(e) => setExportStep(e.target.checked)}
-                      className="size-3.5 shrink-0 accent-primary"
-                    />
-                    {t("addNode.exportStepOptional")}
-                  </label>
+                  <>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={exportStep}
+                        onChange={(e) => setExportStep(e.target.checked)}
+                        className="size-3.5 shrink-0 accent-primary"
+                      />
+                      {t("addNode.exportStepOptional")}
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={exportPdf}
+                        onChange={(e) => setExportPdf(e.target.checked)}
+                        className="size-3.5 shrink-0 accent-primary"
+                      />
+                      {t("addNode.exportPdfOptional")}
+                    </label>
+                  </>
                 )}
 
                 <FormError>{error}</FormError>

@@ -187,6 +187,7 @@ function AddNodeDialog({
   // CAD, więc nie ma czego eksportować. Domyślnie zaznaczony (tak jak dawniej w natywnym
   // dialogu makra).
   const [exportStep, setExportStep] = useState(true)
+  const [exportPdf, setExportPdf] = useState(false)
 
   // Inny plik
   const [file, setFile] = useState<File | null>(null)
@@ -282,6 +283,7 @@ function AddNodeDialog({
         parentId,
         ticket,
         exportStep: ticket ? exportStep : undefined,
+        exportPdf: ticket ? exportPdf : undefined,
       })
       setOpen(false)
       reset()
@@ -556,15 +558,26 @@ function AddNodeDialog({
             )}
 
             {ticket && (
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={exportStep}
-                  onChange={(e) => setExportStep(e.target.checked)}
-                  className="size-3.5 shrink-0 accent-primary"
-                />
-                {t("addNode.exportStepOptional")}
-              </label>
+              <>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={exportStep}
+                    onChange={(e) => setExportStep(e.target.checked)}
+                    className="size-3.5 shrink-0 accent-primary"
+                  />
+                  {t("addNode.exportStepOptional")}
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={exportPdf}
+                    onChange={(e) => setExportPdf(e.target.checked)}
+                    className="size-3.5 shrink-0 accent-primary"
+                  />
+                  {t("addNode.exportPdfOptional")}
+                </label>
+              </>
             )}
 
             <FormError>{error}</FormError>
@@ -590,15 +603,26 @@ function AddNodeDialog({
               </>
             )}
             {mode === "assembly" && ticket && (
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={exportStep}
-                  onChange={(e) => setExportStep(e.target.checked)}
-                  className="size-3.5 shrink-0 accent-primary"
-                />
-                {t("addNode.exportStepOptional")}
-              </label>
+              <>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={exportStep}
+                    onChange={(e) => setExportStep(e.target.checked)}
+                    className="size-3.5 shrink-0 accent-primary"
+                  />
+                  {t("addNode.exportStepOptional")}
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={exportPdf}
+                    onChange={(e) => setExportPdf(e.target.checked)}
+                    className="size-3.5 shrink-0 accent-primary"
+                  />
+                  {t("addNode.exportPdfOptional")}
+                </label>
+              </>
             )}
             <FormError>{error}</FormError>
           </div>

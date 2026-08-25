@@ -166,19 +166,11 @@ function AttachmentsPanel({
     if (file) uploadFile(file, "cad")
   }
 
-  // Na rolę przypada najwyżej jeden załącznik — nowy zastępuje poprzedni (usuwamy stary
-  // PRZED wysłaniem nowego), żeby nigdy nie było niejednoznaczności, który plik jest "tym"
-  // rysunkiem/modelem.
+  // Na rolę przypada najwyżej jeden załącznik — nowy zastępuje poprzedni. Zastępowanie
+  // (usunięcie starego, także fizycznego pliku) robi backend (patrz
+  // ReplaceExistingRoleAttachmentAsync w AttachmentEndpoints.cs), więc działa identycznie
+  // niezależnie od tego, czy plik przychodzi stąd, czy z makra FreeCAD/SolidWorks.
   async function handleRoleUpload(role: "pdf" | "step", file: File) {
-    const existing = attachments.find((a) => a.role === role)
-    if (existing) {
-      try {
-        await api.deleteAttachment(existing.id)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t("item.deleteAttachmentFailed"))
-        return
-      }
-    }
     await uploadFile(file, role)
   }
 

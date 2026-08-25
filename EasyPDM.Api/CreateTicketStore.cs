@@ -18,14 +18,15 @@ class CreateTicketStore
     // existing=true) — ogólne, nie FreeCAD-specyficzne (przyda się też dla SolidWorks
     // później). "existing" mówi makru, którą lokalną ścieżkę kodu odpalić po stronie
     // klienta (_rename_and_upload wprost dla nowego, vs push_to_existing_item — ze swoją
-    // własną obsługą statusu "wydany" — dla dogrania). "exportStep" to wybór zaznaczony w
-    // formularzu w przeglądarce (checkbox widoczny tylko, gdy dodawanie ma przypięty
-    // bilet) — makro po stronie klienta używa go zamiast jakiegokolwiek lokalnego wyboru,
-    // zob. ItemEndpoints.cs i EasyPDMUpload.FCMacro.
-    public void Complete(Guid ticket, Guid itemId, int? itemNumber, string? itemNumberPrefix, string name, bool? exportStep, bool existing)
+    // własną obsługą statusu "wydany" — dla dogrania). "exportStep"/"exportPdf" to
+    // niezależne od siebie wybory zaznaczone w formularzu w przeglądarce (checkboxy
+    // widoczne tylko, gdy dodawanie ma przypięty bilet) — makro po stronie klienta używa
+    // ich zamiast jakiegokolwiek lokalnego wyboru, zob. ItemEndpoints.cs i
+    // EasyPDMUpload.FCMacro/EasyPDMUpload.bas.
+    public void Complete(Guid ticket, Guid itemId, int? itemNumber, string? itemNumberPrefix, string name, bool? exportStep, bool? exportPdf, bool existing)
     {
         Sweep();
-        _tickets[ticket] = new TicketState(DateTime.UtcNow, itemId, itemNumber, itemNumberPrefix, name, exportStep, existing);
+        _tickets[ticket] = new TicketState(DateTime.UtcNow, itemId, itemNumber, itemNumberPrefix, name, exportStep, exportPdf, existing);
     }
 
     public bool TryGet(Guid ticket, out TicketState state)
@@ -47,4 +48,4 @@ class CreateTicketStore
     }
 }
 
-record TicketState(DateTime CreatedAt, Guid ItemId, int? ItemNumber, string? ItemNumberPrefix, string Name, bool? ExportStep, bool Existing);
+record TicketState(DateTime CreatedAt, Guid ItemId, int? ItemNumber, string? ItemNumberPrefix, string Name, bool? ExportStep, bool? ExportPdf, bool Existing);

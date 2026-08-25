@@ -110,6 +110,8 @@ static class AttachmentEndpoints
                 """;
             try
             {
+                await ReplaceExistingRoleAttachmentAsync(conn, itemId, role, user.Id);
+
                 await using var insertCmd = new NpgsqlCommand(insertSql, conn);
                 insertCmd.Parameters.AddWithValue("id", attachmentId);
                 insertCmd.Parameters.AddWithValue("itemId", itemId);
@@ -189,6 +191,8 @@ static class AttachmentEndpoints
             {
                 hash = Convert.ToHexString(await sha256.ComputeHashAsync(readStream));
             }
+
+            await ReplaceExistingRoleAttachmentAsync(conn, itemId, body.Role, user.Id);
 
             const string insertSql = """
                 INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, preview_role)
@@ -302,6 +306,49 @@ static class AttachmentEndpoints
 
             return Results.Ok();
         });
+    }
+
+    // "pdf"/"step" to sloty JEDEN-załącznik-na-rolę (w odróżnieniu od "cad", które się
+    // kumuluje — patrz komentarz w attachments-panel.tsx) — nowy zastępuje poprzedni.
+    // Do niedawna to zastępowanie robił WYŁĄCZNIE frontend webowy (usuwał stary przed
+    // wysłaniem nowego), więc każdy inny wywołujący tego endpointu (makra FreeCAD/
+    // SolidWorks, wysyłające PDF/STEP bezpośrednio przez API) omijał to całkowicie —
+    // stary załącznik zostawał w bazie I na dysku, niewidoczny w UI (RoleSlot pokazuje
+    // tylko jeden, znaleziony przez .find()), ale zajmujący miejsce na zawsze. Wymuszone
+    // tutaj, więc działa identycznie niezależnie od tego, kto woła ten endpoint.
+    private static async Task ReplaceExistingRoleAttachmentAsync(
+        NpgsqlConnection conn, Guid itemId, string? role, Guid userId)
+    {
+        if (role is not ("pdf" or "step"))
+            return;
+
+        var existing = new List<(Guid Id, string FileName, string FilePath)>();
+        await using (var selectCmd = new NpgsqlCommand(
+            "SELECT id, file_name, file_path FROM item_attachments WHERE item_id = @itemId AND preview_role = @role;", conn))
+        {
+            selectCmd.Parameters.AddWithValue("itemId", itemId);
+            selectCmd.Parameters.AddWithValue("role", role);
+            await using var reader = await selectCmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                existing.Add((reader.GetGuid(0), reader.GetString(1), reader.GetString(2)));
+        }
+
+        if (existing.Count == 0)
+            return;
+
+        await using (var deleteCmd = new NpgsqlCommand(
+            "DELETE FROM item_attachments WHERE item_id = @itemId AND preview_role = @role;", conn))
+        {
+            deleteCmd.Parameters.AddWithValue("itemId", itemId);
+            deleteCmd.Parameters.AddWithValue("role", role);
+            await deleteCmd.ExecuteNonQueryAsync();
+        }
+
+        foreach (var (_, fileName, filePath) in existing)
+        {
+            await LogAttachmentHistoryAsync(conn, itemId, fileName, "removed", userId);
+            try { File.Delete(filePath); } catch (IOException) { /* magazyn i tak jest sierocy — nie blokujemy zastąpienia */ }
+        }
     }
 
     // Wpis do panelu "Historia" Części/Złożenia — osobna tabela, bo usunięty załącznik
