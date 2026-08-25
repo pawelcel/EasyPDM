@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 
 import { api } from "@/api/client"
-import { itemDisplayLabel, type Item } from "@/api/types"
+import { itemDisplayLabel, revisionLabel, type Item } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { iconColorClass, itemIcon, ownerLockVisual } from "@/lib/item-visuals"
@@ -276,6 +276,9 @@ function TreeNode({
           {itemDisplayLabel(item)}
           {quantity !== null && quantity !== 1 && (
             <span className="ml-1.5 text-xs text-muted-foreground">×{quantity}</span>
+          )}
+          {item.revisionNumber !== null && (
+            <span className="ml-1.5 text-xs text-muted-foreground">rev. {revisionLabel(item.revisionNumber)}</span>
           )}
         </button>
 
