@@ -222,6 +222,8 @@ Private Function T_PL(ByVal key As String) As String
         Case "PromptTargetFolder": T_PL = "Folder docelowy na lokalne kopie (nazwane pod numerem PDM):"
         Case "TitleTargetFolder": T_PL = "Folder docelowy"
         Case "AssemblyDetectedTitle": T_PL = "Wykryto zlozenie"
+        Case "NewComponentBrowserPromptPrefix": T_PL = "Nowy element w drzewie: "
+        Case "NewComponentBrowserPromptSuffix": T_PL = ". Kliknij OK, aby otworzyc przegladarke i go wprowadzic (moze otworzyc sie w tle -- sprawdz pasek zadan)."
         Case "AssemblyLinksPart1": T_PL = "To zlozenie odwoluje sie do "
         Case "AssemblyLinksPart2": T_PL = " innego(-ych) pliku(-ow) (czesci/podzespoly):"
         Case "AssemblyLinksPart3": T_PL = "Wyslac je automatycznie razem z tym dokumentem (najpierw liscie drzewa, ten dokument na koncu)?"
@@ -272,6 +274,8 @@ Private Function T_EN(ByVal key As String) As String
         Case "PromptTargetFolder": T_EN = "Target folder for local copies (named under the PDM number):"
         Case "TitleTargetFolder": T_EN = "Target folder"
         Case "AssemblyDetectedTitle": T_EN = "Assembly detected"
+        Case "NewComponentBrowserPromptPrefix": T_EN = "New component in the tree: "
+        Case "NewComponentBrowserPromptSuffix": T_EN = ". Click OK to open the browser and fill it in (it may open in the background -- check the taskbar)."
         Case "AssemblyLinksPart1": T_EN = "This assembly links to "
         Case "AssemblyLinksPart2": T_EN = " other file(s) (parts/sub-assemblies):"
         Case "AssemblyLinksPart3": T_EN = "Send them automatically together with this document (leaves first, this document last)?"
@@ -322,6 +326,8 @@ Private Function T_DE(ByVal key As String) As String
         Case "PromptTargetFolder": T_DE = "Zielordner fuer lokale Kopien (benannt nach der PDM-Nummer):"
         Case "TitleTargetFolder": T_DE = "Zielordner"
         Case "AssemblyDetectedTitle": T_DE = "Baugruppe erkannt"
+        Case "NewComponentBrowserPromptPrefix": T_DE = "Neue Komponente im Baum: "
+        Case "NewComponentBrowserPromptSuffix": T_DE = ". Klicken Sie OK, um den Browser zu oeffnen und sie einzugeben (er kann im Hintergrund geoeffnet werden -- pruefen Sie die Taskleiste)."
         Case "AssemblyLinksPart1": T_DE = "Diese Baugruppe verweist auf "
         Case "AssemblyLinksPart2": T_DE = " weitere Datei(en) (Teile/Unterbaugruppen):"
         Case "AssemblyLinksPart3": T_DE = "Sollen sie automatisch zusammen mit diesem Dokument gesendet werden (zuerst die Blaetter, dieses Dokument zuletzt)?"
@@ -1892,9 +1898,20 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             ' leaves-first order as everything else here (never several tabs at once --
             ' confusing to juggle). Cancelling any single ticket aborts the whole
             ' remaining tree walk, same as every other hiccup in this loop.
+            ' A native MsgBox right before opening each browser tab -- confirmed necessary
+            ' in practice: Windows' foreground-stealing protection lets the FIRST
+            ' programmatic browser-open of a run take focus, but silently opens the SECOND
+            ' one (and later) in a background tab with no visible cue, leaving WaitForTicket
+            ' polling forever with nothing for the user to see or fill in. Clicking OK here
+            ' counts as fresh user input, which lets the immediately-following browser-open
+            ' take focus reliably.
+            Dim compSuggestedName As String
+            compSuggestedName = BaseNameFromPath(CStr(filePath))
+            MsgBox T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
+
             Dim compTicket As String
             compTicket = NewGuid()
-            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, BaseNameFromPath(CStr(filePath)))
+            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName)
 
             Dim compTicketData As Object
             Set compTicketData = WaitForTicket(compTicket)
@@ -1935,7 +1952,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
                 Dim compTicketItemNumber As Long
                 compTicketItemNumber = JsonGetLong(compTicketData, "itemNumber", 0)
                 Dim compTicketName As String
-                compTicketName = JsonGetString(compTicketData, "name", BaseNameFromPath(CStr(filePath)))
+                compTicketName = JsonGetString(compTicketData, "name", compSuggestedName)
 
                 RenameAndUpload childModel, CStr(filePath), compTicketItemId, compTicketItemNumber, compTicketName, 1, targetFolder
                 Set created = CreateObject("Scripting.Dictionary")
