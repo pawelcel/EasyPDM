@@ -1668,6 +1668,17 @@ Private Sub VisitAssemblyComponents(ByVal parentModel As Object, ByVal parentPat
     Dim comps As Variant
     comps = parentModel.GetComponents(True) ' top-level components of THIS assembly only
 
+    ' Diagnostic -- GetComponents(True) returning Empty/nothing usable is exactly what makes
+    ' the whole tree walk silently look like "no components at all" further up (no popup, no
+    ' further log lines), which is otherwise indistinguishable from a genuinely empty
+    ' assembly. Logged unconditionally (not just on failure) so a real run always shows what
+    ' SolidWorks actually reported here.
+    If IsEmpty(comps) Then
+        LogLine "VisitAssemblyComponents: GetComponents(True) on """ & parentPath & """ returned Empty (no top-level components)."
+    Else
+        LogLine "VisitAssemblyComponents: GetComponents(True) on """ & parentPath & """ returned " & (UBound(comps) - LBound(comps) + 1) & " component(s)."
+    End If
+
     ' Group by referenced file path first, so a part used several times under the same
     ' parent becomes ONE edge with qty>1 instead of several qty=1 edges.
     Dim qtyByPath As Object
@@ -1680,11 +1691,17 @@ Private Sub VisitAssemblyComponents(ByVal parentModel As Object, ByVal parentPat
         For i = LBound(comps) To UBound(comps)
             Dim comp As Object
             Set comp = comps(i)
-            If comp Is Nothing Then GoTo NextComp
+            If comp Is Nothing Then
+                LogLine "Skipping Nothing entry at index " & i & " in GetComponents(True) result."
+                GoTo NextComp
+            End If
 
             Dim childModel As Object
             Set childModel = comp.GetModelDoc2()
-            If childModel Is Nothing Then GoTo NextComp ' suppressed/lightweight/unresolved
+            If childModel Is Nothing Then
+                LogLine "Skipping component with no resolvable document (suppressed/lightweight/unresolved): " & comp.Name2
+                GoTo NextComp
+            End If
 
             Dim childPath As String
             childPath = childModel.GetPathName()
@@ -1773,6 +1790,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     Set tree = DiscoverComponentTree(topModel)
     Dim order As Collection
     Set order = tree("order")
+    LogLine "ProcessAssemblyTree: discovered " & order.Count & " component(s) in the tree (excluding the top-level document itself)."
     If order.Count = 0 Then Exit Function
 
     Dim summary As String
