@@ -618,7 +618,17 @@ End Sub
 Function ApiGet(ByVal path As String) As Object
     Dim http As Object
     Set http = NewHttpRequest()
-    http.Open "GET", GetBaseUrl() & path, False
+    ' MSXML2.XMLHTTP.6.0 GETs can be served from Windows' local HTTP cache -- confirmed in
+    ' practice on this macro's EasyPDMUpload.bas counterpart: a later GET for the SAME URL
+    ' kept returning the response from the VERY FIRST time that URL was ever fetched. The
+    ' Cache-Control/Pragma headers below are the standard way to ask for a fresh response,
+    ' but the query-string cache-buster guarantees one regardless of whether those headers
+    ' are actually honored (a different URL can never hit an old cache entry).
+    Dim cacheBuster As String
+    cacheBuster = IIf(InStr(path, "?") > 0, "&", "?") & "_ts=" & Format(Now, "yyyymmddhhnnss") & CStr(Timer)
+    http.Open "GET", GetBaseUrl() & path & cacheBuster, False
+    http.setRequestHeader "Cache-Control", "no-cache, no-store"
+    http.setRequestHeader "Pragma", "no-cache"
     Dim cookie As String
     cookie = AuthCookieHeader()
     If cookie <> "" Then http.setRequestHeader "Cookie", cookie
@@ -642,11 +652,17 @@ End Function
 
 ' Like ApiGet, but returns the raw response bytes -- for downloading file (attachment)
 ' content, which is not JSON. Uses "responseBody" (a Byte SAFEARRAY), not "responseText"
-' (which would corrupt binary data through character/codepage conversion).
+' (which would corrupt binary data through character/codepage conversion). Same cache-
+' busting as ApiGet -- without it, a downloaded file's BYTES (not just a status field)
+' could silently be an old revision's content served from Windows' HTTP cache.
 Function ApiGetBinary(ByVal path As String) As Byte()
     Dim http As Object
     Set http = NewHttpRequest()
-    http.Open "GET", GetBaseUrl() & path, False
+    Dim cacheBuster As String
+    cacheBuster = IIf(InStr(path, "?") > 0, "&", "?") & "_ts=" & Format(Now, "yyyymmddhhnnss") & CStr(Timer)
+    http.Open "GET", GetBaseUrl() & path & cacheBuster, False
+    http.setRequestHeader "Cache-Control", "no-cache, no-store"
+    http.setRequestHeader "Pragma", "no-cache"
     Dim cookie As String
     cookie = AuthCookieHeader()
     If cookie <> "" Then http.setRequestHeader "Cookie", cookie
