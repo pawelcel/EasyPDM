@@ -953,7 +953,7 @@ def _usage_hint_for(file_path, edges):
     return t("usage_prefix") + ", ".join(parts) if parts else ""
 
 
-def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=None, export_step=True):
+def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=None, export_step=True, export_pdf=False):
     """Wspólna końcówka obu trybów: KOPIUJE bieżący plik dokumentu do PDM pod nazwą
     "numer (nazwa).REWIZJA.rozszerzenie" (ta sama konwencja numer/nazwa co itemDisplayLabel
     we froncie, plus litera rewizji — zob. revision_label) — i teraz TAK SAMO zapisuje
@@ -1045,6 +1045,8 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
         local_renamed = _save_local_as_pdm_name(doc, new_local_path)
         if export_step:
             _upload_step_attachment(doc, item_id)
+        if export_pdf:
+            _upload_pdf_attachment(doc, item_id)
         return {
             "itemId": item_id,
             "itemNumber": item_number,
@@ -1060,6 +1062,8 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
     local_renamed = _save_local_as_pdm_name(doc, new_local_path)
     if export_step:
         _upload_step_attachment(doc, item_id)
+    if export_pdf:
+        _upload_pdf_attachment(doc, item_id)
     return {
         "itemId": item_id,
         "itemNumber": item_number,
@@ -1136,7 +1140,54 @@ def _upload_step_attachment(doc, item_id):
         pass
 
 
-def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id=None, target_folder=None, export_step=True):
+def _upload_pdf_attachment(doc, item_id):
+    """Eksportuje `doc` do PDF i wgrywa jako załącznik z rolą "pdf" — analogicznie do
+    _upload_step_attachment, ale niezależny wybór (checkbox w przeglądarce), nie powiązany
+    z eksportem STEP. Ta sama zasada "jeden plik na rolę" (zastępuje poprzedni) i to samo
+    tolerowanie błędów (upload dokumentu już się powiódł w tym momencie, nieudany eksport
+    PDF nie powinien wyglądać jak porażka całej operacji).
+
+    "Jeden plik na rolę" (nowy zastępuje poprzedni, także na dysku serwera) jest teraz
+    wymuszane po stronie backendu (zob. ReplaceExistingRoleAttachmentAsync w
+    AttachmentEndpoints.cs), więc -- w odróżnieniu od _upload_step_attachment powyżej --
+    nie ma tu ręcznego pobierania/kasowania poprzedniego załącznika przed wysyłką.
+
+    NIEZWERYFIKOWANE na żywym FreeCAD: Gui.export() dla dowolnej Części/Ciała (a nie strony
+    TechDraw) do .pdf nie jest tak ugruntowaną ścieżką jak Part.export() do STEP -- FreeCAD
+    najpewniej wspiera PDF głównie z poziomu rysunków TechDraw, więc to może się nie udać
+    dla zwykłej Części/Złożenia. Stąd try/except obejmujący WSZYSTKO -- w najgorszym razie
+    PDF po prostu nie powstanie, bez wpływu na resztę wysyłki. Potwierdź na pierwszym
+    prawdziwym uruchomieniu."""
+    try:
+        import FreeCADGui as Gui
+
+        objs = [
+            obj for obj in doc.Objects
+            if hasattr(obj, "Shape") and obj.Shape and not obj.Shape.isNull()
+            and getattr(obj, "Visibility", True)
+        ]
+        if not objs:
+            return
+
+        tmp_dir = tempfile.mkdtemp(prefix="easypdm_pdf_")
+        try:
+            pdf_path = os.path.join(tmp_dir, sanitize_filename(doc.Label or "model") + ".pdf")
+            Gui.export(objs, pdf_path)
+            if not os.path.exists(pdf_path):
+                return
+
+            api_upload_file(
+                f"/items/{item_id}/attachments", pdf_path,
+                override_filename=os.path.basename(pdf_path),
+                extra_fields={"role": "pdf"},
+            )
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+    except Exception:
+        pass
+
+
+def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id=None, target_folder=None, export_step=True, export_pdf=False):
     """Tworzy NOWY element w PDM, a potem dogrywa bieżący dokument jako jego załącznik
     (zob. _rename_and_upload). Nowy element zawsze zaczyna od rewizji 1."""
     if not doc.FileName:
@@ -1149,10 +1200,10 @@ def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id
         body["parentId"] = parent_id
 
     created = api_post_json(f"/projects/{project_id}/nodes", body)
-    return _rename_and_upload(doc, created["id"], created["itemNumber"], name, 1, target_folder, export_step)
+    return _rename_and_upload(doc, created["id"], created["itemNumber"], name, 1, target_folder, export_step, export_pdf)
 
 
-def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None, export_step=True):
+def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None, export_step=True, export_pdf=False):
     """Dogrywa bieżący dokument jako aktualny plik JUŻ ISTNIEJĄCEJ Części/Złożenia
     (np. nowa wersja po zmianach) — bez tworzenia nowego rekordu w PDM.
 
@@ -1195,7 +1246,7 @@ def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None
 
     try:
         return _rename_and_upload(
-            doc, item_id, item["itemNumber"], item["fileName"], revision, target_folder, export_step
+            doc, item_id, item["itemNumber"], item["fileName"], revision, target_folder, export_step, export_pdf
         )
     except Exception as exc:
         if status_changed:
@@ -1668,9 +1719,10 @@ def submit_via_browser(doc, target_folder):
     świadomie ZOSTAJE lokalna, bo jest bezpośrednio związana z tym, co makro zaraz zrobi z
     plikiem na dysku, a nie z właściwościami elementu w PDM.
 
-    Czy eksportować STEP wybiera się WYŁĄCZNIE w przeglądarce (checkbox widoczny w obu
-    ścieżkach) — makro nie ma tu żadnego lokalnego wyboru/fallbacku poza domyślnym "tak",
-    gdyby formularz z jakiegoś powodu nie przekazał wartości (starsza wersja frontendu).
+    Czy eksportować STEP i/lub PDF wybiera się WYŁĄCZNIE w przeglądarce, jako dwa
+    NIEZALEŻNE checkboxy widoczne w obu ścieżkach — makro nie ma tu żadnego lokalnego
+    wyboru/fallbacku poza domyślnymi wartościami (STEP "tak", PDF "nie"), gdyby formularz
+    z jakiegoś powodu nie przekazał wartości (starsza wersja frontendu).
 
     Zwraca to samo co _rename_and_upload/push_to_existing_item, albo None jeśli
     anulowano/upłynął czas oczekiwania — ten sam sygnał "nic nie zostało wysłane", który
@@ -1698,6 +1750,9 @@ def submit_via_browser(doc, target_folder):
     export_step = ticket_data.get("exportStep")
     if export_step is None:
         export_step = True
+    export_pdf = ticket_data.get("exportPdf")
+    if export_pdf is None:
+        export_pdf = False
 
     if ticket_data.get("existing"):
         def confirm_new_revision():
@@ -1708,16 +1763,16 @@ def submit_via_browser(doc, target_folder):
 
         return push_to_existing_item(
             doc, ticket_data["itemId"], confirm_new_revision,
-            target_folder=target_folder, export_step=export_step,
+            target_folder=target_folder, export_step=export_step, export_pdf=export_pdf,
         )
 
     return _rename_and_upload(
         doc, ticket_data["itemId"], ticket_data["itemNumber"], ticket_data["name"],
-        1, target_folder, export_step,
+        1, target_folder, export_step, export_pdf,
     )
 
 
-def process_assembly_tree(top_doc, target_folder=None, export_step=True):
+def process_assembly_tree(top_doc, target_folder=None, export_step=True, export_pdf=False):
     """Wykrywa złożenie (App::Link do zewnętrznych plików, rekurencyjnie) i dla KAŻDEGO
     nowego komponentu (jeszcze nie wysłanego do PDM — rozpoznawane po etykiecie
     "numer (nazwa).REWIZJA", zob. match_existing_item) pokazuje NewComponentDialog, tworzy
@@ -1790,7 +1845,7 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True):
             try:
                 result = push_new_item_to_pdm(
                     doc, project_id, item_type, name, properties,
-                    target_folder=target_folder, export_step=export_step,
+                    target_folder=target_folder, export_step=export_step, export_pdf=export_pdf,
                 )
             except Exception as e:
                 QtWidgets.QMessageBox.critical(
@@ -1883,15 +1938,18 @@ def run():
         return
     target_folder = folder_dialog.result_folder
 
-    # Eksport STEP nie jest już nigdzie wyborem w samym makrze. Dla nowego elementu i dla
-    # dogrania do istniejącego (oba TERAZ przechodzą przez przeglądarkę, zob. Krok 2 niżej)
-    # decyduje o tym checkbox w przeglądarce; dla automatycznie wykrytych komponentów
-    # złożenia (NIGDY nie przechodzą przez przeglądarkę) STEP eksportuje się zawsze.
+    # Eksport STEP/PDF nie jest już nigdzie wyborem w samym makrze. Dla nowego elementu i
+    # dla dogrania do istniejącego (oba TERAZ przechodzą przez przeglądarkę, zob. Krok 2
+    # niżej) decydują o tym dwa niezależne checkboxy w przeglądarce; dla automatycznie
+    # wykrytych komponentów złożenia (NIGDY nie przechodzą przez przeglądarkę) STEP
+    # eksportuje się zawsze (jak dotąd), a PDF nigdy — to nowa, czysto opt-in funkcja bez
+    # żadnego checkboxa w tym miejscu, więc nie ma tu żadnej złapanej intencji użytkownika.
     export_step = True
+    export_pdf = False
 
     # Krok 1a: wykryj i (opcjonalnie) wyślij złożenie rekurencyjnie — części/pod-złożenia
     # znalezione przez App::Link, w kolejności liście-najpierw.
-    edges_for_top, cancelled = process_assembly_tree(doc, target_folder, export_step)
+    edges_for_top, cancelled = process_assembly_tree(doc, target_folder, export_step, export_pdf)
     if cancelled:
         QtWidgets.QMessageBox.information(None, t("pdm_title"), t("cancelled_upload"))
         return
