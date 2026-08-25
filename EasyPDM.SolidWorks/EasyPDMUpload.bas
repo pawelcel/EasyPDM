@@ -229,6 +229,7 @@ Private Function T_PL(ByVal key As String) As String
         Case "PromptTargetFolder": T_PL = "Folder docelowy na lokalne kopie (nazwane pod numerem PDM):"
         Case "TitleTargetFolder": T_PL = "Folder docelowy"
         Case "AssemblyDetectedTitle": T_PL = "Wykryto zlozenie"
+        Case "AlreadyInPdmAsPrefix": T_PL = " -> JUZ w PDM jako #"
         Case "NewComponentBrowserPromptPrefix": T_PL = "Nowy element w drzewie: "
         Case "NewComponentBrowserPromptSuffix": T_PL = ". Kliknij OK, aby otworzyc przegladarke i go wprowadzic (moze otworzyc sie w tle -- sprawdz pasek zadan)."
         Case "AssemblyLinksPart1": T_PL = "To zlozenie odwoluje sie do "
@@ -283,6 +284,7 @@ Private Function T_EN(ByVal key As String) As String
         Case "PromptTargetFolder": T_EN = "Target folder for local copies (named under the PDM number):"
         Case "TitleTargetFolder": T_EN = "Target folder"
         Case "AssemblyDetectedTitle": T_EN = "Assembly detected"
+        Case "AlreadyInPdmAsPrefix": T_EN = " -> ALREADY in PDM as #"
         Case "NewComponentBrowserPromptPrefix": T_EN = "New component in the tree: "
         Case "NewComponentBrowserPromptSuffix": T_EN = ". Click OK to open the browser and fill it in (it may open in the background -- check the taskbar)."
         Case "AssemblyLinksPart1": T_EN = "This assembly links to "
@@ -337,6 +339,7 @@ Private Function T_DE(ByVal key As String) As String
         Case "PromptTargetFolder": T_DE = "Zielordner fuer lokale Kopien (benannt nach der PDM-Nummer):"
         Case "TitleTargetFolder": T_DE = "Zielordner"
         Case "AssemblyDetectedTitle": T_DE = "Baugruppe erkannt"
+        Case "AlreadyInPdmAsPrefix": T_DE = " -> BEREITS in PDM als #"
         Case "NewComponentBrowserPromptPrefix": T_DE = "Neue Komponente im Baum: "
         Case "NewComponentBrowserPromptSuffix": T_DE = ". Klicken Sie OK, um den Browser zu oeffnen und sie einzugeben (er kann im Hintergrund geoeffnet werden -- pruefen Sie die Taskleiste)."
         Case "AssemblyLinksPart1": T_DE = "Diese Baugruppe verweist auf "
@@ -1918,10 +1921,39 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     LogLine "ProcessAssemblyTree: discovered " & order.Count & " component(s) in the tree (excluding the top-level document itself)."
     If order.Count = 0 Then Exit Function
 
+    Dim models As Object
+    Set models = tree("models")
+
+    ' Shows the TARGET item number/name for every ALREADY-linked component, not just its
+    ' filename -- the only chance the user gets to notice a stale link before anything is
+    ' touched. SolidWorks's own native "Save As" (done manually, outside this macro) COPIES
+    ' Custom Properties along with everything else: Save-As'ing an already-linked part to
+    ' start a genuinely DIFFERENT part silently inherits the old EasyPDM_ItemId, so without
+    ' this the macro would otherwise "recognize" the new part as the OLD item and attach it
+    ' into the BOM as a duplicate of something else, instead of creating it -- confirmed in
+    ' practice (a component named unlike anything already in PDM still showed up "already
+    ' linked" to an unrelated item). See the same caveat in the file header for the
+    ' top-level document's own version of this warning.
     Dim summary As String
     Dim p As Variant
     For Each p In order
-        summary = summary & "- " & Mid(p, InStrRev(p, "\") + 1) & vbCrLf
+        Dim summaryLine As String
+        summaryLine = "- " & Mid(p, InStrRev(p, "\") + 1)
+
+        Dim summaryLinkedId As String
+        summaryLinkedId = GetLinkedItemIdOn(models(p))
+        If summaryLinkedId <> "" Then
+            Dim summaryLinkedInfo As Object
+            On Error Resume Next
+            Set summaryLinkedInfo = ApiGet("/items/" & summaryLinkedId)
+            On Error GoTo 0
+            If Not summaryLinkedInfo Is Nothing Then
+                summaryLine = summaryLine & T("AlreadyInPdmAsPrefix") & JsonGetLong(summaryLinkedInfo, "itemNumber", 0) & _
+                              " (" & JsonGetString(summaryLinkedInfo, "fileName", "") & ")"
+            End If
+        End If
+
+        summary = summary & summaryLine & vbCrLf
     Next p
 
     Dim choice As VbMsgBoxResult
@@ -1943,8 +1975,6 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     Dim sendNewComponents As Boolean
     sendNewComponents = (choice = vbYes)
 
-    Dim models As Object
-    Set models = tree("models")
     Dim edges As Collection
     Set edges = tree("edges")
 

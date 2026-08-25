@@ -274,6 +274,7 @@ TRANSLATIONS = {
             "na końcu ten dokument)?\n\n"
             "\"Nie\" wyśle TYLKO ten dokument, tak jak dotychczas — bez podelementów."
         ),
+        "already_in_pdm_as": " -> JUŻ w PDM jako #{number} ({name})",
         "fetch_items_failed": "Nie udało się pobrać listy elementów: {error}",
         "fetch_projects_failed": "Nie udało się pobrać listy projektów: {error}",
         "upload_component_failed": "Nie udało się wysłać {file}: {error}",
@@ -371,6 +372,7 @@ TRANSLATIONS = {
             "first, this document last)?\n\n"
             "\"No\" will send ONLY this document, as before — without sub-items."
         ),
+        "already_in_pdm_as": " -> ALREADY in PDM as #{number} ({name})",
         "fetch_items_failed": "Failed to fetch the list of items: {error}",
         "fetch_projects_failed": "Failed to fetch the list of projects: {error}",
         "upload_component_failed": "Failed to send {file}: {error}",
@@ -470,6 +472,7 @@ TRANSLATIONS = {
             "Teile/Unterbaugruppen, zuletzt dieses Dokument)?\n\n"
             "\"Nein\" sendet NUR dieses Dokument, wie bisher — ohne Unterelemente."
         ),
+        "already_in_pdm_as": " -> BEREITS in PDM als #{number} ({name})",
         "fetch_items_failed": "Die Elementliste konnte nicht abgerufen werden: {error}",
         "fetch_projects_failed": "Die Projektliste konnte nicht abgerufen werden: {error}",
         "upload_component_failed": "{file} konnte nicht gesendet werden: {error}",
@@ -1813,7 +1816,33 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True, export_
     if not order:
         return [], False
 
-    summary = "\n".join(f"- {os.path.basename(f)}" for f in order)
+    try:
+        existing_items = api_get("/items") or []
+    except Exception as e:
+        QtWidgets.QMessageBox.warning(None, t("pdm_title"), t("fetch_items_failed", error=e))
+        existing_items = []
+
+    # Pokazuje DOCELOWY numer/nazwę elementu dla każdego już rozpoznanego komponentu, nie
+    # samą nazwę pliku -- jedyna szansa, żeby zauważyć nieaktualne dopasowanie, zanim
+    # cokolwiek zostanie ruszone. match_existing_item dopasowuje po etykiecie dokumentu
+    # ("numer (nazwa).REWIZJA"), a "Save As" w FreeCAD kopiuje etykietę razem z całą
+    # resztą -- zapisanie od nowa, genuinie INNEJ części z takiej kopii sprawia, że makro
+    # "rozpozna" ją jako STARY element, zamiast utworzyć nowy (potwierdzone w praktyce na
+    # analogicznym mechanizmie w makrze SolidWorks -- tam przez Custom Property zamiast
+    # etykiety, ale ryzyko jest identyczne).
+    summary_lines = []
+    for f in order:
+        line = f"- {os.path.basename(f)}"
+        matched_for_summary = match_existing_item(docs[f], existing_items)
+        if matched_for_summary:
+            line += t(
+                "already_in_pdm_as",
+                number=matched_for_summary.get("itemNumber"),
+                name=matched_for_summary.get("fileName"),
+            )
+        summary_lines.append(line)
+    summary = "\n".join(summary_lines)
+
     choice = QtWidgets.QMessageBox.question(
         None,
         t("assembly_detected_title"),
@@ -1826,11 +1855,6 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True, export_
     if choice == QtWidgets.QMessageBox.No:
         return [], False
 
-    try:
-        existing_items = api_get("/items") or []
-    except Exception as e:
-        QtWidgets.QMessageBox.warning(None, t("pdm_title"), t("fetch_items_failed", error=e))
-        existing_items = []
     try:
         projects = api_get("/projects") or []
     except Exception as e:
