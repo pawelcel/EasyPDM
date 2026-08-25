@@ -63,6 +63,7 @@ function OwnerControl({ item, onChanged }: { item: Item; onChanged: () => void |
           variant={locked ? "default" : "outline"}
           disabled={isIssued || pending || locked}
           onClick={handleLock}
+          className={!isIssued ? "disabled:opacity-100" : undefined}
         >
           {t("item.lock")}
         </Button>
@@ -71,6 +72,7 @@ function OwnerControl({ item, onChanged }: { item: Item; onChanged: () => void |
           variant={!locked ? "default" : "outline"}
           disabled={isIssued || pending || !locked || !isOwner}
           onClick={handleRelease}
+          className={!isIssued ? "disabled:opacity-100" : undefined}
         >
           {t("item.release")}
         </Button>
