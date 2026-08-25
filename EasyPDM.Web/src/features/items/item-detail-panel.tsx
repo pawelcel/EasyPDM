@@ -432,8 +432,8 @@ function ItemDetailPanel({
                   <TableRow>
                     <TableHead className="w-10">{t("item.colPosition")}</TableHead>
                     <TableHead>{t("common.name")}</TableHead>
-                    <TableHead className="text-right">{t("common.quantity")}</TableHead>
                     <TableHead>{t("item.colRevision")}</TableHead>
+                    <TableHead className="text-right">{t("common.quantity")}</TableHead>
                     <TableHead>{t("common.material")}</TableHead>
                     <TableHead>{t("common.manufacturer")}</TableHead>
                     <TableHead>{t("item.colOrderNumber1")}</TableHead>
@@ -603,6 +603,7 @@ function SortableBomRow({
           </div>
         </TableCell>
         <TableCell>{itemDisplayLabel(child)}</TableCell>
+        <TableCell>{child.revisionNumber !== null ? revisionLabel(child.revisionNumber) : "—"}</TableCell>
         <TableCell className="text-right">
           <BomQuantityCell
             parentId={parentId}
@@ -612,7 +613,6 @@ function SortableBomRow({
             disabled={disabled}
           />
         </TableCell>
-        <TableCell>{child.revisionNumber !== null ? revisionLabel(child.revisionNumber) : "—"}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "material")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "manufacturer")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "orderNumber")}</TableCell>
@@ -649,8 +649,8 @@ function SortableBomRow({
               ? `${entry.itemNumberPrefix ?? ""}${entry.itemNumber} (${entry.fileName})`
               : entry.fileName}
           </TableCell>
-          <TableCell className="text-right">{entry.quantity}</TableCell>
           <TableCell>{entry.revisionNumber !== null ? revisionLabel(entry.revisionNumber) : "—"}</TableCell>
+          <TableCell className="text-right">{entry.quantity}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "material")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "manufacturer")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "orderNumber")}</TableCell>
