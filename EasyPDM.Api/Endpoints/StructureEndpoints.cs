@@ -328,11 +328,15 @@ static class StructureEndpoints
 
             await using var tx = await conn.BeginTransactionAsync();
 
+            // Korzeń = show_in_tree=true, NIEZALEŻNIE od tego, czy element ma też rodzica gdzie
+            // indziej -- element może być jednocześnie widoczny jako korzeń projektu I zagnieżdżony
+            // pod złożeniem (np. część dodana do projektu, a potem dołączona jako podelement już
+            // istniejącego złożenia -- oba miejsca mają pozostać widoczne, patrz komentarz przy
+            // show_in_tree w item-creation insertach).
             var existingIds = new List<Guid>();
             const string selectSql = """
                 SELECT i.id FROM items i
-                WHERE i.project_id = @projectId AND i.show_in_tree = true
-                  AND NOT EXISTS (SELECT 1 FROM item_relations ir WHERE ir.child_id = i.id);
+                WHERE i.project_id = @projectId AND i.show_in_tree = true;
                 """;
             await using (var selectCmd = new NpgsqlCommand(selectSql, conn, tx))
             {
