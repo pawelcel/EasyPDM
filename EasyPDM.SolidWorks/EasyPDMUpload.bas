@@ -828,9 +828,11 @@ NetErr:
     Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 
-Function ApiRegisterAttachment(ByVal itemId As String, ByVal filePath As String) As Object
+Function ApiRegisterAttachment(ByVal itemId As String, ByVal filePath As String, Optional ByVal role As String = "") As Object
     Dim bodyJson As String
-    bodyJson = "{""filePath"":" & JsonStr(filePath) & "}"
+    bodyJson = "{""filePath"":" & JsonStr(filePath)
+    If role <> "" Then bodyJson = bodyJson & ",""role"":" & JsonStr(role)
+    bodyJson = bodyJson & "}"
     Set ApiRegisterAttachment = ApiPostJson("/items/" & itemId & "/attachments/register", bodyJson)
 End Function
 
@@ -876,8 +878,9 @@ Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional 
         fileName = Mid(filePath, InStrRev(filePath, "\") + 1)
     End If
 
-    ' Extra plain form field BEFORE the file part -- only ever "role=step" today (see
-    ' UploadStepAttachment), but kept generic rather than hardcoded to that one call site.
+    ' Extra plain form field BEFORE the file part -- "role=step" (see UploadStepAttachment)
+    ' or "role=cad" (see RenameAndUpload, tags the actual uploaded CAD file so the web app
+    ' can show it separately from ordinary, manually-added attachments).
     Dim head As String
     head = ""
     If extraFieldName <> "" Then
@@ -1493,7 +1496,11 @@ End Function
 ' then uploads THAT (possibly just-renamed) file into PDM. Skips the Save As if the file is
 ' ALREADY at the target path (re-uploading the same revision without a new one -- a no-op
 ' Save As onto the document's own current path). The ORIGINAL file at its old path/name, if
-' different, is left on disk untouched -- neither moved nor deleted.
+' different, is left on disk untouched -- neither moved nor deleted. Every upload is tagged
+' role="cad" (both the storage-copy register path and the plain HTTP upload path below), so
+' the web app can show it under its "CAD attachments" section, separately from ordinary,
+' attachments -- one per revision (unique filename per revision means these ACCUMULATE,
+' unlike the single-slot "pdf"/"step" roles which replace the previous attachment).
 Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long, ByVal targetFolder As String) As Boolean
     Dim ext As String
     Dim dotPos As Long
@@ -1614,7 +1621,7 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
             Dim registerErrNum As Long, registerErrDesc As String
             On Error Resume Next
             Err.Clear
-            ApiRegisterAttachment itemId, targetPath
+            ApiRegisterAttachment itemId, targetPath, "cad"
             registerErrNum = Err.Number
             registerErrDesc = Err.Description
             On Error GoTo 0
@@ -1637,7 +1644,7 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
     End If
 
     LogLine "Plain HTTP upload: /items/" & itemId & "/attachments as """ & newFilename & """"
-    ApiUploadFile "/items/" & itemId & "/attachments", filePath, newFilename
+    ApiUploadFile "/items/" & itemId & "/attachments", filePath, newFilename, "role", "cad"
     RenameAndUpload = True
 End Function
 
