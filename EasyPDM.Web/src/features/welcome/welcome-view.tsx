@@ -1,10 +1,10 @@
-import { Building2, Database, Factory, FolderKanban, Layers } from "lucide-react"
+import { Building2, Database, Factory, FolderKanban, Layers, Settings } from "lucide-react"
 
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
-type WelcomeTarget = "projects" | "database" | "materials" | "manufacturers" | "clients"
+type WelcomeTarget = "projects" | "database" | "materials" | "manufacturers" | "clients" | "settings"
 
 function WelcomeView({ onNavigate }: { onNavigate: (view: WelcomeTarget) => void }) {
   const { t } = useLanguage()
@@ -15,6 +15,7 @@ function WelcomeView({ onNavigate }: { onNavigate: (view: WelcomeTarget) => void
     { target: "materials", icon: Layers, titleKey: "welcome.materialsTitle", descriptionKey: "welcome.materialsDescription" },
     { target: "manufacturers", icon: Factory, titleKey: "welcome.manufacturersTitle", descriptionKey: "welcome.manufacturersDescription" },
     { target: "clients", icon: Building2, titleKey: "welcome.clientsTitle", descriptionKey: "welcome.clientsDescription" },
+    { target: "settings", icon: Settings, titleKey: "welcome.settingsTitle", descriptionKey: "welcome.settingsDescription" },
   ]
 
   return (

@@ -157,6 +157,8 @@ const pl = {
   "welcome.manufacturersDescription": "Przeglądaj i zarządzaj listą producentów oraz ich kontaktami.",
   "welcome.clientsTitle": "Klienci",
   "welcome.clientsDescription": "Przeglądaj i zarządzaj listą klientów, ich kontaktami oraz plikami.",
+  "welcome.settingsTitle": "Ustawienia",
+  "welcome.settingsDescription": "Użytkownicy, magazyn plików, nazewnictwo, kopie zapasowe i wygląd aplikacji.",
 
   "login.title": "Zaloguj się do EasyPDM",
   "login.description": "Podaj login i hasło swojego konta.",
@@ -674,6 +676,8 @@ const en: Record<TranslationKey, string> = {
   "welcome.manufacturersDescription": "Browse and manage the list of manufacturers and their contacts.",
   "welcome.clientsTitle": "Clients",
   "welcome.clientsDescription": "Browse and manage the list of clients, their contacts, and files.",
+  "welcome.settingsTitle": "Settings",
+  "welcome.settingsDescription": "Users, file storage, naming, backups, and app appearance.",
 
   "login.title": "Log in to EasyPDM",
   "login.description": "Enter your account's username and password.",
@@ -1189,6 +1193,8 @@ const de: Record<TranslationKey, string> = {
   "welcome.manufacturersDescription": "Herstellerliste und deren Kontakte durchsuchen und verwalten.",
   "welcome.clientsTitle": "Kunden",
   "welcome.clientsDescription": "Kundenliste, deren Kontakte und Dateien durchsuchen und verwalten.",
+  "welcome.settingsTitle": "Einstellungen",
+  "welcome.settingsDescription": "Benutzer, Dateispeicher, Namensgebung, Sicherungen und Erscheinungsbild der App.",
 
   "login.title": "Bei EasyPDM anmelden",
   "login.description": "Geben Sie Benutzername und Passwort Ihres Kontos ein.",
