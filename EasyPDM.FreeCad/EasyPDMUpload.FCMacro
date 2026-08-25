@@ -1054,6 +1054,27 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
             "localRenamed": local_renamed,
         }
 
+    # Unlike the register path above (which overwrites the SAME physical file in place, so
+    # re-registering an unchanged name is correctly a no-op), a plain HTTP upload always
+    # lands at a BRAND NEW server-generated path with no relation to "new_filename" --
+    # without this check, repeated uploads while the revision letter stays the same (e.g.
+    # several saves in a row while still "w_pracy", no status change) would each add
+    # ANOTHER "cad" attachment instead of replacing the one for THIS revision, accumulating
+    # indefinitely (confirmed in practice on the SolidWorks counterpart of this macro).
+    # Delete any previous attachment with the exact same name first, so re-uploading the
+    # same revision replaces it instead.
+    try:
+        existing_cad = api_get(f"/items/{item_id}/attachments") or []
+    except Exception:
+        existing_cad = []
+    for att in existing_cad:
+        if att.get("fileName") == new_filename:
+            try:
+                api_delete(f"/attachments/{att['id']}")
+            except Exception:
+                pass
+            break
+
     api_upload_file(
         f"/items/{item_id}/attachments", doc.FileName,
         override_filename=new_filename, extra_fields={"role": "cad"},
