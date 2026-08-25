@@ -24,6 +24,7 @@ static class ItemEndpoints
                 itemNumberPrefix = state.ItemNumberPrefix,
                 name = state.Name,
                 exportStep = state.ExportStep,
+                exportPdf = state.ExportPdf,
                 existing = state.Existing,
             });
         });
@@ -59,7 +60,7 @@ static class ItemEndpoints
             var itemNumberPrefix = reader.IsDBNull(1) ? null : reader.GetString(1);
             var fileName = reader.GetString(2);
 
-            createTicketStore.Complete(ticket, body.ItemId, itemNumber, itemNumberPrefix, fileName, body.ExportStep, existing: true);
+            createTicketStore.Complete(ticket, body.ItemId, itemNumber, itemNumberPrefix, fileName, body.ExportStep, body.ExportPdf, existing: true);
             return Results.Ok();
         });
 
@@ -297,7 +298,7 @@ static class ItemEndpoints
             // GET /create-tickets/{ticket} — zob. CreateTicketStore.cs. Czysto addytywne,
             // zero zmiany zachowania dla wywołań bez ticketu (czyli normalnego webowego UI).
             if (body.Ticket is not null)
-                createTicketStore.Complete(body.Ticket.Value, itemId, itemNumber, itemNumberPrefix, body.Name.Trim(), body.ExportStep, existing: false);
+                createTicketStore.Complete(body.Ticket.Value, itemId, itemNumber, itemNumberPrefix, body.Name.Trim(), body.ExportStep, body.ExportPdf, existing: false);
 
             return Results.Created($"/api/items/{itemId}", new { id = itemId, itemNumber, itemNumberPrefix });
         });
@@ -1152,8 +1153,8 @@ static class ItemEndpoints
     }
 }
 
-record CreateNodeRequest(string Name, string ItemType, JsonElement? Properties, Guid? ParentId, Guid? Ticket, bool? ExportStep);
-record AttachExistingTicketRequest(Guid ItemId, bool? ExportStep);
+record CreateNodeRequest(string Name, string ItemType, JsonElement? Properties, Guid? ParentId, Guid? Ticket, bool? ExportStep, bool? ExportPdf);
+record AttachExistingTicketRequest(Guid ItemId, bool? ExportStep, bool? ExportPdf);
 record VisibilityRequest(bool ShowInTree);
 record RenameRequest(string Name);
 record StatusRequest(string Status, string? Comment = null);

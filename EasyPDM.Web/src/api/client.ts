@@ -147,6 +147,7 @@ export const api = {
       parentId?: string | null
       ticket?: string
       exportStep?: boolean
+      exportPdf?: boolean
     }
   ) =>
     fetch(`${BASE}/projects/${projectId}/nodes`, json(body)).then((r) =>
@@ -155,11 +156,11 @@ export const api = {
 
   // Druga (obok createNode z ticket) droga dopełnienia biletu z makra CAD — wskazuje JUŻ
   // ISTNIEJĄCY element zamiast tworzenia nowego (zob. pending-create-ticket.ts). Używane
-  // przez oba tryby biletu: "create" (dogranie pliku do istniejącego, exportStep ma
-  // znaczenie) i "download" (wskazanie, co pobrać — exportStep pomijane, nieistotne).
+  // przez oba tryby biletu: "create" (dogranie pliku do istniejącego, exportStep/exportPdf
+  // mają znaczenie) i "download" (wskazanie, co pobrać — oba pomijane, nieistotne).
   // Nic nie tworzy — tylko mówi makru, o który element chodzi.
-  attachExistingToTicket: (ticket: string, itemId: string, exportStep?: boolean) =>
-    fetch(`${BASE}/create-tickets/${ticket}/attach-existing`, json({ itemId, exportStep })).then(
+  attachExistingToTicket: (ticket: string, itemId: string, exportStep?: boolean, exportPdf?: boolean) =>
+    fetch(`${BASE}/create-tickets/${ticket}/attach-existing`, json({ itemId, exportStep, exportPdf })).then(
       (r) => handleResponse<void>(r)
     ),
 

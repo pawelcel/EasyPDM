@@ -77,7 +77,12 @@ function ItemHistoryPanel({
       {entries.length === 0 ? (
         <Hint>{t("history.empty")}</Hint>
       ) : (
-        <ul className="flex flex-col gap-1">
+        // Wpisów historii z czasem przybywa dużo (każda zmiana statusu/właściwości/
+        // załącznika dopisuje kolejny) — bez ograniczenia wysokości lista rozpychała panel
+        // i robiła się nieczytelna. max-h ~5 wierszy + przewijanie w środku; entries już
+        // przychodzi z backendu najnowsze-pierwsze (ORDER BY at DESC), więc 5 widocznych
+        // bez przewijania to zawsze 5 najnowszych.
+        <ul className="flex max-h-[7.5rem] flex-col gap-1 overflow-y-auto">
           {entries.map((entry, index) => (
             <li key={index} className="text-[12.5px]">
               <span className="text-muted-foreground">
