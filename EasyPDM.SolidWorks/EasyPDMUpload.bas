@@ -44,12 +44,15 @@ Option Explicit
 '     existing" all decided THERE, not locally, exactly like the FreeCAD macro. The macro
 '     waits (WaitForTicket, polling GET /create-tickets/{ticket}; Escape cancels, no
 '     UserForm needed) and then finishes the job: rename+upload the file, and (see below)
-'     export+upload a STEP attachment.
-'   - STEP export: for any ticket path (top-level document OR an auto-detected assembly
-'     component, see next point), whether to export is a checkbox in the browser (same as
-'     FreeCAD); for the "already linked"/"already in PDM" native paths, where there is no
-'     browser round-trip to host a checkbox in, STEP always exports, matching FreeCAD's
-'     own rule.
+'     export+upload a STEP and/or PDF attachment.
+'   - STEP/PDF export: for any ticket path (top-level document OR an auto-detected assembly
+'     component, see next point), whether to export EACH of STEP and PDF is its OWN,
+'     independent checkbox in the browser (same as FreeCAD for STEP; PDF is checked
+'     separately and defaults to off, unlike STEP which defaults to on) -- see
+'     UploadStepAttachment/UploadPdfAttachment. For the "already linked"/"already in PDM"
+'     native paths, where there is no browser round-trip to host a checkbox in, STEP always
+'     exports (matching FreeCAD's own rule) but PDF does NOT -- there is no captured user
+'     intent for it there, unlike STEP's pre-existing "always on" default.
 '   - Assembly components: if the active document is an Assembly, the macro first walks
 '     its component tree (IAssemblyDoc.GetComponents, recursively) and offers to send any
 '     component NOT yet linked to a PDM item, leaves-first -- same idea as FreeCAD's
@@ -703,7 +706,18 @@ End Sub
 Function ApiGet(ByVal path As String) As Object
     Dim http As Object
     Set http = NewHttpRequest()
-    http.Open "GET", GetBaseUrl() & path, False
+    ' MSXML2.XMLHTTP.6.0 GETs can be served from Windows' local HTTP cache -- confirmed in
+    ' practice: after a status/revision change on the server, a later GET for the SAME URL
+    ' kept returning the response from the VERY FIRST time this URL was ever fetched, making
+    ' the macro believe an item was permanently stuck at its original status/revision. The
+    ' Cache-Control/Pragma headers below are the standard way to ask for a fresh response,
+    ' but the query-string cache-buster guarantees one regardless of whether those headers
+    ' are actually honored (a different URL can never hit an old cache entry).
+    Dim cacheBuster As String
+    cacheBuster = IIf(InStr(path, "?") > 0, "&", "?") & "_ts=" & Format(Now, "yyyymmddhhnnss") & CStr(Timer)
+    http.Open "GET", GetBaseUrl() & path & cacheBuster, False
+    http.setRequestHeader "Cache-Control", "no-cache, no-store"
+    http.setRequestHeader "Pragma", "no-cache"
     Dim cookie As String
     cookie = AuthCookieHeader()
     If cookie <> "" Then http.setRequestHeader "Cookie", cookie
@@ -1502,7 +1516,7 @@ End Function
 ' SolidWorks API behavior, not tested here (no SolidWorks in this environment) -- confirm
 ' on the first real run and adjust SW_SAVE_AS_SILENT/argument order if SolidWorks reports
 ' a different signature.
-Sub UploadStepAttachment(ByVal swModel As Object, ByVal itemId As String)
+Sub UploadStepAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long)
     On Error Resume Next
 
     Dim tempPath As String
@@ -1516,22 +1530,53 @@ Sub UploadStepAttachment(ByVal swModel As Object, ByVal itemId As String)
         Exit Sub
     End If
 
-    ' "One file per role" -- same rule as the FreeCAD macro's _upload_step_attachment:
-    ' delete any PREVIOUS step attachment before uploading the fresh one, so the preview
-    ' always reflects the current revision instead of accumulating old ones.
-    Dim existingAttachments As Object
-    Set existingAttachments = ApiGet("/items/" & itemId & "/attachments")
-    If Not existingAttachments Is Nothing Then
-        Dim a As Variant
-        For Each a In existingAttachments
-            If JsonGetString(a, "role", "") = "step" Then
-                ApiDeleteRequest "/attachments/" & JsonGetString(a, "id", "")
-            End If
-        Next a
+    ' Uploaded under the SAME "number (name).REVISION.ext" convention as RenameAndUpload's
+    ' local Save As, so the STEP attachment shown/downloaded from the web app is immediately
+    ' recognizable instead of a meaningless temp filename. "One file per role" (a new STEP
+    ' replaces any previous one, physically deleted from disk too) is enforced server-side
+    ' now (see ReplaceExistingRoleAttachmentAsync in AttachmentEndpoints.cs) -- no need to
+    ' fetch/delete the old one from here anymore.
+    Dim stepDisplayName As String
+    stepDisplayName = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".step"
+
+    ApiUploadFile "/items/" & itemId & "/attachments", tempPath, stepDisplayName, "role", "step"
+    LogLine "Uploaded STEP attachment for item " & itemId & " as """ & stepDisplayName & """ (from " & tempPath & ")."
+
+    Kill tempPath
+    On Error GoTo 0
+End Sub
+
+' Same idea as UploadStepAttachment, but exports to PDF instead of STEP and tags the
+' attachment role="pdf" -- an independent opt-in choice from the browser ticket form (see
+' file header/main()), NOT tied to whether STEP export was also requested. SolidWorks
+' supports "Save As PDF" directly from a Part/Assembly document (renders the current view),
+' not just from a Drawing -- same tolerant, error-swallowing style as UploadStepAttachment:
+' a failed PDF export must not look like the whole upload failed.
+'
+' UNVERIFIED against a live SolidWorks install, same caveat as UploadStepAttachment above --
+' confirm on the first real run.
+Sub UploadPdfAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long)
+    On Error Resume Next
+
+    Dim tempPath As String
+    tempPath = Environ$("TEMP") & "\EasyPDM_pdf_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".pdf"
+
+    Dim saveErrors As Long, saveWarnings As Long
+    Dim saveOk As Boolean
+    saveOk = swModel.Extension.SaveAs(tempPath, 0, SW_SAVE_AS_SILENT, Nothing, saveErrors, saveWarnings)
+    If Not saveOk Or Dir(tempPath) = "" Then
+        LogLine "PDF export failed for item " & itemId & " (SaveAs errors=" & saveErrors & ", warnings=" & saveWarnings & ")."
+        Exit Sub
     End If
 
-    ApiUploadFile "/items/" & itemId & "/attachments", tempPath, Mid(tempPath, InStrRev(tempPath, "\") + 1), "role", "step"
-    LogLine "Uploaded STEP attachment for item " & itemId & " (" & tempPath & ")."
+    ' Same "number (name).REVISION.pdf" naming convention as the STEP attachment -- see
+    ' UploadStepAttachment's comment for why, and ReplaceExistingRoleAttachmentAsync for
+    ' why no manual pre-delete of the previous "pdf" attachment is needed here.
+    Dim pdfDisplayName As String
+    pdfDisplayName = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".pdf"
+
+    ApiUploadFile "/items/" & itemId & "/attachments", tempPath, pdfDisplayName, "role", "pdf"
+    LogLine "Uploaded PDF attachment for item " & itemId & " as """ & pdfDisplayName & """ (from " & tempPath & ")."
 
     Kill tempPath
     On Error GoTo 0
@@ -1633,6 +1678,7 @@ Function PushToExistingItem(ByVal swModel As Object, ByVal itemId As String, ByV
     Set result = CreateObject("Scripting.Dictionary")
     result.Add "itemId", itemId
     result.Add "itemNumber", itemNumber
+    result.Add "name", fileName
     result.Add "revision", revision
     Set PushToExistingItem = result
 End Function
@@ -1937,6 +1983,12 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
                 If Not IsNull(compTicketData.Item("exportStep")) Then compExportStep = CBool(compTicketData.Item("exportStep"))
             End If
 
+            Dim compExportPdf As Boolean
+            compExportPdf = False
+            If compTicketData.Exists("exportPdf") Then
+                If Not IsNull(compTicketData.Item("exportPdf")) Then compExportPdf = CBool(compTicketData.Item("exportPdf"))
+            End If
+
             Dim compIsExisting As Boolean
             compIsExisting = False
             If compTicketData.Exists("existing") Then
@@ -1969,11 +2021,14 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
                 Set created = CreateObject("Scripting.Dictionary")
                 created.Add "itemId", compTicketItemId
                 created.Add "itemNumber", compTicketItemNumber
+                created.Add "name", compTicketName
+                created.Add "revision", 1
             End If
 
             Dim newItemId As String
             newItemId = JsonGetString(created, "itemId", "")
-            If compExportStep Then UploadStepAttachment childModel, newItemId
+            If compExportStep Then UploadStepAttachment childModel, newItemId, JsonGetLong(created, "itemNumber", 0), JsonGetString(created, "name", ""), JsonGetLong(created, "revision", 1)
+            If compExportPdf Then UploadPdfAttachment childModel, newItemId, JsonGetLong(created, "itemNumber", 0), JsonGetString(created, "name", ""), JsonGetLong(created, "revision", 1)
             ' Redundant final refresh -- RenameAndUpload/PushToExistingItem's own upload
             ' path already set (and saved) this same Custom Property BEFORE uploading, so
             ' the file actually sent to the server already carries it. Kept here as cheap
@@ -2275,7 +2330,7 @@ Sub main()
         confirmUpdate = MsgBox(confirmText, vbYesNo + vbQuestion, T("AppTitle"))
         If confirmUpdate <> vbYes Then Exit Sub
         Set resultInfo = PushToExistingItem(swActiveModel, linkedItemId, filePath, targetFolder)
-        If Not resultInfo Is Nothing Then UploadStepAttachment swActiveModel, linkedItemId
+        If Not resultInfo Is Nothing Then UploadStepAttachment swActiveModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
     Else
         ' Not yet linked -- "new item vs duplicate vs attach to existing" is decided in
         ' the browser, not locally, exactly like EasyPDMUpload.FCMacro's
@@ -2298,6 +2353,12 @@ Sub main()
             If Not IsNull(ticketData.Item("exportStep")) Then exportStep = CBool(ticketData.Item("exportStep"))
         End If
 
+        Dim exportPdf As Boolean
+        exportPdf = False
+        If ticketData.Exists("exportPdf") Then
+            If Not IsNull(ticketData.Item("exportPdf")) Then exportPdf = CBool(ticketData.Item("exportPdf"))
+        End If
+
         Dim ticketItemId As String
         ticketItemId = JsonGetString(ticketData, "itemId", "")
 
@@ -2315,7 +2376,8 @@ Sub main()
                 Exit Sub
             End If
             linkedItemId = ticketItemId
-            If exportStep Then UploadStepAttachment swActiveModel, ticketItemId
+            If exportStep Then UploadStepAttachment swActiveModel, ticketItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+            If exportPdf Then UploadPdfAttachment swActiveModel, ticketItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
         Else
             ' New item -- it already exists server-side (the browser called POST /nodes
             ' with this ticket), so finish DIRECTLY with the file upload; creating another
@@ -2330,8 +2392,10 @@ Sub main()
             Set resultInfo = CreateObject("Scripting.Dictionary")
             resultInfo.Add "itemId", ticketItemId
             resultInfo.Add "itemNumber", ticketItemNumber
+            resultInfo.Add "name", ticketName
             resultInfo.Add "revision", 1
-            If exportStep Then UploadStepAttachment swActiveModel, ticketItemId
+            If exportStep Then UploadStepAttachment swActiveModel, ticketItemId, ticketItemNumber, ticketName, 1
+            If exportPdf Then UploadPdfAttachment swActiveModel, ticketItemId, ticketItemNumber, ticketName, 1
         End If
     End If
 
