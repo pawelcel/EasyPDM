@@ -1699,7 +1699,22 @@ Private Sub VisitAssemblyComponents(ByVal parentModel As Object, ByVal parentPat
             Dim childModel As Object
             Set childModel = comp.GetModelDoc2()
             If childModel Is Nothing Then
-                LogLine "Skipping component with no resolvable document (suppressed/lightweight/unresolved): " & comp.Name2
+                ' Raw suppression state (swComponentSuppressionState_e) logged as a plain
+                ' number -- deliberately not decoded/hardcoded here (cannot be verified
+                ' without a live SolidWorks session), but the number itself tells us
+                ' immediately whether this is suppression, lightweight, or something else.
+                Dim suppErrNum As Long, suppErrDesc As String, suppState As Long
+                On Error Resume Next
+                Err.Clear
+                suppState = comp.GetSuppression2()
+                suppErrNum = Err.Number
+                suppErrDesc = Err.Description
+                On Error GoTo 0
+                If suppErrNum <> 0 Then
+                    LogLine "Skipping component with no resolvable document: " & comp.Name2 & " (GetSuppression2 failed: " & suppErrDesc & ")"
+                Else
+                    LogLine "Skipping component with no resolvable document: " & comp.Name2 & " (GetSuppression2 = " & suppState & ")"
+                End If
                 GoTo NextComp
             End If
 
@@ -1792,10 +1807,23 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     ' it LOOKS fully displayed in the graphics area), which otherwise makes every lightweight
     ' part silently indistinguishable from "no components at all" -- confirmed in practice
     ' (GetComponents(True) found 2 components, GetModelDoc2() returned Nothing for both).
+    ' ResolveAllLightWeightComponents is an IAssemblyDoc method -- called directly on
+    ' topModel (same as GetComponents below), NOT via .Extension (ModelDocExtension does not
+    ' have this method; a first attempt through .Extension silently failed, see log below).
     ' Recursive: resolves the whole tree, not just this assembly's direct children.
+    Dim resolveErrNum As Long, resolveErrDesc As String
+    Dim resolvedOk As Boolean
     On Error Resume Next
-    topModel.Extension.ResolveAllLightWeightComponents True
+    Err.Clear
+    resolvedOk = topModel.ResolveAllLightWeightComponents(True)
+    resolveErrNum = Err.Number
+    resolveErrDesc = Err.Description
     On Error GoTo 0
+    If resolveErrNum <> 0 Then
+        LogLine "ResolveAllLightWeightComponents failed (" & resolveErrNum & "): " & resolveErrDesc
+    Else
+        LogLine "ResolveAllLightWeightComponents returned " & resolvedOk
+    End If
 
     Dim tree As Object
     Set tree = DiscoverComponentTree(topModel)
