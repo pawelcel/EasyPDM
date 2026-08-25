@@ -64,13 +64,17 @@ export function useProjectTree(projectId: string) {
     [childrenByParentId, emptyChildren]
   )
 
-  const childIds = useMemo(() => new Set(relations.map((r) => r.childId)), [relations])
+  // Korzeń = showInTree, NIEZALEŻNIE od tego, czy element ma też rodzica gdzie indziej — element
+  // może być jednocześnie widoczny jako korzeń projektu I zagnieżdżony pod złożeniem (np. część
+  // dodana do projektu, a potem dołączona jako podelement już istniejącego złożenia — oba miejsca
+  // mają zostać widoczne). Zgodne z backendowym wyliczaniem korzeni w StructureEndpoints.cs
+  // (roots/reorder).
   const roots = useMemo(
     () =>
       items
-        .filter((i) => i.projectId === projectId && i.showInTree && !childIds.has(i.id))
+        .filter((i) => i.projectId === projectId && i.showInTree)
         .sort((a, b) => a.rootPosition - b.rootPosition),
-    [items, childIds, projectId]
+    [items, projectId]
   )
 
   return { items, itemsById, roots, childrenOf, loading, refetch }

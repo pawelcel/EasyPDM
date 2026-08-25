@@ -104,8 +104,13 @@ function ProjectTreeView({
   async function handleRemoveFromStructure() {
     if (selection.kind !== "item") return
     if (selection.parentId) {
-      // Element z rodzicem — odpinamy konkretną krawędź, sam rekord zostaje.
+      // Element z rodzicem — odpinamy konkretną krawędź, sam rekord zostaje. Dodatkowo
+      // wymuszamy showInTree=true: element mógł powstać OD RAZU jako podelement (wtedy ma
+      // showInTree=false, żeby nie dublować się na korzeniu — zob. komentarz przy insertach w
+      // ItemEndpoints.cs) — po odpięciu jedynej relacji musi dostać szansę pokazać się jako
+      // korzeń, inaczej zniknąłby całkowicie z drzewka mimo że nadal należy do projektu.
       await api.removeChild(selection.parentId, selection.id)
+      await api.setShowInTree(selection.id, true)
     } else {
       // Element bez rodzica — nie ma czego odpiąć, więc przestaje być widoczny
       // jako korzeń w drzewku (rekord i przynależność do projektu zostają).

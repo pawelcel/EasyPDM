@@ -139,11 +139,15 @@ static class ItemEndpoints
                 hash = Convert.ToHexString(await sha256.ComputeHashAsync(readStream));
             }
 
+            // show_in_tree=false gdy element od razu powstaje jako podelement (parentId podany) —
+            // inaczej pokazywałby się PODWÓJNIE: jako korzeń projektu ORAZ zagnieżdżony pod
+            // rodzicem. Element bez rodzica dostaje domyślne true (widoczny jako korzeń).
             const string insertSql = """
-                INSERT INTO items (id, project_id, item_type, file_path, file_name, file_type, file_hash, file_size, modified_at, properties, root_position)
+                INSERT INTO items (id, project_id, item_type, file_path, file_name, file_type, file_hash, file_size, modified_at, properties, root_position, show_in_tree)
                 VALUES (
                     @id, @projectId, 'file', @filePath, @fileName, @fileType, @hash, @size, now(), @props::jsonb,
-                    COALESCE((SELECT MAX(root_position) FROM items WHERE project_id = @projectId), 0) + 1
+                    COALESCE((SELECT MAX(root_position) FROM items WHERE project_id = @projectId), 0) + 1,
+                    @showInTree
                 );
                 """;
             try
@@ -157,6 +161,7 @@ static class ItemEndpoints
                 insertCmd.Parameters.AddWithValue("hash", hash);
                 insertCmd.Parameters.AddWithValue("size", file.Length);
                 insertCmd.Parameters.AddWithValue("props", propertiesJson);
+                insertCmd.Parameters.AddWithValue("showInTree", parentId is null);
                 await insertCmd.ExecuteNonQueryAsync();
 
                 if (parentId is not null)
@@ -235,8 +240,11 @@ static class ItemEndpoints
                     ? rodzajEl.GetString()
                     : null;
 
+            // show_in_tree=false gdy element od razu powstaje jako podelement (parentId podany) —
+            // inaczej pokazywałby się PODWÓJNIE: jako korzeń projektu ORAZ zagnieżdżony pod
+            // rodzicem. Element bez rodzica dostaje domyślne true (widoczny jako korzeń).
             const string insertSql = """
-                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, item_number_prefix, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by)
+                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, item_number_prefix, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by, show_in_tree)
                 VALUES (
                     @id, @projectId, @itemType, @name, @props::jsonb,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN nextval('item_number_seq') ELSE NULL END,
@@ -249,7 +257,8 @@ static class ItemEndpoints
                     COALESCE((SELECT MAX(root_position) FROM items WHERE project_id = @projectId), 0) + 1,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN @ownerId ELSE NULL END,
                     @itemType IN ('part', 'assembly'),
-                    @ownerId
+                    @ownerId,
+                    @showInTree
                 )
                 RETURNING item_number, item_number_prefix;
                 """;
@@ -261,6 +270,7 @@ static class ItemEndpoints
             insertCmd.Parameters.AddWithValue("props", propertiesJson);
             insertCmd.Parameters.AddWithValue("ownerId", user.Id);
             insertCmd.Parameters.AddWithValue("rodzaj", (object?)rodzaj ?? DBNull.Value);
+            insertCmd.Parameters.AddWithValue("showInTree", body.ParentId is null);
 
             await using var reader = await insertCmd.ExecuteReaderAsync();
             await reader.ReadAsync();
@@ -354,7 +364,7 @@ static class ItemEndpoints
                         await shiftCmd.ExecuteNonQueryAsync();
                     }
 
-                    var (itemNumber, itemNumberPrefix) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null);
+                    var (itemNumber, itemNumberPrefix) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null, showInTree: false);
 
                     await using (var insertRelCmd = new NpgsqlCommand(
                         """
@@ -397,12 +407,12 @@ static class ItemEndpoints
                     await shiftCmd.ExecuteNonQueryAsync();
                 }
 
-                var (itemNumber, itemNumberPrefix) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: sourceRootPosition + 1);
+                var (itemNumber, itemNumberPrefix) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: sourceRootPosition + 1, showInTree: true);
                 await tx.CommitAsync();
                 return Results.Created($"/api/items/{newId}", new { id = newId, itemNumber, itemNumberPrefix });
             }
 
-            var (appendedItemNumber, appendedItemNumberPrefix) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null);
+            var (appendedItemNumber, appendedItemNumberPrefix) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null, showInTree: true);
             await tx.CommitAsync();
             return Results.Created($"/api/items/{newId}", new { id = newId, itemNumber = appendedItemNumber, itemNumberPrefix = appendedItemNumberPrefix });
         });
@@ -1081,21 +1091,23 @@ static class ItemEndpoints
     // oryginałem" (rootPosition podany explicite) jak i przy zwykłym dopisaniu na koniec listy
     // korzeni projektu (rootPosition = null, wyliczane tu jako MAX+1).
     internal static async Task<(int? ItemNumber, string? ItemNumberPrefix)> InsertDuplicateRowAsync(
-        NpgsqlConnection conn, NpgsqlTransaction tx, Guid newId, Guid sourceId, Guid ownerId, int? rootPosition)
+        NpgsqlConnection conn, NpgsqlTransaction tx, Guid newId, Guid sourceId, Guid ownerId, int? rootPosition, bool showInTree)
     {
         // Kopia to NOWY rekord — dostaje własnego właściciela (osobę duplikującą), zablokowanego
         // od razu, tak samo jak przy ręcznym tworzeniu Części/Złożenia; nie dziedziczy właściciela
         // oryginału. item_number_prefix liczony na podstawie WŁASNEGO (skopiowanego) rodzaju
         // kopii i BIEŻĄCEGO mapowania w Ustawieniach w momencie duplikacji — nie kopiowany
-        // z oryginału (oryginał mógł powstać dawno temu, przy innym mapowaniu).
+        // z oryginału (oryginał mógł powstać dawno temu, przy innym mapowaniu). show_in_tree
+        // jest false, gdy kopia od razu ląduje jako podelement (żeby nie pokazać się PODWÓJNIE:
+        // jako korzeń projektu ORAZ zagnieżdżona pod rodzicem) — patrz wywołania.
         const string sql = """
-            INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, item_number_prefix, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by)
+            INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, item_number_prefix, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by, show_in_tree)
             SELECT @newId, src.project_id, src.item_type, src.file_name || ' (kopia)', src.properties,
                    nextval('item_number_seq'),
                    p.prefix,
                    'w_pracy', 1, now(),
                    COALESCE(@rootPosition, (SELECT COALESCE(MAX(root_position), 0) + 1 FROM items WHERE project_id = src.project_id)),
-                   @ownerId, true, @ownerId
+                   @ownerId, true, @ownerId, @showInTree
             FROM items src
             LEFT JOIN item_number_prefixes p
                 ON p.rodzaj = (CASE WHEN src.item_type = 'assembly' THEN 'Zlozenie' ELSE src.properties->>'rodzaj' END)
@@ -1107,6 +1119,7 @@ static class ItemEndpoints
         cmd.Parameters.AddWithValue("sourceId", sourceId);
         cmd.Parameters.AddWithValue("ownerId", ownerId);
         cmd.Parameters.AddWithValue("rootPosition", (object?)rootPosition ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("showInTree", showInTree);
         await using var reader = await cmd.ExecuteReaderAsync();
         await reader.ReadAsync();
         return (reader.IsDBNull(0) ? null : reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetString(1));
