@@ -123,6 +123,7 @@ function AttachmentsPanel({
   const [error, setError] = useState<string | null>(null)
   const [previewing, setPreviewing] = useState<Attachment | null>(null)
   const genericInputRef = useRef<HTMLInputElement>(null)
+  const cadInputRef = useRef<HTMLInputElement>(null)
 
   async function refetch() {
     setAttachments(await api.getAttachments(itemId))
@@ -133,7 +134,7 @@ function AttachmentsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId])
 
-  async function uploadFile(file: File, role: "pdf" | "step" | null) {
+  async function uploadFile(file: File, role: "pdf" | "step" | "cad" | null) {
     setError(null)
     setUploading(true)
     try {
@@ -154,6 +155,15 @@ function AttachmentsPanel({
     const file = e.target.files?.[0]
     e.target.value = ""
     if (file) uploadFile(file, null)
+  }
+
+  // W odróżnieniu od PDF/3D (jeden załącznik na rolę, nowy zastępuje poprzedni) -- "cad"
+  // się KUMULUJE: makro wysyła każdą rewizję pod unikalną nazwą, więc kolejne wysyłki nie
+  // powinny kasować poprzednich (to zachowana historia rewizji, widoczna jako lista).
+  function handleCadFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (file) uploadFile(file, "cad")
   }
 
   // Na rolę przypada najwyżej jeden załącznik — nowy zastępuje poprzedni (usuwamy stary
@@ -185,12 +195,83 @@ function AttachmentsPanel({
 
   const pdfAttachment = attachments.find((a) => a.role === "pdf")
   const stepAttachment = attachments.find((a) => a.role === "step")
+  const cadAttachments = attachments.filter((a) => a.role === "cad")
   const genericAttachments = attachments.filter((a) => !a.role)
 
   return (
     <div>
       {locked && <Hint>{lockedHint ?? t("item.attachmentsLockedHint")}</Hint>}
       {error && <p className="text-[12.5px] text-destructive">{error}</p>}
+
+      <div className="mb-3 rounded-lg bg-muted/30 p-2 ring-1 ring-foreground/10">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[11px] font-medium text-muted-foreground uppercase">
+            {t("item.cadAttachments")}
+          </span>
+          <input
+            ref={cadInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleCadFileSelected}
+            disabled={locked || uploading}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={locked || uploading}
+            onClick={() => cadInputRef.current?.click()}
+          >
+            <Upload className="size-3.5" /> {t("common.add")}
+          </Button>
+        </div>
+
+        {cadAttachments.length > 0 ? (
+          <ul className="flex flex-col gap-1">
+            {cadAttachments.map((attachment) => (
+              <li
+                key={attachment.id}
+                className="flex items-center justify-between gap-2 text-[13px]"
+              >
+                <a
+                  className="truncate text-primary hover:underline"
+                  href={api.attachmentDownloadUrl(attachment.id)}
+                  download
+                >
+                  {attachment.fileName}
+                </a>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="text-muted-foreground">
+                    {formatUploadedAt(attachment.uploadedAt)}
+                    {attachment.uploadedAt && attachment.fileSize !== null && " · "}
+                    {formatSize(attachment.fileSize)}
+                  </span>
+                  {previewKindOf(attachment.fileName) && (
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      onClick={() => setPreviewing(attachment)}
+                      aria-label={t("common.preview")}
+                    >
+                      <Eye className="size-3 text-muted-foreground" />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    onClick={() => handleDelete(attachment)}
+                    disabled={locked}
+                    aria-label={t("common.deleteNamed", { name: attachment.fileName })}
+                  >
+                    <Trash2 className="size-3 text-muted-foreground" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Hint>{t("item.noFile")}</Hint>
+        )}
+      </div>
 
       <div className="mb-3 flex gap-2">
         <RoleSlot

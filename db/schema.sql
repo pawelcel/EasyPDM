@@ -163,10 +163,14 @@ CREATE TABLE item_attachments (
     file_hash    TEXT,
     file_size    BIGINT,
     uploaded_at  TIMESTAMPTZ DEFAULT now(),
-    -- Opcjonalna "rola" — pdf/step — wskazuje, KTÓRY załącznik zasila stały podgląd
-    -- (2D/3D) w panelu właściwości elementu, żeby nie zgadywać po rozszerzeniu przy
-    -- więcej niż jednym pliku PDF/STEP.
-    preview_role TEXT CHECK (preview_role IN ('pdf', 'step'))
+    -- Opcjonalna "rola" załącznika:
+    --   pdf/step — wskazuje, KTÓRY załącznik zasila stały podgląd (2D/3D) w panelu
+    --     właściwości elementu (jeden na rolę, nowy zastępuje poprzedni).
+    --   cad — oryginalny plik CAD (SLDPRT/SLDASM/FCStd) wgrany przez makro
+    --     SolidWorks/FreeCAD, odróżniony od zwykłych, ręcznie dodanych załączników.
+    --     WIELE na element dozwolone (jeden na rewizję, nazwy zawierają literę rewizji,
+    --     więc kolejne przesłania się nie nadpisują — historia rewizji zostaje widoczna).
+    preview_role TEXT CHECK (preview_role IN ('pdf', 'step', 'cad'))
 );
 
 CREATE INDEX idx_item_attachments_item ON item_attachments (item_id);
@@ -292,4 +296,4 @@ INSERT INTO schema_migrations (filename) VALUES
     ('023_attachment_history.sql'), ('024_owner_lock_history.sql'),
     ('025_backup_schedule.sql'), ('026_backup_retention.sql'),
     ('027_schema_migrations_tracking.sql'), ('028_attachment_preview_role.sql'),
-    ('029_item_number_prefix.sql');
+    ('029_item_number_prefix.sql'), ('030_attachment_cad_role.sql');

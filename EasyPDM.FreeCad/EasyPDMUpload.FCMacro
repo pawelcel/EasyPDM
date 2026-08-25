@@ -673,10 +673,13 @@ def api_delete(path):
         raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
 
-def api_register_attachment(item_id, file_path):
+def api_register_attachment(item_id, file_path, role=None):
     """Rejestruje JUŻ ISTNIEJĄCY plik (już wewnątrz magazynu PDM) jako załącznik —
     bez przesyłania go drugi raz przez HTTP (zob. POST .../attachments/register)."""
-    return api_post_json(f"/items/{item_id}/attachments/register", {"filePath": file_path})
+    body = {"filePath": file_path}
+    if role:
+        body["role"] = role
+    return api_post_json(f"/items/{item_id}/attachments/register", body)
 
 
 def api_login(username, password):
@@ -982,6 +985,12 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
     powtórna wysyłka bez zmiany statusu. Jeśli magazyn nie jest osiągalny, kopia trafia przez
     zwykły upload HTTP (POST .../attachments) pod tą samą, ładną nazwą.
 
+    Każdy załącznik dostaje rolę "cad" (patrz api_register_attachment/api_upload_file
+    poniżej) — dzięki temu front pokazuje go osobno, pod "Załączniki CAD", zamiast razem
+    ze zwykłymi, ręcznie dodanymi plikami. W odróżnieniu od ról "pdf"/"step" (jeden
+    załącznik na rolę, nowy zastępuje poprzedni) rola "cad" może mieć wiele załączników —
+    unikalna nazwa pliku per rewizja oznacza, że kolejne wysyłki się nie nadpisują.
+
     Zwraca dict: {"itemId", "itemNumber", "newPath", "localRenamed"} — "newPath" to ścieżka
     KOPII na serwerze (albo lokalny plik, jeśli magazyn jest nieosiągalny), NIE lokalny plik
     dokumentu (ten jest teraz dostępny jako doc.FileName). "localRenamed" mówi, czy lokalny
@@ -1018,7 +1027,7 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
         already_registered = any(a["fileName"] == new_filename for a in existing or [])
         if not already_registered:
             try:
-                api_register_attachment(item_id, target_path)
+                api_register_attachment(item_id, target_path, role="cad")
             except Exception:
                 # Rejestracja zawiodła — bez sprzątania kopia w storage/components/ zostałaby
                 # osierocona: nigdy niezarejestrowana jako załącznik, zajmuje miejsce na dysku
@@ -1043,7 +1052,10 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
             "localRenamed": local_renamed,
         }
 
-    api_upload_file(f"/items/{item_id}/attachments", doc.FileName, override_filename=new_filename)
+    api_upload_file(
+        f"/items/{item_id}/attachments", doc.FileName,
+        override_filename=new_filename, extra_fields={"role": "cad"},
+    )
     doc.Label = new_label
     local_renamed = _save_local_as_pdm_name(doc, new_local_path)
     if export_step:
