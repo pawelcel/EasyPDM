@@ -1,0 +1,101 @@
+name: Build Linux Package
+
+# Buduje frontend + self-contained backend (linux-x64) i pakuje je razem z
+# install-easypdm-linux.sh/uninstall-easypdm-linux.sh/db/schema.sql w jedno archiwum
+# "easypdm-linux-x64.tar.gz" -- pobieralny artefakt tego przebiegu, analogicznie do
+# build-windows-installer.yml, tylko że tu nie ma jednego pliku wykonywalnego-instalatora
+# (Linux nie ma odpowiednika Inno Setup w tym repo) -- paczka zawiera już zbudowaną
+# aplikację + skrypt instalujący ją jako usługę systemd, więc docelowa maszyna NIE
+# potrzebuje .NET SDK ani Node.js, tylko odpakować i uruchomić skrypt.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "EasyPDM.Api/**"
+      - "EasyPDM.Web/**"
+      - "db/**"
+      - "install-easypdm-linux.sh"
+      - "uninstall-easypdm-linux.sh"
+      - ".github/workflows/build-linux-package.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Buduj frontend
+        working-directory: EasyPDM.Web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publikuj backend (self-contained, linux-x64)
+        run: >
+          dotnet publish EasyPDM.Api -c Release -r linux-x64 --self-contained true
+          -p:PublishSingleFile=true -o pkg/publish
+
+      - name: Złóż paczkę
+        run: |
+          mkdir -p pkg/db
+          cp db/schema.sql pkg/db/schema.sql
+          cp install-easypdm-linux.sh pkg/
+          cp uninstall-easypdm-linux.sh pkg/
+          chmod +x pkg/install-easypdm-linux.sh pkg/uninstall-easypdm-linux.sh
+          tar czf easypdm-linux-x64.tar.gz -C pkg .
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: easypdm-linux-x64
+          path: easypdm-linux-x64.tar.gz
+          if-no-files-found: error
+
+      # Prawdziwy test end-to-end SAMEJ PACZKI (tryb PACKAGE_MODE w install-easypdm-linux.sh),
+      # analogicznie do test-linux-installer.yml, które testuje tylko tryb budowania z
+      # repo -- bez tego test-linux-installer.yml nie łapałby regresji specyficznych dla
+      # ścieżki "gotowa paczka bez .NET SDK/npm na maszynie docelowej".
+      - name: Rozpakuj paczkę do czystego katalogu (symulacja pobrania przez użytkownika)
+        run: |
+          mkdir -p /tmp/easypdm-package-test
+          tar xzf easypdm-linux-x64.tar.gz -C /tmp/easypdm-package-test
+
+      - name: Zainstaluj z paczki (bez budowania)
+        working-directory: /tmp/easypdm-package-test
+        run: sudo ./install-easypdm-linux.sh
+
+      - name: Sprawdź status usługi i odpowiedź serwera
+        run: |
+          systemctl status easypdm --no-pager
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/ > /dev/null; then
+              echo "EasyPDM odpowiada poprawnie po instalacji z paczki."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::EasyPDM nie odpowiedziało pod http://localhost:5000 po instalacji z paczki."
+          journalctl -u easypdm --no-pager | tail -100
+          exit 1
+
+      - name: Odinstaluj
+        working-directory: /tmp/easypdm-package-test
+        run: sudo ./uninstall-easypdm-linux.sh
+
+      - name: Sprawdź, że usługa faktycznie zniknęła
+        run: |
+          if systemctl status easypdm --no-pager 2>&1 | grep -q "could not be found"; then
+            echo "Usługa poprawnie usunięta."
+          else
+            echo "::error::Usługa easypdm wciąż istnieje po odinstalowaniu."
+            systemctl status easypdm --no-pager || true
+            exit 1
+          fi

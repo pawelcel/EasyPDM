@@ -371,6 +371,35 @@ needs to be done manually.
 > role/database/system account via `sudo`) hasn't been executed end-to-end yet — watch
 > the output on first run and report anything that doesn't work.
 
+#### Ready-made package (no local .NET SDK/Node.js needed)
+
+`.github/workflows/build-linux-package.yml` builds the frontend + self-contained backend
+on a GitHub Ubuntu runner and packages them together with
+`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`/`db/schema.sql` into one
+downloadable `easypdm-linux-x64.tar.gz` artifact — rebuilt automatically on every push
+touching the backend/frontend/installer scripts, same trigger pattern as
+`build-windows-installer.yml` below. The target machine then needs only `sudo`, no
+`.NET SDK` or `Node.js` at all:
+
+```bash
+tar xzf easypdm-linux-x64.tar.gz
+cd easypdm-linux-x64   # whatever directory you extracted into
+sudo ./install-easypdm-linux.sh
+```
+
+`install-easypdm-linux.sh` detects the already-built `publish/` folder shipped inside
+the archive (`PACKAGE_MODE=1`) and skips the build step entirely — everything else
+(PostgreSQL setup, systemd service, updates by re-running the script from a newer
+package) works exactly as described above for the git-checkout path. The workflow also
+runs this exact install → verify → uninstall sequence for real on a clean Ubuntu runner
+(mirroring `test-linux-installer.yml`, which only covers the build-from-checkout path),
+so the packaged path is end-to-end tested too, not just the scripted one.
+
+Download the artifact via `gh run download <id> -n easypdm-linux-x64` or from the
+workflow run's page in the Actions tab — like `EasyPDMSetup.exe` below, this is
+currently **not** published to the repository's Releases page automatically (see the
+note under "Windows — installer" about the same gap there).
+
 ### Windows — installer (`.exe`, Inno Setup)
 
 **Simplest: `.github/workflows/build-windows-installer.yml`** builds a ready
@@ -379,6 +408,13 @@ Compiler preinstalled) on every push touching the backend/frontend/installer —
 to have Windows or Inno Setup locally. Run it manually via `gh workflow run
 build-windows-installer.yml`, wait (`gh run watch`), download the artifact (`gh run
 download <id> -n EasyPDMSetup`).
+
+> This workflow only uploads `EasyPDMSetup.exe` as a GitHub Actions run artifact
+> (`actions/upload-artifact`) — it does **not** create/attach anything to the
+> repository's Releases page automatically. The README's "go to the Releases page and
+> download `EasyPDMSetup.exe`" step currently assumes someone does that publish step by
+> hand after downloading the artifact; automating it (e.g. `softprops/action-gh-release`
+> on a version tag) hasn't been set up yet.
 
 Alternatively, to build locally on a Windows machine (.NET 10 SDK + Node.js +
 [Inno Setup Compiler](https://jrsoftware.org/isinfo.php)):
