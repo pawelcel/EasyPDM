@@ -37,12 +37,29 @@ import { APP_VERSION } from "@/version"
 
 type View = "welcome" | "projects" | "database" | "materials" | "manufacturers" | "clients" | "settings"
 
+const VIEWS: View[] = ["welcome", "projects", "database", "materials", "manufacturers", "clients", "settings"]
+
+// Nawigacja żyje wyłącznie w stanie Reacta -- bez tego F5 zawsze zerowałoby użytkownika
+// do ekranu powitalnego. Odczytujemy początkowy widok/projekt/sekcję ustawień z query
+// stringa (ścieżka strony się nie zmienia, więc nie trzeba nic ruszać w serwowaniu SPA),
+// a efekt niżej trzyma URL zsynchronizowany przy każdej zmianie.
+function readUrlState() {
+  const params = new URLSearchParams(window.location.search)
+  const view = params.get("view")
+  return {
+    view: VIEWS.includes(view as View) ? (view as View) : "welcome",
+    projectId: params.get("projectId") ?? "",
+    settingsSection: params.get("section") ?? "users",
+  }
+}
+
 function App() {
   const { user, loading: authLoading, refetch: refetchAuth, logout } = useAuth()
   const { t } = useLanguage()
-  const [view, setView] = useState<View>("welcome")
-  const [settingsSection, setSettingsSection] = useState("users")
-  const [projectId, setProjectId] = useState("")
+  const [initialUrlState] = useState(readUrlState)
+  const [view, setView] = useState<View>(initialUrlState.view)
+  const [settingsSection, setSettingsSection] = useState(initialUrlState.settingsSection)
+  const [projectId, setProjectId] = useState(initialUrlState.projectId)
   const [tag, setTag] = useState("")
   const [search, setSearch] = useState("")
   const [treeRefreshKey, setTreeRefreshKey] = useState(0)
@@ -86,6 +103,15 @@ function App() {
       setSettingsSection("appearance")
     }
   }, [isAdmin, settingsSection])
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    params.set("view", view)
+    if (view === "projects" && projectId) params.set("projectId", projectId)
+    if (view === "settings") params.set("section", settingsSection)
+    const query = params.toString()
+    window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname)
+  }, [view, projectId, settingsSection])
 
   async function refreshAfterMutation() {
     await refetchProjects()
