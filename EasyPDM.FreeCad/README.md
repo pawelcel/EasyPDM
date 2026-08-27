@@ -7,7 +7,10 @@ Two independent macros, one for uploading, one for downloading/opening:
 - **`EasyPDMUpload.FCMacro`** sends the active FreeCAD document to EasyPDM. The macro asks
   NOTHING locally except the save folder — even the choice of "new item or attach to an
   existing one" is decided in the **system browser** (described further down in this
-  file), on the same form/bar as in the web application.
+  file), on the same form/bar as in the web application — **with one exception**: if the
+  document's label already looks like it belongs to an existing PDM item, the macro asks
+  locally first whether to attach it there as a new revision, bypassing the browser
+  entirely (see "Local shortcut for an already-recognized document" below).
 - **`EasyPDMDownload.FCMacro`** downloads a Part/Assembly from EasyPDM (together with ALL
   of its components, if it's an Assembly) and opens it in FreeCAD right away (described in
   a separate section at the end of this file).
@@ -65,6 +68,21 @@ separate ones.
     right at the start — this also covers the automatically detected assembly tree
     (parts/sub-assemblies sent before the main window even opens).
 
+1b. **Local shortcut for an already-recognized document.** FreeCAD has no persistent
+    Custom-Property equivalent to SolidWorks' `EasyPDM_ItemId` (see the SolidWorks macro
+    README for that mechanism) — instead, if the document's **label** looks like
+    `number (name).REVISION` and that number actually matches an existing PDM item's
+    number/filename (`match_existing_item`), the macro asks **locally, natively**:
+    attach the current version to that item as a new revision? Confirming shows two more
+    native Yes/No prompts (Export STEP — default Yes; Export PDF — default No) and
+    attaches straight to that item, **skipping the browser entirely** for this document.
+    Declining falls through to the normal browser flow in step 2 below, with the matched
+    item number pre-filled as a suggestion in the "Attach to existing" search box. Since
+    this relies on a free-form label rather than a persistent property, it can in rare
+    cases be wrong — e.g. FreeCAD's own "Save As" copies the document's label onto a
+    genuinely new, unrelated file, which could make it falsely "recognize" itself as an
+    existing item; declining the confirmation is always safe (falls back to the browser).
+
 2. **No native window appears anymore at this point.** The macro immediately opens the
    **system browser**, already logged in (token→cookie bridge, see "Login" above), on a
    bar saying "a request from a CAD macro is pending" (visible on EVERY screen of the web
@@ -81,8 +99,10 @@ separate ones.
      **Client-supplied** → no additional fields. For an Assembly the kind is optional and
      limited to Manufactured/Purchased/Standard (no "Client-supplied"), and Mass is
      always visible regardless of the chosen kind — an Assembly never has a Material
-     field (only a Part does). The popup also has an **"Export and send STEP model"
-     checkbox**. The ticket is EXPLICITLY pinned to this one specific popup — no OTHER
+     field (only a Part does). The popup also has **"Export STEP" and "Export PDF"
+     checkboxes** (STEP checked by default, PDF unchecked — see step 5 below for what
+     each actually does on export). The ticket is EXPLICITLY pinned to this one specific
+     popup — no OTHER
      "Add" button in the application (in the project tree, the details panel) will ever
      accidentally "swallow" it. **Cancel** in the popup goes back to the "New
      item"/"Duplicate"/"Attach to existing" choice without creating anything.
@@ -93,9 +113,9 @@ separate ones.
      it's an ordinary creation of a new item, just pre-filled with data from the source.
    - **"Attach to existing"** — opens a search box for a Part/Assembly from the **whole
      database** (not just the current project, since a component can be shared), with
-     suggestions as you type (by number or by name) and the same STEP checkbox. If the
-     local document's label looks like `number (name).REVISION` (because this same macro
-     already named it that way after an earlier upload), the search box immediately
+     suggestions as you type (by number or by name) and the same STEP/PDF checkboxes. If
+     the local document's label looks like `number (name).REVISION` (because this same
+     macro already named it that way after an earlier upload), the search box immediately
      suggests the matching item — this is only a **suggestion**, the choice can always be
      changed. The selected item is not created anew — the current document is attached to
      it as the **current version of its current revision** (what happens next with the
@@ -154,22 +174,39 @@ separate ones.
    (`POST /api/items/{id}/attachments`, the same mechanism as attaching CAD files from the
    properties panel in the web application) — in that case revision history is not
    preserved.
-5. **Optionally exports STEP and uploads it automatically as an attachment with the
-   "step" role** — the macro has no local choice left at this point. For a **new** item
-   this is decided EXCLUSIVELY by the checkbox in the browser form (step 2 above). For
-   attaching to an **existing** item, and for automatically detected assembly components
-   (neither of which ever go through the browser), STEP is **always** exported, with no
-   prompt. When it does export, it works through exactly the same mechanism as the manual
-   "STEP" button in the Attachments panel of the web application, so it immediately feeds
-   the item panel's persistent 3D preview. The whole **visible** geometry of the document
-   is exported (every solid-bearing object whose visibility is on — for a Part this is
-   usually a single solid/Body, for an automatically detected assembly it's the resolved
-   `App::Link`s, so the STEP reflects the whole assembly). The previous attachment with
-   the "step" role is **replaced** (deleted before uploading the new one), so the preview
-   always shows the current revision. If the document has no visible solid (a bare
-   sketch, an empty document) or the export/upload fails — the step is **silently
-   skipped**, it does not abort or roll back the rest of the upload (the `.FCStd` file is
-   already safely saved in the PDM at that point).
+5. **Optionally exports STEP and/or PDF and uploads them automatically as attachments
+   with the "step"/"pdf" roles.** Where the Yes/No comes from depends on the path taken
+   above: for a **new item** or **attach to existing** decided in the browser (step 2), it
+   comes from that same ticket's checkboxes; for each **assembly component** with its own
+   ticket (see "Automatic assembly detection" below), from THAT component's own
+   checkboxes; for the **local shortcut** (step 1b), from the two native Yes/No prompts
+   shown there instead. There is no path left where STEP is unconditionally forced with no
+   choice at all.
+   - **STEP**: works through the same underlying mechanism as the manual "STEP" button in
+     the Attachments panel of the web application, so it immediately feeds the item
+     panel's persistent 3D preview. The document is first `recompute()`-d (needed for
+     assembly containers/links to report their actual geometry rather than a stale empty
+     compound), then the geometry is collected while explicitly excluding construction/
+     datum objects (origin, axes, planes); if a container object is present
+     (`Assembly::AssemblyObject`, `App::Part`, `PartDesign::Body` — i.e. this is an
+     assembly, not a bare part), ONLY that container's own already-fully-placed shape is
+     exported (exporting its child links too would duplicate every part's geometry), else
+     every remaining visible solid-bearing object is combined into one compound. That
+     shape is exported straight to STEP (not through FreeCAD's generic `Part.export`,
+     which silently drops assembly/link objects with an "is not a shape" warning even
+     though they carry perfectly valid geometry — this was a real, fixed bug: assemblies
+     used to produce a STEP file with no geometry in it at all).
+   - **PDF**: uses FreeCAD's `Gui.export(...)` on the same visible objects — this is not
+     FreeCAD's usual TechDraw-drawing-based PDF path, so treat it as best-effort for a
+     plain Part/Body/assembly rather than a guaranteed mechanism; confirmed working in
+     practice, but if it ever silently fails for a particular document, that's the first
+     place to look.
+   - Either attachment **replaces** the previous one with the same role (deleted before
+     uploading the new one), so the preview always shows the current revision. If the
+     document has no visible solid (a bare sketch, an empty document) or an export/upload
+     fails — that one attachment is **silently skipped**, it does not abort or roll back
+     the rest of the upload (the `.FCStd` file is already safely saved in the PDM at that
+     point).
 
 ## Automatic assembly detection
 
@@ -186,18 +223,27 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
   finally the main document — so that every component exists in the PDM before being
   attached as a child item.
 - **Already-uploaded components**: recognized by a label in the format
-  `number (name).REVISION` (the same format the macro itself assigns after uploading) —
-  if that number exists in the PDM, the component is NOT created again, only attached to
-  the BOM with the calculated quantity.
-- **New components**: for each not-yet-uploaded file a separate, short **native** window
-  is shown (Project/Type/Name and — ONLY for Parts — Kind and the fields that depend on
-  it; an Assembly has no kind at all, it only gets an optional Mass — the same rules as
-  the browser form for a single new item, see above) — **deliberately without the
-  browser**, so that uploading an assembly with many new components doesn't require as
-  many browser windows as components; the type (Part/Assembly) is suggested based on
-  whether that file itself has further links. The MAIN assembly document itself (the one
-  the macro was run on) still goes through the browser form like any other new item —
-  only its automatically detected COMPONENTS bypass the browser.
+  `number (name).REVISION` matching an existing PDM item's number/filename (the same
+  `match_existing_item` check as the top-level "local shortcut", step 1b above) — such a
+  component is purely **referenced**: no upload, no browser ticket, nothing sent for it
+  at all, it's just attached to the BOM with the calculated quantity using its existing
+  item ID.
+- **New components go through the browser too, one at a time** — each not-yet-recognized
+  file gets its OWN browser ticket (same New item/Duplicate/Attach to existing choice,
+  including its own STEP/PDF checkboxes, as the top-level document), opened sequentially,
+  never several tabs at once, leaves first. Since only one browser tab per macro run can
+  reliably grab Windows' foreground focus, a native "click OK to continue" `MsgBox`
+  appears right before each tab after the first — clicking it counts as fresh user input
+  that lets the next browser window take focus instead of opening silently in the
+  background (check the taskbar if a step seems to hang). The suggested type (Part/
+  Assembly) pre-fills the browser form based on whether that file itself has further
+  links.
+- **Newly-created components are hidden from the project tree root** once attached to
+  their real parent (`PATCH /items/{id}/visibility {showInTree: false}`) — this only
+  applies to components actually created THIS run via their own ticket; an
+  already-existing, merely-referenced component (previous bullet) keeps whatever
+  visibility it already had, since it may be a deliberately independent catalog entry
+  used elsewhere too.
 - Choosing **"No"** on the prompt about automatic sending uploads ONLY the current
   document, exactly as before (without child items) — the BOM structure is then left to
   be filled in manually in the web application, as before.
@@ -213,7 +259,14 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
 - Automatic assembly detection only works for references to **external, saved files**
   (`App::Link`) — not for assemblies kept in a single file as `App::Part` containers
   (these have no separate files to upload individually; they then need to be uploaded
-  manually, part by part, as before).
+  manually, part by part, as before). This covers FreeCAD's native Assembly workbench
+  too, as long as its components are separate saved documents (the typical, and
+  confirmed-working, way of building an assembly in it) — its own containers
+  (`Assembly::AssemblyObject`) and joints have no separate file and are correctly
+  ignored by the detection walk, only their `App::Link` children matter.
+- **PDF export is best-effort** (see step 5 above, `Gui.export(...)`) — it doesn't go
+  through FreeCAD's usual TechDraw-based PDF path, so results may vary by FreeCAD
+  version or document type even though it's confirmed working in practice.
 - Recognizing an "already-uploaded" component relies on the document's label — the macro
   assigns it itself after uploading and saves it to disk right away (Save As under the
   PDM name), so it also works in a NEW FreeCAD session, as long as the renamed file (the
@@ -245,94 +298,29 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
   FILE on disk is nonetheless correctly saved with the current content (likely, since
   `save()` does actually run — only the "modified" indicator in the GUI doesn't clear).
 
-## Verification
+## Status
 
-⚠️ **The tests below concern the version FROM BEFORE the "new-item form in the browser"
-change** (described in step 2 above) — that change is **untested on live FreeCAD**.
-Verified so far: syntax (`py_compile`), structural consistency (no orphaned references to
-removed native-dialog fields), and end-to-end at the level of the backend endpoints
-themselves (`GET /api/auth/browser-login` — cookie setting + redirect + open-redirect
-protection, `POST /projects/{id}/nodes` with a ticket + `GET /create-tickets/{ticket}` —
-returning correct item data) in an isolated test environment, see
-`EasyPDM.Api.Tests/CreateTicketEndpointsTests.cs` and `AuthEndpointsTests.cs`. NOT
-verified live: `webbrowser.open()` itself from within FreeCAD, the "Waiting for the
-browser" window (`WaitForTicketDialog`) in a real GUI, and the whole flow from clicking
-"Add" in the browser to automatically continuing in FreeCAD. On the first run, watch the
-process carefully and report anything that doesn't work.
+**Live-verified end-to-end on real FreeCAD**, across several rounds of testing and
+bug-fixing (most recently 2026-08-27): login, the browser ticket flow (new item/
+duplicate/attach to existing) for both the top-level document and each assembly
+component individually, the native "already-recognized document" shortcut (step 1b),
+Save-As-under-the-PDM-name with correctly-resolving `App::Link` references after a
+later download, STEP export (including the fix for native-Assembly-workbench documents,
+which previously produced a geometry-less STEP file), and PDF export — all confirmed
+working against a live server by the user, not just reviewed statically (there is still
+no FreeCAD instance available in the environment these files are edited from, so every
+fix here came from the user reproducing an issue live — in one case pasting FreeCAD's
+own Report View output for line-by-line diagnosis — not from a build/test step).
 
-⚠️ **The tests below concern the version FROM BEFORE the "Save As of the local file
-under the PDM name" change** (described in step 3 above) — in particular, the points
-saying that the local file/`doc.FileName` "does not change"/"stays untouched" describe
-the PREVIOUS behavior, not the current one.
-
-The Save As mechanism itself **has been confirmed live by the user** — uploading an
-assembly with a Part, then downloading it via `EasyPDMDownload.FCMacro`, opened WITHOUT a
-"Link broken" error (previously, before this change, the assembly reported exactly that
-error, looking for the original, pre-upload file name). Two NEWER additions, built right
-afterward, have not yet been tested live: the **target-folder selection window** (step
-1a — shared with the download folder in `EasyPDMDownload.FCMacro`) and the **improved
-final message** (distinguishing whether the local file was actually moved, or was already
-there).
-
-The logic (without the dialog window itself) was tested automatically via `freecadcmd`
-against a live `EasyPDM.Api`:
-- **login/session**: an API call without a session is rejected (401); a wrong password is
-  rejected with a plain error (the local token stays empty); a correct login saves the
-  token and the displayed username in FreeCAD preferences, subsequent API calls with that
-  token work; logging out clears the token/name locally AND invalidates the session
-  server-side (a subsequent call with the same, now-invalidated token gets 401 again),
-- **the four Part kinds** (Manufactured/Purchased/Standard/Client-supplied) in the combo
-  box, with field visibility depending on the selected kind exactly as in
-  `PartPropertyForm` (checked on the real `PdmUploadDialog` window, rendered by Qt in
-  `offscreen` mode); the Assembly kind is limited to three options with no
-  "Client-supplied", with Mass always visible regardless of kind, but no Material field
-  (only a Part has it); creating a "Standard" Part (with Material and Norm) and a
-  "Client-supplied" Part (no additional fields) was confirmed by reading back the saved
-  properties from the server,
-- **automatic assembly detection** (a three-level tree: a part linked 2× via separate
-  links + 1× via a pattern of 2 pieces in the main assembly, plus the same part again
-  inside a separate sub-assembly): the detected leaves-first upload order, correctly
-  summed quantity (2+2=4) for a part used multiple times, correct parent-child edges at
-  every level (including from a sub-assembly to its own part) — confirmed directly via
-  `GET /api/projects/{projectId}/relations` after a full run of `process_assembly_tree`
-  (with the new-component window swapped out, so it could be run without a GUI).
-  Re-checking within the same session recognizes already-uploaded components by their
-  label (without creating duplicates).
-- creating a Part with a material, creating an Assembly under a Folder with a BOM link,
-- **a file saved outside the storage (e.g. a simulated Desktop) stays where it was** —
-  after uploading, the local file still exists under the same path and name,
-  `doc.FileName` doesn't change, and only a COPY of it goes into `storage/components/`
-  (byte-identical, confirmed by comparing the local file and the copy on the server),
-- items from TWO different projects land in the same, shared `storage/components/` — with
-  no per-project subfolders,
-- the registration endpoint: rejects a path outside the storage (400) and a non-existent
-  file (404), correct registration (confirmed via the `file_path` in the database),
-- `revision_label()`: 1→A, 2→B, 26→Z, 27→AA,
-- **full revision cycle**: the first upload creates a `N (name).A.ext` copy on the server
-  with a single attachment (the local file stays unchanged the whole time); a repeat
-  upload WITHOUT a status change only overwrites that same `.A.` copy (doesn't multiply
-  copies, the local file untouched); uploading to an item with "Released" status,
-  declined → nothing changes (the status stays "Released", the copy and attachment A
-  untouched); confirmed → the status goes back to "In progress", the revision number
-  increases, a NEW `.B.ext` copy is created on the server **alongside** `.A.ext` (the old
-  one is NOT deleted, the local file stays under the same, unchanged name/path the whole
-  time), and the PDM now has exactly TWO attachments — one per revision,
-- **automatic detection of an existing item by name** (the only test that builds a real
-  `PdmUploadDialog` window, without `exec()`): exactly one name match → the mode switches
-  to "Existing item" and the item is selected right away; no match → it stays "New item";
-  several items with the same name (different projects) → the mode switches and the
-  search narrows to that name, but nothing is auto-selected; typing the name live into
-  the "Name" field triggers the same check,
-- **revision comment**: on confirming a new revision with a comment —
-  `GET /api/items/{id}/revisions` returns exactly one entry with that comment and the
-  correct revision number; declining the revision, or confirming with an EMPTY comment,
-  add nothing there (revisions with no comment simply have no entry).
-
-Everything passed correctly — including once live, by the user themself, in the FreeCAD
-GUI (creating an item and revision A→B), which confirmed file and attachment behavior in
-a real environment, not just in automated tests. The dialog window itself (PySide6,
-including the existing-item search box and the "New revision" window with a comment) was
-also checked manually — tested on FreeCAD 1.1.3 with PySide6.
+Earlier in this file's history, the underlying login/ticket/revision logic was also
+verified automatically via `freecadcmd` against a live `EasyPDM.Api` (session handling,
+`revision_label()` numbering, the full revision A→B cycle, the registration endpoint's
+storage-path validation, automatic assembly detection's leaves-first order and quantity
+summing) — see git history around 2026-08-2x for the itemized list, since the exact
+native dialog that testing exercised (`PdmUploadDialog`/`PartPropertyForm`) predates the
+move to browser-based item creation described above and no longer exists in this file in
+that form; the underlying data-layer behavior it verified (revisions, BOM edges, storage
+registration) is unchanged.
 
 ---
 
@@ -416,24 +404,22 @@ best approximation.
 
 ## Verification status
 
-⚠️ **Untested on live FreeCAD** — unlike `EasyPDMUpload.FCMacro` (which went through a
-full cycle of tests via `freecadcmd` against a live server, plus manual verification in
-the GUI), this macro could only be verified: syntactically (`ast.parse`), for correctness
-of Polish characters (a script checking character frequency — zero corruption), and
-through a careful review of the logic against the actual API endpoints (`GET
-/api/items`, `/items/{id}/attachments`, `/items/{id}/children`, `/attachments/{id}/file`,
-each checked against the `EasyPDM.Api` code). On the first run on live FreeCAD, watch the
-process (the log in the window at the end, and in the FreeCAD Report view console) and
-report anything that doesn't work — the riskiest spots are: recognizing attachment names
-via regex (if a file has an unusual name), and whether the `App::Link` references in the
-downloaded assembly actually resolve automatically once all files are placed in one flat
-folder (this depends on how the link paths are saved in the original file — see
-"Limitations" above).
-
-Choosing the item via the browser (step 1 above) is the MOST RECENT change in this file,
-built directly on the same, already-verified mechanism from `EasyPDMUpload.FCMacro` (`GET
-/api/auth/browser-login`, the ticket `GET /api/create-tickets/{ticket}` + `POST
-/create-tickets/{ticket}/attach-existing`, the "pending request from the macro" bar in
-the web application) — the backend/frontend of this part were tested end-to-end (`curl`
-in an isolated environment), but `EasyPDMDownload.FCMacro` itself (`webbrowser.open`,
-`WaitForTicketDialog` in a real GUI) hasn't been run on live FreeCAD yet.
+⚠️ **Not yet confirmed live on FreeCAD**, as opposed to `EasyPDMUpload.FCMacro` above
+(which has, across several rounds of testing). This macro shares the same underlying
+browser-ticket mechanism (`GET /api/auth/browser-login`, `GET
+/api/create-tickets/{ticket}` + `POST /create-tickets/{ticket}/attach-existing`, the
+"pending request from the macro" bar in the web application) already exercised live by
+`EasyPDMUpload.FCMacro`, so the ticket/waiting-window plumbing itself is not new or
+unusual — but the specifics of THIS macro (recursive component download, the
+already-downloaded/outdated-revision detection by filename, opening the result with
+`App.openDocument`) have only been verified: syntactically (`ast.parse`), for
+correctness of Polish characters (a script checking character frequency — zero
+corruption), and through a careful review of the logic against the actual API endpoints
+(`GET /api/items`, `/items/{id}/attachments`, `/items/{id}/children`,
+`/attachments/{id}/file`, each checked against the `EasyPDM.Api` code). On the first run
+on live FreeCAD, watch the process (the log in the window at the end, and in the FreeCAD
+Report view console) and report anything that doesn't work — the riskiest spots are:
+recognizing attachment names via regex (if a file has an unusual name), and whether the
+`App::Link` references in the downloaded assembly actually resolve automatically once
+all files are placed in one flat folder (this depends on how the link paths are saved in
+the original file — see "Limitations" above).

@@ -7,7 +7,11 @@ Zwei unabhängige Makros, eines zum Senden, eines zum Herunterladen/Öffnen:
 - **`EasyPDMUpload.FCMacro`** sendet das aktive FreeCAD-Dokument an EasyPDM. Das Makro
   fragt lokal NICHTS ab außer dem Speicherordner — sogar die Wahl "neues Element oder
   Anhängen an ein vorhandenes" fällt im **System-Browser** (weiter unten in dieser Datei
-  beschrieben), auf demselben Formular/derselben Leiste wie in der Web-Anwendung.
+  beschrieben), auf demselben Formular/derselben Leiste wie in der Web-Anwendung — **mit
+  einer Ausnahme**: Wenn das Label des Dokuments bereits so aussieht, als gehöre es zu
+  einem vorhandenen PDM-Element, fragt das Makro zuerst lokal, ob es dort als neue
+  Revision angehängt werden soll, und umgeht den Browser dabei vollständig (siehe
+  „Lokale Abkürzung für ein bereits erkanntes Dokument" unten).
 - **`EasyPDMDownload.FCMacro`** lädt ein Teil/eine Baugruppe aus EasyPDM herunter
   (zusammen mit ALLEN seinen/ihren Komponenten, falls es sich um eine Baugruppe handelt)
   und öffnet es/sie sofort in FreeCAD (in einem eigenen Abschnitt am Ende dieser Datei
@@ -68,6 +72,23 @@ des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
     heruntergeladene Dateien zusammen an einem Ort landen). Wird EINMAL, ganz am Anfang,
     gefragt — dies deckt auch den automatisch erkannten Baugruppenbaum ab (Teile/
     Unterbaugruppen, die vor dem Öffnen des Hauptfensters gesendet werden).
+1b. **Lokale Abkürzung für ein bereits erkanntes Dokument.** FreeCAD hat kein
+    dauerhaftes Äquivalent zur Custom Property `EasyPDM_ItemId` des SolidWorks-Makros
+    (siehe die README des SolidWorks-Makros für diesen Mechanismus) — stattdessen fragt
+    das Makro **lokal, nativ**, wenn das **Label** des Dokuments wie
+    `Nummer (Name).REVISION` aussieht und diese Nummer tatsächlich zu einem vorhandenen
+    PDM-Element (Nummer/Dateiname) passt (`match_existing_item`): die aktuelle Version
+    diesem Element als neue Revision anhängen? Eine Bestätigung zeigt zwei weitere
+    native Ja/Nein-Abfragen (STEP exportieren — Standard Ja; PDF exportieren — Standard
+    Nein) und hängt direkt an dieses Element an, **wobei der Browser für dieses Dokument
+    vollständig umgangen wird**. Eine Ablehnung fällt zurück auf den normalen
+    Browser-Ablauf in Schritt 2 unten, wobei die passende Elementnummer als Vorschlag im
+    Suchfeld „An Vorhandenes anhängen" vorausgefüllt ist. Da dies auf einem freien Label
+    statt auf einer dauerhaften Eigenschaft beruht, kann es in seltenen Fällen falsch
+    liegen — z. B. kopiert FreeCADs eigenes „Speichern unter" das Label des Dokuments auf
+    eine wirklich neue, unabhängige Datei, wodurch sie sich fälschlich selbst als
+    vorhandenes Element „erkennen" könnte; das Ablehnen der Bestätigung ist immer sicher
+    (fällt zurück auf den Browser).
 2. **Es erscheint kein natives Fenster mehr.** Das Makro öffnet sofort den
    **System-Browser**, bereits angemeldet (Token→Cookie-Brücke, siehe "Anmeldung" oben),
    auf einer Leiste, die "eine Anfrage von einem CAD-Makro wartet" anzeigt (sichtbar auf
@@ -85,9 +106,10 @@ des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
      Material/Norm, **Kundenteil** → keine zusätzlichen Felder. Bei einer Baugruppe ist
      die Art optional und auf Gefertigt/Zugekauft/Norm beschränkt (ohne "Kundenteil"), und
      die Masse ist immer sichtbar, unabhängig von der gewählten Art — eine Baugruppe hat
-     nie ein Materialfeld (nur ein Teil). Das Popup hat außerdem eine **Checkbox
-     "STEP-Modell exportieren und senden"**. Das Ticket ist EXPLIZIT an genau dieses eine
-     Popup gebunden — kein ANDERES "Hinzufügen" in der Anwendung (im Projektbaum, im
+     nie ein Materialfeld (nur ein Teil). Das Popup hat außerdem die **Checkboxen
+     „STEP exportieren" und „PDF exportieren"** (STEP standardmäßig angehakt, PDF nicht —
+     siehe Schritt 5 unten, was jede davon beim Export genau bewirkt). Das Ticket ist
+     EXPLIZIT an genau dieses eine Popup gebunden — kein ANDERES "Hinzufügen" in der Anwendung (im Projektbaum, im
      Detailbereich) "schluckt" es jemals versehentlich. **Abbrechen** im Popup kehrt zur
      Wahl "Neues Element"/"Duplizieren"/"An Vorhandenes anhängen" zurück, ohne etwas zu
      erstellen.
@@ -100,7 +122,7 @@ des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
    - **"An Vorhandenes anhängen"** — öffnet eine Suche für ein Teil/eine Baugruppe aus der
      **gesamten Datenbank** (nicht nur dem aktuellen Projekt, da eine Komponente gemeinsam
      genutzt werden kann), mit Vorschlägen während der Eingabe (nach Nummer oder Name) und
-     derselben STEP-Checkbox. Wenn das Label des lokalen Dokuments wie
+     denselben STEP-/PDF-Checkboxen. Wenn das Label des lokalen Dokuments wie
      `Nummer (Name).REVISION` aussieht (weil dasselbe Makro es nach einem früheren Senden
      bereits so benannt hat), schlägt die Suche sofort das passende Element vor — das ist
      nur ein **Vorschlag**, die Wahl kann immer geändert werden. Das ausgewählte Element
@@ -164,24 +186,43 @@ des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
    einen gewöhnlichen HTTP-Upload dorthin (`POST /api/items/{id}/attachments`, derselbe
    Mechanismus wie das Anhängen von CAD-Dateien über den Eigenschaftenbereich in der
    Web-Anwendung) — in diesem Fall wird die Revisionshistorie nicht bewahrt.
-5. **Exportiert optional STEP und lädt es automatisch als Anhang mit der Rolle "step"
-   hoch** — das Makro hat hier keine lokale Wahl mehr. Für ein **neues** Element
-   entscheidet darüber AUSSCHLIESSLICH die Checkbox im Browser-Formular (Schritt 2 oben).
-   Beim Anhängen an ein **vorhandenes** Element und bei automatisch erkannten
-   Baugruppenkomponenten (beide durchlaufen nie den Browser) wird STEP **immer**
-   exportiert, ohne Nachfrage. Beim Export funktioniert es über exakt denselben
-   Mechanismus wie die manuelle Schaltfläche "STEP" im Anhänge-Bereich der Web-Anwendung,
-   sodass es sofort die dauerhafte 3D-Vorschau im Elementbereich speist. Exportiert wird
-   die gesamte **sichtbare** Geometrie des Dokuments (alle Objekte mit einem
-   Volumenkörper, deren Sichtbarkeit eingeschaltet ist — bei einem Teil ist das meist ein
-   einzelner Volumenkörper/Body, bei einer automatisch erkannten Baugruppe sind es die
-   aufgelösten `App::Link`s, sodass das STEP die gesamte Baugruppe wiedergibt). Der
-   vorherige Anhang mit der Rolle "step" wird **ersetzt** (vor dem Hochladen des neuen
-   gelöscht), damit die Vorschau stets die aktuelle Revision zeigt. Hat das Dokument
-   keinen sichtbaren Volumenkörper (eine bloße Skizze, ein leeres Dokument) oder schlägt
-   der Export/Upload fehl — wird der Schritt **stillschweigend übersprungen**, er bricht
-   den Rest des Sendevorgangs weder ab noch macht er ihn rückgängig (die `.FCStd`-Datei
-   ist zu diesem Zeitpunkt bereits sicher im PDM gespeichert).
+5. **Exportiert optional STEP und/oder PDF und lädt sie automatisch als Anhänge mit den
+   Rollen „step"/„pdf" hoch.** Woher das Ja/Nein kommt, hängt vom gewählten Pfad oben ab:
+   für ein **neues Element** oder **An Vorhandenes anhängen**, im Browser entschieden
+   (Schritt 2), stammt es aus den Checkboxen desselben Tickets; für jede
+   **Baugruppenkomponente** mit eigenem Ticket (siehe „Automatische Baugruppenerkennung"
+   unten) aus DEREN eigenen Checkboxen; für die **lokale Abkürzung** (Schritt 1b) aus den
+   zwei dort stattdessen gezeigten nativen Ja/Nein-Abfragen. Es gibt keinen verbleibenden
+   Pfad mehr, auf dem STEP bedingungslos ohne jede Wahl erzwungen wird.
+   - **STEP**: funktioniert über denselben zugrundeliegenden Mechanismus wie die manuelle
+     Schaltfläche „STEP" im Anhänge-Bereich der Web-Anwendung, sodass es sofort die
+     dauerhafte 3D-Vorschau im Elementbereich speist. Das Dokument wird zuerst
+     `recompute()`-t (nötig, damit Baugruppen-Container/-Links ihre tatsächliche
+     Geometrie melden statt eines veralteten, leeren Compounds), dann wird die Geometrie
+     gesammelt, wobei Konstruktions-/Bezugsobjekte (Ursprung, Achsen, Ebenen) explizit
+     ausgeschlossen werden; ist ein Container-Objekt vorhanden
+     (`Assembly::AssemblyObject`, `App::Part`, `PartDesign::Body` — d. h. es handelt sich
+     um eine Baugruppe, kein bloßes Teil), wird NUR die bereits vollständig platzierte
+     eigene Form dieses Containers exportiert (der Export auch seiner Kind-Links würde
+     die Geometrie jedes Teils duplizieren), andernfalls wird jedes verbleibende sichtbare
+     Objekt mit Volumenkörper zu einem Compound zusammengefasst. Diese Form wird direkt
+     nach STEP exportiert (nicht über FreeCADs generisches `Part.export`, das
+     Baugruppen-/Link-Objekte mit der Warnung „is not a shape" still verwirft, obwohl sie
+     vollkommen gültige Geometrie tragen — das war ein echter, behobener Fehler:
+     Baugruppen erzeugten früher eine STEP-Datei ganz ohne Geometrie darin).
+   - **PDF**: nutzt FreeCADs `Gui.export(...)` auf denselben sichtbaren Objekten — dies
+     ist nicht FreeCADs üblicher, auf TechDraw-Zeichnungen basierender PDF-Pfad, daher
+     als Best-Effort für ein gewöhnliches Teil/einen Body/eine Baugruppe betrachten,
+     nicht als garantierter Mechanismus; in der Praxis als funktionierend bestätigt, aber
+     falls es für ein bestimmtes Dokument einmal still fehlschlägt, ist das die erste
+     Stelle, die zu prüfen ist.
+   - Jeder Anhang **ersetzt** den vorherigen mit derselben Rolle (vor dem Hochladen des
+     neuen gelöscht), damit die Vorschau stets die aktuelle Revision zeigt. Hat das
+     Dokument keinen sichtbaren Volumenkörper (eine bloße Skizze, ein leeres Dokument)
+     oder schlägt ein Export/Upload fehl — wird dieser eine Anhang **stillschweigend
+     übersprungen**, er bricht den Rest des Sendevorgangs weder ab noch macht er ihn
+     rückgängig (die `.FCStd`-Datei ist zu diesem Zeitpunkt bereits sicher im PDM
+     gespeichert).
 
 ## Automatische Baugruppenerkennung
 
@@ -199,20 +240,30 @@ automatisch gesendet werden soll:
 - **Sendereihenfolge**: zuerst Blätter (Teile ohne weitere Links), dann Unterbaugruppen,
   zuletzt das Hauptdokument — damit jede Komponente im PDM existiert, bevor sie als
   Unterelement angehängt wird.
-- **Bereits gesendete Komponenten**: erkannt am Label im Format `Nummer (Name).REVISION`
-  (dasselbe Format, das das Makro selbst nach dem Senden vergibt) — existiert diese
-  Nummer bereits im PDM, wird die Komponente NICHT erneut erstellt, sondern nur mit der
-  berechneten Menge an die Stückliste angehängt.
-- **Neue Komponenten**: für jede noch nicht gesendete Datei erscheint ein separates,
-  kurzes **natives** Fenster (Projekt/Typ/Name und — NUR für Teile — Art und die davon
-  abhängigen Felder; eine Baugruppe hat überhaupt keine Art, sie erhält nur eine
-  optionale Masse — dieselben Regeln wie das Browser-Formular für ein einzelnes neues
-  Element, siehe oben) — **bewusst ohne Browser**, damit das Senden einer Baugruppe mit
-  vielen neuen Komponenten nicht so viele Browserfenster wie Komponenten erfordert; der
-  Typ (Teil/Baugruppe) wird danach vorgeschlagen, ob die betreffende Datei selbst weitere
-  Links hat. Das HAUPT-Baugruppendokument selbst (dasjenige, auf dem das Makro ausgeführt
-  wurde) durchläuft trotzdem das Browser-Formular wie jedes andere neue Element — nur
-  seine automatisch erkannten KOMPONENTEN umgehen den Browser.
+- **Bereits gesendete Komponenten**: erkannt am Label im Format `Nummer (Name).REVISION`,
+  das zu Nummer/Dateiname eines vorhandenen PDM-Elements passt (dieselbe
+  `match_existing_item`-Prüfung wie die lokale Abkürzung auf oberster Ebene, Schritt 1b
+  oben) — eine solche Komponente wird rein **referenziert**: kein Upload, kein
+  Browser-Ticket, überhaupt nichts wird für sie gesendet, sie wird nur mit der
+  berechneten Menge und ihrer vorhandenen Element-ID an die Stückliste angehängt.
+- **Neue Komponenten laufen ebenfalls über den Browser, eine nach der anderen** — jede
+  noch nicht erkannte Datei erhält ihr EIGENES Browser-Ticket (dieselbe Wahl Neu/
+  Duplizieren/An Vorhandenes anhängen, einschließlich eigener STEP-/PDF-Checkboxen, wie
+  das Hauptdokument), nacheinander geöffnet, nie mehrere Tabs gleichzeitig, zuerst die
+  Blätter. Da pro Makrolauf nur ein Browser-Tab zuverlässig den Windows-Vordergrundfokus
+  erhalten kann, erscheint unmittelbar vor jedem weiteren Tab (nach dem ersten) ein
+  natives „Zum Fortfahren OK klicken"-`MsgBox` — der Klick zählt als frische
+  Benutzereingabe, die es dem nächsten Browserfenster erlaubt, den Fokus zu erhalten,
+  statt still im Hintergrund zu öffnen (Taskleiste prüfen, falls ein Schritt hängen zu
+  bleiben scheint). Der vorgeschlagene Typ (Teil/Baugruppe) füllt das Browser-Formular
+  danach vor, ob die betreffende Datei selbst weitere Links hat.
+- **Neu erstellte Komponenten werden aus dem Stamm des Projektbaums ausgeblendet**,
+  sobald sie an ihrem eigentlichen Elternelement angehängt sind
+  (`PATCH /items/{id}/visibility {showInTree: false}`) — dies gilt nur für Komponenten,
+  die IN DIESEM Lauf tatsächlich über ihr eigenes Ticket erstellt wurden; eine bereits
+  vorhandene, rein referenzierte Komponente (vorheriger Punkt) behält jede Sichtbarkeit,
+  die sie bereits hatte, da es sich um einen bewusst unabhängigen Katalogeintrag handeln
+  kann, der auch anderswo verwendet wird.
 - Die Wahl von **"Nein"** bei der Frage nach dem automatischen Senden sendet NUR das
   aktuelle Dokument, genau wie bisher (ohne Unterelemente) — die Stücklistenstruktur
   bleibt dann zur manuellen Ergänzung in der Web-Anwendung, wie zuvor.
@@ -230,7 +281,15 @@ automatisch gesendet werden soll:
   gespeicherte Dateien** (`App::Link`) — nicht für Baugruppen, die als `App::Part`-
   Container in einer einzigen Datei gehalten werden (diese haben keine separaten
   Dateien, die einzeln gesendet werden könnten; sie müssen dann manuell gesendet werden,
-  Teil für Teil, wie bisher).
+  Teil für Teil, wie bisher). Dies deckt auch FreeCADs native Assembly-Workbench ab,
+  solange deren Komponenten separate gespeicherte Dokumente sind (die typische, und
+  bestätigt funktionierende, Art, darin eine Baugruppe aufzubauen) — ihre eigenen
+  Container (`Assembly::AssemblyObject`) und Gelenke haben keine separate Datei und
+  werden vom Erkennungsdurchlauf korrekt ignoriert, nur deren `App::Link`-Kinder zählen.
+- **Der PDF-Export ist Best-Effort** (siehe Schritt 5 oben, `Gui.export(...)`) — er läuft
+  nicht über FreeCADs üblichen, auf TechDraw basierenden PDF-Pfad, sodass die Ergebnisse
+  je nach FreeCAD-Version oder Dokumenttyp variieren können, auch wenn er in der Praxis
+  als funktionierend bestätigt ist.
 - Die Erkennung eines "bereits gesendeten" Bauteils beruht auf dem Label des Dokuments —
   das Makro vergibt es selbst nach dem Senden und speichert es sofort auf der Festplatte
   (Speichern unter dem PDM-Namen), sodass es auch in einer NEUEN FreeCAD-Sitzung
@@ -269,105 +328,33 @@ automatisch gesendet werden soll:
   (wahrscheinlich, da `save()` tatsächlich ausgeführt wird — nur der "geändert"-Indikator
   in der GUI verschwindet nicht).
 
-## Verifizierung
+## Status
 
-⚠️ **Die folgenden Tests betreffen die Version VOR der Änderung "Formular für neues
-Element im Browser"** (beschrieben in Schritt 2 oben) — diese Änderung ist **auf einem
-echten FreeCAD ungetestet**. Bisher verifiziert: Syntax (`py_compile`), strukturelle
-Konsistenz (keine verwaisten Verweise auf entfernte Felder des nativen Dialogs), und
-End-to-End auf Ebene der Backend-Endpunkte selbst (`GET /api/auth/browser-login` — Setzen
-des Cookies + Weiterleitung + Schutz vor Open-Redirect, `POST /projects/{id}/nodes` mit
-einem Ticket + `GET /create-tickets/{ticket}` — Rückgabe korrekter Elementdaten) in einer
-isolierten Testumgebung, siehe `EasyPDM.Api.Tests/CreateTicketEndpointsTests.cs` und
-`AuthEndpointsTests.cs`. NICHT live verifiziert: `webbrowser.open()` selbst aus FreeCAD
-heraus, das Fenster "Warte auf Browser" (`WaitForTicketDialog`) in einer echten GUI, sowie
-der gesamte Ablauf vom Klick auf "Hinzufügen" im Browser bis zum automatischen Fortfahren
-in FreeCAD. Beobachten Sie beim ersten Start den Ablauf aufmerksam und melden Sie, was
-nicht funktioniert.
+**Durchgängig live auf echtem FreeCAD verifiziert**, über mehrere Runden von Tests und
+Fehlerbehebungen hinweg (zuletzt 2026-08-27): Anmeldung, der Browser-Ticket-Ablauf (neues
+Element/Duplikat/An Vorhandenes anhängen) sowohl für das Hauptdokument als auch für jede
+Baugruppenkomponente einzeln, die native „bereits erkanntes Dokument"-Abkürzung (Schritt
+1b), Speichern-unter-dem-PDM-Namen mit anschließend korrekt aufgelösten
+`App::Link`-Verweisen nach einem späteren Download, STEP-Export (einschließlich der
+Korrektur für Dokumente der nativen Assembly-Workbench, die zuvor eine geometrielose
+STEP-Datei erzeugten) und PDF-Export — alles vom Benutzer gegen einen echten Server
+bestätigt, nicht nur statisch durchgesehen (in der Umgebung, in der diese Dateien
+bearbeitet werden, gibt es weiterhin kein verfügbares FreeCAD, sodass jede Korrektur hier
+daher rührt, dass der Benutzer ein Problem live nachgestellt hat — in einem Fall durch
+Einfügen der Ausgabe von FreeCADs eigenem Report View zur zeilenweisen Diagnose — nicht
+aus einem Build-/Testschritt).
 
-⚠️ **Die folgenden Tests betreffen die Version VOR der Änderung "Speichern unter der
-lokalen Datei unter dem PDM-Namen"** (beschrieben in Schritt 3 oben) — insbesondere
-beschreiben die Punkte, die besagen, dass die lokale Datei/`doc.FileName` sich "nicht
-ändert"/"unangetastet bleibt", das FRÜHERE Verhalten, nicht das aktuelle.
-
-Der Speichern-unter-Mechanismus selbst **wurde live vom Benutzer bestätigt** — das Senden
-einer Baugruppe mit einem Teil und das anschließende Herunterladen über
-`EasyPDMDownload.FCMacro` öffnete sich OHNE den Fehler "Link broken" (zuvor, vor dieser
-Änderung, meldete die Baugruppe genau diesen Fehler, da sie nach dem ursprünglichen
-Dateinamen von vor dem Senden suchte). Zwei NEUERE, unmittelbar danach hinzugefügte Dinge
-wurden noch nicht live getestet: das **Fenster zur Wahl des Zielordners** (Schritt 1a —
-geteilt mit dem Download-Ordner in `EasyPDMDownload.FCMacro`) und die **verbesserte
-Abschlussmeldung** (die unterscheidet, ob die lokale Datei tatsächlich verschoben wurde
-oder bereits dort lag).
-
-Die Logik (ohne das Dialogfenster selbst) wurde automatisch über `freecadcmd` gegen ein
-echtes `EasyPDM.Api` getestet:
-- **Anmeldung/Sitzung**: ein API-Aufruf ohne Sitzung wird abgelehnt (401); ein falsches
-  Passwort wird mit einem gewöhnlichen Fehler abgelehnt (das lokale Token bleibt leer);
-  eine korrekte Anmeldung speichert das Token und den angezeigten Benutzernamen in den
-  FreeCAD-Einstellungen, weitere API-Aufrufe mit diesem Token funktionieren; das Abmelden
-  löscht Token/Namen lokal UND macht die Sitzung serverseitig ungültig (ein weiterer
-  Aufruf mit demselben, bereits ungültigen Token erhält erneut 401),
-- **die vier Teile-Arten** (Gefertigt/Zugekauft/Norm/Kundenteil) in der Combobox, mit
-  einer Feldsichtbarkeit, die genau wie in `PartPropertyForm` von der gewählten Art
-  abhängt (geprüft am echten Fenster `PdmUploadDialog`, von Qt im `offscreen`-Modus
-  dargestellt); die Art der Baugruppe ist auf drei Optionen ohne "Kundenteil" beschränkt,
-  mit Masse immer sichtbar unabhängig von der Art, aber ohne Materialfeld (nur ein Teil
-  hat es); die Erstellung eines Teils "Norm" (mit Material und Norm) und "Kundenteil"
-  (ohne zusätzliche Felder) wurde durch Auslesen der gespeicherten Eigenschaften vom
-  Server bestätigt,
-- **automatische Baugruppenerkennung** (ein dreistufiger Baum: ein Teil, das 2× über
-  separate Links + 1× über ein Muster von 2 Stück in der Hauptbaugruppe verlinkt ist,
-  plus dasselbe Teil noch einmal innerhalb einer separaten Unterbaugruppe): erkannte
-  Blätter-zuerst-Sendereihenfolge, korrekt summierte Menge (2+2=4) für ein mehrfach
-  verwendetes Teil, korrekte Eltern-Kind-Kanten auf allen Ebenen (einschließlich von
-  einer Unterbaugruppe zu ihrem eigenen Teil) — direkt bestätigt über
-  `GET /api/projects/{projectId}/relations` nach einem vollständigen Durchlauf von
-  `process_assembly_tree` (mit ausgetauschtem Fenster für neue Komponenten, damit dies
-  ohne GUI ausgeführt werden konnte). Eine erneute Prüfung in derselben Sitzung erkennt
-  bereits gesendete Komponenten an ihrem Label (ohne Duplikate zu erstellen).
-- Erstellung eines Teils mit einem Material, Erstellung einer Baugruppe unter einem
-  Ordner mit einer Stücklistenverknüpfung,
-- **eine außerhalb des Speichers gespeicherte Datei (z. B. ein simulierter Desktop)
-  bleibt dort, wo sie war** — nach dem Senden existiert die lokale Datei weiterhin unter
-  demselben Pfad und Namen, `doc.FileName` ändert sich nicht, und in
-  `storage/components/` gelangt nur eine KOPIE davon (bytegleich, bestätigt durch den
-  Vergleich der lokalen Datei mit der Kopie auf dem Server),
-- Elemente aus ZWEI verschiedenen Projekten landen im selben, gemeinsamen
-  `storage/components/` — ohne separate Unterordner pro Projekt,
-- der Registrierungs-Endpunkt: Ablehnung eines Pfads außerhalb des Speichers (400) und
-  einer nicht existierenden Datei (404), korrekte Registrierung (bestätigt über
-  `file_path` in der Datenbank),
-- `revision_label()`: 1→A, 2→B, 26→Z, 27→AA,
-- **vollständiger Revisionszyklus**: das erste Senden erstellt eine Kopie
-  `N (Name).A.ext` auf dem Server mit einem einzigen Anhang (die lokale Datei bleibt die
-  ganze Zeit unverändert); ein erneutes Senden OHNE Statusänderung überschreibt nur
-  dieselbe `.A.`-Kopie (vervielfacht die Kopien nicht, die lokale Datei bleibt
-  unangetastet); Senden an ein Element mit Status "Freigegeben" mit Ablehnung → nichts
-  ändert sich (der Status bleibt "Freigegeben", Kopie und Anhang A unangetastet); mit
-  Bestätigung → der Status kehrt zu "In Bearbeitung" zurück, die Revisionsnummer steigt,
-  auf dem Server entsteht eine NEUE Kopie `.B.ext` **neben** `.A.ext` (die alte wird
-  NICHT gelöscht, die lokale Datei bleibt die ganze Zeit unter demselben, unveränderten
-  Namen/Pfad), und im PDM gibt es jetzt genau ZWEI Anhänge — einen pro Revision,
-- **automatische Erkennung eines vorhandenen Elements anhand des Namens** (der einzige
-  Test, der ein echtes `PdmUploadDialog`-Fenster aufbaut, ohne `exec()`): genau eine
-  Namensübereinstimmung → der Modus wechselt zu "Vorhandenes Element" und das Element ist
-  sofort ausgewählt; keine Übereinstimmung → es bleibt bei "Neues Element"; mehrere
-  Elemente mit demselben Namen (verschiedene Projekte) → der Modus wechselt und die Suche
-  wird auf diesen Namen eingegrenzt, aber nichts wird automatisch ausgewählt; das
-  Eingeben des Namens live im Feld "Name" löst dieselbe Prüfung aus,
-- **Revisionskommentar**: bei Bestätigung einer neuen Revision mit Kommentar —
-  `GET /api/items/{id}/revisions` gibt genau einen Eintrag mit diesem Kommentar und der
-  korrekten Revisionsnummer zurück; eine Ablehnung der Revision oder eine Bestätigung mit
-  LEEREM Kommentar tragen dort nichts ein (Revisionen ohne Kommentar haben schlicht
-  keinen Eintrag).
-
-Alles verlief korrekt — einschließlich einmal live durch den Benutzer selbst in der
-FreeCAD-GUI (Erstellung eines Elements und einer Revision A→B), was das Verhalten von
-Dateien und Anhängen in einer echten Umgebung bestätigte, nicht nur in automatisierten
-Tests. Das Dialogfenster selbst (PySide6, einschließlich der Suche nach vorhandenen
-Elementen und des Fensters "Neue Revision" mit Kommentar) wurde ebenfalls manuell
-überprüft — getestet auf FreeCAD 1.1.3 mit PySide6.
+Früher in der Historie dieser Datei wurde die zugrundeliegende Anmelde-/Ticket-/
+Revisionslogik zusätzlich automatisch über `freecadcmd` gegen ein echtes `EasyPDM.Api`
+verifiziert (Sitzungsbehandlung, `revision_label()`-Nummerierung, der vollständige
+Revisionszyklus A→B, die Pfadvalidierung des Registrierungs-Endpunkts, die
+Blätter-zuerst-Reihenfolge und Mengensummierung der automatischen Baugruppenerkennung) —
+siehe Git-Historie um 2026-08-2x für die vollständige Liste, da genau der native Dialog,
+den diese Tests geprüft haben (`PdmUploadDialog`/`PartPropertyForm`), aus der Zeit vor
+dem oben beschriebenen Wechsel zur browserbasierten Elementerstellung stammt und in
+dieser Form in dieser Datei nicht mehr existiert — das zugrundeliegende Verhalten der
+Datenschicht, das damit verifiziert wurde (Revisionen, Stücklistenkanten,
+Speicherregistrierung), ist unverändert.
 
 ---
 
@@ -457,27 +444,25 @@ nimmt es einfach den zuletzt hochgeladenen Anhang als beste Annäherung.
 
 ## Verifizierungsstatus
 
-⚠️ **Auf einem echten FreeCAD ungetestet** — im Gegensatz zu `EasyPDMUpload.FCMacro`
-(das einen vollständigen Testzyklus über `freecadcmd` gegen einen echten Server
-durchlaufen hat, plus manuelle Verifizierung in der GUI), konnte dieses Makro nur
-verifiziert werden: syntaktisch (`ast.parse`), hinsichtlich der Korrektheit polnischer
-Zeichen (ein Skript zur Prüfung der Zeichenhäufigkeit — null Verfälschungen) und durch
-eine sorgfältige Überprüfung der Logik anhand der tatsächlichen API-Endpunkte
-(`GET /api/items`, `/items/{id}/attachments`, `/items/{id}/children`,
-`/attachments/{id}/file`, jeder im Code von `EasyPDM.Api` überprüft). Beobachten Sie beim
-ersten Start auf einem echten FreeCAD den Ablauf (das Log im Fenster am Ende und in der
-FreeCAD-Berichtskonsole) und melden Sie, was nicht funktioniert — die riskantesten
-Stellen sind: die Erkennung von Anhangsnamen per Regex (falls eine Datei einen
-untypischen Namen hat) und ob sich die `App::Link`-Verweise in der heruntergeladenen
-Baugruppe tatsächlich automatisch auflösen, nachdem alle Dateien in einem einzigen,
-flachen Ordner platziert wurden (dies hängt davon ab, wie die Link-Pfade in der
-ursprünglichen Datei gespeichert sind — siehe "Einschränkungen" oben).
-
-Die Wahl des Elements über den Browser (Schritt 1 oben) ist die NEUESTE Änderung in
-dieser Datei, direkt auf demselben, bereits verifizierten Mechanismus aus
-`EasyPDMUpload.FCMacro` aufgebaut (`GET /api/auth/browser-login`, das Ticket
-`GET /api/create-tickets/{ticket}` + `POST /create-tickets/{ticket}/attach-existing`,
-die Leiste "wartende Anfrage vom Makro" in der Web-Anwendung) — Backend/Frontend dieses
-Teils wurden End-to-End getestet (`curl` in einer isolierten Umgebung), aber
-`EasyPDMDownload.FCMacro` selbst (`webbrowser.open`, `WaitForTicketDialog` in einer
-echten GUI) wurde noch nicht auf einem echten FreeCAD ausgeführt.
+⚠️ **Noch nicht live auf FreeCAD bestätigt**, im Gegensatz zu `EasyPDMUpload.FCMacro`
+oben (das es ist, über mehrere Testrunden hinweg). Dieses Makro teilt sich denselben
+zugrundeliegenden Browser-Ticket-Mechanismus (`GET /api/auth/browser-login`, `GET
+/api/create-tickets/{ticket}` + `POST /create-tickets/{ticket}/attach-existing`, die
+Leiste "wartende Anfrage vom Makro" in der Web-Anwendung), der von
+`EasyPDMUpload.FCMacro` bereits live durchgespielt wurde — die Ticket-/Wartefenster-
+Mechanik selbst ist also nichts Neues oder Ungewöhnliches —, aber die Besonderheiten
+DIESES Makros (rekursiver Komponenten-Download, die Erkennung von
+bereits-heruntergeladen/veraltete-Revision anhand des Dateinamens, das Öffnen des
+Ergebnisses mit `App.openDocument`) wurden nur verifiziert: syntaktisch (`ast.parse`),
+hinsichtlich der Korrektheit polnischer Zeichen (ein Skript zur Prüfung der
+Zeichenhäufigkeit — null Verfälschungen) und durch eine sorgfältige Überprüfung der
+Logik anhand der tatsächlichen API-Endpunkte (`GET /api/items`,
+`/items/{id}/attachments`, `/items/{id}/children`, `/attachments/{id}/file`, jeder im
+Code von `EasyPDM.Api` überprüft). Beobachten Sie beim ersten Start auf einem echten
+FreeCAD den Ablauf (das Log im Fenster am Ende und in der FreeCAD-Berichtskonsole) und
+melden Sie, was nicht funktioniert — die riskantesten Stellen sind: die Erkennung von
+Anhangsnamen per Regex (falls eine Datei einen untypischen Namen hat) und ob sich die
+`App::Link`-Verweise in der heruntergeladenen Baugruppe tatsächlich automatisch auflösen,
+nachdem alle Dateien in einem einzigen, flachen Ordner platziert wurden (dies hängt davon
+ab, wie die Link-Pfade in der ursprünglichen Datei gespeichert sind — siehe
+"Einschränkungen" oben).

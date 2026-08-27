@@ -7,7 +7,10 @@ Dwa niezależne makra, jedno na wysyłanie, jedno na pobieranie/otwieranie:
 - **`EasyPDMUpload.FCMacro`** wysyła aktywny dokument FreeCAD do EasyPDM. Makro nie pyta
   lokalnie o NIC poza folderem zapisu — nawet wybór "nowy element czy dogranie do
   istniejącego" zapada w **przeglądarce systemowej** (opisane w tym pliku niżej), na tym
-  samym formularzu/pasku co w aplikacji webowej.
+  samym formularzu/pasku co w aplikacji webowej — **z jednym wyjątkiem**: jeśli etykieta
+  dokumentu już wygląda, jakby należała do istniejącego elementu PDM, makro pyta najpierw
+  lokalnie, czy dograć ją tam jako nową rewizję, całkowicie omijając przeglądarkę (patrz
+  "Lokalny skrót dla już rozpoznanego dokumentu" niżej).
 - **`EasyPDMDownload.FCMacro`** pobiera Część/Złożenie z EasyPDM (razem ze WSZYSTKIMI jego
   składnikami, jeśli to Złożenie) i od razu je otwiera w FreeCAD (opisane w osobnej sekcji
   na końcu tego pliku).
@@ -61,6 +64,21 @@ dwie osobne.
     wysłane i pobrane pliki lądowały razem w jednym miejscu). Pytane RAZ, na samym początku —
     obejmuje też automatycznie wykryte drzewo złożenia (część/pod-złożenia wysyłane wcześniej
     niż otwiera się główne okno).
+1b. **Lokalny skrót dla już rozpoznanego dokumentu.** FreeCAD nie ma trwałego odpowiednika
+    Właściwości niestandardowej `EasyPDM_ItemId` z makra SolidWorks (patrz README makra
+    SolidWorks po opis tego mechanizmu) — zamiast tego, jeśli **etykieta** dokumentu
+    wygląda jak `numer (nazwa).REWIZJA`, a ten numer faktycznie pasuje do istniejącego
+    elementu PDM po numerze/nazwie pliku (`match_existing_item`), makro pyta **lokalnie,
+    natywnie**: dograć bieżącą wersję do tego elementu jako nową rewizję? Potwierdzenie
+    pokazuje jeszcze dwa natywne pytania Tak/Nie (Eksportuj STEP — domyślnie Tak;
+    Eksportuj PDF — domyślnie Nie) i dogrywa wprost do tego elementu, **całkowicie
+    omijając przeglądarkę** dla tego dokumentu. Odmowa spada do zwykłego przepływu przez
+    przeglądarkę w kroku 2 niżej, z dopasowanym numerem elementu podpowiedzianym w
+    wyszukiwarce "Dograj do istniejącego". Ponieważ to opiera się na dowolnej etykiecie,
+    nie na trwałej właściwości, w rzadkich przypadkach może się mylić — np. własne "Zapisz
+    jako" FreeCAD kopiuje etykietę dokumentu na naprawdę nowy, niepowiązany plik, co może
+    sprawić, że fałszywie "rozpozna się" jako istniejący element; odmowa potwierdzenia jest
+    zawsze bezpieczna (spada z powrotem do przeglądarki).
 2. **Żadne natywne okno się już nie pokazuje.** Makro od razu otwiera **przeglądarkę
    systemową**, już zalogowaną (most token→ciasteczko, zob. "Logowanie" wyżej), na pasku
    "oczekuje żądanie z makra CAD" (widoczny na KAŻDYM ekranie aplikacji webowej, dopóki
@@ -75,8 +93,10 @@ dwie osobne.
      1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** → brak dodatkowych pól. Dla
      Złożenia rodzaj jest opcjonalny i ograniczony do Wykonywana/Zakupowa/Normalia (bez
      "Klienta"), a Masa jest zawsze widoczna niezależnie od wybranego rodzaju — Złożenie
-     nigdy nie ma pola Materiał (tylko Część). Popup ma też **checkbox "Eksportuj i wyślij
-     model STEP"**. Bilet jest przypięty JAWNIE do tego jednego, konkretnego popupu — żadne
+     nigdy nie ma pola Materiał (tylko Część). Popup ma też **checkboksy "Eksportuj STEP"
+     i "Eksportuj PDF"** (STEP domyślnie zaznaczony, PDF nie — patrz krok 5 niżej, co
+     dokładnie robi każdy z nich przy eksporcie). Bilet jest przypięty JAWNIE do tego
+     jednego, konkretnego popupu — żadne
      INNE "Dodaj" w aplikacji (w drzewie projektu, panelu szczegółów) nigdy przypadkiem go
      nie "połknie". **Anuluj** w popupie wraca do wyboru "Nowy element"/"Duplikuj"/"Dograj
      do istniejącego" bez tworzenia niczego.
@@ -87,8 +107,8 @@ dwie osobne.
      zwykłe tworzenie nowego elementu, tylko podpowiedziane danymi ze źródła.
    - **"Dograj do istniejącego"** — rozwija wyszukiwarkę Części/Złożenia z
      **całej bazy** (nie tylko bieżącego projektu, bo komponent może być współdzielony), z
-     podpowiedziami podczas pisania (po numerze albo nazwie) i tym samym checkboksem STEP.
-     Jeśli etykieta lokalnego dokumentu wygląda jak `numer (nazwa).REWIZJA` (bo to samo
+     podpowiedziami podczas pisania (po numerze albo nazwie) i tymi samymi checkboksami
+     STEP/PDF. Jeśli etykieta lokalnego dokumentu wygląda jak `numer (nazwa).REWIZJA` (bo to samo
      makro już go tak nazwało po wcześniejszej wysyłce), wyszukiwarka od razu podpowiada
      dopasowany element — to tylko **podpowiedź**, wybór zawsze można zmienić. Wybrany
      element nie jest tworzony na nowo — bieżący dokument trafia do niego jako **aktualna
@@ -142,22 +162,38 @@ dwie osobne.
    przez zwykły upload HTTP (`POST /api/items/{id}/attachments`, ten sam mechanizm co
    dogrywanie plików CAD z panelu właściwości w aplikacji webowej) — wtedy historia rewizji
    nie jest zachowywana.
-5. **Opcjonalnie eksportuje STEP i wgrywa go automatycznie jako załącznik z rolą "step"** —
-   makro nie ma tu już żadnego lokalnego wyboru. Dla **nowego** elementu decyduje o tym
-   WYŁĄCZNIE checkbox w formularzu w przeglądarce (krok 2 wyżej). Dla dogrywania do
-   **istniejącego** elementu i dla automatycznie wykrytych komponentów złożenia (oba nigdy
-   nie przechodzą przez przeglądarkę) STEP eksportuje się **zawsze**, bez pytania. Gdy
-   eksportuje, działa dokładnie tym samym mechanizmem co ręczny przycisk "STEP" w panelu
-   Załączników w aplikacji webowej, więc od
-   razu zasila stały podgląd 3D w panelu elementu. Eksportowana jest cała **widoczna**
-   geometria dokumentu (wszystkie obiekty z bryłą, których widoczność jest włączona — dla
-   Części to zwykle jedna bryła/Body, dla automatycznie wykrytego złożenia to rozwiązane
-   `App::Link`i, więc STEP
-   odzwierciedla całe złożenie). Poprzedni załącznik z rolą "step" jest **zastępowany**
-   (usuwany przed wysyłką nowego), żeby podgląd zawsze pokazywał aktualną rewizję. Jeśli
-   dokument nie ma żadnej widocznej bryły (sam szkic, pusty dokument) albo eksport/wysyłka
-   się nie powiedzie — krok jest **cicho pomijany**, nie przerywa ani nie cofa reszty
-   wysyłki (plik `.FCStd` w PDM jest już bezpiecznie zapisany w tym momencie).
+5. **Opcjonalnie eksportuje STEP i/lub PDF i wgrywa je automatycznie jako załączniki z
+   rolami "step"/"pdf".** Skąd bierze się Tak/Nie, zależy od wybranej wcześniej ścieżki:
+   dla **nowego elementu** albo **dogrania do istniejącego** zdecydowanego w przeglądarce
+   (krok 2), bierze się z checkboksów tego samego biletu; dla każdego **komponentu
+   złożenia** z własnym biletem (patrz "Automatyczne wykrywanie złożenia" niżej) — z
+   checkboksów TEGO KONKRETNEGO komponentu; dla **lokalnego skrótu** (krok 1b) — z dwóch
+   natywnych pytań Tak/Nie pokazanych tam zamiast tego. Nie ma już ścieżki, gdzie STEP
+   byłby bezwarunkowo wymuszony bez żadnego wyboru.
+   - **STEP**: działa tym samym, leżącym u podstaw mechanizmem co ręczny przycisk "STEP" w
+     panelu Załączników w aplikacji webowej, więc od razu zasila stały podgląd 3D w panelu
+     elementu. Dokument jest najpierw `recompute()`-owany (potrzebne, żeby kontenery/linki
+     złożenia zgłosiły swoją faktyczną geometrię zamiast nieaktualnego, pustego compoundu),
+     potem zbierana jest geometria z jawnym wykluczeniem obiektów konstrukcyjnych/
+     odniesienia (origin, osie, płaszczyzny); jeśli obecny jest obiekt-kontener
+     (`Assembly::AssemblyObject`, `App::Part`, `PartDesign::Body` — czyli to złożenie, nie
+     goła część), eksportowana jest TYLKO gotowa, już poprawnie ułożona bryła tego
+     kontenera (eksport też jego dzieci-linków zdublowałby geometrię każdej części), w
+     przeciwnym razie każdy pozostały widoczny obiekt z bryłą łączony jest w jeden compound.
+     Ta bryła eksportowana jest bezpośrednio do STEP (nie przez ogólną funkcję FreeCAD
+     `Part.export`, która cicho odrzuca obiekty złożenia/linków komunikatem "is not a
+     shape", mimo że mają zupełnie poprawną geometrię — to był realny, naprawiony błąd:
+     złożenia potrafiły wyprodukować plik STEP zupełnie bez geometrii w środku).
+   - **PDF**: korzysta z `Gui.export(...)` FreeCAD na tych samych widocznych obiektach —
+     to nie jest typowa dla FreeCAD ścieżka PDF oparta o rysunki TechDraw, więc traktuj to
+     jako rozwiązanie best-effort dla zwykłej Części/Bryły/złożenia, nie gwarantowany
+     mechanizm; potwierdzone jako działające w praktyce, ale jeśli kiedyś cicho zawiedzie
+     dla konkretnego dokumentu, to pierwsze miejsce do sprawdzenia.
+   - Każdy z załączników **zastępuje** poprzedni z tą samą rolą (usuwany przed wysyłką
+     nowego), żeby podgląd zawsze pokazywał aktualną rewizję. Jeśli dokument nie ma żadnej
+     widocznej bryły (sam szkic, pusty dokument) albo eksport/wysyłka się nie powiedzie —
+     ten jeden załącznik jest **cicho pomijany**, nie przerywa ani nie cofa reszty wysyłki
+     (plik `.FCStd` w PDM jest już bezpiecznie zapisany w tym momencie).
 
 ## Automatyczne wykrywanie złożenia
 
@@ -174,17 +210,28 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   na końcu główny dokument — żeby każdy komponent istniał w PDM, zanim zostanie podpięty
   jako podelement.
 - **Już wysłane komponenty**: rozpoznawane po etykiecie w formacie `numer (nazwa).REWIZJA`
-  (ten sam format, który makro samo nadaje po wysłaniu) — jeśli taki numer istnieje w PDM,
-  komponent NIE jest tworzony ponownie, tylko podpinany do BOM-u z wyliczoną ilością.
-- **Nowe komponenty**: dla każdego jeszcze nie wysłanego pliku pokazuje się osobne, krótkie
-  **natywne** okno (Projekt/Typ/Nazwa i — TYLKO dla Części — Rodzaj i zależne od niego
-  pola; Złożenie nie ma rodzaju w ogóle, dostaje tylko opcjonalną Masę — te same reguły co
-  formularz w przeglądarce dla pojedynczego nowego elementu, patrz wyżej) — **celowo bez
-  przeglądarki**, żeby wysłanie złożenia z wieloma nowymi komponentami nie wymagało tylu
-  samo okien przeglądarki co komponentów; typ (Część/Złożenie) jest podpowiadany na
-  podstawie tego, czy dany plik sam ma dalsze linki. Sam GŁÓWNY dokument złożenia (ten, na
-  którym uruchomiono makro) i tak przechodzi przez formularz w przeglądarce jak każdy inny
-  nowy element — tylko jego automatycznie wykryte SKŁADNIKI omijają przeglądarkę.
+  pasującej do numeru/nazwy pliku istniejącego elementu PDM (to samo sprawdzenie
+  `match_existing_item` co lokalny skrót na górnym poziomie, krok 1b wyżej) — taki
+  komponent jest czysto **referencyjny**: żadnej wysyłki, żadnego biletu przeglądarki,
+  nic dla niego nie jest wysyłane — tylko podpinany do BOM-u z wyliczoną ilością, po
+  swoim istniejącym ID.
+- **Nowe komponenty też idą przez przeglądarkę, jeden po drugim** — każdy jeszcze
+  nierozpoznany plik dostaje WŁASNY bilet przeglądarki (ten sam wybór Nowy element/
+  Duplikuj/Dograj do istniejącego, wraz z własnymi checkboksami STEP/PDF, co dokument
+  główny), otwierany sekwencyjnie, nigdy kilka kart naraz, liście najpierw. Ponieważ
+  tylko jedna karta przeglądarki na uruchomienie makra może niezawodnie przejąć fokus
+  Windows, tuż przed każdą kolejną kartą (po pierwszej) pojawia się natywny `MsgBox`
+  "kliknij OK, aby kontynuować" — kliknięcie liczy się jako świeże działanie użytkownika,
+  które pozwala kolejnemu oknu przeglądarki przejąć fokus zamiast otworzyć się cicho w
+  tle (sprawdź pasek zadań, jeśli krok wygląda na zawieszony). Podpowiadany typ (Część/
+  Złożenie) wstępnie wypełnia formularz w przeglądarce na podstawie tego, czy dany plik
+  sam ma dalsze linki.
+- **Nowo utworzone komponenty są ukrywane z korzenia drzewa projektu** po podpięciu do
+  swojego właściwego rodzica (`PATCH /items/{id}/visibility {showInTree: false}`) —
+  dotyczy to tylko komponentów faktycznie utworzonych W TYM przebiegu przez własny bilet;
+  już istniejący, czysto referencyjny komponent (poprzedni punkt) zachowuje jakąkolwiek
+  widoczność już miał, bo może być celowo niezależnym wpisem katalogu używanym też
+  gdzie indziej.
 - Wybranie **"Nie"** na pytanie o automatyczne wysłanie wysyła TYLKO bieżący dokument,
   dokładnie tak jak dotychczas (bez podelementów) — struktura BOM-u zostaje wtedy do
   ręcznego uzupełnienia w aplikacji webowej, jak wcześniej.
@@ -200,7 +247,15 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
 - Automatyczne wykrywanie złożenia działa tylko dla odnośników do **zewnętrznych, zapisanych
   plików** (`App::Link`) — nie dla złożeń trzymanych w jednym pliku jako kontenery
   `App::Part` (te nie mają osobnych plików do wysłania osobno; trzeba je wtedy wysyłać
-  ręcznie, część po części, tak jak dotychczas).
+  ręcznie, część po części, tak jak dotychczas). Obejmuje to też natywny workbench
+  Assembly FreeCAD, o ile jego komponenty są osobnymi zapisanymi dokumentami (typowy i
+  potwierdzony jako działający sposób budowania w nim złożenia) — jego własne kontenery
+  (`Assembly::AssemblyObject`) i więzy nie mają osobnego pliku i są poprawnie pomijane
+  przez przechodzenie wykrywające, liczą się tylko ich dzieci `App::Link`.
+- **Eksport PDF jest rozwiązaniem best-effort** (patrz krok 5 wyżej, `Gui.export(...)`) —
+  nie korzysta z typowej dla FreeCAD ścieżki PDF opartej o TechDraw, więc wyniki mogą się
+  różnić między wersjami FreeCAD i typami dokumentu, mimo że potwierdzone jako działające
+  w praktyce.
 - Rozpoznanie "już wysłanego" komponentu opiera się na etykiecie dokumentu — makro samo ją
   nadaje po wysłaniu i od razu zapisuje na dysk (Save As pod nazwą PDM), więc działa też
   w NOWEJ sesji FreeCAD, o ile otwarty zostanie przemianowany plik (ten pod nazwą PDM) —
@@ -232,91 +287,31 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   zawartością (prawdopodobne, skoro `save()` faktycznie się wykonuje — tylko sam wskaźnik
   "zmieniony" w GUI nie znika).
 
-## Weryfikacja
+## Status
 
-⚠️ **Poniższe testy dotyczą wersji SPRZED zmiany "formularz nowego elementu w
-przeglądarce"** (opisanej w kroku 2 wyżej) — ta zmiana jest **nieprzetestowana na żywym
-FreeCAD**. Zweryfikowane do tej pory: składnia (`py_compile`), spójność struktury (brak
-osieroconych odwołań do usuniętych pól natywnego dialogu), i end-to-end na poziomie samych
-endpointów backendu (`GET /api/auth/browser-login` — ustawienie ciasteczka + przekierowanie
-+ ochrona przed open-redirect, `POST /projects/{id}/nodes` z ticketem + `GET
-/create-tickets/{ticket}` — zwrot poprawnych danych elementu) w izolowanym środowisku
-testowym, patrz `EasyPDM.Api.Tests/CreateTicketEndpointsTests.cs` i
-`AuthEndpointsTests.cs`. NIE zweryfikowane na żywo: samo `webbrowser.open()` z poziomu
-FreeCAD, okno "Czekam na przeglądarkę" (`WaitForTicketDialog`) w realnym GUI, oraz cały
-przepływ od kliknięcia "Dodaj" w przeglądarce do automatycznego kontynuowania w FreeCAD.
-Przy pierwszym uruchomieniu obserwuj przebieg uważnie i zgłoś, co nie zagra.
+**Zweryfikowane na żywo od początku do końca na prawdziwym FreeCAD**, w kilku rundach
+testów i poprawek (ostatnio 2026-08-27): logowanie, przepływ przez bilet w przeglądarce
+(nowy element/duplikat/dograj do istniejącego) zarówno dla dokumentu głównego, jak i dla
+każdego komponentu złożenia z osobna, natywny skrót "już rozpoznany dokument" (krok 1b),
+Save As pod nazwą PDM z poprawnie rozwiązującymi się odnośnikami `App::Link` po
+późniejszym pobraniu, eksport STEP (w tym naprawa dla dokumentów natywnego workbencha
+Assembly, które wcześniej produkowały plik STEP bez żadnej geometrii) i eksport PDF —
+wszystko potwierdzone na żywym serwerze przez użytkownika, nie tylko przeglądem
+statycznym (w środowisku, w którym te pliki są edytowane, wciąż nie ma dostępnego
+FreeCAD, więc każda poprawka tutaj wzięła się z tego, że użytkownik odtworzył problem na
+żywo — w jednym przypadku wklejając wynik z Panelu raportu FreeCAD do diagnozy linia po
+linii — nie z etapu budowania/testów).
 
-⚠️ **Poniższe testy dotyczą wersji SPRZED zmiany "Save As lokalnego pliku pod nazwą PDM"**
-(opisanej w kroku 3 wyżej) — w szczególności punkty mówiące, że lokalny plik/`doc.FileName`
-"nie zmienia się"/"zostaje nienaruszony" opisują POPRZEDNIE zachowanie, nie obecne.
-
-Sam mechanizm Save As **został potwierdzony na żywo przez użytkownika** — wysłanie
-złożenia z Częścią, a potem pobranie go przez `EasyPDMDownload.FCMacro`, otworzyło się BEZ
-błędu "Link broken" (wcześniej, przed tą zmianą, złożenie zgłaszało dokładnie taki błąd,
-szukając oryginalnej nazwy pliku sprzed wysyłki). Dwie NOWSZE, dobudowane od razu potem
-rzeczy nie były jeszcze testowane na żywo: **okno wyboru folderu docelowego** (krok 1a —
-współdzielone z folderem pobierania w `EasyPDMDownload.FCMacro`) i **poprawiony komunikat
-końcowy** (rozróżniający, czy lokalny plik faktycznie został przeniesiony, czy już tam był).
-
-Logika (bez samego okna dialogowego) była testowana automatycznie przez `freecadcmd`
-przeciwko żywemu `EasyPDM.Api`:
-- **logowanie/sesja**: wywołanie API bez sesji odrzucone (401); złe hasło odrzucone zwykłym
-  błędem (token lokalny zostaje pusty); poprawne logowanie zapisuje token i wyświetlaną
-  nazwę użytkownika w preferencjach FreeCAD, kolejne wywołania API z tym tokenem działają;
-  wylogowanie czyści token/nazwę lokalnie ORAZ unieważnia sesję po stronie serwera (kolejne
-  wywołanie z tym samym, już unieważnionym tokenem znowu dostaje 401),
-- **cztery rodzaje Części** (Wykonywana/Zakupowa/Normalia/Klienta) w combo, z widocznością pól
-  zależną od wybranego rodzaju dokładnie jak w `PartPropertyForm` (sprawdzone na realnym oknie
-  `PdmUploadDialog`, wyświetlonym przez Qt w trybie `offscreen`); rodzaj Złożenia ograniczony
-  do trzech opcji bez "Klienta", z Masą zawsze widoczną niezależnie od rodzaju, ale bez pola
-  Materiał (tylko Część je ma);
-  utworzenie Części "Normalia" (z Materiałem i Normą) i "Klienta" (bez dodatkowych pól)
-  potwierdzone odczytem zapisanych właściwości z serwera,
-- **automatyczne wykrywanie złożenia** (trzypoziomowe drzewo: część linkowana 2× osobnymi
-  linkami + 1× wzorcem po 2 sztuki w głównym złożeniu, plus ta sama część jeszcze raz
-  wewnątrz osobnego pod-złożenia): wykryta kolejność wysyłki liście-najpierw, poprawnie
-  zsumowana ilość (2+2=4) dla części użytej wielokrotnie, poprawne krawędzie rodzic-dziecko
-  na wszystkich poziomach (w tym z pod-złożenia do jego własnej części) — potwierdzone
-  bezpośrednio przez `GET /api/projects/{projectId}/relations` po pełnym przebiegu
-  `process_assembly_tree` (z podmienionym oknem nowego komponentu, żeby dało się to
-  uruchomić bez GUI). Ponowne sprawdzenie w tej samej sesji rozpoznaje już wysłane
-  komponenty po etykiecie (bez tworzenia duplikatów).
-- utworzenie Części z materiałem, utworzenie Złożenia pod Folderem z powiązaniem w BOM-ie,
-- **plik zapisany poza magazynem (np. symulowany Pulpit) zostaje tam, gdzie był** — po
-  wysyłce lokalny plik nadal istnieje pod tą samą ścieżką i nazwą, `doc.FileName` się nie
-  zmienia, a do `storage/components/` trafia tylko jego KOPIA (bajty identyczne, sprawdzone
-  porównaniem lokalnego pliku i kopii na serwerze),
-- elementy z DWÓCH różnych projektów lądują w tym samym, wspólnym `storage/components/` —
-  bez osobnych podfolderów per projekt,
-- endpoint rejestracji: odrzucenie ścieżki spoza magazynu (400) i nieistniejącego pliku (404),
-  poprawna rejestracja (potwierdzone przez `file_path` w bazie),
-- `revision_label()`: 1→A, 2→B, 26→Z, 27→AA,
-- **pełny cykl rewizji**: pierwsza wysyłka tworzy kopię `N (nazwa).A.ext` na serwerze
-  z jednym załącznikiem (lokalny plik cały czas bez zmian); powtórna wysyłka BEZ zmiany
-  statusu nadpisuje tylko tę samą kopię `.A.` (nie mnoży kopii, lokalny plik nietknięty);
-  wysyłka do elementu o statusie "Wydany" z odmową → nic się nie zmienia (status zostaje
-  "Wydany", kopia i załącznik A nienaruszone); z potwierdzeniem → status wraca do "W pracy",
-  numer rewizji rośnie, na serwerze powstaje NOWA kopia `.B.ext` **obok** `.A.ext` (stara NIE
-  jest usuwana, lokalny plik przez cały czas pod tą samą, niezmienioną nazwą/ścieżką), a w PDM
-  są teraz dokładnie DWA załączniki — po jednym na rewizję,
-- **automatyczne wykrycie istniejącego elementu po nazwie** (jedyny test budujący realne
-  okno `PdmUploadDialog`, bez `exec()`): dokładnie jedno dopasowanie nazwy → tryb
-  przełącza się na "Istniejący element" i element jest od razu zaznaczony; brak
-  dopasowania → zostaje "Nowy element"; kilka elementów o tej samej nazwie (różne
-  projekty) → tryb się przełącza i wyszukiwanie zawęża się do tej nazwy, ale nic nie jest
-  zaznaczane automatycznie; wpisywanie nazwy na żywo w polu "Nazwa" wywołuje to samo
-  sprawdzenie,
-- **komentarz do rewizji**: przy potwierdzeniu nowej rewizji z komentarzem —
-  `GET /api/items/{id}/revisions` zwraca dokładnie jeden wpis z tym komentarzem i właściwym
-  numerem rewizji; odmowa rewizji albo potwierdzenie z PUSTYM komentarzem niczego tam nie
-  dopisują (rewizje bez komentarza po prostu nie mają wpisu).
-
-Wszystko przeszło poprawnie — w tym raz na żywo przez samego użytkownika w GUI FreeCAD
-(utworzenie elementu i rewizji A→B), co potwierdziło zachowanie plików i załączników w realnym
-środowisku, nie tylko w testach automatycznych. Samo okno dialogowe (PySide6, w tym
-wyszukiwarka istniejących elementów i okno "Nowa rewizja" z komentarzem) było też sprawdzane
-ręcznie — testowane na FreeCAD 1.1.3 z PySide6.
+Wcześniej w historii tego pliku, leżąca u podstaw logika logowania/biletów/rewizji była
+też weryfikowana automatycznie przez `freecadcmd` przeciwko żywemu `EasyPDM.Api`
+(obsługa sesji, numeracja `revision_label()`, pełny cykl rewizji A→B, walidacja ścieżek
+w endpoincie rejestracji, kolejność liście-najpierw i sumowanie ilości przy
+automatycznym wykrywaniu złożenia) — patrz historia gita w okolicach 2026-08-2x po pełną
+listę, ponieważ dokładnie ten natywny dialog, który te testy sprawdzały
+(`PdmUploadDialog`/`PartPropertyForm`), pochodzi sprzed przejścia na tworzenie elementów
+przez przeglądarkę opisane wyżej i nie istnieje już w tym pliku w tamtej formie —
+leżące u podstaw zachowanie warstwy danych, które te testy weryfikowały (rewizje,
+krawędzie BOM, rejestracja w magazynie), pozostaje niezmienione.
 
 ---
 
@@ -394,24 +389,21 @@ wgrany załącznik jako najlepsze przybliżenie.
 
 ## Status weryfikacji
 
-⚠️ **Nieprzetestowane na żywym FreeCAD** — w odróżnieniu od `EasyPDMUpload.FCMacro` (które
-przeszło pełny cykl testów przez `freecadcmd` przeciwko żywemu serwerowi, plus ręczną
-weryfikację w GUI), to makro było możliwe do zweryfikować tylko: składniowo (`ast.parse`),
-pod kątem poprawności polskich znaków (skrypt sprawdzający częstość znaków — zero
-zniekształceń) i przez uważny przegląd logiki względem rzeczywistych endpointów API
-(`GET /api/items`, `/items/{id}/attachments`, `/items/{id}/children`,
-`/attachments/{id}/file`, każdy sprawdzony w kodzie `EasyPDM.Api`). Przy pierwszym
-uruchomieniu na żywym FreeCAD obserwuj przebieg (log w oknie na końcu i w konsoli raportów
-FreeCAD) i zgłoś, co nie zagra — najbardziej ryzykowne miejsca to: rozpoznawanie nazw
-załączników regexem (jeśli plik ma nietypową nazwę) i to, czy odnośniki `App::Link` w
-pobranym złożeniu faktycznie rozwiążą się automatycznie po umieszczeniu wszystkich plików
-w jednym, płaskim folderze (zależy od tego, jak zapisane są ścieżki linków w oryginalnym
-pliku — patrz "Ograniczenia" wyżej).
-
-Wybór elementu przez przeglądarkę (krok 1 wyżej) to NAJNOWSZA zmiana w tym pliku, zbudowana
-wprost na tym samym, już zweryfikowanym mechanizmie z `EasyPDMUpload.FCMacro`
-(`GET /api/auth/browser-login`, bilet `GET /api/create-tickets/{ticket}` +
-`POST /create-tickets/{ticket}/attach-existing`, pasek "oczekujące żądanie z makra" w
-aplikacji webowej) — backend/frontend tej części były testowane end-to-end (`curl` w
-izolowanym środowisku), ale samo `EasyPDMDownload.FCMacro` (`webbrowser.open`,
-`WaitForTicketDialog` w realnym GUI) nie było jeszcze uruchomione na żywym FreeCAD.
+⚠️ **Jeszcze niepotwierdzone na żywo na FreeCAD**, w odróżnieniu od `EasyPDMUpload.FCMacro`
+wyżej (które jest, w kilku rundach testów). To makro dzieli ten sam, leżący u podstaw
+mechanizm biletów przeglądarki (`GET /api/auth/browser-login`, `GET
+/api/create-tickets/{ticket}` + `POST /create-tickets/{ticket}/attach-existing`, pasek
+"oczekujące żądanie z makra" w aplikacji webowej) już przećwiczony na żywo przez
+`EasyPDMUpload.FCMacro`, więc sama hydraulika biletu/okna oczekiwania nie jest niczym
+nowym ani nietypowym — ale specyfika TEGO makra (rekurencyjne pobieranie komponentów,
+wykrywanie już-pobrane/nieaktualna-rewizja po nazwie pliku, otwieranie wyniku przez
+`App.openDocument`) była weryfikowana tylko: składniowo (`ast.parse`), pod kątem
+poprawności polskich znaków (skrypt sprawdzający częstość znaków — zero zniekształceń)
+i przez uważny przegląd logiki względem rzeczywistych endpointów API (`GET /api/items`,
+`/items/{id}/attachments`, `/items/{id}/children`, `/attachments/{id}/file`, każdy
+sprawdzony w kodzie `EasyPDM.Api`). Przy pierwszym uruchomieniu na żywym FreeCAD obserwuj
+przebieg (log w oknie na końcu i w konsoli raportów FreeCAD) i zgłoś, co nie zagra —
+najbardziej ryzykowne miejsca to: rozpoznawanie nazw załączników regexem (jeśli plik ma
+nietypową nazwę) i to, czy odnośniki `App::Link` w pobranym złożeniu faktycznie rozwiążą
+się automatycznie po umieszczeniu wszystkich plików w jednym, płaskim folderze (zależy od
+tego, jak zapisane są ścieżki linków w oryginalnym pliku — patrz "Ograniczenia" wyżej).
