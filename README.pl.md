@@ -45,15 +45,37 @@ adres (będzie wyglądał np. tak: `http://192.168.1.20:5000`, albo `http://loca
 jeśli EasyPDM stoi na Twoim własnym komputerze). Wpisz go w pasek adresu przeglądarki,
 tak jak każdy inny adres strony internetowej, i zaloguj się.
 
-**Jeśli jeszcze nikt go nie zainstalował, a to Ty masz to zrobić** — najprostszy sposób
-(Windows, bez żadnej wiedzy informatycznej): wejdź na stronę
+**Jeśli jeszcze nikt go nie zainstalował, a to Ty masz to zrobić:**
+
+**Windows** (bez żadnej wiedzy informatycznej) — wejdź na stronę
 [Releases tego repozytorium](https://github.com/pawelcel/EasyPDM/releases), pobierz
 najnowszy plik `EasyPDMSetup.exe` i uruchom go — kreator instalacji przeprowadzi Cię
 przez resztę krok po kroku i zostawi na pulpicie skrót do EasyPDM (jedyne, o co może
 zapytać: czy masz już zainstalowany PostgreSQL, czyli program przechowujący dane — jeśli
-nie, wskaże stronę, skąd go pobrać, zanim będzie mógł kontynuować). Inne sposoby
-instalacji (Docker, Linux jako usługa) wymagają już wiedzy administratora serwerów —
-opisane w [`TECHNICAL.pl.md`](TECHNICAL.pl.md).
+nie, wskaże stronę, skąd go pobrać, zanim będzie mógł kontynuować).
+
+**Linux** (wystarczy podstawowa obsługa terminala — wybierz jedno):
+
+- *Docker* (zalecane, jeśli na maszynie jest już zainstalowany Docker):
+  ```bash
+  git clone https://github.com/pawelcel/EasyPDM.git
+  cd EasyPDM
+  ./install-easypdm-docker.sh
+  ```
+- *Instalacja natywna, bez Dockera* — pobierz gotową paczkę `easypdm-linux-x64`
+  (budowaną automatycznie przez CI tego repo — z zakładki
+  [Actions](https://github.com/pawelcel/EasyPDM/actions/workflows/build-linux-package.yml),
+  najnowszy udany przebieg, sekcja "Artifacts") albo sklonuj repo samodzielnie, potem:
+  ```bash
+  tar xzf easypdm-linux-x64.tar.gz && cd easypdm-linux-x64   # jeśli pobrałeś paczkę
+  sudo ./install-easypdm-linux.sh
+  ```
+  Instaluje PostgreSQL (jeśli go brakuje) i samo EasyPDM jako usługę `systemd`,
+  startującą automatycznie razem z maszyną.
+
+W obu przypadkach EasyPDM ląduje pod `http://localhost:5000` (albo adresem maszyny w
+sieci, z innego komputera). Pełne szczegóły, aktualizacja i deinstalacja: patrz
+[`TECHNICAL.pl.md`](TECHNICAL.pl.md).
 
 Przy pierwszym logowaniu do całkiem świeżo zainstalowanego EasyPDM: login `admin`, hasło
 `admin` — zmień to hasło od razu po zalogowaniu (Ustawienia → Użytkownicy → znajdź konto

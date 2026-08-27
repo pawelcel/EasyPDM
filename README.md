@@ -45,15 +45,38 @@ address (it will look something like `http://192.168.1.20:5000`, or
 `http://localhost:5000` if EasyPDM is running on your own computer). Type it into your
 browser's address bar, just like any other website address, and log in.
 
-**If nobody has installed it yet and it's up to you** — the simplest way (Windows, no
-IT knowledge required): go to the
+**If nobody has installed it yet and it's up to you:**
+
+**Windows** (no IT knowledge required) — go to the
 [Releases page of this repository](https://github.com/pawelcel/EasyPDM/releases),
 download the latest `EasyPDMSetup.exe` file and run it — the installation wizard will
 walk you through the rest step by step and leave a shortcut to EasyPDM on your desktop
 (the only thing it might ask about: whether you already have PostgreSQL installed, the
 program that stores the data — if not, it will point you to where to download it before
-it can continue). Other installation methods (Docker, Linux as a service) require
-server-administrator knowledge — described in [`TECHNICAL.md`](TECHNICAL.md).
+it can continue).
+
+**Linux** (some comfort with a terminal is enough — pick one):
+
+- *Docker* (recommended if Docker is already installed on the machine):
+  ```bash
+  git clone https://github.com/pawelcel/EasyPDM.git
+  cd EasyPDM
+  ./install-easypdm-docker.sh
+  ```
+- *Native install, no Docker* — download the ready-made `easypdm-linux-x64` package
+  (built automatically by this repo's CI — grab it from the
+  [Actions tab](https://github.com/pawelcel/EasyPDM/actions/workflows/build-linux-package.yml),
+  latest successful run, "Artifacts" section) or clone the repo yourself, then:
+  ```bash
+  tar xzf easypdm-linux-x64.tar.gz && cd easypdm-linux-x64   # if you downloaded the package
+  sudo ./install-easypdm-linux.sh
+  ```
+  This installs PostgreSQL (if missing) and EasyPDM itself as a `systemd` service that
+  starts automatically with the machine.
+
+Either way, EasyPDM ends up at `http://localhost:5000` (or the machine's address on
+your network, from another computer). Full details, updating, and uninstalling: see
+[`TECHNICAL.md`](TECHNICAL.md).
 
 First login on a freshly installed EasyPDM: username `admin`, password `admin` — change
 this password right after logging in (Settings → Users → find the `admin` account in
