@@ -29,9 +29,21 @@ async function loadOcctGeometries(kind: "step" | "iges", buffer: Uint8Array): Pr
   occtPromise ??= loadOcct()
   const occt = await occtPromise
   const result = kind === "step" ? occt.ReadStepFile(buffer, null) : occt.ReadIgesFile(buffer, null)
-  if (!result.success || result.meshes.length === 0) return []
+  if (!result.success) {
+    console.error(`occt-import-js: parse ${kind} failed`, result)
+    return []
+  }
+  if (result.meshes.length === 0) return []
 
-  return result.meshes.map((mesh) => {
+  // W złożeniach zdarzają się węzły bez triangulowanej geometrii (np. czysto
+  // referencyjne/pomocnicze podzespoły, które occt-import-js zwraca jako mesh
+  // bez atrybutu position) — jeden taki wpis nie może wywrócić całego podglądu.
+  const geometries: THREE.BufferGeometry[] = []
+  for (const mesh of result.meshes) {
+    if (!mesh.attributes?.position?.array?.length) {
+      console.warn("occt-import-js: pominięto mesh bez geometrii", mesh)
+      continue
+    }
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(mesh.attributes.position.array, 3))
     if (mesh.attributes.normal) {
@@ -40,8 +52,9 @@ async function loadOcctGeometries(kind: "step" | "iges", buffer: Uint8Array): Pr
       geometry.computeVertexNormals()
     }
     if (mesh.index) geometry.setIndex(mesh.index.array)
-    return geometry
-  })
+    geometries.push(geometry)
+  }
+  return geometries
 }
 
 function extensionOf(fileName: string): string {
@@ -132,7 +145,8 @@ function StepPreview({ url, fileName }: { url: string; fileName: string }) {
         renderer.render(scene, camera)
 
         setLoading(false)
-      } catch {
+      } catch (err) {
+        console.error("Podgląd STEP/IGES/STL: błąd renderowania", err)
         if (!cancelled) setError(t("preview.stepParseFailed"))
       }
     }

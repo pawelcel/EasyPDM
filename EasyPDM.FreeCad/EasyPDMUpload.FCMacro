@@ -16,8 +16,12 @@ Co robi (w tej kolejności):
         z możliwością zmiany. Pytane RAZ, na samym początku — obejmuje też automatycznie
         wykryte drzewo złożenia (część/pod-złożenia), wysyłane wcześniej niż otwiera się
         główne okno.
-    2. **Żadne natywne okno się już nie pokazuje** — makro od razu otwiera PRZEGLĄDARKĘ
-       SYSTEMOWĄ, już zalogowaną (most token->ciasteczko, zob. "Logowanie" niżej), na pasku
+    2. Jeśli etykieta dokumentu wygląda jak "numer (nazwa).REWIZJA" i taki element
+       faktycznie istnieje w PDM (zob. match_existing_item), pyta WPROST, natywnie: podpiąć
+       bieżącą wersję jako nową rewizję TEGO elementu? Zgoda -> dwa kolejne natywne
+       pytania Tak/Nie (STEP? PDF?) i koniec, bez przeglądarki. Odmowa (albo brak takiego
+       dopasowania) -> otwiera PRZEGLĄDARKĘ SYSTEMOWĄ, już zalogowaną (most token-
+       >ciasteczko, zob. "Logowanie" niżej), na pasku
        "oczekuje żądanie z makra CAD" (widoczny na każdym ekranie aplikacji webowej, dopóki
        bilet czeka). Pasek pokazuje JAWNY wybór trzema przyciskami — WYBÓR "nowy element,
        duplikat czy dogranie do istniejącego" zapada tam, nie lokalnie i nie przez
@@ -89,20 +93,29 @@ Co robi (w tej kolejności):
 Automatyczne wykrywanie złożenia:
     Jeśli aktywny dokument linkuje (App::Link — standardowy sposób budowania złożeń
     w workbenchu Assembly/Assembly4) do INNYCH, zapisanych plików .FCStd, makro PRZED
-    otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie. Po zgodzie:
-    schodzi rekurencyjnie w głąb (pod-złożenia też mogą linkować dalej), dla każdego
-    jeszcze nie wysłanego komponentu pokazuje osobne, krótkie NATYWNE okno (typ/nazwa/
-    rodzaj — te same pola i reguły co formularz w przeglądarce dla nowego elementu,
-    zob. punkt 2 wyżej) — CELOWO bez przeglądarki, żeby wysłanie złożenia z wieloma
-    nowymi komponentami nie wymagało tylu samo okien przeglądarki co komponentów — i
-    wysyła wszystko w kolejności LIŚCIE NAJPIERW, na końcu główny dokument (ten JUŻ
-    przechodzi przez formularz w przeglądarce — patrz punkt 2), budując po drodze cały
-    BOM (z ilością odczytaną z liczby odnośników do tego samego pliku — pojedyncze
-    linki i wzorce/tablice linków liczą się razem). Komponent uznaje za "już wysłany",
-    jeśli jego etykieta pasuje do formatu "numer (nazwa).REWIZJA" (ten sam, który makro
-    samo nadaje po wysłaniu) I taki numer istnieje w PDM — wtedy tylko podpina go do
-    BOM-u, bez tworzenia duplikatu. "Nie" na to pytanie wysyła TYLKO bieżący dokument,
-    dokładnie jak dotychczas (bez podelementów).
+    otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie — podsumowanie
+    pokazuje przy okazji, do którego DOKŁADNIE elementu PDM trafi każdy już rozpoznany
+    komponent (numer + nazwa), nie tylko nazwę pliku, żeby dało się zauważyć nieaktualne
+    dopasowanie (zob. match_existing_item) PRZED czymkolwiek. Po zgodzie: schodzi
+    rekurencyjnie w głąb (pod-złożenia też mogą linkować dalej) i dla KAŻDEGO jeszcze nie
+    wysłanego komponentu przechodzi przez TEN SAM formularz w przeglądarce co główny
+    dokument (patrz punkt 2 wyżej) — jedna karta na raz, po kolei, NIGDY kilka naraz
+    (ochrona Windows przed "kradzieżą focusu" i tak wyciszyłaby każdą kolejną kartę
+    otwartą zaraz po poprzedniej bez świeżej interakcji użytkownika — stąd natywny popup
+    "kliknij OK" tuż przed każdym otwarciem, żeby to kliknięcie policzyło się jako ta
+    świeża interakcja). Każdy komponent dostaje więc WŁASNY, niezależny wybór projektu/
+    typu/nazwy/rodzaju/eksportu STEP i PDF — te same reguły co dla głównego dokumentu,
+    tylko każdy w osobnym bilecie. Wysyła wszystko w kolejności LIŚCIE NAJPIERW, na końcu
+    główny dokument, budując po drodze cały BOM (z ilością odczytaną z liczby odnośników
+    do tego samego pliku — pojedyncze linki i wzorce/tablice linków liczą się razem).
+    Nowo utworzony w ten sposób komponent znika z korzenia projektu w aplikacji webowej,
+    gdy tylko zostanie podpięty pod swojego prawdziwego rodzica — jego utworzenie jest
+    czystym efektem ubocznym kolejności liście-najpierw, nigdy nie miał być niezależnym
+    elementem. Komponent uznaje za "już wysłany", jeśli jego etykieta pasuje do formatu
+    "numer (nazwa).REWIZJA" (ten sam, który makro samo nadaje po wysyłce) I taki numer
+    istnieje w PDM — wtedy tylko podpina go do BOM-u, bez tworzenia duplikatu i bez
+    otwierania dla niego przeglądarki. "Nie" na pytanie o wysłanie drzewa wysyła TYLKO
+    bieżący dokument, dokładnie jak dotychczas (bez podelementów).
 
 Logowanie:
     EasyPDM.Api wymaga sesji (ciasteczko pdm_session) dla każdego wywołania poza
@@ -244,28 +257,6 @@ TRANSLATIONS = {
         "revision_comment_label": "Komentarz do rewizji (opcjonalnie):",
         "revision_comment_placeholder": "Co zmieniło się w tej rewizji…",
         "create_revision_button": "Stwórz rewizję",
-        "new_component_title": "Nowy komponent złożenia",
-        "project_label": "Projekt:",
-        "type_label": "Typ:",
-        "type_part": "Część",
-        "type_assembly": "Złożenie",
-        "name_label": "Nazwa:",
-        "kind_label": "Rodzaj:",
-        "kind_manufactured": "Wykonywana",
-        "kind_purchased": "Zakupowa",
-        "kind_standard": "Normalia",
-        "kind_client": "Klienta",
-        "material_label": "Materiał:",
-        "mass_label": "Masa [kg]:",
-        "manufacturer_label": "Producent:",
-        "order1_label": "Numer zamówieniowy 1:",
-        "order2_label": "Numer zamówieniowy 2:",
-        "norm_label": "Norma:",
-        "choose_project_error": "Wybierz projekt.",
-        "name_required_error": "Nazwa jest wymagana.",
-        "select_kind_error": "Dla Części wybierz rodzaj: {manufactured}, {purchased}, {standard} albo {client}.",
-        "usage_prefix": "Używane: ",
-        "usage_entry": "{qty}× w {file}",
         "assembly_detected_title": "Wykryto złożenie",
         "assembly_detected_body": (
             "Ten dokument linkuje do {count} innych plików (części/pod-złożeń):\n\n"
@@ -275,6 +266,18 @@ TRANSLATIONS = {
             "\"Nie\" wyśle TYLKO ten dokument, tak jak dotychczas — bez podelementów."
         ),
         "already_in_pdm_as": " -> JUŻ w PDM jako #{number} ({name})",
+        "already_linked_confirm": (
+            "Ten dokument wygląda jak już wcześniej wysłany element PDM nr {number} "
+            "({name}). Podpiąć bieżącą wersję jako nową rewizję/aktualizację TEGO "
+            "elementu?\n\n\"Nie\" otworzy zwykły formularz w przeglądarce (Nowy element / "
+            "Duplikuj / Dogranie do istniejącego)."
+        ),
+        "export_step_prompt": "Wyeksportować i wysłać model STEP (podgląd 3D)?",
+        "export_pdf_prompt": "Wyeksportować i wysłać plik PDF?",
+        "new_component_browser_prompt": (
+            "Nowy element w drzewie: {name}. Kliknij OK, aby otworzyć przeglądarkę i go "
+            "wprowadzić (może otworzyć się w tle — sprawdź pasek zadań)."
+        ),
         "fetch_items_failed": "Nie udało się pobrać listy elementów: {error}",
         "fetch_projects_failed": "Nie udało się pobrać listy projektów: {error}",
         "upload_component_failed": "Nie udało się wysłać {file}: {error}",
@@ -342,28 +345,6 @@ TRANSLATIONS = {
         "revision_comment_label": "Revision comment (optional):",
         "revision_comment_placeholder": "What changed in this revision…",
         "create_revision_button": "Create revision",
-        "new_component_title": "New assembly component",
-        "project_label": "Project:",
-        "type_label": "Type:",
-        "type_part": "Part",
-        "type_assembly": "Assembly",
-        "name_label": "Name:",
-        "kind_label": "Kind:",
-        "kind_manufactured": "Manufactured",
-        "kind_purchased": "Purchased",
-        "kind_standard": "Standard part",
-        "kind_client": "Client's",
-        "material_label": "Material:",
-        "mass_label": "Mass [kg]:",
-        "manufacturer_label": "Manufacturer:",
-        "order1_label": "Order number 1:",
-        "order2_label": "Order number 2:",
-        "norm_label": "Standard:",
-        "choose_project_error": "Choose a project.",
-        "name_required_error": "Name is required.",
-        "select_kind_error": "For a Part, choose a kind: {manufactured}, {purchased}, {standard}, or {client}.",
-        "usage_prefix": "Used: ",
-        "usage_entry": "{qty}× in {file}",
         "assembly_detected_title": "Assembly detected",
         "assembly_detected_body": (
             "This document links to {count} other files (parts/sub-assemblies):\n\n"
@@ -373,6 +354,18 @@ TRANSLATIONS = {
             "\"No\" will send ONLY this document, as before — without sub-items."
         ),
         "already_in_pdm_as": " -> ALREADY in PDM as #{number} ({name})",
+        "already_linked_confirm": (
+            "This document looks like an already-uploaded PDM item #{number} ({name}). "
+            "Attach the current version as a new revision/update of THIS item?\n\n"
+            "\"No\" opens the regular browser form (New item / Duplicate / Attach to "
+            "existing)."
+        ),
+        "export_step_prompt": "Export and upload STEP model (3D preview)?",
+        "export_pdf_prompt": "Export and upload a PDF file?",
+        "new_component_browser_prompt": (
+            "New component in the tree: {name}. Click OK to open the browser and fill it "
+            "in (it may open in the background — check the taskbar)."
+        ),
         "fetch_items_failed": "Failed to fetch the list of items: {error}",
         "fetch_projects_failed": "Failed to fetch the list of projects: {error}",
         "upload_component_failed": "Failed to send {file}: {error}",
@@ -442,28 +435,6 @@ TRANSLATIONS = {
         "revision_comment_label": "Revisionskommentar (optional):",
         "revision_comment_placeholder": "Was hat sich in dieser Revision geändert…",
         "create_revision_button": "Revision erstellen",
-        "new_component_title": "Neue Baugruppenkomponente",
-        "project_label": "Projekt:",
-        "type_label": "Typ:",
-        "type_part": "Teil",
-        "type_assembly": "Baugruppe",
-        "name_label": "Name:",
-        "kind_label": "Art:",
-        "kind_manufactured": "Gefertigt",
-        "kind_purchased": "Zugekauft",
-        "kind_standard": "Normteil",
-        "kind_client": "Kundenteil",
-        "material_label": "Material:",
-        "mass_label": "Masse [kg]:",
-        "manufacturer_label": "Hersteller:",
-        "order1_label": "Bestellnummer 1:",
-        "order2_label": "Bestellnummer 2:",
-        "norm_label": "Norm:",
-        "choose_project_error": "Wählen Sie ein Projekt.",
-        "name_required_error": "Name ist erforderlich.",
-        "select_kind_error": "Wählen Sie für ein Teil eine Art: {manufactured}, {purchased}, {standard} oder {client}.",
-        "usage_prefix": "Verwendet: ",
-        "usage_entry": "{qty}× in {file}",
         "assembly_detected_title": "Baugruppe erkannt",
         "assembly_detected_body": (
             "Dieses Dokument verknüpft mit {count} anderen Dateien (Teile/Unterbaugruppen):\n\n"
@@ -473,6 +444,19 @@ TRANSLATIONS = {
             "\"Nein\" sendet NUR dieses Dokument, wie bisher — ohne Unterelemente."
         ),
         "already_in_pdm_as": " -> BEREITS in PDM als #{number} ({name})",
+        "already_linked_confirm": (
+            "Dieses Dokument sieht aus wie das bereits hochgeladene PDM-Element Nr. "
+            "{number} ({name}). Die aktuelle Version als neue Revision/Aktualisierung "
+            "DIESES Elements anhängen?\n\n\"Nein\" öffnet das normale Browser-Formular "
+            "(Neues Element / Duplizieren / Vorhandenem anhängen)."
+        ),
+        "export_step_prompt": "STEP-Modell exportieren und hochladen (3D-Vorschau)?",
+        "export_pdf_prompt": "PDF-Datei exportieren und hochladen?",
+        "new_component_browser_prompt": (
+            "Neue Komponente im Baum: {name}. Klicken Sie OK, um den Browser zu öffnen "
+            "und sie einzugeben (er kann im Hintergrund geöffnet werden — prüfen Sie die "
+            "Taskleiste)."
+        ),
         "fetch_items_failed": "Die Elementliste konnte nicht abgerufen werden: {error}",
         "fetch_projects_failed": "Die Projektliste konnte nicht abgerufen werden: {error}",
         "upload_component_failed": "{file} konnte nicht gesendet werden: {error}",
@@ -769,45 +753,6 @@ def sanitize_filename(name):
     return cleaned or "bez_nazwy"
 
 
-# Cztery rodzaje Części — dokładnie te same i w tej samej kolejności co PartKindSelect/
-# add-node-dialog w aplikacji webowej. "Rodzaj" to koncepcja WYŁĄCZNIE Części — Złożenie
-# nie ma rodzaju w ogóle (patrz add-node-dialog.tsx — okno tworzenia złożenia nie oferuje
-# tego pola; ta sama zasada dotyczy tu NewComponentDialog dla nowych komponentów-złożeń).
-PART_KINDS = ["Wykonywana", "Zakupowa", "Normalia", "Klienta"]
-
-# Klucz tłumaczenia wyświetlanej etykiety dla każdej wartości "rodzaj" — sama WARTOŚĆ
-# (properties["rodzaj"], zob. NewComponentDialog.result_data) zostaje nietłumaczonym,
-# stałym literałem wire (tak samo jak w aplikacji webowej — PartKindSelect trzyma
-# value="Wykonywana" itd., tłumacząc tylko WIDOCZNY tekst opcji), tylko ETYKIETA w
-# ComboBoxie jest tłumaczona.
-PART_KIND_LABEL_KEYS = {
-    "Wykonywana": "kind_manufactured",
-    "Zakupowa": "kind_purchased",
-    "Normalia": "kind_standard",
-    "Klienta": "kind_client",
-}
-
-
-def kind_field_visibility(is_part, rodzaj):
-    """Jedno źródło prawdy dla widoczności pól zależnych od typu/rodzaju — używane przez
-    NewComponentDialog (automatyczne wykrywanie złożenia, jedyne miejsce w tym pliku, gdzie
-    te pola nadal się lokalnie zbiera — dla pojedynczego, głównego elementu przechodzi się
-    teraz przez formularz w przeglądarce, zob. submit_via_browser). Dokładnie te same
-    reguły co PartPropertyForm/add-node-dialog w aplikacji webowej: Wykonywana -> Materiał;
-    Zakupowa -> Producent/Numery zamówieniowe/Masa; Normalia -> Materiał/Norma; Klienta ->
-    brak dodatkowych pól. Złożenie NIE MA rodzaju (rodzaj zawsze "" dla is_part=False) —
-    dostaje tylko Masę, zawsze widoczną; Materiał/Numery/Norma nigdy."""
-    wykonywana = rodzaj == "Wykonywana"
-    zakupowa = rodzaj == "Zakupowa"
-    normalia = rodzaj == "Normalia"
-    return {
-        "material": is_part and (wykonywana or normalia),
-        "mass": zakupowa if is_part else True,
-        "purchase": is_part and zakupowa,
-        "norm": is_part and normalia,
-    }
-
-
 def revision_label(n):
     """Rewizje jako wielkie litery zamiast cyfr: 1->A, 2->B, ..., 26->Z, 27->AA...
     (jak numeracja kolumn arkusza) — sama liczba w bazie (revisionNumber) się nie zmienia.
@@ -943,17 +888,6 @@ def match_existing_item(doc, existing_items):
         if it.get("itemNumber") == item_number and it.get("fileName", "").strip().lower() == label_name:
             return it
     return None
-
-
-def _usage_hint_for(file_path, edges):
-    """Czytelny opis "używane Nx w pliku Y" do okna nowego komponentu — komponent może być
-    używany w kilku miejscach drzewa naraz (współdzielona część)."""
-    parts = [
-        t("usage_entry", qty=qty, file=os.path.basename(parent))
-        for parent, child, qty in edges
-        if child == file_path
-    ]
-    return t("usage_prefix") + ", ".join(parts) if parts else ""
 
 
 def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=None, export_step=True, export_pdf=False):
@@ -1211,22 +1145,6 @@ def _upload_pdf_attachment(doc, item_id):
         pass
 
 
-def push_new_item_to_pdm(doc, project_id, item_type, name, properties, parent_id=None, target_folder=None, export_step=True, export_pdf=False):
-    """Tworzy NOWY element w PDM, a potem dogrywa bieżący dokument jako jego załącznik
-    (zob. _rename_and_upload). Nowy element zawsze zaczyna od rewizji 1."""
-    if not doc.FileName:
-        raise RuntimeError("Dokument nie jest zapisany na dysku.")
-    doc.recompute()
-    doc.save()
-
-    body = {"name": name, "itemType": item_type, "properties": properties}
-    if parent_id:
-        body["parentId"] = parent_id
-
-    created = api_post_json(f"/projects/{project_id}/nodes", body)
-    return _rename_and_upload(doc, created["id"], created["itemNumber"], name, 1, target_folder, export_step, export_pdf)
-
-
 def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None, export_step=True, export_pdf=False):
     """Dogrywa bieżący dokument jako aktualny plik JUŻ ISTNIEJĄCEJ Części/Złożenia
     (np. nowa wersja po zmianach) — bez tworzenia nowego rekordu w PDM.
@@ -1348,8 +1266,7 @@ class LoginDialog(QtWidgets.QDialog):
 
 
 class TargetFolderDialog(QtWidgets.QDialog):
-    """Jedyne natywne okno z polami w całym przebiegu run() (pomijając ewentualne
-    NewComponentDialog dla auto-wykrytych komponentów złożenia) — pyta o folder, do
+    """Jedyne natywne okno z polami w całym przebiegu run() — pyta o folder, do
     którego mają trafiać lokalne kopie (Save As) wysyłanych dokumentów — pokazywane RAZ, na
     samym początku, PRZED jakimkolwiek przetwarzaniem (żeby objęło też automatycznie
     wykryte drzewo złożenia, wysyłane wcześniej niż cokolwiek innego). Ten sam folder co
@@ -1471,197 +1388,6 @@ class NewRevisionDialog(QtWidgets.QDialog):
         return self.comment_edit.toPlainText().strip()
 
 
-class NewComponentDialog(QtWidgets.QDialog):
-    """Zbiera dane dla JEDNEGO automatycznie wykrytego, jeszcze nie istniejącego w PDM
-    komponentu złożenia (część albo pod-złożenie) — pokazywane raz na każdy taki komponent,
-    w kolejności "liście najpierw", zanim zostanie przetworzony plik, który go używa.
-    CELOWO natywne, nie przez przeglądarkę (zob. submit_via_browser dla pojedynczego,
-    głównego elementu) — otwieranie przeglądarki N razy dla N nowych komponentów złożenia
-    byłoby gorszym UX niż jedno takie okno na komponent. Pola i ich widoczność (rodzaj i
-    zależne od niego materiał/masa/producent/numery/norma) to ta sama logika co formularz
-    w przeglądarce (kind_field_visibility, dokładnie te same reguły co PartPropertyForm/
-    add-node-dialog), tylko bez wyboru trybu/elementu nadrzędnego — te są tu z góry
-    przesądzone (zawsze "nowy", rodzic dopina się automatycznie po utworzeniu)."""
-
-    def __init__(self, file_path, suggested_name, suggested_is_assembly, usage_hint, projects, materials, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(t("new_component_title"))
-        self.setMinimumWidth(440)
-
-        outer = QtWidgets.QVBoxLayout(self)
-
-        header_text = f"<b>{os.path.basename(file_path)}</b>"
-        if usage_hint:
-            header_text += f"<br>{usage_hint}"
-        header = QtWidgets.QLabel(header_text)
-        header.setWordWrap(True)
-        outer.addWidget(header)
-
-        form = QtWidgets.QFormLayout()
-        outer.addLayout(form)
-
-        self.project_combo = QtWidgets.QComboBox()
-        for p in projects:
-            self.project_combo.addItem(p["name"], p["id"])
-        form.addRow(t("project_label"), self.project_combo)
-
-        # Wyświetlana etykieta jest tłumaczona, ale userData zostaje przy stałych,
-        # nietłumaczonych wartościach wire ("part"/"assembly", zob. result_data) — dokładnie
-        # ten sam wzorzec co project_combo wyżej (tekst do pokazania, dane do logiki).
-        self.type_combo = QtWidgets.QComboBox()
-        self.type_combo.addItem(t("type_part"), "part")
-        self.type_combo.addItem(t("type_assembly"), "assembly")
-        self.type_combo.setCurrentIndex(1 if suggested_is_assembly else 0)
-        self.type_combo.currentIndexChanged.connect(self.on_type_changed)
-        form.addRow(t("type_label"), self.type_combo)
-
-        self.name_edit = QtWidgets.QLineEdit(suggested_name)
-        form.addRow(t("name_label"), self.name_edit)
-
-        self.rodzaj_label = QtWidgets.QLabel(t("kind_label"))
-        self.rodzaj_combo = QtWidgets.QComboBox()
-        self.rodzaj_combo.currentIndexChanged.connect(self.on_rodzaj_changed)
-        form.addRow(self.rodzaj_label, self.rodzaj_combo)
-
-        self.material_label = QtWidgets.QLabel(t("material_label"))
-        self.material_combo = QtWidgets.QComboBox()
-        self.material_combo.setEditable(True)
-        self.material_combo.addItem("", "")
-        for m in materials:
-            self.material_combo.addItem(m["name"], m["name"])
-        form.addRow(self.material_label, self.material_combo)
-
-        self.mass_label = QtWidgets.QLabel(t("mass_label"))
-        self.mass_edit = QtWidgets.QLineEdit()
-        form.addRow(self.mass_label, self.mass_edit)
-
-        self.manufacturer_label = QtWidgets.QLabel(t("manufacturer_label"))
-        self.manufacturer_edit = QtWidgets.QLineEdit()
-        form.addRow(self.manufacturer_label, self.manufacturer_edit)
-
-        self.order1_label = QtWidgets.QLabel(t("order1_label"))
-        self.order1_edit = QtWidgets.QLineEdit()
-        form.addRow(self.order1_label, self.order1_edit)
-
-        self.order2_label = QtWidgets.QLabel(t("order2_label"))
-        self.order2_edit = QtWidgets.QLineEdit()
-        form.addRow(self.order2_label, self.order2_edit)
-
-        self.norm_label = QtWidgets.QLabel(t("norm_label"))
-        self.norm_edit = QtWidgets.QLineEdit()
-        form.addRow(self.norm_label, self.norm_edit)
-
-        self.error_label = QtWidgets.QLabel("")
-        self.error_label.setStyleSheet("color: #c0392b;")
-        self.error_label.setWordWrap(True)
-        outer.addWidget(self.error_label)
-
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
-        )
-        buttons.accepted.connect(self._try_accept)
-        buttons.rejected.connect(self.reject)
-        outer.addWidget(buttons)
-
-        self.on_type_changed()
-
-    def on_type_changed(self):
-        is_part = self.type_combo.currentData() == "part"
-        self.rodzaj_label.setVisible(is_part)
-        self.rodzaj_combo.setVisible(is_part)
-        self.rodzaj_combo.blockSignals(True)
-        self.rodzaj_combo.clear()
-        if is_part:
-            for kind in PART_KINDS:
-                self.rodzaj_combo.addItem(t(PART_KIND_LABEL_KEYS[kind]), kind)
-        self.rodzaj_combo.blockSignals(False)
-        self.on_rodzaj_changed()
-
-    def on_rodzaj_changed(self):
-        is_part = self.type_combo.currentData() == "part"
-        rodzaj = self.rodzaj_combo.currentData()
-        vis = kind_field_visibility(is_part, rodzaj)
-
-        for w in (self.material_label, self.material_combo):
-            w.setVisible(vis["material"])
-        for w in (self.mass_label, self.mass_edit):
-            w.setVisible(vis["mass"])
-        for w in (
-            self.manufacturer_label,
-            self.manufacturer_edit,
-            self.order1_label,
-            self.order1_edit,
-            self.order2_label,
-            self.order2_edit,
-        ):
-            w.setVisible(vis["purchase"])
-        for w in (self.norm_label, self.norm_edit):
-            w.setVisible(vis["norm"])
-
-    def _try_accept(self):
-        self.error_label.setText("")
-        if not self.project_combo.currentData():
-            self.error_label.setText(t("choose_project_error"))
-            return
-        if not self.name_edit.text().strip():
-            self.error_label.setText(t("name_required_error"))
-            return
-        is_part = self.type_combo.currentData() == "part"
-        rodzaj = self.rodzaj_combo.currentData()
-        if is_part and rodzaj not in PART_KINDS:
-            self.error_label.setText(
-                t(
-                    "select_kind_error",
-                    manufactured=t("kind_manufactured"),
-                    purchased=t("kind_purchased"),
-                    standard=t("kind_standard"),
-                    client=t("kind_client"),
-                )
-            )
-            return
-        self.accept()
-
-    def result_data(self):
-        """Zwraca (project_id, item_type, name, properties) — do przekazania do
-        push_new_item_to_pdm."""
-        is_part = self.type_combo.currentData() == "part"
-        item_type = self.type_combo.currentData()
-        rodzaj = self.rodzaj_combo.currentData()
-
-        properties = {}
-        if rodzaj:
-            properties["rodzaj"] = rodzaj
-        if self.material_combo.isVisible():
-            material = self.material_combo.currentText().strip()
-            if material:
-                properties["material"] = material
-        if self.mass_edit.isVisible():
-            mass = self.mass_edit.text().strip()
-            if mass:
-                properties["mass"] = mass
-        if self.manufacturer_edit.isVisible():
-            manufacturer = self.manufacturer_edit.text().strip()
-            if manufacturer:
-                properties["manufacturer"] = manufacturer
-            order1 = self.order1_edit.text().strip()
-            if order1:
-                properties["orderNumber"] = order1
-            order2 = self.order2_edit.text().strip()
-            if order2:
-                properties["orderNumber2"] = order2
-        if self.norm_edit.isVisible():
-            norm = self.norm_edit.text().strip()
-            if norm:
-                properties["norm"] = norm
-
-        return (
-            self.project_combo.currentData(),
-            item_type,
-            self.name_edit.text().strip(),
-            properties,
-        )
-
-
 class WaitForTicketDialog(QtWidgets.QDialog):
     """Pokazywane PO otwarciu przeglądarki na formularzu dodawania (zob.
     build_browser_create_url/_submit_new) — odpytuje GET /api/create-tickets/{ticket} co
@@ -1728,20 +1454,20 @@ class WaitForTicketDialog(QtWidgets.QDialog):
 
 
 def submit_via_browser(doc, target_folder):
-    """JEDYNA droga tworzenia nowego elementu ALBO dogrywania do istniejącego — obie decyzje
-    (i "co", i "który") zapadają w przeglądarce, nie lokalnie (zob. build_browser_create_url).
-    Makro: generuje bilet, sprawdza czy etykieta dokumentu wygląda jak już wcześniej wysłany
-    element (podpowiedź dla banera w przeglądarce, nie automatyczna decyzja — zob.
-    match_existing_item), otwiera przeglądarkę, czeka (WaitForTicketDialog). Po stronie
-    przeglądarki dwie możliwe drogi dopełniają ten sam bilet: zwykłe "Dodaj" (nowy element,
-    POST /nodes z ticketem) albo baner "oczekujące żądanie z makra" -> dogranie do
-    istniejącego (POST /create-tickets/{ticket}/attach-existing) — GET /create-tickets/
-    {ticket} zwraca pole "existing", które mówi, którą z dwóch dalszych ścieżek odpalić:
-    dla nowego elementu wprost _rename_and_upload (rewizja=1); dla dogrania do istniejącego
-    push_to_existing_item — ten ma WŁASNĄ, lokalną obsługę statusu "wydany" (pyta o nową
-    rewizję i opcjonalny komentarz przez NewRevisionDialog) — to jedyna decyzja, która
-    świadomie ZOSTAJE lokalna, bo jest bezpośrednio związana z tym, co makro zaraz zrobi z
-    plikiem na dysku, a nie z właściwościami elementu w PDM.
+    """Droga tworzenia nowego elementu ALBO dogrywania do istniejącego, gdy nie ma
+    wystarczająco pewnego lokalnego dopasowania (zob. blok "already_linked" poniżej dla
+    przypadku, gdy jest) — obie decyzje ("co", i "który") zapadają w przeglądarce, nie
+    lokalnie (zob. build_browser_create_url). Makro: generuje bilet, otwiera przeglądarkę,
+    czeka (WaitForTicketDialog). Po stronie przeglądarki dwie możliwe drogi dopełniają ten
+    sam bilet: zwykłe "Dodaj" (nowy element, POST /nodes z ticketem) albo baner "oczekujące
+    żądanie z makra" -> dogranie do istniejącego (POST /create-tickets/{ticket}/attach-
+    existing) — GET /create-tickets/{ticket} zwraca pole "existing", które mówi, którą z
+    dwóch dalszych ścieżek odpalić: dla nowego elementu wprost _rename_and_upload
+    (rewizja=1); dla dogrania do istniejącego push_to_existing_item — ten ma WŁASNĄ,
+    lokalną obsługę statusu "wydany" (pyta o nową rewizję i opcjonalny komentarz przez
+    NewRevisionDialog) — to jedyna decyzja, która świadomie ZOSTAJE lokalna, bo jest
+    bezpośrednio związana z tym, co makro zaraz zrobi z plikiem na dysku, a nie z
+    właściwościami elementu w PDM.
 
     Czy eksportować STEP i/lub PDF wybiera się WYŁĄCZNIE w przeglądarce, jako dwa
     NIEZALEŻNE checkboxy widoczne w obu ścieżkach — makro nie ma tu żadnego lokalnego
@@ -1756,6 +1482,51 @@ def submit_via_browser(doc, target_folder):
     except Exception:
         existing_items = []
     matched = match_existing_item(doc, existing_items)
+
+    # Etykieta dokumentu wygląda jak "numer (nazwa).REWIZJA" i taki numer+nazwa istnieją w
+    # PDM (zob. match_existing_item) -- pytamy WPROST, natywnie, czy podpiąć bieżącą wersję
+    # jako nową rewizję TEGO elementu, zamiast po cichu zakładać "nowy" i zmuszać do ręcznego
+    # znalezienia go przez wyszukiwarkę w przeglądarce (potwierdzone w praktyce: domyślny
+    # wybór w przeglądarce to "Nowy element", więc bez tego pytania łatwo przeoczyć, że
+    # dokument już istnieje, i utworzyć duplikat). Ten sam pomysł co natywna ścieżka
+    # "already linked" w EasyPDMUpload.bas (SolidWorks), tam oparta o Custom Property
+    # (pewny link) -- tutaj o dopasowanie etykiety (mniej pewne, stąd "Nie" tu NIE anuluje
+    # całości, tylko spada do zwykłego formularza w przeglądarce poniżej, gdzie to samo
+    # dopasowanie i tak zostaje podpowiedziane w wyszukiwarce "Dogranie do istniejącego").
+    if matched:
+        confirm = QtWidgets.QMessageBox.question(
+            None,
+            t("pdm_title"),
+            t("already_linked_confirm", number=matched.get("itemNumber"), name=matched.get("fileName")),
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.Yes,
+        )
+        if confirm == QtWidgets.QMessageBox.Yes:
+            native_export_step = QtWidgets.QMessageBox.question(
+                None, t("pdm_title"), t("export_step_prompt"),
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.Yes,
+            ) == QtWidgets.QMessageBox.Yes
+            native_export_pdf = QtWidgets.QMessageBox.question(
+                None, t("pdm_title"), t("export_pdf_prompt"),
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.No,
+            ) == QtWidgets.QMessageBox.Yes
+
+            def confirm_new_revision():
+                dlg = NewRevisionDialog()
+                if dlg.exec() != QtWidgets.QDialog.Accepted:
+                    return None
+                return dlg.comment_text()
+
+            return push_to_existing_item(
+                doc, matched["id"], confirm_new_revision,
+                target_folder=target_folder, export_step=native_export_step, export_pdf=native_export_pdf,
+            )
+        # "Nie" -- spada do zwykłego formularza w przeglądarce poniżej, z tym samym
+        # dopasowaniem nadal podpowiedzianym tam (suggested_item_number), na wypadek gdyby
+        # user jednak chciał wybrać "Dogranie do istniejącego" ręcznie.
+
     suggested_item_number = matched["itemNumber"] if matched else None
 
     ticket = str(uuid.uuid4())
@@ -1796,19 +1567,24 @@ def submit_via_browser(doc, target_folder):
     )
 
 
-def process_assembly_tree(top_doc, target_folder=None, export_step=True, export_pdf=False):
+def process_assembly_tree(top_doc, target_folder=None):
     """Wykrywa złożenie (App::Link do zewnętrznych plików, rekurencyjnie) i dla KAŻDEGO
     nowego komponentu (jeszcze nie wysłanego do PDM — rozpoznawane po etykiecie
-    "numer (nazwa).REWIZJA", zob. match_existing_item) pokazuje NewComponentDialog, tworzy
-    go w PDM (lokalna kopia trafia do target_folder — zob. TargetFolderDialog/run, żeby
-    wszystkie komponenty złożenia lądowały razem w jednym, wybranym folderze), po czym
+    "numer (nazwa).REWIZJA", zob. match_existing_item) przechodzi przez TEN SAM bilet
+    przeglądarki co główny dokument (zob. submit_via_browser) — jedna karta na raz, po
+    kolei, w tej samej kolejności "liście najpierw" co reszta tego drzewa (nigdy kilka kart
+    naraz — myląco się w tym gubić, a ochrona Windows przed "kradzieżą focusu" i tak
+    wyciszyłaby każdą kolejną kartę otwartą zaraz po poprzedniej bez świeżej interakcji
+    użytkownika, patrz notatka przed każdym otwarciem karty). Po utworzeniu/dograniu
     podpina relacje rodzic-dziecko (BOM) MIĘDZY odkrytymi komponentami.
     Relacje, gdzie rodzicem jest top_doc, NIE są tu podpinane — top_doc jeszcze nie ma
     swojego item_id w PDM (może to być nowy ALBO już istniejący element — o tym decyduje
     reszta run(), przez submit_via_browser); te relacje dopina run() po jego utworzeniu.
 
     Zwraca (edges_for_top, cancelled):
-        edges_for_top — lista (child_item_id, quantity) do podpięcia pod element top_doc,
+        edges_for_top — lista (child_item_id, quantity, newly_created) do podpięcia pod
+                        element top_doc (newly_created mówi run(), czy po podpięciu trzeba
+                        ukryć ten element z korzenia projektu, zob. niżej),
         cancelled     — True, jeśli użytkownik przerwał w trakcie. Komponenty utworzone
                         PRZED przerwaniem zostają w PDM (tak samo jak reszta makra nie
                         cofa częściowo wykonanych kroków w razie błędu w połowie)."""
@@ -1855,18 +1631,15 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True, export_
     if choice == QtWidgets.QMessageBox.No:
         return [], False
 
-    try:
-        projects = api_get("/projects") or []
-    except Exception as e:
-        QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("fetch_projects_failed", error=e))
-        return [], True
-    try:
-        materials = api_get("/materials") or []
-    except Exception:
-        materials = []
-
-    # Pliki, które same mają dalsze zewnętrzne linki -> podpowiadamy w oknie typ "Złożenie".
-    has_children = {parent for parent, _child, _qty in edges}
+    # Ścieżki UTWORZONE w tym biegu (w odróżnieniu od już-istniejących komponentów, tylko
+    # podpinanych) -- gdy taki element zostanie podpięty pod swojego prawdziwego rodzica
+    # poniżej, znika z korzenia projektu (show_in_tree=False). Nigdy nie był niezależnym
+    # elementem -- jego utworzenie jest wyłącznie efektem ubocznym kolejności wysyłki
+    # liście-najpierw (utwórz liść, POTEM podepnij go pod właściwego rodzica). Element JUŻ
+    # podlinkowany to potencjalnie niezależny, celowo widoczny wpis katalogu -- podpięcie go
+    # tutaj NIE może ruszać jego istniejącej widoczności na korzeniu (ta sama zasada co przy
+    # ręcznym dodaniu istniejącego elementu do złożenia w aplikacji webowej).
+    newly_created_paths = set()
 
     doc_to_item_id = {}
     for file_path in order:
@@ -1875,23 +1648,64 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True, export_
         if matched:
             doc_to_item_id[file_path] = matched["id"]
         else:
-            dlg = NewComponentDialog(
-                file_path=file_path,
-                suggested_name=doc.Label,
-                suggested_is_assembly=file_path in has_children,
-                usage_hint=_usage_hint_for(file_path, edges),
-                projects=projects,
-                materials=materials,
+            # Ten sam bilet przeglądarki co główny dokument (submit_via_browser) --
+            # otwierany JEDEN NA RAZ. Natywny popup tuż przed każdym otwarciem karty:
+            # ochrona Windows przed "kradzieżą focusu" przepuszcza tylko PIERWSZE
+            # programowe otwarcie przeglądarki w danym biegu, każde kolejne bez świeżej
+            # interakcji użytkownika ląduje bez focusu (potwierdzone w praktyce na
+            # analogicznym mechanizmie w makrze SolidWorks) -- kliknięcie OK tutaj liczy
+            # się jako świeża interakcja.
+            suggested_name = doc.Label
+            QtWidgets.QMessageBox.information(
+                None, t("pdm_title"), t("new_component_browser_prompt", name=suggested_name)
             )
-            if dlg.exec() != QtWidgets.QDialog.Accepted:
+
+            ticket = str(uuid.uuid4())
+            url = build_browser_create_url(suggested_name, ticket)
+            try:
+                webbrowser.open(url)
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
                 return [], True
 
-            project_id, item_type, name, properties = dlg.result_data()
+            wait_dlg = WaitForTicketDialog(ticket)
+            if wait_dlg.exec() != QtWidgets.QDialog.Accepted:
+                return [], True
+
+            ticket_data = wait_dlg.result_data
+            comp_export_step = ticket_data.get("exportStep")
+            if comp_export_step is None:
+                comp_export_step = True
+            comp_export_pdf = ticket_data.get("exportPdf")
+            if comp_export_pdf is None:
+                comp_export_pdf = False
+
             try:
-                result = push_new_item_to_pdm(
-                    doc, project_id, item_type, name, properties,
-                    target_folder=target_folder, export_step=export_step, export_pdf=export_pdf,
-                )
+                if ticket_data.get("existing"):
+                    def confirm_new_revision():
+                        rev_dlg = NewRevisionDialog()
+                        if rev_dlg.exec() != QtWidgets.QDialog.Accepted:
+                            return None
+                        return rev_dlg.comment_text()
+
+                    result = push_to_existing_item(
+                        doc, ticket_data["itemId"], confirm_new_revision,
+                        target_folder=target_folder, export_step=comp_export_step, export_pdf=comp_export_pdf,
+                    )
+                    if result is None:
+                        # Element już istniejący jest "wydany" i użytkownik odmówił nowej
+                        # rewizji -- traktujemy jak każdą inną rezygnację w tej pętli.
+                        return [], True
+                else:
+                    # Nowy element -- już istnieje po stronie serwera (przeglądarka
+                    # wywołała POST /nodes z tym biletem), więc kończymy WPROST wysyłką
+                    # pliku; tworzenie kolejnego elementu przez API stworzyłoby DRUGI
+                    # rekord.
+                    result = _rename_and_upload(
+                        doc, ticket_data["itemId"], ticket_data["itemNumber"], ticket_data["name"],
+                        1, target_folder, comp_export_step, comp_export_pdf,
+                    )
+                    newly_created_paths.add(file_path)
             except Exception as e:
                 QtWidgets.QMessageBox.critical(
                     None, t("pdm_title"), t("upload_component_failed", file=os.path.basename(file_path), error=e)
@@ -1928,12 +1742,21 @@ def process_assembly_tree(top_doc, target_folder=None, export_step=True, export_
                         error=e,
                     ),
                 )
+                continue
+
+            if child_file in newly_created_paths:
+                # Teraz prawidłowo zagnieżdżony pod swoim prawdziwym rodzicem -- ukryj go
+                # z korzenia projektu (zob. komentarz przy newly_created_paths wyżej).
+                try:
+                    api_patch_json(f"/items/{child_item_id}/visibility", {"showInTree": False})
+                except Exception:
+                    pass
 
     # Relacje, w których rodzicem jest top_doc SAMO W SOBIE, nie mogły zostać podpięte
     # w pętli powyżej (top_doc celowo nie jest częścią "order" — nie ma jeszcze własnego
     # item_id, o tym decyduje reszta run()) — zwracamy je do podpięcia przez wywołującego.
     edges_for_top = [
-        (doc_to_item_id[child_file], qty)
+        (doc_to_item_id[child_file], qty, child_file in newly_created_paths)
         for parent_file, child_file, qty in edges
         if parent_file == top_doc.FileName and child_file in doc_to_item_id
     ]
@@ -1983,18 +1806,15 @@ def run():
         return
     target_folder = folder_dialog.result_folder
 
-    # Eksport STEP/PDF nie jest już nigdzie wyborem w samym makrze. Dla nowego elementu i
-    # dla dogrania do istniejącego (oba TERAZ przechodzą przez przeglądarkę, zob. Krok 2
-    # niżej) decydują o tym dwa niezależne checkboxy w przeglądarce; dla automatycznie
-    # wykrytych komponentów złożenia (NIGDY nie przechodzą przez przeglądarkę) STEP
-    # eksportuje się zawsze (jak dotąd), a PDF nigdy — to nowa, czysto opt-in funkcja bez
-    # żadnego checkboxa w tym miejscu, więc nie ma tu żadnej złapanej intencji użytkownika.
-    export_step = True
-    export_pdf = False
-
+    # Eksport STEP/PDF nie jest już nigdzie wyborem w samym makrze -- decydują o tym dwa
+    # niezależne checkboxy w przeglądarce, ZA KAŻDYM RAZEM gdy przeglądarka pośredniczy:
+    # dla głównego dokumentu (Krok 2 niżej) i, od teraz, TAKŻE dla każdego automatycznie
+    # wykrytego nowego komponentu złożenia z osobna (zob. process_assembly_tree) -- każdy
+    # dostaje WŁASNY bilet, więc własny wybór, nie jeden odgórny dla całego drzewa.
+    #
     # Krok 1a: wykryj i (opcjonalnie) wyślij złożenie rekurencyjnie — części/pod-złożenia
     # znalezione przez App::Link, w kolejności liście-najpierw.
-    edges_for_top, cancelled = process_assembly_tree(doc, target_folder, export_step, export_pdf)
+    edges_for_top, cancelled = process_assembly_tree(doc, target_folder)
     if cancelled:
         QtWidgets.QMessageBox.information(None, t("pdm_title"), t("cancelled_upload"))
         return
@@ -2011,7 +1831,7 @@ def run():
 
     # Krok 3: podepnij pod TEN element podelementy odkryte w kroku 1a (BOM) — dopiero teraz
     # znamy jego item_id, niezależnie od tego, czy był nowy, czy już istniał w PDM.
-    for child_item_id, qty in edges_for_top:
+    for child_item_id, qty, newly_created in edges_for_top:
         try:
             api_post_json(
                 f"/items/{info['itemId']}/children", {"childId": child_item_id, "quantity": qty}
@@ -2020,6 +1840,16 @@ def run():
             QtWidgets.QMessageBox.warning(
                 None, t("pdm_title"), t("link_subitem_failed", error=e)
             )
+            continue
+
+        if newly_created:
+            # Utworzony wyłącznie jako efekt uboczny przetwarzania drzewa (zob.
+            # process_assembly_tree) -- teraz prawidłowo zagnieżdżony pod TYM dokumentem,
+            # ukryj go z korzenia projektu.
+            try:
+                api_patch_json(f"/items/{child_item_id}/visibility", {"showInTree": False})
+            except Exception:
+                pass
 
     # Mimo że doc już przeszedł przez _rename_and_upload (Label + saveAs), FreeCAD potrafi
     # oznaczyć dokument jako "dotknięty" (gwiazdka przy nazwie) PO tym zapisie — recompute
