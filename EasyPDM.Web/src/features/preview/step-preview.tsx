@@ -33,7 +33,10 @@ async function loadOcctGeometries(kind: "step" | "iges", buffer: Uint8Array): Pr
     console.error(`occt-import-js: parse ${kind} failed`, result)
     return []
   }
-  if (result.meshes.length === 0) return []
+  if (result.meshes.length === 0) {
+    console.error(`occt-import-js: parse ${kind} succeeded ale zwrócił 0 meshy`, result)
+    return []
+  }
 
   // W złożeniach zdarzają się węzły bez triangulowanej geometrii (np. czysto
   // referencyjne/pomocnicze podzespoły, które occt-import-js zwraca jako mesh
