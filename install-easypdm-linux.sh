@@ -3,19 +3,24 @@
 # PostgreSQL (jeśli jeszcze nie ma), baza danych, self-contained publish backendu razem
 # ze zbudowanym frontendem, dedykowane konto systemowe, usługa systemd z autostartem.
 #
-# Uruchom z katalogu repo, z sudo:
+# Dwa tryby uruchomienia:
+#   1. Z katalogu repo (klon z gita) -- skrypt SAM buduje frontend i backend na tej
+#      maszynie, wymaga .NET SDK + Node.js/npm zainstalowanych tu tylko na czas budowy.
+#   2. Z rozpakowanej gotowej paczki (patrz .github/workflows/build-linux-package.yml,
+#      artefakt "easypdm-linux-x64") -- obok tego skryptu leży już zbudowany katalog
+#      publish/ (self-contained exe + wwwroot), więc budowanie jest pomijane i ta
+#      maszyna NIE musi mieć .NET SDK/npm w ogóle.
+#
+# Uruchom z sudo:
 #   sudo ./install-linux.sh
 #
 # Obsługiwane menedżery pakietów (do instalacji samego PostgreSQL): pacman (Arch/CachyOS),
 # apt (Debian/Ubuntu), dnf (Fedora/RHEL). Inna dystrybucja: zainstaluj PostgreSQL ręcznie
 # i uruchom ponownie ten skrypt — reszta kroków jest niezależna od dystrybucji.
 #
-# Wymaga zainstalowanych: .NET 10 SDK, Node.js/npm (potrzebne tylko na czas budowy —
-# gotowa usługa ich już nie potrzebuje, publikowany jest self-contained plik wykonywalny).
-#
-# Aktualizacja: uruchom ten sam skrypt ponownie z zaktualizowanego checkoutu repo — wykrywa
-# istniejącą bazę/konto, przebudowuje i podmienia tylko aplikację, restartuje usługę. Nowe
-# migracje bazy program stosuje sam automatycznie przy starcie (nic nie trzeba robić ręcznie).
+# Aktualizacja: uruchom ten sam skrypt ponownie (z zaktualizowanego checkoutu repo albo z
+# nowszej paczki) — wykrywa istniejącą bazę/konto, przebudowuje/podmienia tylko aplikację,
+# restartuje usługę. Nowe migracje bazy program stosuje sam automatycznie przy starcie.
 #
 # Odinstalowanie: sudo ./uninstall-linux.sh
 set -euo pipefail
@@ -27,6 +32,15 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR=/opt/easypdm
+# Paczka z build-linux-package.yml niesie już gotowy katalog publish/ obok tego skryptu --
+# jeśli jest, pomijamy budowanie i instalujemy bezpośrednio z niego (tryb 2 powyżej).
+if [ -x "${REPO_ROOT}/publish/EasyPDM.Api" ]; then
+    PACKAGE_MODE=1
+    PUBLISH_DIR="${REPO_ROOT}/publish"
+else
+    PACKAGE_MODE=0
+    PUBLISH_DIR="${REPO_ROOT}/EasyPDM.Api/bin/publish-linux"
+fi
 DATA_DIR=/var/lib/easypdm
 CONFIG_DIR=/etc/easypdm
 SERVICE_USER=easypdm
@@ -103,23 +117,27 @@ else
 fi
 
 echo "== 3/6: Budowa aplikacji =="
-if ! command -v dotnet >/dev/null 2>&1; then
-    echo "Brak .NET SDK w PATH — zainstaluj .NET 10 SDK i uruchom ponownie ten skrypt." >&2
-    exit 1
-fi
-if ! command -v npm >/dev/null 2>&1; then
-    echo "Brak npm w PATH — zainstaluj Node.js i uruchom ponownie ten skrypt." >&2
-    exit 1
-fi
+if [ "$PACKAGE_MODE" -eq 1 ]; then
+    echo "Gotowa paczka wykryta w ${PUBLISH_DIR} — pomijam budowanie (ta maszyna nie musi"
+    echo "mieć zainstalowanego .NET SDK ani Node.js)."
+else
+    if ! command -v dotnet >/dev/null 2>&1; then
+        echo "Brak .NET SDK w PATH — zainstaluj .NET 10 SDK i uruchom ponownie ten skrypt." >&2
+        exit 1
+    fi
+    if ! command -v npm >/dev/null 2>&1; then
+        echo "Brak npm w PATH — zainstaluj Node.js i uruchom ponownie ten skrypt." >&2
+        exit 1
+    fi
 
-echo "Buduję frontend (npm run build)..."
-(cd "${REPO_ROOT}/EasyPDM.Web" && npm ci && npm run build)
+    echo "Buduję frontend (npm run build)..."
+    (cd "${REPO_ROOT}/EasyPDM.Web" && npm ci && npm run build)
 
-echo "Publikuję backend (self-contained, linux-x64)..."
-PUBLISH_DIR="${REPO_ROOT}/EasyPDM.Api/bin/publish-linux"
-rm -rf "${PUBLISH_DIR}"
-dotnet publish "${REPO_ROOT}/EasyPDM.Api" -c Release -r linux-x64 --self-contained true \
-    -p:PublishSingleFile=true -o "${PUBLISH_DIR}"
+    echo "Publikuję backend (self-contained, linux-x64)..."
+    rm -rf "${PUBLISH_DIR}"
+    dotnet publish "${REPO_ROOT}/EasyPDM.Api" -c Release -r linux-x64 --self-contained true \
+        -p:PublishSingleFile=true -o "${PUBLISH_DIR}"
+fi
 
 echo "== 4/6: Konto systemowe i katalogi =="
 getent group "${SERVICE_USER}" >/dev/null || groupadd --system "${SERVICE_USER}"
