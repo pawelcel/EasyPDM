@@ -1063,18 +1063,68 @@ def _upload_step_attachment(doc, item_id):
     try:
         import Part
 
-        objs = [
-            obj for obj in doc.Objects
-            if hasattr(obj, "Shape") and obj.Shape and not obj.Shape.isNull()
-            and getattr(obj, "Visibility", True)
-        ]
-        if not objs:
+        # doc.recompute() jest tu konieczny: dla złożeń (App::Link / kontenery zbierające
+        # geometrię dzieci) .Shape bywa pustym, ale NIE-null compoundem, dopóki dokument
+        # nie zostanie przeliczony na nowo -- taki obiekt przechodziłby filtr niżej
+        # (isNull() == False) mimo że w środku nie ma ani jednej bryły/ściany, co dawało
+        # STEP z samymi metadanymi produktu i zerową geometrią.
+        try:
+            doc.recompute()
+        except Exception:
+            pass
+
+        def has_real_geometry(shape):
+            return bool(shape.Solids or shape.Faces or shape.Edges)
+
+        # Osie/płaszczyzny/punkty odniesienia (App::Origin/Line/Plane/Point) technicznie
+        # maja niepusty Shape (cienka linia/plaszczyzna), ale to szum konstrukcyjny --
+        # nigdy nie powinny trafic do eksportu.
+        DATUM_PREFIXES = ("App::Origin", "App::Line", "App::Plane", "App::Point")
+        # Kontenery, ktorych .Shape to juz gotowy, poprawnie ulozony compound WSZYSTKICH
+        # swoich dzieci (zlozenie natywnego workbencha Assembly, albo App::Part) -- jesli
+        # taki kontener jest obecny, bierzemy TYLKO jego, zeby nie zdublowac geometrii
+        # dzieci (App::Link/Assembly::AssemblyLink) tez zebranych w petli nizej.
+        CONTAINER_TYPES = ("Assembly::AssemblyObject", "App::Part", "PartDesign::Body")
+
+        candidates = []
+        App.Console.PrintMessage(f"EasyPDM: eksport STEP -- diagnostyka obiektow w '{doc.Name}':\n")
+        for obj in doc.Objects:
+            has_shape = hasattr(obj, "Shape")
+            shape = obj.Shape if has_shape else None
+            is_null = shape.isNull() if shape is not None else None
+            has_geom = has_real_geometry(shape) if shape is not None and not is_null else False
+            visible = getattr(obj, "Visibility", True)
+            is_datum = obj.TypeId.startswith(DATUM_PREFIXES)
+            App.Console.PrintMessage(
+                f"  {obj.Name} ({obj.TypeId}): hasShape={has_shape} isNull={is_null} "
+                f"hasGeometry={has_geom} visible={visible} datum={is_datum}\n"
+            )
+            if has_shape and shape is not None and not is_null and has_geom and visible and not is_datum:
+                candidates.append(obj)
+
+        # Kontenery typu Assembly::AssemblyObject/App::Part/PartDesign::Body agreguja we
+        # wlasnym Shape geometrie wszystkich swoich dzieci (Linkow) juz poprawnie ulozona
+        # wg polaczen/wiezow -- jesli taki kontener jest wsrod kandydatow, uzywamy TYLKO
+        # jego (dzieci pomijamy, zeby nie zdublowac tej samej bryly w eksporcie).
+        containers = [o for o in candidates if o.TypeId in CONTAINER_TYPES]
+        chosen = containers if containers else candidates
+        if not chosen:
+            App.Console.PrintMessage("EasyPDM: eksport STEP -- brak obiektow z realna geometria, pomijam.\n")
             return
+
+        shapes = [o.Shape for o in chosen]
+        combined_shape = shapes[0] if len(shapes) == 1 else Part.makeCompound(shapes)
 
         tmp_dir = tempfile.mkdtemp(prefix="easypdm_step_")
         try:
             step_path = os.path.join(tmp_dir, sanitize_filename(doc.Label or "model") + ".step")
-            Part.export(objs, step_path)
+            # Eksport bezposrednio z gotowej bryly (combined_shape.exportStep), NIE przez
+            # Part.export(objekty_dokumentu, ...) -- ta druga funkcja akceptuje do
+            # eksportu tylko okreslone typy obiektow (np. Part::Feature) i po cichu
+            # odrzuca Assembly::AssemblyObject/Assembly::AssemblyLink/App::Link z komunikatem
+            # "is not a shape, export will be ignored", mimo ze maja poprawna geometrie --
+            # to byla realna przyczyna pustych plikow STEP dla zlozen.
+            combined_shape.exportStep(step_path)
 
             try:
                 existing = api_get(f"/items/{item_id}/attachments") or []
