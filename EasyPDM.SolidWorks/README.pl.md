@@ -15,17 +15,19 @@ między sobą poza współdzielonym miejscem w rejestrze Windows na sesję logow
 
 ## Status
 
-**Poprzednia wersja (bez przeglądarki, natywne `InputBox`/`MsgBox` do wyboru
-projektu/elementu/rodzaju) była zweryfikowana na żywo** (SolidWorks 2026, 2026-08-20) —
-zob. "Historia naprawionych problemów" niżej, wciąż aktualna dla współdzielonej
-infrastruktury logowania/JSON/HTTP, którą obecna wersja w całości zachowuje.
+**Zweryfikowane na żywo od początku do końca na prawdziwym SolidWorks 2026**, w kilku
+rundach testów i poprawek (od 2026-08-20, ostatnio 2026-08-27): logowanie, przepływ przez
+bilet w przeglądarce (nowy element/duplikat/dograj do istniejącego), upload/rejestracja
+pliku, eksport załączników STEP/PDF, automatyczne wykrywanie drzewa złożenia z biletami
+w przeglądarce per komponent, oraz rekurencyjne pobieranie komponentów w
+`EasyPDMDownload.bas` — wszystko potwierdzone na żywym serwerze, nie tylko przeglądem
+statycznym (w środowisku, w którym te pliki są edytowane, wciąż nie ma kompilatora VBA,
+więc każda poprawka tutaj wzięła się z tego, że użytkownik odtworzył problem na żywo i
+wkleił log samego makra, nie z etapu budowania). Zob. "Historia naprawionych problemów"
+niżej po konkretne błędy znalezione tym sposobem.
 
-**Obecna wersja (wzorzec przeglądarki + eksport STEP + automatyczne wykrywanie drzewa
-złożenia) jest NIEZWERYFIKOWANA** — napisana bez dostępu do SolidWorks/kompilatora VBA w
-środowisku, w którym powstała (w przeciwieństwie do makr FreeCAD, gdzie `py_compile` dawał
-realną weryfikację składni, tu jedyna weryfikacja to ręczny przegląd kodu). Wymaga
-pełnego testu na żywym SolidWorks przed użyciem produkcyjnym — zob. "Znane ryzyka" niżej,
-gdzie są dokładnie wskazane najbardziej niepewne fragmenty.
+Kilka wąskich, rzadko używanych fragmentów kodu pozostaje faktycznie nieprzetestowanych
+w praktyce (oznaczone `UNVERIFIED` bezpośrednio w kodzie) — zob. "Znane ryzyka" niżej.
 
 ## Różnice względem makr FreeCAD
 
@@ -47,25 +49,34 @@ inaczej:
   ten sam wzorzec bilet+`GET /api/auth/browser-login`+popup "oczekujące żądanie z makra
   CAD" co makra FreeCAD, **z jednym świadomym wyjątkiem**: jeśli dokument jest JUŻ
   podpięty do elementu PDM (patrz punkt niżej), makro NIE otwiera przeglądarki wcale —
-  pyta lokalnie tylko o zgodę na nową rewizję, dokładnie jak przed tą zmianą. SolidWorks
-  zna wtedy element ze 100% pewnością, więc przeglądarka nic by tu nie dodała; FreeCAD
-  zawsze idzie do przeglądarki, bo nie ma tak niezawodnego mechanizmu lokalnego.
+  pyta lokalnie (natywny `MsgBox`) o zgodę na nową rewizję, plus czy eksportować STEP
+  i/lub PDF (patrz niżej), dokładnie jak przed tą zmianą. SolidWorks zna wtedy element ze
+  100% pewnością, więc przeglądarka nic by tu nie dodała; FreeCAD zawsze idzie do
+  przeglądarki (albo, od niedawna, najpierw pyta natywnie, gdy znajdzie dopasowanie po
+  etykiecie), bo nie ma równie niezawodnego mechanizmu lokalnego.
 - **Rozpoznawanie "już wysłanego" dokumentu** (`EasyPDMUpload.bas`): NIE przez etykietę/
   nazwę pliku (SolidWorks nie ma odpowiednika swobodnej etykiety FreeCAD) — przez
   **Właściwości niestandardowe** dokumentu (`EasyPDM_ItemId`, `EasyPDM_ItemNumber`),
   zapisywane w samym pliku po udanej wysyłce. To w rzeczywistości **trwalsze** podejście
-  niż w FreeCAD — działa też w NOWEJ sesji SolidWorks, i (nowość) jest teraz też
-  wykorzystywane dla KAŻDEGO komponentu złożenia z osobna (patrz "wykrywanie drzewa
-  złożenia" niżej), nie tylko dla dokumentu głównego.
-- **Nowe komponenty złożenia zbierane sekwencją `InputBox`, nie przez przeglądarkę** —
-  ten sam powód co natywny dialog komponentu w FreeCAD (N kart przeglądarki dla N nowych
-  komponentów złożenia byłoby gorszym UX niż jeden natywny prompt na komponent), tym
-  bardziej uzasadniony tutaj przez brak `UserForm` w ogóle w tym pliku.
-- **Eksport STEP dla ścieżek bez przeglądarki eksportuje się zawsze** (dokument już
-  podpięty; automatycznie wykryte komponenty złożenia) — nie ma tam formularza w
-  przeglądarce, w którym mógłby siedzieć checkbox. Tylko ścieżka przez bilet (nowy
-  element/duplikat/dograj do istniejącego) ma checkbox STEP w przeglądarce, tak jak w
-  FreeCAD.
+  niż w FreeCAD — działa też w NOWEJ sesji SolidWorks, i jest też wykorzystywane dla
+  KAŻDEGO komponentu złożenia z osobna (patrz "wykrywanie drzewa złożenia" niżej), nie
+  tylko dla dokumentu głównego.
+- **Nowe komponenty złożenia też idą przez przeglądarkę, jeden po drugim** — każdy
+  jeszcze niepodpięty komponent znaleziony podczas przechodzenia drzewa otwiera własny
+  bilet + kartę przeglądarki (liście najpierw, ten sam wybór Nowy/Duplikuj/Dograj do
+  istniejącego co dokument główny), sekwencyjnie, nigdy kilka kart naraz — to ten sam
+  wzorzec, do którego później dostosowano makro FreeCAD. Ponieważ tylko jedna karta
+  przeglądarki na uruchomienie makra może niezawodnie przejąć fokus Windows, tuż przed
+  otwarciem każdej kolejnej karty pojawia się natywny `MsgBox` "kliknij OK, aby
+  kontynuować" — kliknięcie liczy się jako świeże działanie użytkownika, które pozwala
+  kolejnemu oknu przeglądarki przejąć fokus zamiast otworzyć się cicho w tle (sprawdź
+  pasek zadań, jeśli krok wygląda na zawieszony).
+- **Eksport STEP i PDF są opcjonalne wszędzie** — checkbox na każdy z nich na ścieżkach
+  przez bilet w przeglądarce (nowy element/duplikat/dograj do istniejącego, zarówno dla
+  dokumentu głównego, jak i każdego komponentu złożenia), albo dwa natywne pytania
+  Tak/Nie (`ExportStepPrompt`/`ExportPdfPrompt`, STEP domyślnie Tak, PDF domyślnie Nie)
+  na ścieżce bez przeglądarki "już podpięty". Eksport PDF korzysta z własnego "Zapisz
+  jako PDF" SolidWorks, oznaczony rolą załącznika `"pdf"`, niezależną od załącznika STEP.
 
 ## Co robi `EasyPDMUpload.bas`
 
@@ -77,31 +88,40 @@ inaczej:
    ponowne logowanie, dopóki sesja jest ważna (30 dni).
 2. **Zapisuje aktywny dokument**, jeśli jeszcze nie był zapisany (standardowe okno "Zapisz
    jako" SolidWorks).
-3. **Jeśli aktywny dokument to Złożenie**: wykrywa jego drzewo komponentów
-   (`IAssemblyDoc.GetComponents`, rekurencyjnie) i pyta, czy wysłać automatycznie razem z
-   nim wszystkie komponenty, które NIE są jeszcze podpięte do PDM (rozpoznawane przez
-   Właściwości niestandardowe na KAŻDYM komponencie z osobna, patrz niżej) — liście
-   najpierw, ten dokument na końcu. Dla każdego nowego komponentu: krótka sekwencja
-   `InputBox` (Projekt → Typ → Nazwa, a dla Części dodatkowo Rodzaj i pola zależne — te
-   same reguły co niżej; Złożenie nie ma rodzaju, tylko opcjonalną Masę), NIE przeglądarka
-   (patrz "Różnice względem makr FreeCAD"). Nowo utworzone komponenty
-   od razu dostają eksport STEP i własny wpis `EasyPDM_ItemId`, i są automatycznie
+3. **Jeśli aktywny dokument to Złożenie**: najpierw rozwiązuje wszystkie komponenty
+   Lightweight (`ResolveAllLightWeightComponents`, wywołane bezpośrednio na modelu
+   złożenia — wywołanie przez `.Extension` zamiast tego cicho nic nie robi i było
+   prawdziwym błędem złapanym podczas testów: `GetModelDoc2()` zwraca `Nothing` dla
+   wciąż-Lightweight komponentu, przez co nie da się go odróżnić od "komponentu nie
+   znaleziono" dopóki nie zostanie rozwiązany), potem wykrywa drzewo komponentów
+   (`IAssemblyDoc.GetComponents`, rekurencyjnie). Podsumowujący `MsgBox` przed
+   przejściem drzewa wypisuje każdy znaleziony komponent, oznaczając już podpięte ich
+   docelowym numerem elementu PDM i nazwą pliku — świadome zabezpieczenie, bo własne
+   "Zapisz jako" SolidWorks cicho kopiuje Właściwości niestandardowe, co może sprawić,
+   że naprawdę nowa część fałszywie "rozpozna się" jako istniejący element, jeśli nie
+   zwróci się uwagi na to podsumowanie. Po potwierdzeniu przechodzi liśćmi najpierw (ten
+   dokument na końcu); dla każdego JESZCZE niepodpiętego komponentu otwiera własny bilet
+   w przeglądarce (ten sam wybór Nowy/Duplikuj/Dograj do istniejącego co dokument główny,
+   patrz "Różnice względem makr FreeCAD" po opis natywnego `MsgBox` przed każdą kartą).
+   Nowo utworzone komponenty dostają własny eksport STEP/PDF (wg wyboru checkboxa tego
+   konkretnego komponentu w przeglądarce) i wpis `EasyPDM_ItemId`, i są automatycznie
    podpinane pod swojego rodzica w strukturze BOM.
 4. Sprawdza **Właściwości niestandardowe** dokumentu głównego:
    - **Już podpięty** (ma zapisane `EasyPDM_ItemId`) — pyta lokalnie o zgodę na dogranie
      bieżącej wersji jako nowej rewizji, bez otwierania przeglądarki (patrz "Różnice
-     względem makr FreeCAD"). Eksport STEP następuje zawsze.
+     względem makr FreeCAD"), a potem jeszcze dwa natywne pytania Tak/Nie o eksport STEP
+     (domyślnie Tak) i PDF (domyślnie Nie).
    - **Jeszcze niepodpięty** — otwiera przeglądarkę systemową (już zalogowaną, most
      token→ciasteczko) na popupie "oczekujące żądanie z makra CAD", z trzema opcjami do
      wyboru TAM: **Nowy element** (projekt, opcjonalnie rodzic, typ, nazwa — dla Części
      dodatkowo rodzaj i zależne od niego pola: Wykonywana → Materiał; Zakupowa →
      Producent/Numery zamówieniowe/Masa; Normalia → Materiał/Norma; Klienta → brak
      dodatkowych pól; **Złożenie nie ma rodzaju w ogóle** — tylko opcjonalna Masa — plus
-     checkbox eksportu STEP), **Duplikuj** (wskazuje istniejący element, kopiuje jego
-     właściwości do nowego, bez plików) albo **Dograj do istniejącego** (wyszukiwarka po
-     całej bazie + ten sam checkbox STEP). Makro czeka (odpytuje co ~2s, limit 10 minut,
-     Escape anuluje, postęp w pasku stanu SolidWorks) i kontynuuje automatycznie, gdy
-     wybór zostanie zatwierdzony w przeglądarce.
+     checkboxy eksportu STEP i PDF), **Duplikuj** (wskazuje istniejący element, kopiuje
+     jego właściwości do nowego, bez plików) albo **Dograj do istniejącego**
+     (wyszukiwarka po całej bazie + te same checkboxy STEP/PDF). Makro czeka (odpytuje
+     co ~2s, limit 10 minut, Escape anuluje, postęp w pasku stanu SolidWorks) i
+     kontynuuje automatycznie, gdy wybór zostanie zatwierdzony w przeglądarce.
    - **Istniejący element ze statusem "Wydany"** (obie ścieżki wyżej): pyta o zgodę na
      nową rewizję i opcjonalny komentarz — dokładnie ten sam mechanizm co w aplikacji
      webowej, jedyna decyzja świadomie zostająca lokalna nawet na ścieżce przez
@@ -114,12 +134,18 @@ inaczej:
    rewizji); jeśli nie (typowe, gdy SolidWorks i usługa EasyPDM działają jako różni
    użytkownicy Windows — magazyn jest w `C:\ProgramData\...`, do którego zwykły
    użytkownik zwykle nie ma prawa zapisu), zwykły upload HTTP (fallback bez zachowania
-   historii rewizji) — **to nie błąd**, tylko poprawnie zadziałane zabezpieczenie.
-6. Gdy eksport STEP jest włączony (checkbox w przeglądarce, albo zawsze dla ścieżek bez
-   przeglądarki — patrz p.4): eksportuje widoczną geometrię do tymczasowego pliku `.step`
-   (`IModelDocExtension.SaveAs`) i wgrywa jako załącznik z rolą `"step"`, zastępując
-   poprzedni załącznik tej samej roli — zasila stały podgląd 3D w aplikacji webowej.
-   Błąd eksportu (np. brak widocznej geometrii) NIE przerywa reszty operacji.
+   historii rewizji, korzystający specjalnie do tego wywołania z
+   `WinHttp.WinHttpRequest.5.1` — zob. "Historia naprawionych problemów" niżej) — **to
+   nie błąd**, tylko poprawnie zadziałane zabezpieczenie. Ta ścieżka zapasowa sprawdza
+   też i kasuje istniejący załącznik z rolą `"cad"` o dokładnie tej samej nazwie pliku
+   przed wgraniem nowego, więc ponowny zapis przy tej samej literze rewizji nie
+   gromadzi zduplikowanych załączników.
+6. Gdy eksport STEP/PDF jest włączony (checkbox w przeglądarce, albo natywne pytania na
+   ścieżce bez przeglądarki — patrz p.4): eksportuje widoczną geometrię do tymczasowego
+   pliku `.step`/`.pdf` (`IModelDocExtension.SaveAs`) i wgrywa jako załącznik z rolą
+   `"step"`/`"pdf"`, zastępując poprzedni załącznik tej samej roli — zasila stały
+   podgląd 3D (STEP) w aplikacji webowej. Błąd eksportu (np. brak widocznej geometrii)
+   NIE przerywa reszty operacji.
 7. Zapisuje `EasyPDM_ItemId`/`EasyPDM_ItemNumber` we Właściwościach niestandardowych
    dokumentu i pokazuje potwierdzenie.
 
@@ -198,12 +224,12 @@ projektu makra), więc dla KAŻDEGO z dwóch plików osobno:
 Adres API (domyślnie `http://localhost:5000/api`) zapisuje się automatycznie po pierwszym
 podaniu przy logowaniu — wspólnie dla obu makr.
 
-## Historia naprawionych problemów (z pierwszego realnego testu `EasyPDMUpload.bas`)
+## Historia naprawionych problemów
 
-Znalezione i naprawione 2026-08-20 na żywym SolidWorks 2026 — zostawione tu jako
-udokumentowany przykład tego, na co uważać przy weryfikacji `EasyPDMDownload.bas` (który
-korzysta z tej samej, już poprawionej infrastruktury, ale ma też WŁASNY, jeszcze
-niesprawdzony kod — regex, rekurencyjne pobieranie, `OpenDoc6`):
+Znalezione i naprawione 2026-08-20, podczas pierwszego realnego testu `EasyPDMUpload.bas`
+na żywym SolidWorks 2026 — zostawione tu jako udokumentowany przykład tego rodzaju
+specyficznych dla VBA pułapek, na jakie ten kod już trafiał (oba makra korzystają teraz z
+tej samej, już poprawionej infrastruktury):
 
 1. **Brak tokenu sesji w treści logowania** — `MSXML2.XMLHTTP.6.0` nie dawał pewnego
    dostępu do nagłówka `Set-Cookie`. Naprawione po stronie serwera (`POST /auth/login`
@@ -221,60 +247,49 @@ niesprawdzony kod — regex, rekurencyjne pobieranie, `OpenDoc6`):
    znaki (w komentarzach ORAZ w oknach widocznych dla użytkownika) wychodziły jako
    krzaki. Naprawione przez przetłumaczenie całego pliku na czysty ASCII (angielski).
 5. **`MSXML2.XMLHTTP.send()` odrzucał gołą tablicę `Byte()`** ("Parametr jest
-   niepoprawny") przy uploadzie przez fallback HTTP. Naprawione przez opakowanie bajtów
-   w binarny `ADODB.Stream` i wysłanie strumienia zamiast tablicy.
+   niepoprawny") przy uploadzie przez fallback HTTP. Pierwsza próba opakowała bajty w
+   binarny `ADODB.Stream` wysyłany przez ten sam obiekt `MSXML2.XMLHTTP` — to samo w
+   sobie nadal zawodziło na prawdziwym uploadzie z ogólnym błędem "BRAK POŁĄCZENIA".
+   Faktyczna naprawa: `ApiUploadFile` przełączono konkretnie na
+   `WinHttp.WinHttpRequest.5.1`, który przyjmuje tablicę `Byte()` bezpośrednio przez
+   `.Send()`; każde inne wywołanie (`ApiGet`, logowanie itd.) nadal używa
+   `MSXML2.XMLHTTP.6.0`.
+
+Kolejne rundy testów na żywo (do 2026-08-27) znalazły i naprawiły jeszcze kilka spraw,
+podsumowanych tu zbiorczo zamiast punkt po punkcie — pełne szczegóły w historii gita:
+niewykrywane komponenty złożenia Lightweight (`ResolveAllLightWeightComponents` trzeba
+wywołać bezpośrednio na modelu, nie przez `.Extension`, które cicho nic nie robi);
+żądania GET `MSXML2.XMLHTTP.6.0` serwowane z lokalnego cache HTTP Windows w
+nieskończoność, naprawione dodaniem nagłówków `Cache-Control`/`Pragma` plus parametru
+`_ts=` do każdego wywołania `ApiGet` w OBU plikach (każdy ma własną, niezależną kopię
+`ApiGet`, a `EasyPDMDownload.bas` potrzebował dodatkowo tej samej poprawki w
+`ApiGetBinary`, bo nieaktualna odpowiedź z cache tam po cichu zepsułaby faktyczną
+zawartość pobranego pliku, nie tylko pole statusu); nowy komponent złożenia pojawiający
+się jako niechciany duplikat w korzeniu projektu, naprawione przez jawne ukrywanie
+nowo utworzonych elementów-liści z korzenia drzewa po podpięciu do właściwego rodzica;
+oraz powtarzające się załączniki roli "cad" gromadzące się przy każdym zapisie na tej
+samej rewizji, naprawione przez sprawdzenie i skasowanie istniejącego załącznika o tej
+samej nazwie pliku przed fallbackowym uploadem HTTP.
 
 ## Znane ryzyka / miejsca do sprawdzenia w pierwszej kolejności
 
-Nieprzetestowane jeszcze fragmenty — napisane bez dostępu do SolidWorks/kompilatora VBA,
-więc nawet SKŁADNIA nie została sprawdzona automatycznie (w odróżnieniu od makr FreeCAD,
-gdzie `py_compile` dawał realną weryfikację). Sugerowana kolejność testów: zwykła Część
-jeszcze niepodpięta → ta sama Część ponownie (ścieżka natywna) → Dograj/Duplikuj w
-przeglądarce → Złożenie z nowymi komponentami → Escape/timeout w trakcie oczekiwania →
-`EasyPDMDownload.bas`.
+Główne przepływy są już zweryfikowane na żywo (patrz "Status" wyżej). To, co pozostaje
+faktycznie nieprzetestowane, to kilka wąskich, rzadko używanych fragmentów, oznaczonych
+`UNVERIFIED` bezpośrednio w kodzie:
 
-**Współdzielone przez oba pliki (nowe w tej rundzie):**
-1. **`WaitForTicket`** — pętla `Sleep`/`DoEvents`/`GetAsyncKeyState(VK_ESCAPE)` +
-   odpytywanie `GET /create-tickets/{ticket}` co ~2s, `swApp.Frame.SetStatusBarText` do
-   pokazania postępu. Mechanizm (Win32 API przez `Declare`, brak `UserForm`) nie ma
-   bezpośredniego odpowiednika gdzie indziej w tym repo — do sprawdzenia: czy Escape
-   faktycznie przerywa pętlę, czy pasek stanu się aktualizuje/czyści poprawnie, czy
-   SolidWorks zostaje responsywny (`DoEvents`) przez cały czas oczekiwania.
-2. **`Scriptlet.TypeLib.Guid`** (`NewGuid`) i ręczny `UrlEncode` (percent-encoding przez
-   `ADODB.Stream` do UTF-8 + ręczne omijanie BOM) — oba standardowe, udokumentowane
-   obejścia braku wbudowanego GUID/URL-encodera w VBA, ale nieprzetestowane w tym
-   konkretnym zastosowaniu (nazwa dokumentu z polskimi znakami w `name=` warto sprawdzić
-   osobno).
-
-**`EasyPDMUpload.bas` (nowe w tej rundzie):**
-3. **`IModelDocExtension.SaveAs` do `.step`** (`UploadStepAttachment`) — dokładna liczba/
-   znaczenie parametrów (`SaveAsVersion`/`SaveAsOptions`) napisane z dokumentacji API, NIE
-   przetestowane — jeśli SolidWorks zgłosi błąd argumentów, sprawdzić w edytorze VBA (F1
+1. **Dokładna sygnatura parametrów `IModelDocExtension.SaveAs`** dla eksportu
+   `.step`/`.pdf` (`UploadStepAttachment`/`UploadPdfAttachment`) — napisana z dokumentacji
+   API SolidWorks; jeśli SolidWorks zgłosi błąd argumentów, sprawdzić w edytorze VBA (F1
    na `SaveAs`) dokładną sygnaturę zainstalowanej wersji.
-4. **`IAssemblyDoc.GetComponents`/`IComponent2.GetModelDoc2`/`Name2`/`GetTitle`**
-   (`VisitAssemblyComponents`/`ProcessAssemblyTree`) — zakłada, że późno wiązany
-   `ModelDoc2` dla Złożenia można wywoływać bezpośrednio metodami `IAssemblyDoc` (typowy,
-   udokumentowany wzorzec w makrach SolidWorks, ale nieprzetestowany tutaj). Zawieszone/
-   nierozwiązane/wirtualne komponenty są pomijane przez sprawdzenie `GetModelDoc2() Is
-   Nothing`/pusty `GetPathName()` zamiast sztywnej wartości enuma zawieszenia — do
-   potwierdzenia, że to faktycznie wystarcza.
+2. **Ścieżka "zapisz w tym samym formacie"** dla dokumentu już raz zapisanego w tej
+   sesji (pomija pełne okno Zapisz jako) — typowy przypadek "po prostu zapisz ponownie i
+   uruchom makro" jest dobrze przećwiczony, ta konkretna gałąź mniej.
+3. **Dokładna wartość stałej `SW_SAVE_AS_SILENT`**, używanej do wyciszenia natywnych
+   okien potwierdzenia SolidWorks podczas wywołań `SaveAs` eksportu STEP/PDF.
 
-**`EasyPDMDownload.bas` (bez zmian od poprzedniej rundy):**
-5. **`swApp.OpenDoc6`** — sygnatura (`FileName, Type, Options, Configuration, Errors,
-   Warnings`) jest dobrze udokumentowanym, standardowym API, ale nie została przetestowana
-   na żywo. `Options = 0` (brak specjalnych flag) powinno być bezpieczną wartością
-   domyślną.
-6. **`VBScript.RegExp`** (`NewRevisionRegex`) — używane do rozpoznawania konwencji nazw
-   plików (`numer (nazwa).REWIZJA.rozszerzenie`) przy wykrywaniu aktualnej rewizji i
-   starszych lokalnych kopii. Standardowy, stabilny mechanizm, ale nieprzetestowany w
-   tym konkretnym zastosowaniu.
-7. **Rekurencyjne pobieranie składników złożenia** (`DownloadChildrenRecursive`) —
-   analogiczne do `_download_children_recursive` w `EasyPDMDownload.FCMacro` (w tym ten sam
-   kształt odpowiedzi `GET /items/{id}/children`: element zagnieżdżony pod kluczem
-   `"item"`), ale nieprzetestowane po stronie SolidWorks.
-8. **`EnsureDirectory`** — ręczna implementacja tworzenia zagnieżdżonych folderów (VBA
-   `MkDir` tworzy tylko jeden poziom naraz, w odróżnieniu od `os.makedirs`) — prosta
-   logika, ale warto sprawdzić na ścieżce z kilkoma nieistniejącymi poziomami naraz.
+Żadne z tych miejsc nie spowodowało jak dotąd zgłoszonej awarii — są tu wypisane jako
+pierwsze miejsce do sprawdzenia, gdyby coś specyficznego dla wersji SolidWorks kiedyś
+zawiodło przy eksporcie albo zapisie.
 
 ## Ograniczenia (świadomie poza zakresem tej wersji)
 

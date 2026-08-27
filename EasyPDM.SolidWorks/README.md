@@ -16,17 +16,18 @@ session):
 
 ## Status
 
-**The earlier version (no browser, native `InputBox`/`MsgBox` for choosing the
-project/item/kind) was verified live** (SolidWorks 2026, 2026-08-20) — see "History of
-fixed issues" below, still current for the shared login/JSON/HTTP infrastructure, which
-the current version keeps in its entirety.
+**Live-verified end-to-end on real SolidWorks 2026**, across several rounds of testing
+and bug-fixing (starting 2026-08-20, most recently 2026-08-27): login, the browser
+ticket flow (new item/duplicate/attach to existing), file upload/registration, STEP/PDF
+attachment export, automatic assembly-tree detection with per-component browser tickets,
+and `EasyPDMDownload.bas`'s recursive component download — all confirmed working against
+a live server, not just reviewed statically (there is still no VBA compiler in the
+environment these files are edited from, so every fix here came from the user
+reproducing an issue live and pasting the macro's own log, not from a build step). See
+"History of fixed issues" below for the specific bugs this process found.
 
-**The current version (browser-based pattern + STEP export + automatic assembly-tree
-detection) is UNVERIFIED** — written without access to SolidWorks/a VBA compiler in the
-environment where it was created (unlike the FreeCAD macros, where `py_compile` gave real
-syntax verification, here the only verification is a manual code review). It requires a
-full test on live SolidWorks before production use — see "Known risks" below, which
-precisely points out the most uncertain parts.
+A few narrow, low-traffic code paths remain genuinely untested in practice (marked
+`UNVERIFIED` inline in the source) — see "Known risks" below.
 
 ## Differences from the FreeCAD macros
 
@@ -47,25 +48,34 @@ solved differently:
   same ticket+`GET /api/auth/browser-login`+"pending request from a CAD macro" popup
   pattern as the FreeCAD macros, **with one deliberate exception**: if the document is
   ALREADY linked to a PDM item (see the point below), the macro does NOT open the browser
-  at all — it only asks locally for consent to a new revision, exactly as before this
-  change. SolidWorks then knows the item with 100% certainty, so the browser wouldn't add
-  anything here; FreeCAD always goes to the browser because it has no such reliable local
-  mechanism.
+  at all — it asks locally (native `MsgBox`) for consent to a new revision, plus whether
+  to export STEP and/or PDF (see below), exactly as before this change. SolidWorks then
+  knows the item with 100% certainty, so the browser wouldn't add anything here; FreeCAD
+  always goes to the browser (or, since a recent change, a native confirmation first when
+  a label match is found) because it has no equally reliable local mechanism.
 - **Recognizing an "already sent" document** (`EasyPDMUpload.bas`): NOT through a
   label/file name (SolidWorks has no equivalent of FreeCAD's free-form label) — through
   the document's **Custom Properties** (`EasyPDM_ItemId`, `EasyPDM_ItemNumber`), saved
   into the file itself after a successful upload. This is actually a **more durable**
-  approach than in FreeCAD — it also works in a NEW SolidWorks session, and (new) is now
-  also used for EVERY assembly component individually (see "assembly tree detection"
-  below), not just for the main document.
-- **New assembly components are collected via an `InputBox` sequence, not the browser** —
-  the same reasoning as the native component dialog in FreeCAD (N browser tabs for N new
-  assembly components would be worse UX than one native prompt per component), all the
-  more justified here by the complete absence of `UserForm` in this file at all.
-- **STEP export for browser-less paths always exports** (a document already linked;
-  automatically detected assembly components) — there's no browser form there for a
-  checkbox to live in. Only the ticket path (new item/duplicate/attach to existing) has
-  the STEP checkbox in the browser, same as in FreeCAD.
+  approach than in FreeCAD — it also works in a NEW SolidWorks session, and is also used
+  for EVERY assembly component individually (see "assembly tree detection" below), not
+  just for the main document.
+- **New assembly components go through the browser too, one at a time** — each
+  not-yet-linked component discovered while walking the tree opens its own ticket +
+  browser tab (leaves first, same New item/Duplicate/Attach to existing choice as the
+  top-level document), sequentially, never several tabs at once — this is the same
+  pattern the FreeCAD macro was later ported to match. Since only one browser tab can
+  reliably grab Windows' foreground focus per macro run, a native "click OK to continue"
+  `MsgBox` appears right before each subsequent tab opens — clicking it counts as fresh
+  user input that lets the next browser window take focus instead of opening silently in
+  the background (check the taskbar if a step seems to hang).
+- **STEP and PDF export are both optional everywhere** — a checkbox for each in the
+  ticket-driven browser paths (new item/duplicate/attach to existing, at both the
+  top-level document and per assembly component), or two native Yes/No prompts
+  (`ExportStepPrompt`/`ExportPdfPrompt`, STEP defaulting to Yes, PDF to No) on the
+  browser-less "already linked" path. PDF export uses SolidWorks' own "Save As PDF",
+  tagged as the `"pdf"` attachment role, separate from and independent of the STEP
+  attachment.
 
 ## What `EasyPDMUpload.bas` does
 
@@ -77,29 +87,37 @@ solved differently:
    in again as long as the session is valid (30 days).
 2. **Saves the active document**, if it hasn't been saved yet (SolidWorks' standard "Save
    As" window).
-3. **If the active document is an Assembly**: it detects its component tree
-   (`IAssemblyDoc.GetComponents`, recursively) and asks whether to automatically send
-   along with it all components that are NOT yet linked to the PDM (recognized by Custom
-   Properties on EACH component individually, see below) — leaves first, this document
-   last. For each new component: a short `InputBox` sequence (Project → Type → Name, and
-   for Parts additionally Kind and its dependent fields — the same rules as below; an
-   Assembly has no kind, only an optional Mass), NOT the browser (see "Differences from
-   the FreeCAD macros"). Newly created components immediately get a STEP export and their
-   own `EasyPDM_ItemId` entry, and are automatically attached under their parent in the
-   BOM structure.
+3. **If the active document is an Assembly**: resolves any Lightweight components first
+   (`ResolveAllLightWeightComponents`, called directly on the assembly model — calling it
+   through `.Extension` instead silently no-ops and was a real bug caught in testing:
+   `GetModelDoc2()` returns `Nothing` for a still-Lightweight component, making it
+   indistinguishable from "component not found" until resolved), then detects the
+   component tree (`IAssemblyDoc.GetComponents`, recursively). A pre-walk summary
+   `MsgBox` lists every discovered component, flagging already-linked ones with their
+   target PDM item number and filename — a deliberate guard, since SolidWorks' own
+   Save-As silently copies Custom Properties, which can make a genuinely new part
+   falsely "recognize" itself as an existing item if you're not paying attention to this
+   summary. If confirmed, it walks leaves first (this document last); for each
+   NOT-yet-linked component it opens its own browser ticket (same New item/Duplicate/
+   Attach to existing choice as the top-level document, see "Differences from the
+   FreeCAD macros" for the focus-stealing `MsgBox` shown before each tab). Newly created
+   components get their own STEP/PDF export (per that component's own checkbox choice in
+   the browser) and `EasyPDM_ItemId` entry, and are automatically attached under their
+   parent in the BOM structure.
 4. Checks the main document's **Custom Properties**:
    - **Already linked** (has a saved `EasyPDM_ItemId`) — asks locally for consent to
      attach the current version as a new revision, without opening the browser (see
-     "Differences from the FreeCAD macros"). STEP export always happens.
+     "Differences from the FreeCAD macros"), followed by two more native Yes/No prompts
+     for STEP export (default Yes) and PDF export (default No).
    - **Not yet linked** — opens the system browser (already logged in, token→cookie
      bridge) to the "pending request from a CAD macro" popup, with three options to
      choose THERE: **New item** (project, optionally a parent, type, name — for Parts
      additionally the kind and its dependent fields: Manufactured → Material; Purchased →
      Manufacturer/Order numbers/Mass; Standard part → Material/Norm; Client's → no
      additional fields; **an Assembly has no kind at all** — only an optional Mass — plus
-     a STEP export checkbox), **Duplicate** (points to an existing item, copies its
-     properties to a new one, no files) or **Attach to existing** (search across the
-     whole database + the same STEP checkbox). The macro waits (polls every ~2s,
+     STEP and PDF export checkboxes), **Duplicate** (points to an existing item, copies
+     its properties to a new one, no files) or **Attach to existing** (search across the
+     whole database + the same STEP/PDF checkboxes). The macro waits (polls every ~2s,
      10-minute limit, Escape cancels, progress shown in SolidWorks' status bar) and
      continues automatically once the choice is confirmed in the browser.
    - **Existing item with "Released" status** (both paths above): asks for consent to a
@@ -113,14 +131,18 @@ solved differently:
    over HTTP (preserves revision history); if not (typical when SolidWorks and the
    EasyPDM service run as different Windows users — the storage is under
    `C:\ProgramData\...`, which a regular user usually has no write access to), a plain
-   HTTP upload (fallback, without preserving revision history) — **this is not a bug**,
-   just a security measure working correctly.
-6. When STEP export is enabled (checkbox in the browser, or always for browser-less paths
-   — see point 4): it exports the visible geometry to a temporary `.step` file
-   (`IModelDocExtension.SaveAs`) and uploads it as an attachment with the role `"step"`,
-   replacing the previous attachment of the same role — feeds the persistent 3D preview
-   in the web application. An export error (e.g. no visible geometry) does NOT abort the
-   rest of the operation.
+   HTTP upload (fallback, without preserving revision history, and uses
+   `WinHttp.WinHttpRequest.5.1` specifically for this call — see "History of fixed
+   issues" below) — **this is not a bug**, just a security measure working correctly.
+   This fallback path also checks for and deletes any existing `"cad"`-role attachment
+   with the exact same filename before uploading, so re-saving at the same revision
+   letter doesn't accumulate duplicate attachments.
+6. When STEP/PDF export is enabled (checkbox in the browser, or the native prompts on the
+   browser-less path — see point 4): exports the visible geometry to a temporary
+   `.step`/`.pdf` file (`IModelDocExtension.SaveAs`) and uploads it as an attachment with
+   the role `"step"`/`"pdf"`, replacing the previous attachment of that same role — feeds
+   the persistent 3D preview (STEP) in the web application. An export error (e.g. no
+   visible geometry) does NOT abort the rest of the operation.
 7. Saves `EasyPDM_ItemId`/`EasyPDM_ItemNumber` into the document's Custom Properties and
    shows a confirmation.
 
@@ -201,12 +223,11 @@ whole macro project), so for EACH of the two files separately:
 The API address (default `http://localhost:5000/api`) is saved automatically after being
 entered once at login — shared by both macros.
 
-## History of fixed issues (from the first real test of `EasyPDMUpload.bas`)
+## History of fixed issues
 
-Found and fixed on 2026-08-20 on live SolidWorks 2026 — left here as a documented example
-of what to watch out for when verifying `EasyPDMDownload.bas` (which uses the same,
-already-fixed infrastructure, but also has its OWN, still-unverified code — regex,
-recursive downloading, `OpenDoc6`):
+Found and fixed on 2026-08-20, during the first real test of `EasyPDMUpload.bas` on live
+SolidWorks 2026 — left here as a documented example of the kind of VBA-specific gotcha
+this codebase has hit before (both macros now share this fixed infrastructure):
 
 1. **No session token in the login body** — `MSXML2.XMLHTTP.6.0` did not give reliable
    access to the `Set-Cookie` header. Fixed server-side (`POST /auth/login` adds
@@ -225,57 +246,48 @@ recursive downloading, `OpenDoc6`):
    Polish characters (in comments AND in windows visible to the user) came out as
    garbage. Fixed by translating the whole file into plain ASCII (English).
 5. **`MSXML2.XMLHTTP.send()` rejected a bare `Byte()` array** ("The parameter is
-   incorrect") when uploading through the HTTP fallback. Fixed by wrapping the bytes in
-   a binary `ADODB.Stream` and sending the stream instead of the array.
+   incorrect") when uploading through the HTTP fallback. An initial attempt wrapped the
+   bytes in a binary `ADODB.Stream` sent through the same `MSXML2.XMLHTTP` object — this
+   itself still failed on a real upload with a generic "NO CONNECTION" error. The actual
+   fix: `ApiUploadFile` switched specifically to `WinHttp.WinHttpRequest.5.1`, which
+   accepts a `Byte()` array directly via `.Send()`; every other call (`ApiGet`, login,
+   etc.) still uses `MSXML2.XMLHTTP.6.0`.
+
+Later rounds of live testing (through 2026-08-27) found and fixed several more issues,
+summarized here rather than item-by-item — see git history for the full detail:
+Lightweight assembly components not being detected (`ResolveAllLightWeightComponents`
+must be called directly on the model, not through `.Extension`, which silently no-ops);
+`MSXML2.XMLHTTP.6.0` GET requests being served from Windows' local HTTP cache
+indefinitely, fixed by adding `Cache-Control`/`Pragma` headers plus a `_ts=`
+cache-busting query parameter to every `ApiGet` call in **both** files (each has its own
+independent copy of `ApiGet`, and `EasyPDMDownload.bas` additionally needed the same fix
+in `ApiGetBinary`, since a stale cached response there would silently corrupt the
+downloaded file's actual bytes, not just a status field); a new assembly component
+showing up as an unwanted duplicate at the project root, fixed by explicitly hiding
+newly-created leaf items from the tree root once attached to their real parent; and
+repeated "cad"-role attachments accumulating on every save at the same revision, fixed
+by checking for and deleting an existing same-filename attachment before the plain-HTTP
+upload fallback.
 
 ## Known risks / places to check first
 
-Parts not yet tested — written without access to SolidWorks/a VBA compiler, so not even
-the SYNTAX has been checked automatically (unlike the FreeCAD macros, where `py_compile`
-gave real verification). Suggested test order: a plain Part not yet linked → the same
-Part again (native path) → Attach/Duplicate in the browser → an Assembly with new
-components → Escape/timeout while waiting → `EasyPDMDownload.bas`.
+The main flows are now live-verified (see "Status" above). What remains genuinely
+untested are a few narrow, low-traffic details, marked `UNVERIFIED` inline in the
+source:
 
-**Shared by both files (new in this round):**
-1. **`WaitForTicket`** — a `Sleep`/`DoEvents`/`GetAsyncKeyState(VK_ESCAPE)` loop +
-   polling `GET /create-tickets/{ticket}` every ~2s, `swApp.Frame.SetStatusBarText` to
-   show progress. The mechanism (Win32 API via `Declare`, no `UserForm`) has no direct
-   counterpart elsewhere in this repo — to check: whether Escape actually breaks the
-   loop, whether the status bar updates/clears correctly, whether SolidWorks stays
-   responsive (`DoEvents`) for the whole waiting period.
-2. **`Scriptlet.TypeLib.Guid`** (`NewGuid`) and manual `UrlEncode` (percent-encoding via
-   `ADODB.Stream` to UTF-8 + manual BOM skipping) — both standard, documented workarounds
-   for VBA's lack of a built-in GUID/URL encoder, but untested in this specific use (a
-   document name with Polish characters in `name=` is worth checking separately).
+1. **`IModelDocExtension.SaveAs` exact parameter signature** for `.step`/`.pdf` export
+   (`UploadStepAttachment`/`UploadPdfAttachment`) — written from the SolidWorks API
+   documentation; if SolidWorks reports an argument error, check the exact signature of
+   the installed version in the VBA editor (F1 on `SaveAs`).
+2. **The "save in the same format" path** for a document that was already saved once
+   this session (skips the full Save As dialog) — the common "just re-save and re-run
+   the macro" case is well exercised, this specific branch less so.
+3. **`SW_SAVE_AS_SILENT`**'s exact constant value, used to suppress SolidWorks' own
+   confirmation dialogs during the STEP/PDF export `SaveAs` calls.
 
-**`EasyPDMUpload.bas` (new in this round):**
-3. **`IModelDocExtension.SaveAs` to `.step`** (`UploadStepAttachment`) — the exact
-   number/meaning of the parameters (`SaveAsVersion`/`SaveAsOptions`) written from the
-   API documentation, NOT tested — if SolidWorks reports an argument error, check the
-   exact signature of the installed version in the VBA editor (F1 on `SaveAs`).
-4. **`IAssemblyDoc.GetComponents`/`IComponent2.GetModelDoc2`/`Name2`/`GetTitle`**
-   (`VisitAssemblyComponents`/`ProcessAssemblyTree`) — assumes that a late-bound
-   `ModelDoc2` for an Assembly can be called directly with `IAssemblyDoc` methods (a
-   typical, documented pattern in SolidWorks macros, but untested here). Suppressed/
-   unresolved/virtual components are skipped by checking `GetModelDoc2() Is Nothing`/an
-   empty `GetPathName()` instead of a hardcoded suppression enum value — to be confirmed
-   that this is actually enough.
-
-**`EasyPDMDownload.bas` (unchanged from the previous round):**
-5. **`swApp.OpenDoc6`** — the signature (`FileName, Type, Options, Configuration,
-   Errors, Warnings`) is a well-documented, standard API, but has not been tested live.
-   `Options = 0` (no special flags) should be a safe default value.
-6. **`VBScript.RegExp`** (`NewRevisionRegex`) — used to recognize the file naming
-   convention (`number (name).REVISION.extension`) when detecting the current revision
-   and older local copies. A standard, stable mechanism, but untested in this specific
-   use.
-7. **Recursive downloading of assembly components** (`DownloadChildrenRecursive`) —
-   analogous to `_download_children_recursive` in `EasyPDMDownload.FCMacro` (including
-   the same response shape from `GET /items/{id}/children`: the item nested under the
-   `"item"` key), but untested on the SolidWorks side.
-8. **`EnsureDirectory`** — a manual implementation of creating nested folders (VBA's
-   `MkDir` only creates one level at a time, unlike `os.makedirs`) — simple logic, but
-   worth checking on a path with several non-existent levels at once.
+None of these have caused a reported failure so far — they're listed here as the first
+place to look if something SolidWorks-version-specific ever goes wrong with export or
+save behavior.
 
 ## Limitations (deliberately out of scope for this version)
 
