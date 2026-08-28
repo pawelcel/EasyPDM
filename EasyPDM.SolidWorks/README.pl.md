@@ -109,7 +109,12 @@ inaczej:
    referencjonowane**, nigdy nie wysyłane ponownie — niezależnie od statusu — tylko
    podpinane do BOM-u z wyliczoną ilością; jeśli któryś ma aktualnie status "Sprawdzany"
    albo "Wydany", jest to też wypisane w końcowym komunikacie sukcesu, jako przypomnienie
-   że ewentualne lokalne zmiany w nim NIE zostały wysłane.
+   że ewentualne lokalne zmiany w nim NIE zostały wysłane. **Komponenty usunięte ze
+   złożenia od poprzedniej wysyłki są też oznaczane** — dla każdego rodzica (dokumentu
+   głównego i każdego pod-złożenia), przed podpięciem jego aktualnych lokalnych dzieci,
+   makro sprawdza czy PDM nadal ma relację BOM do dziecka, którego nie ma już lokalnie,
+   i pyta natywnie o potwierdzenie przed usunięciem tej relacji (same elementy nigdy nie
+   są kasowane, tylko ich podpięcie pod tego konkretnego rodzica).
 4. Sprawdza **Właściwości niestandardowe** dokumentu głównego:
    - **Już podpięty** (ma zapisane `EasyPDM_ItemId`) — pyta lokalnie o zgodę na dogranie
      bieżącej wersji jako nowej rewizji, bez otwierania przeglądarki (patrz "Różnice

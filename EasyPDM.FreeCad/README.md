@@ -256,6 +256,13 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
 - Choosing **"No"** on the prompt about automatic sending uploads ONLY the current
   document, exactly as before (without child items) — the BOM structure is then left to
   be filled in manually in the web application, as before.
+- **Removed components are flagged too** — for every parent (the top-level document and
+  every sub-assembly), before attaching its current local children the macro checks
+  whether PDM still has a BOM relation to a child that's no longer in the local
+  structure (removed from the FreeCAD tree since the last upload). If so, it asks
+  natively for confirmation before removing that link (the items themselves are never
+  deleted, only their attachment under this specific parent) — declining leaves
+  everything untouched.
 
 ## First-version limitations
 

@@ -279,6 +279,13 @@ automatisch gesendet werden soll:
 - Die Wahl von **"Nein"** bei der Frage nach dem automatischen Senden sendet NUR das
   aktuelle Dokument, genau wie bisher (ohne Unterelemente) — die Stücklistenstruktur
   bleibt dann zur manuellen Ergänzung in der Web-Anwendung, wie zuvor.
+- **Entfernte Komponenten werden ebenfalls markiert** — für jedes Elternelement (das
+  Hauptdokument und jede Unterbaugruppe) prüft das Makro vor dem Anhängen seiner
+  aktuellen lokalen Kinder, ob das PDM noch eine Stücklistenbeziehung zu einem Kind hat,
+  das nicht mehr in der lokalen Struktur ist (seit dem letzten Hochladen aus dem
+  FreeCAD-Baum entfernt). Falls ja, wird nativ um Bestätigung vor dem Entfernen dieser
+  Beziehung gebeten (die Elemente selbst werden nie gelöscht, nur ihre Zuordnung zu
+  diesem konkreten Elternelement) — eine Ablehnung lässt alles unverändert.
 
 ## Einschränkungen der ersten Version
 

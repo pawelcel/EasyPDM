@@ -326,6 +326,12 @@ TRANSLATIONS = {
             "zablokowane statusem, więc gdybyś je zmieniał lokalnie, wyślij je osobno po "
             "cofnięciu statusu do \"W pracy\"):\n{lines}"
         ),
+        "stale_children_confirm": (
+            "{count} podelement(ów) tego elementu istnieje w PDM, ale nie ma ich już w "
+            "lokalnej strukturze złożenia (usunięte z drzewa FreeCAD od poprzedniej "
+            "wysyłki):\n{lines}\n\nUsunąć te powiązania z PDM? (Same elementy NIE zostaną "
+            "skasowane, tylko ich podpięcie pod to złożenie.)"
+        ),
     },
     "en": {
         "no_connection": "Could not connect to {url}: {reason}",
@@ -427,6 +433,12 @@ TRANSLATIONS = {
             "already-existing components, but these are additionally locked by status, "
             "so if you changed them locally, upload them separately after moving the "
             "status back to \"In progress\"):\n{lines}"
+        ),
+        "stale_children_confirm": (
+            "{count} sub-item(s) of this item exist in PDM, but are no longer in the "
+            "local assembly structure (removed from the FreeCAD tree since the last "
+            "upload):\n{lines}\n\nRemove these links from PDM? (The items themselves will "
+            "NOT be deleted, only their attachment under this assembly.)"
         ),
     },
     "de": {
@@ -535,6 +547,13 @@ TRANSLATIONS = {
             "durch ihren Status gesperrt — falls Sie sie lokal geändert haben, laden Sie "
             "sie separat hoch, nachdem der Status wieder auf \"In Bearbeitung\" gesetzt "
             "wurde):\n{lines}"
+        ),
+        "stale_children_confirm": (
+            "{count} Unterelement(e) dieses Elements existieren im PDM, sind aber nicht "
+            "mehr in der lokalen Baugruppenstruktur (seit dem letzten Hochladen aus dem "
+            "FreeCAD-Baum entfernt):\n{lines}\n\nDiese Verknüpfungen aus dem PDM entfernen? "
+            "(Die Elemente selbst werden NICHT gelöscht, nur ihre Zuordnung zu dieser "
+            "Baugruppe.)"
         ),
     },
 }
@@ -1692,6 +1711,50 @@ def submit_via_browser(doc, target_folder):
     )
 
 
+def sync_stale_children(parent_item_id, local_child_ids):
+    """Wykrywa dzieci elementu `parent_item_id`, które istnieją w PDM, ale NIE ma ich już
+    wśród `local_child_ids` (odkrytych właśnie w lokalnej strukturze FreeCAD -- usunięte
+    z drzewa złożenia od poprzedniej wysyłki). Makro dotąd tylko DODAWAŁ relacje BOM,
+    nigdy nie usuwał tych, które zniknęły lokalnie -- potwierdzony w praktyce błąd:
+    usunięcie komponentu ze złożenia w FreeCAD i ponowna wysyłka zostawiały starą relację
+    w PDM nietkniętą. Przed usunięciem pyta natywnie o potwierdzenie (relacja mogła zostać
+    dodana ręcznie w aplikacji webowej z innego powodu, niezwiązanego z tym plikiem
+    FreeCAD) -- odmowa albo błąd pobrania listy NIC nie usuwa. Po każdym udanym usunięciu
+    przywraca widoczność usuniętego dziecka w korzeniu projektu (showInTree=true) --
+    dokładnie ten sam dwuetapowy mechanizm co ręczne "Usuń ze struktury" w aplikacji
+    webowej (inaczej element zostałby całkowicie niewidoczny, jeśli wcześniej był ukryty
+    jako efekt uboczny leaves-first, zob. newly_created_paths)."""
+    try:
+        existing_children = api_get(f"/items/{parent_item_id}/children") or []
+    except Exception:
+        return
+
+    stale = []
+    for entry in existing_children:
+        child = entry.get("item", entry)
+        child_id = child.get("id")
+        if child_id and child_id not in local_child_ids:
+            stale.append(child)
+
+    if not stale:
+        return
+
+    lines = "\n".join(f"- {c.get('itemNumber')} ({c.get('fileName')})" for c in stale)
+    choice = QtWidgets.QMessageBox.question(
+        None, t("pdm_title"), t("stale_children_confirm", count=len(stale), lines=lines),
+        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No,
+    )
+    if choice != QtWidgets.QMessageBox.Yes:
+        return
+
+    for c in stale:
+        try:
+            api_delete(f"/items/{parent_item_id}/children/{c.get('id')}")
+            api_patch_json(f"/items/{c.get('id')}/visibility", {"showInTree": True})
+        except Exception:
+            pass
+
+
 def process_assembly_tree(top_doc, target_folder=None):
     """Wykrywa złożenie (App::Link do zewnętrznych plików, rekurencyjnie) i dla KAŻDEGO
     nowego komponentu (jeszcze nie wysłanego do PDM — rozpoznawane po etykiecie
@@ -1854,6 +1917,14 @@ def process_assembly_tree(top_doc, target_folder=None):
                 return [], True, locked_matches
             doc_to_item_id[file_path] = result["itemId"]
 
+        # Zanim dogramy AKTUALNE relacje niżej, sprawdź czy w PDM nie zostały jakieś
+        # relacje do dzieci, których już nie ma w lokalnej strukturze tego pod-złożenia
+        # (usunięte z drzewa FreeCAD od poprzedniej wysyłki) -- zob. sync_stale_children.
+        local_child_ids_here = {
+            doc_to_item_id[cf] for pf, cf, _ in edges if pf == file_path and cf in doc_to_item_id
+        }
+        sync_stale_children(doc_to_item_id[file_path], local_child_ids_here)
+
         # Podpinamy relacje TERAZ, w TEJ SAMEJ iteracji w której file_path (jako rodzic)
         # właśnie dostał swoje item_id — NIE w osobnej pętli po całkowitym zakończeniu
         # tworzenia wszystkich komponentów. "order" gwarantuje dzieci przed rodzicami
@@ -1971,6 +2042,11 @@ def run():
         # przypadków nic nie wysłano.
         QtWidgets.QMessageBox.information(None, t("pdm_title"), t("nothing_sent"))
         return
+
+    # Zanim dogramy AKTUALNE relacje niżej, sprawdź czy w PDM nie zostały jakieś relacje
+    # do dzieci, których już nie ma w lokalnej strukturze złożenia (usunięte z drzewa
+    # FreeCAD od poprzedniej wysyłki) -- zob. sync_stale_children.
+    sync_stale_children(info["itemId"], {child_item_id for child_item_id, _, _ in edges_for_top})
 
     # Krok 3: podepnij pod TEN element podelementy odkryte w kroku 1a (BOM) — dopiero teraz
     # znamy jego item_id, niezależnie od tego, czy był nowy, czy już istniał w PDM.
