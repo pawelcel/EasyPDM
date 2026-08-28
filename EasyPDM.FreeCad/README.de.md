@@ -290,14 +290,19 @@ automatisch gesendet werden soll:
   überschritten (oder Abbrechen gedrückt), endet das Makro mit einer Meldung, ohne eine
   Datei zu erstellen/anzuhängen.
 - Die automatische Baugruppenerkennung funktioniert nur für Verweise auf **externe,
-  gespeicherte Dateien** (`App::Link`) — nicht für Baugruppen, die als `App::Part`-
+  gespeicherte Dateien** (`App::Link` und davon abgeleitete Typen, z. B. das
+  `Assembly::AssemblyLink` der nativen Assembly-Workbench für Unterbaugruppen-
+  Komponenten — geprüft wird `isDerivedFrom("App::Link")`, kein exakter Typvergleich,
+  genau weil sich ein exakter Vergleich früher still eine neu hinzugefügte
+  Unterbaugruppen-Komponente komplett entgehen ließ, ganz ohne Fehlermeldung — ein
+  echter, in der Praxis behobener Fehler) — nicht für Baugruppen, die als `App::Part`-
   Container in einer einzigen Datei gehalten werden (diese haben keine separaten
   Dateien, die einzeln gesendet werden könnten; sie müssen dann manuell gesendet werden,
-  Teil für Teil, wie bisher). Dies deckt auch FreeCADs native Assembly-Workbench ab,
-  solange deren Komponenten separate gespeicherte Dokumente sind (die typische, und
-  bestätigt funktionierende, Art, darin eine Baugruppe aufzubauen) — ihre eigenen
-  Container (`Assembly::AssemblyObject`) und Gelenke haben keine separate Datei und
-  werden vom Erkennungsdurchlauf korrekt ignoriert, nur deren `App::Link`-Kinder zählen.
+  Teil für Teil, wie bisher). Dies deckt FreeCADs native Assembly-Workbench ab, solange
+  deren Komponenten separate gespeicherte Dokumente sind (die typische, und bestätigt
+  funktionierende, Art, darin eine Baugruppe aufzubauen) — ihre eigenen Container
+  (`Assembly::AssemblyObject`) und Gelenke haben keine separate Datei und werden vom
+  Erkennungsdurchlauf korrekt ignoriert.
 - **Der PDF-Export ist Best-Effort** (siehe Schritt 5 oben, `Gui.export(...)`) — er läuft
   nicht über FreeCADs üblichen, auf TechDraw basierenden PDF-Pfad, sodass die Ergebnisse
   je nach FreeCAD-Version oder Dokumenttyp variieren können, auch wenn er in der Praxis

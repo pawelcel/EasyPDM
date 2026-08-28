@@ -266,13 +266,17 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
   a **10-minute** limit — once exceeded (or on Cancel) the macro ends with a message,
   without creating/attaching a file.
 - Automatic assembly detection only works for references to **external, saved files**
-  (`App::Link`) — not for assemblies kept in a single file as `App::Part` containers
-  (these have no separate files to upload individually; they then need to be uploaded
-  manually, part by part, as before). This covers FreeCAD's native Assembly workbench
-  too, as long as its components are separate saved documents (the typical, and
-  confirmed-working, way of building an assembly in it) — its own containers
-  (`Assembly::AssemblyObject`) and joints have no separate file and are correctly
-  ignored by the detection walk, only their `App::Link` children matter.
+  (`App::Link` and Link-derived types, e.g. the native Assembly workbench's
+  `Assembly::AssemblyLink` for sub-assembly components — detection checks
+  `isDerivedFrom("App::Link")`, not an exact type match, precisely because relying on an
+  exact match once silently missed a newly-added sub-assembly component entirely, with no
+  error at all, a real bug found and fixed in practice) — not for assemblies kept in a
+  single file as `App::Part` containers (these have no separate files to upload
+  individually; they then need to be uploaded manually, part by part, as before). This
+  covers FreeCAD's native Assembly workbench, as long as its components are separate
+  saved documents (the typical, and confirmed-working, way of building an assembly in
+  it) — its own containers (`Assembly::AssemblyObject`) and joints have no separate file
+  and are correctly ignored by the detection walk.
 - **PDF export is best-effort** (see step 5 above, `Gui.export(...)`) — it doesn't go
   through FreeCAD's usual TechDraw-based PDF path, so results may vary by FreeCAD
   version or document type even though it's confirmed working in practice.
