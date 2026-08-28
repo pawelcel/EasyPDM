@@ -153,6 +153,14 @@ des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
     Ein Abbruch speichert nichts; eine Bestätigung ändert den Status auf "In Bearbeitung"
     (derselbe Mechanismus wie in der Web-Anwendung — erhöht die Revisionsnummer und
     speichert den Kommentar, falls angegeben) und sendet erst danach die Datei.
+
+    Für den Status **"In Prüfung"** wird das Anhängen an ein vorhandenes Element
+    stattdessen **hart blockiert**, mit einer nativen Fehlermeldung — das Makro setzt den
+    Status NICHT still zurück auf "In Bearbeitung", um trotzdem hochzuladen (das war ein
+    echter, behobener Fehler: das Element von jemand anderem prüfen und es sich durch
+    einen erneuten Upload still unter den Füßen zurücksetzen lassen). Wer prüft, muss den
+    Status selbst in der Web-Anwendung aus "In Prüfung" herausbewegen, bevor eine neue
+    Datei angehängt werden kann.
 3. Das Element existiert an diesem Punkt bereits im PDM (neu — über das Formular im
    Browser erstellt; bereits vorhanden — dort über dieselbe Leiste angegeben, siehe
    Schritt 2). In beiden Fällen **KOPIERT** das Makro die aktuelle Dokumentdatei in das

@@ -133,6 +133,13 @@ dwie osobne.
     lokalne. Anulowanie nic nie zapisuje; zatwierdzenie zmienia status na "W pracy" (ten
     sam mechanizm co w aplikacji webowej — podnosi numer rewizji i zapisuje komentarz,
     jeśli podano) i dopiero potem wysyła plik.
+
+    Dla statusu **"Sprawdzany"** dogranie do istniejącego elementu jest zamiast tego
+    **twardo blokowane**, z natywnym komunikatem błędu — makro NIE cofa cicho statusu do
+    "W pracy" i nie wysyła mimo to (to był realny, naprawiony błąd: recenzowanie czyjegoś
+    elementu i ciche zresetowanie tego przez ponowną wysyłkę spod nóg recenzenta). Osoba
+    recenzująca musi sama przenieść element poza status "Sprawdzany" w aplikacji webowej,
+    zanim będzie można dograć nowy plik.
 3. Element w tym momencie już istnieje w PDM (nowy — stworzony przez formularz w
    przeglądarce; już istniejący — wskazany tam samym paskiem, zob. krok 2). W obu
    przypadkach makro

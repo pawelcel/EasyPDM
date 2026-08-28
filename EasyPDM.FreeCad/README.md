@@ -144,6 +144,13 @@ separate ones.
     application — it bumps the revision number and saves the comment, if one was given)
     and only then sends the file.
 
+    For the **"Under review"** status, attaching to an existing item is instead **hard
+    blocked**, with a native error message — the macro does NOT silently flip the status
+    back to "In progress" and upload anyway (that was a real, fixed bug: reviewing
+    someone's item and having it silently reset out from under you by a re-upload).
+    Whoever is reviewing needs to move the item out of "Under review" themselves in the
+    web application before a new file can be attached.
+
 3. At this point the item already exists in the PDM (new — created via the browser form;
    already existing — pointed to there via the same bar, see step 2). In both cases the
    macro **COPIES** the current document file into the PDM under the name

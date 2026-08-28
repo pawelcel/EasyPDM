@@ -16,6 +16,12 @@ const NEXT_STATUSES: Record<ItemStatus, ItemStatus[]> = {
   wydany: ["w_pracy"],
 }
 
+// Stała kolejność wszystkich statusów -- przyciski renderowane są zawsze w tym samym
+// układzie (bieżący jako odznaka, reszta jako przyciski), żeby nic nie zmieniało pozycji
+// przy zmianie statusu. Nieosiągalne stąd bezpośrednio przejścia (np. w_pracy -> wydany)
+// są nadal widoczne, tylko wyszarzone/nieaktywne.
+const ALL_STATUSES: ItemStatus[] = ["w_pracy", "sprawdzany", "wydany"]
+
 function StatusControl({
   item,
   disabled = false,
@@ -49,24 +55,27 @@ function StatusControl({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className={cn(buttonVariants({ variant: "default", size: "sm" }))}>
-        {t(STATUS_LABEL_KEYS[status])}
-      </span>
       <div className="flex gap-1.5">
-        {NEXT_STATUSES[status].map((next) => (
-          <Button
-            key={next}
-            size="sm"
-            variant="outline"
-            disabled={disabled}
-            onClick={() => {
-              setComment("")
-              setPending(next)
-            }}
-          >
-            → {t(STATUS_LABEL_KEYS[next])}
-          </Button>
-        ))}
+        {ALL_STATUSES.map((s) =>
+          s === status ? (
+            <span key={s} className={cn(buttonVariants({ variant: "default", size: "sm" }))}>
+              {t(STATUS_LABEL_KEYS[s])}
+            </span>
+          ) : (
+            <Button
+              key={s}
+              size="sm"
+              variant="outline"
+              disabled={disabled || !NEXT_STATUSES[status].includes(s)}
+              onClick={() => {
+                setComment("")
+                setPending(s)
+              }}
+            >
+              → {t(STATUS_LABEL_KEYS[s])}
+            </Button>
+          )
+        )}
       </div>
 
       {revisions.length > 0 && (
