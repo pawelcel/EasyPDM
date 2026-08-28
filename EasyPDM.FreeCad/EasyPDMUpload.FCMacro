@@ -870,15 +870,33 @@ def _iter_external_link_targets(doc):
     wykrywania drzewa, bez żadnego błędu), dokładnie tak jak `Part.export()` cicho pomijał
     ten sam typ obiektów przy eksporcie STEP (zob. `_upload_step_attachment`)."""
     result = {}
+    App.Console.PrintMessage(f"EasyPDM: wykrywanie drzewa -- diagnostyka obiektow w '{doc.Name}':\n")
     for obj in doc.Objects:
-        if not obj.isDerivedFrom("App::Link"):
+        is_link = obj.isDerivedFrom("App::Link")
+        if not is_link:
+            App.Console.PrintMessage(f"  {obj.Name} ({obj.TypeId}): pomijam -- nie jest App::Link\n")
             continue
         linked = getattr(obj, "LinkedObject", None)
         if linked is None:
+            App.Console.PrintMessage(f"  {obj.Name} ({obj.TypeId}): pomijam -- brak LinkedObject\n")
             continue
         linked_doc = getattr(linked, "Document", None)
-        if linked_doc is None or not linked_doc.FileName or linked_doc.FileName == doc.FileName:
+        if linked_doc is None:
+            App.Console.PrintMessage(
+                f"  {obj.Name} ({obj.TypeId}): pomijam -- LinkedObject '{linked.Name}' nie ma Document (dokument nieotwarty?)\n"
+            )
             continue
+        if not linked_doc.FileName:
+            App.Console.PrintMessage(
+                f"  {obj.Name} ({obj.TypeId}): pomijam -- dokument docelowy '{linked_doc.Name}' nie ma FileName (niezapisany)\n"
+            )
+            continue
+        if linked_doc.FileName == doc.FileName:
+            App.Console.PrintMessage(
+                f"  {obj.Name} ({obj.TypeId}): pomijam -- link wewnatrz tego samego pliku\n"
+            )
+            continue
+        App.Console.PrintMessage(f"  {obj.Name} ({obj.TypeId}): OK -- link do '{linked_doc.FileName}'\n")
         qty = getattr(obj, "ElementCount", 0) or 1
         qty = max(int(qty), 1)
         key = linked_doc.FileName
