@@ -856,14 +856,22 @@ def build_browser_create_url(name, ticket, suggested_item_number=None):
 # ============================================================
 def _iter_external_link_targets(doc):
     """Zwraca dict {ścieżka_pliku: [freecad_document, łączna_ilość]} dla wszystkich
-    App::Link w `doc` wskazujących na INNY, już zapisany dokument (linki wewnątrz tego
-    samego dokumentu — np. wzorzec śrub w obrębie jednej części — są pomijane, bo nie mają
-    osobnego pliku do wysłania). Ilość to suma po WSZYSTKICH linkach do tego samego pliku:
-    zwykły (niearrayowy) App::Link ma ElementCount=0, co liczymy jako 1 sztukę; wzorzec/
-    tablica linków (ElementCount>0) liczy się jako tyle sztuk, ile wskazuje ElementCount."""
+    App::Link (i pochodnych, np. Assembly::AssemblyLink -- zob. niżej) w `doc` wskazujących
+    na INNY, już zapisany dokument (linki wewnątrz tego samego dokumentu — np. wzorzec śrub
+    w obrębie jednej części — są pomijane, bo nie mają osobnego pliku do wysłania). Ilość to
+    suma po WSZYSTKICH linkach do tego samego pliku: zwykły (niearrayowy) link ma
+    ElementCount=0, co liczymy jako 1 sztukę; wzorzec/tablica linków (ElementCount>0) liczy
+    się jako tyle sztuk, ile wskazuje ElementCount.
+
+    Sprawdzamy `isDerivedFrom("App::Link")`, NIE dokładne `TypeId == "App::Link"` -- natywny
+    workbench Assembly reprezentuje niektóre komponenty (potwierdzone w praktyce: pod-złożenie
+    wstawione jako komponent) jako `Assembly::AssemblyLink`, nie gołe `App::Link` -- dokładne
+    porównanie TypeId cicho pomijało takie komponenty (nowo dodany element "znikał" z
+    wykrywania drzewa, bez żadnego błędu), dokładnie tak jak `Part.export()` cicho pomijał
+    ten sam typ obiektów przy eksporcie STEP (zob. `_upload_step_attachment`)."""
     result = {}
     for obj in doc.Objects:
-        if obj.TypeId != "App::Link":
+        if not obj.isDerivedFrom("App::Link"):
             continue
         linked = getattr(obj, "LinkedObject", None)
         if linked is None:

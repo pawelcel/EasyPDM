@@ -255,13 +255,17 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   — po przekroczeniu (albo Anuluj) makro kończy się komunikatem, bez tworzenia/dogrania
   pliku.
 - Automatyczne wykrywanie złożenia działa tylko dla odnośników do **zewnętrznych, zapisanych
-  plików** (`App::Link`) — nie dla złożeń trzymanych w jednym pliku jako kontenery
-  `App::Part` (te nie mają osobnych plików do wysłania osobno; trzeba je wtedy wysyłać
-  ręcznie, część po części, tak jak dotychczas). Obejmuje to też natywny workbench
-  Assembly FreeCAD, o ile jego komponenty są osobnymi zapisanymi dokumentami (typowy i
-  potwierdzony jako działający sposób budowania w nim złożenia) — jego własne kontenery
-  (`Assembly::AssemblyObject`) i więzy nie mają osobnego pliku i są poprawnie pomijane
-  przez przechodzenie wykrywające, liczą się tylko ich dzieci `App::Link`.
+  plików** (`App::Link` i typów pochodnych, np. `Assembly::AssemblyLink` używanego przez
+  natywny workbench Assembly dla komponentów będących pod-złożeniami — sprawdzane jest
+  `isDerivedFrom("App::Link")`, nie dokładne dopasowanie typu, właśnie dlatego, że poleganie
+  na dokładnym dopasowaniu kiedyś cicho gubiło nowo dodany komponent pod-złożenia
+  całkowicie, bez żadnego błędu — to był realny, naprawiony błąd) — nie dla złożeń
+  trzymanych w jednym pliku jako kontenery `App::Part` (te nie mają osobnych plików do
+  wysłania osobno; trzeba je wtedy wysyłać ręcznie, część po części, tak jak dotychczas).
+  Obejmuje to natywny workbench Assembly FreeCAD, o ile jego komponenty są osobnymi
+  zapisanymi dokumentami (typowy i potwierdzony jako działający sposób budowania w nim
+  złożenia) — jego własne kontenery (`Assembly::AssemblyObject`) i więzy nie mają
+  osobnego pliku i są poprawnie pomijane przez przechodzenie wykrywające.
 - **Eksport PDF jest rozwiązaniem best-effort** (patrz krok 5 wyżej, `Gui.export(...)`) —
   nie korzysta z typowej dla FreeCAD ścieżki PDF opartej o TechDraw, więc wyniki mogą się
   różnić między wersjami FreeCAD i typami dokumentu, mimo że potwierdzone jako działające
