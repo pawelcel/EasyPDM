@@ -312,6 +312,11 @@ TRANSLATIONS = {
             "poprzedniej wersji — popraw to ręcznie w aplikacji webowej (dograj plik "
             "ponownie) albo spróbuj ponownie z tego makra."
         ),
+        "upload_blocked_review": (
+            "Nie można wysłać — element #{number} ma status \"Sprawdzany\". Poczekaj, aż "
+            "recenzja się zakończy (element wróci do statusu \"W pracy\"), albo zmień "
+            "status ręcznie w aplikacji webowej."
+        ),
     },
     "en": {
         "no_connection": "Could not connect to {url}: {reason}",
@@ -399,6 +404,11 @@ TRANSLATIONS = {
             "{error}\n\nThe item in PDM now has a new revision, but still has the file from "
             "the previous version — fix this manually in the web application (upload the "
             "file again) or try again from this macro."
+        ),
+        "upload_blocked_review": (
+            "Cannot upload — item #{number} has status \"Under review\". Wait until the "
+            "review finishes (the item returns to \"In progress\"), or change the status "
+            "manually in the web application."
         ),
     },
     "de": {
@@ -491,6 +501,12 @@ TRANSLATIONS = {
             "aber immer noch die Datei der vorherigen Version — korrigieren Sie dies "
             "manuell in der Webanwendung (Datei erneut hochladen) oder versuchen Sie es "
             "erneut mit diesem Makro."
+        ),
+        "upload_blocked_review": (
+            "Hochladen nicht möglich — Element #{number} hat den Status \"In Prüfung\". "
+            "Warten Sie, bis die Prüfung abgeschlossen ist (das Element kehrt zu \"In "
+            "Bearbeitung\" zurück), oder ändern Sie den Status manuell in der "
+            "Web-Anwendung."
         ),
     },
 }
@@ -1227,12 +1243,17 @@ def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None
         status_changed = True
     elif current_status is not None and current_status != "w_pracy":
         # Każdy status poza "w_pracy" blokuje dogrywanie plików po stronie backendu
-        # (zob. ItemEndpoints.IsLocked) — nie tylko "wydany". Dla "sprawdzany" wystarczy
-        # wrócić do "w_pracy" bez pytania o nową rewizję: rewizję podnosi WYŁĄCZNIE
-        # przejście wydany -> w_pracy (zob. bumpRevision w PATCH /items/{id}/status),
-        # więc "sprawdzany" -> "w_pracy" nie jest nową rewizją i nie potrzebuje komentarza.
-        api_patch_json(f"/items/{item_id}/status", {"status": "w_pracy"})
-        status_changed = True
+        # (zob. ItemEndpoints.IsLocked) — jedynym innym realnym stanem tutaj jest
+        # "sprawdzany" ("wydany" ma własną gałąź wyżej). W przeciwieństwie do "wydany"
+        # (gdzie powrót do "w_pracy" to świadoma, chciana akcja "nowa rewizja"),
+        # "sprawdzany" oznacza, że ktoś aktywnie recenzuje ten element — cichy powrót do
+        # "w_pracy" i wysłanie nowego pliku byłoby cichym skasowaniem recenzji w toku,
+        # bez pytania kogokolwiek o zgodę. Zamiast tego twardo blokujemy z komunikatem —
+        # to poprzednie zachowanie (cichy PATCH + wysyłka) było błędem.
+        QtWidgets.QMessageBox.warning(
+            None, t("pdm_title"), t("upload_blocked_review", number=item.get("itemNumber", item_id))
+        )
+        return None
     else:
         status_changed = False
 
@@ -1743,8 +1764,10 @@ def process_assembly_tree(top_doc, target_folder=None):
                         target_folder=target_folder, export_step=comp_export_step, export_pdf=comp_export_pdf,
                     )
                     if result is None:
-                        # Element już istniejący jest "wydany" i użytkownik odmówił nowej
-                        # rewizji -- traktujemy jak każdą inną rezygnację w tej pętli.
+                        # Albo element już istniejący jest "wydany" i użytkownik odmówił
+                        # nowej rewizji, albo ma status "sprawdzany" i push_to_existing_item
+                        # zablokował wysyłkę z własnym komunikatem -- w obu przypadkach
+                        # traktujemy jak każdą inną rezygnację w tej pętli.
                         return [], True
                 else:
                     # Nowy element -- już istnieje po stronie serwera (przeglądarka
@@ -1874,8 +1897,10 @@ def run():
     info = submit_via_browser(doc, target_folder)
 
     if info is None:
-        # Anulowano/upłynął czas oczekiwania na przeglądarkę, albo element był "Wydany" i
-        # użytkownik odmówił stworzenia nowej rewizji — w obu przypadkach nic nie wysłano.
+        # Anulowano/upłynął czas oczekiwania na przeglądarkę, element był "Wydany" i
+        # użytkownik odmówił stworzenia nowej rewizji, albo element ma status "Sprawdzany"
+        # i push_to_existing_item już pokazał własny komunikat blokujący — w każdym z tych
+        # przypadków nic nie wysłano.
         QtWidgets.QMessageBox.information(None, t("pdm_title"), t("nothing_sent"))
         return
 

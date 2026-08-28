@@ -142,6 +142,12 @@ anders gelöst:
      Zustimmung zu einer neuen Revision und einem optionalen Kommentar — genau derselbe
      Mechanismus wie in der Web-Anwendung, die einzige Entscheidung, die bewusst auch auf
      dem Browser-Pfad lokal bleibt.
+   - **Vorhandenes Element im Status „In Prüfung"**: das Anhängen wird stattdessen **hart
+     blockiert**, mit einer nativen Fehlermeldung — das Makro setzt den Status NICHT still
+     zurück auf „In Bearbeitung", um trotzdem hochzuladen (das war ein echter, behobener
+     Fehler: jemand prüft das Element und es wird ihm durch einen erneuten Upload still
+     unter den Füßen zurückgesetzt). Wer prüft, muss den Status zuerst selbst in der
+     Web-Anwendung aus „In Prüfung" herausbewegen.
 5. **Kopiert** die aktuelle Dokumentdatei in das PDM unter dem Namen
    `nummer (name).REVISION.erweiterung` (dieselbe Konvention wie in der Web-Anwendung und
    den FreeCAD-Makros). **Die lokale Datei wird NICHT angetastet** — sie wird weder

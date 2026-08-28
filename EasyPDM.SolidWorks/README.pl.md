@@ -126,6 +126,11 @@ inaczej:
      nową rewizję i opcjonalny komentarz — dokładnie ten sam mechanizm co w aplikacji
      webowej, jedyna decyzja świadomie zostająca lokalna nawet na ścieżce przez
      przeglądarkę.
+   - **Istniejący element ze statusem "Sprawdzany"**: dogranie jest zamiast tego **twardo
+     blokowane** natywnym komunikatem błędu — makro NIE cofa cicho statusu do "W pracy" i
+     nie wysyła mimo to (to był realny, naprawiony błąd: recenzowanie elementu i ciche
+     zresetowanie go przez ponowną wysyłkę spod nóg recenzenta). Osoba recenzująca musi
+     najpierw sama przenieść element poza status "Sprawdzany" w aplikacji webowej.
 5. **Kopiuje** bieżący plik dokumentu do PDM pod nazwą `numer (nazwa).REWIZJA.rozszerzenie`
    (ta sama konwencja co w aplikacji webowej i makrach FreeCAD). **Lokalny plik NIE jest
    ruszany** — nie jest ani przenoszony, ani usuwany. Jeśli magazyn PDM jest widoczny

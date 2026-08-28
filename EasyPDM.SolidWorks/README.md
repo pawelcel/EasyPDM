@@ -123,6 +123,11 @@ solved differently:
    - **Existing item with "Released" status** (both paths above): asks for consent to a
      new revision and an optional comment — exactly the same mechanism as in the web
      application, the only decision deliberately staying local even on the browser path.
+   - **Existing item with "Under review" status**: attaching is instead **hard blocked**
+     with a native error message — the macro does NOT silently flip the status back to
+     "In progress" and upload anyway (that was a real, fixed bug: someone reviewing the
+     item could have it silently reset out from under them by a re-upload). Whoever is
+     reviewing needs to move the item out of "Under review" in the web application first.
 5. **Copies** the current document file into the PDM under the name
    `number (name).REVISION.extension` (the same convention as in the web application and
    the FreeCAD macros). **The local file is NOT touched** — it is neither moved nor

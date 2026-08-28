@@ -225,6 +225,9 @@ Private Function T_PL(ByVal key As String) As String
         Case "TitleNewRevision": T_PL = "Nowa rewizja"
         Case "ItemStatusReleasedPrefix": T_PL = "Element nr "
         Case "ItemStatusReleasedSuffix": T_PL = " ma status ""Wydany"" -- podpiecie pliku wymaga nowej rewizji. Utworzyc nowa rewizje?"
+        Case "TitleUploadBlocked": T_PL = "Wysylka zablokowana"
+        Case "UploadBlockedReviewPrefix": T_PL = "Nie mozna wyslac -- element nr "
+        Case "UploadBlockedReviewSuffix": T_PL = " ma status ""Sprawdzany"". Poczekaj, az recenzja sie zakonczy (element wroci do statusu ""W pracy""), albo zmien status recznie w aplikacji webowej."
         Case "PromptRevisionComment": T_PL = "Komentarz do nowej rewizji (opcjonalnie):"
         Case "PromptTargetFolder": T_PL = "Folder docelowy na lokalne kopie (nazwane pod numerem PDM):"
         Case "TitleTargetFolder": T_PL = "Folder docelowy"
@@ -280,6 +283,9 @@ Private Function T_EN(ByVal key As String) As String
         Case "TitleNewRevision": T_EN = "New revision"
         Case "ItemStatusReleasedPrefix": T_EN = "Item #"
         Case "ItemStatusReleasedSuffix": T_EN = " is in status ""Released"" -- attaching a file requires a new revision. Create a new revision?"
+        Case "TitleUploadBlocked": T_EN = "Upload blocked"
+        Case "UploadBlockedReviewPrefix": T_EN = "Cannot upload -- item #"
+        Case "UploadBlockedReviewSuffix": T_EN = " has status ""Under review"". Wait until the review finishes (the item returns to ""In progress""), or change the status manually in the web application."
         Case "PromptRevisionComment": T_EN = "New revision comment (optional):"
         Case "PromptTargetFolder": T_EN = "Target folder for local copies (named under the PDM number):"
         Case "TitleTargetFolder": T_EN = "Target folder"
@@ -335,6 +341,9 @@ Private Function T_DE(ByVal key As String) As String
         Case "TitleNewRevision": T_DE = "Neue Revision"
         Case "ItemStatusReleasedPrefix": T_DE = "Element Nr. "
         Case "ItemStatusReleasedSuffix": T_DE = " hat den Status ""Freigegeben"" -- das Anhaengen einer Datei erfordert eine neue Revision. Neue Revision erstellen?"
+        Case "TitleUploadBlocked": T_DE = "Hochladen blockiert"
+        Case "UploadBlockedReviewPrefix": T_DE = "Hochladen nicht moeglich -- Element Nr. "
+        Case "UploadBlockedReviewSuffix": T_DE = " hat den Status ""In Pruefung"". Warten Sie, bis die Pruefung abgeschlossen ist (das Element kehrt zu ""In Bearbeitung"" zurueck), oder aendern Sie den Status manuell in der Web-Anwendung."
         Case "PromptRevisionComment": T_DE = "Kommentar zur neuen Revision (optional):"
         Case "PromptTargetFolder": T_DE = "Zielordner fuer lokale Kopien (benannt nach der PDM-Nummer):"
         Case "TitleTargetFolder": T_DE = "Zielordner"
@@ -1677,11 +1686,16 @@ Function PushToExistingItem(ByVal swModel As Object, ByVal itemId As String, ByV
         statusChanged = True
     ElseIf currentStatus <> "" And currentStatus <> "w_pracy" Then
         ' Any status other than "w_pracy" (in progress) blocks attaching files on the
-        ' backend, not just "wydany" (released). For "sprawdzany" (under review), just
-        ' going back to "w_pracy" is enough without asking about a new revision: the
-        ' revision is bumped ONLY by the wydany -> w_pracy transition.
-        ApiPatchJson "/items/" & itemId & "/status", "{""status"":""w_pracy""}"
-        statusChanged = True
+        ' backend -- the only other real state here is "sprawdzany" (under review),
+        ' since "wydany" has its own branch above. Unlike "wydany" (where going back to
+        ' "w_pracy" is a deliberate, wanted "new revision" action), "sprawdzany" means
+        ' someone is actively reviewing this item -- silently reverting to "w_pracy" and
+        ' uploading a new file would silently blow away a review in progress, without
+        ' asking anyone. Hard-block instead, with a message -- the previous behavior
+        ' (silent PATCH + upload) was a bug.
+        MsgBox T("UploadBlockedReviewPrefix") & itemNumber & T("UploadBlockedReviewSuffix"), vbExclamation, T("TitleUploadBlocked")
+        Set PushToExistingItem = Nothing
+        Exit Function
     End If
 
     Dim uploadErrNum As Long, uploadErrDesc As String
