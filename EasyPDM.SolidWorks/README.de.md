@@ -123,7 +123,12 @@ anders gelöst:
    — nur mit der berechneten Menge an die Stückliste angehängt; hat eine davon aktuell
    den Status „In Prüfung" oder „Freigegeben", wird sie auch in der abschließenden
    Erfolgsmeldung aufgeführt, als Erinnerung, dass lokale Änderungen daran NICHT gesendet
-   wurden.
+   wurden. **Seit dem letzten Hochladen aus der Baugruppe entfernte Komponenten werden
+   ebenfalls markiert** — für jedes Elternelement (das Hauptdokument und jede
+   Unterbaugruppe) prüft das Makro vor dem Anhängen seiner aktuellen lokalen Kinder, ob
+   das PDM noch eine Stücklistenbeziehung zu einem nicht mehr lokal vorhandenen Kind hat,
+   und bittet nativ um Bestätigung vor dem Entfernen dieser Beziehung (die Elemente
+   selbst werden nie gelöscht, nur ihre Zuordnung zu diesem konkreten Elternelement).
 4. Prüft die **Custom Properties** des Hauptdokuments:
    - **Bereits verknüpft** (hat eine gespeicherte `EasyPDM_ItemId`) — fragt lokal nach der
      Zustimmung, die aktuelle Version als neue Revision anzuhängen, ohne den Browser zu

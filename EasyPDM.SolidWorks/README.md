@@ -107,7 +107,12 @@ solved differently:
    never re-uploaded — regardless of status — just attached to the BOM with the
    calculated quantity; if one of them currently has status "Under review" or
    "Released", it's listed in the final success message too, as a reminder that any
-   local changes to it were NOT sent.
+   local changes to it were NOT sent. **Components removed from the assembly since the
+   last upload are flagged too** — for every parent (the top-level document and every
+   sub-assembly), before attaching its current local children the macro checks whether
+   PDM still has a BOM relation to a child no longer present locally, and asks natively
+   for confirmation before removing that link (the items themselves are never deleted,
+   only their attachment under this specific parent).
 4. Checks the main document's **Custom Properties**:
    - **Already linked** (has a saved `EasyPDM_ItemId`) — asks locally for consent to
      attach the current version as a new revision, without opening the browser (see

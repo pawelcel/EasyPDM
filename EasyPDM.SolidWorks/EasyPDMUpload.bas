@@ -232,6 +232,8 @@ Private Function T_PL(ByVal key As String) As String
         Case "StatusLabelWydany": T_PL = "Wydany"
         Case "LockedComponentsTailPrefix": T_PL = "Uwaga: "
         Case "LockedComponentsTailSuffix": T_PL = " juz podlinkowany(-e) komponent(y) w zlozeniu ma zablokowany status -- NIE zostaly zaktualizowane (drzewo zlozenia nigdy nie dosyla ponownie juz-istniejacych komponentow, ale te akurat sa dodatkowo zablokowane statusem -- jesli je zmieniales lokalnie, wyslij je osobno po cofnieciu statusu do ""W pracy""):"
+        Case "StaleChildrenConfirmPrefix": T_PL = "Podelementow tego elementu: "
+        Case "StaleChildrenConfirmSuffix": T_PL = " istnieje w PDM, ale nie ma ich juz w lokalnej strukturze zlozenia (usuniete z drzewa od poprzedniej wysylki). Usunac te powiazania z PDM? (Same elementy NIE zostana skasowane, tylko ich podpiecie pod to zlozenie.)"
         Case "PromptRevisionComment": T_PL = "Komentarz do nowej rewizji (opcjonalnie):"
         Case "PromptTargetFolder": T_PL = "Folder docelowy na lokalne kopie (nazwane pod numerem PDM):"
         Case "TitleTargetFolder": T_PL = "Folder docelowy"
@@ -294,6 +296,8 @@ Private Function T_EN(ByVal key As String) As String
         Case "StatusLabelWydany": T_EN = "Released"
         Case "LockedComponentsTailPrefix": T_EN = "Note: "
         Case "LockedComponentsTailSuffix": T_EN = " already-linked component(s) in the assembly have a locked status -- they were NOT updated (the assembly tree never re-sends already-existing components, but these are additionally locked by status -- if you changed them locally, upload them separately after moving the status back to ""In progress""):"
+        Case "StaleChildrenConfirmPrefix": T_EN = "Sub-item(s) of this item: "
+        Case "StaleChildrenConfirmSuffix": T_EN = " exist in PDM, but are no longer in the local assembly structure (removed from the tree since the last upload). Remove these links from PDM? (The items themselves will NOT be deleted, only their attachment under this assembly.)"
         Case "PromptRevisionComment": T_EN = "New revision comment (optional):"
         Case "PromptTargetFolder": T_EN = "Target folder for local copies (named under the PDM number):"
         Case "TitleTargetFolder": T_EN = "Target folder"
@@ -356,6 +360,8 @@ Private Function T_DE(ByVal key As String) As String
         Case "StatusLabelWydany": T_DE = "Freigegeben"
         Case "LockedComponentsTailPrefix": T_DE = "Hinweis: "
         Case "LockedComponentsTailSuffix": T_DE = " bereits verknuepfte Komponente(n) in der Baugruppe haben einen gesperrten Status -- sie wurden NICHT aktualisiert (der Baugruppenbaum sendet bereits vorhandene Komponenten nie erneut, aber diese sind zusaetzlich durch ihren Status gesperrt -- falls Sie sie lokal geaendert haben, laden Sie sie separat hoch, nachdem der Status wieder auf ""In Bearbeitung"" gesetzt wurde):"
+        Case "StaleChildrenConfirmPrefix": T_DE = "Unterelement(e) dieses Elements: "
+        Case "StaleChildrenConfirmSuffix": T_DE = " existieren im PDM, sind aber nicht mehr in der lokalen Baugruppenstruktur (seit dem letzten Hochladen aus dem Baum entfernt). Diese Verknuepfungen aus dem PDM entfernen? (Die Elemente selbst werden NICHT geloescht, nur ihre Zuordnung zu dieser Baugruppe.)"
         Case "PromptRevisionComment": T_DE = "Kommentar zur neuen Revision (optional):"
         Case "PromptTargetFolder": T_DE = "Zielordner fuer lokale Kopien (benannt nach der PDM-Nummer):"
         Case "TitleTargetFolder": T_DE = "Zielordner"
@@ -1922,6 +1928,65 @@ Function StatusLabel(ByVal status As String) As String
     End Select
 End Function
 
+' Detects children of "parentItemId" that exist in PDM but are no longer among
+' "localChildIds" (a Scripting.Dictionary used as a set, keyed by item id -- children
+' just discovered in the local assembly/component structure) -- removed from the tree
+' since the last upload. The macro only ever ADDED relations before this; a component
+' deleted from the assembly in SolidWorks and re-uploaded left the stale relation in PDM
+' untouched, a real bug found and fixed in practice. Asks natively for confirmation before
+' removing anything (the relation may have been added manually in the web app for an
+' unrelated reason) -- declining, or a failed fetch of the current children, removes
+' nothing. Each successful removal also restores the removed child's visibility at the
+' project root (showInTree=true), mirroring the same two-step "remove from structure"
+' mechanism the web application itself uses -- otherwise a child hidden earlier as a
+' leaves-first side effect (see "newlyCreatedPaths") would become invisible entirely.
+Sub SyncStaleChildren(ByVal parentItemId As String, ByVal localChildIds As Object)
+    Dim rows As Object
+    On Error Resume Next
+    Err.Clear
+    Set rows = ApiGet("/items/" & parentItemId & "/children")
+    On Error GoTo 0
+    If rows Is Nothing Then Exit Sub
+
+    Dim staleList As New Collection
+    Dim row As Variant
+    For Each row In rows
+        If row.Exists("item") Then
+            Dim childItem As Object
+            Set childItem = row("item")
+            Dim childId As String
+            childId = JsonGetString(childItem, "id", "")
+            If childId <> "" Then
+                If Not localChildIds.Exists(childId) Then
+                    staleList.Add childItem
+                End If
+            End If
+        End If
+    Next row
+
+    If staleList.Count = 0 Then Exit Sub
+
+    Dim lines As String
+    Dim c As Variant
+    For Each c In staleList
+        lines = lines & "- " & JsonGetLong(c, "itemNumber", 0) & " (" & JsonGetString(c, "fileName", "") & ")" & vbCrLf
+    Next c
+
+    Dim choice As VbMsgBoxResult
+    choice = MsgBox(T("StaleChildrenConfirmPrefix") & staleList.Count & T("StaleChildrenConfirmSuffix") & vbCrLf & vbCrLf & lines, _
+                     vbYesNo + vbQuestion, T("AppTitle"))
+    If choice <> vbYes Then Exit Sub
+
+    For Each c In staleList
+        Dim cid As String
+        cid = JsonGetString(c, "id", "")
+        On Error Resume Next
+        ApiDeleteRequest "/items/" & parentItemId & "/children/" & cid
+        ApiPatchJson "/items/" & cid & "/visibility", "{""showInTree"":true}"
+        On Error GoTo 0
+    Next c
+End Sub
+
 Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Collection, ByVal targetFolder As String, ByRef lockedComponents As Collection) As Boolean
     ProcessAssemblyTree = False
     If topModel.GetType() <> SW_DOC_ASSEMBLY Then Exit Function
@@ -2161,6 +2226,21 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
         ' Guarded by pathToItemId.Exists(filePath): a component skipped just above (declined
         ' new component) never got an item id, so it cannot be a relation parent either.
         If pathToItemId.Exists(filePath) Then
+            ' Before attaching CURRENT relations below, check whether PDM still has relations
+            ' to children that are no longer in this sub-assembly's local structure (removed
+            ' from the SolidWorks tree since the last upload) -- see SyncStaleChildren.
+            Dim localChildIdsHere As Object
+            Set localChildIdsHere = CreateObject("Scripting.Dictionary")
+            Dim edgePre As Variant
+            For Each edgePre In edges
+                If edgePre("parent") = filePath And pathToItemId.Exists(edgePre("child")) Then
+                    If Not localChildIdsHere.Exists(pathToItemId(edgePre("child"))) Then
+                        localChildIdsHere.Add pathToItemId(edgePre("child")), True
+                    End If
+                End If
+            Next edgePre
+            SyncStaleChildren pathToItemId(filePath), localChildIdsHere
+
             Dim edge2 As Variant
             For Each edge2 In edges
                 If edge2("parent") = filePath Then
@@ -2530,6 +2610,17 @@ Sub main()
     ' Step 3: attach components discovered in step 1 under THIS element, now that it has
     ' an item id -- regardless of whether it was brand new or already existing.
     If Not resultInfo Is Nothing Then
+        ' Before attaching CURRENT relations below, check whether PDM still has relations to
+        ' children no longer in the local assembly structure (removed from the tree since
+        ' the last upload) -- see SyncStaleChildren.
+        Dim localTopChildIds As Object
+        Set localTopChildIds = CreateObject("Scripting.Dictionary")
+        Dim edgeTopPre As Variant
+        For Each edgeTopPre In edgesForTop
+            If Not localTopChildIds.Exists(edgeTopPre(0)) Then localTopChildIds.Add edgeTopPre(0), True
+        Next edgeTopPre
+        SyncStaleChildren linkedItemId, localTopChildIds
+
         Dim edgeVariant As Variant
         For Each edgeVariant In edgesForTop
             Dim topRelErr As String

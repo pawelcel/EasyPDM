@@ -245,6 +245,13 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
 - Wybranie **"Nie"** na pytanie o automatyczne wysłanie wysyła TYLKO bieżący dokument,
   dokładnie tak jak dotychczas (bez podelementów) — struktura BOM-u zostaje wtedy do
   ręcznego uzupełnienia w aplikacji webowej, jak wcześniej.
+- **Usunięte komponenty też są oznaczane** — dla każdego rodzica (dokumentu głównego i
+  każdego pod-złożenia), przed podpięciem jego aktualnych lokalnych dzieci, makro
+  sprawdza, czy PDM nadal ma relację BOM do dziecka, którego nie ma już w lokalnej
+  strukturze (usuniętego z drzewa FreeCAD od poprzedniej wysyłki). Jeśli tak, pyta
+  natywnie o potwierdzenie przed usunięciem tej relacji (same elementy nigdy nie są
+  kasowane, tylko ich podpięcie pod tego konkretnego rodzica) — odmowa zostawia
+  wszystko bez zmian.
 
 ## Ograniczenia pierwszej wersji
 
