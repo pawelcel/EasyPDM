@@ -105,7 +105,11 @@ inaczej:
    patrz "Różnice względem makr FreeCAD" po opis natywnego `MsgBox` przed każdą kartą).
    Nowo utworzone komponenty dostają własny eksport STEP/PDF (wg wyboru checkboxa tego
    konkretnego komponentu w przeglądarce) i wpis `EasyPDM_ItemId`, i są automatycznie
-   podpinane pod swojego rodzica w strukturze BOM.
+   podpinane pod swojego rodzica w strukturze BOM. **Już podpięte komponenty są tylko
+   referencjonowane**, nigdy nie wysyłane ponownie — niezależnie od statusu — tylko
+   podpinane do BOM-u z wyliczoną ilością; jeśli któryś ma aktualnie status "Sprawdzany"
+   albo "Wydany", jest to też wypisane w końcowym komunikacie sukcesu, jako przypomnienie
+   że ewentualne lokalne zmiany w nim NIE zostały wysłane.
 4. Sprawdza **Właściwości niestandardowe** dokumentu głównego:
    - **Już podpięty** (ma zapisane `EasyPDM_ItemId`) — pyta lokalnie o zgodę na dogranie
      bieżącej wersji jako nowej rewizji, bez otwierania przeglądarki (patrz "Różnice

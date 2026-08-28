@@ -103,7 +103,11 @@ solved differently:
    FreeCAD macros" for the focus-stealing `MsgBox` shown before each tab). Newly created
    components get their own STEP/PDF export (per that component's own checkbox choice in
    the browser) and `EasyPDM_ItemId` entry, and are automatically attached under their
-   parent in the BOM structure.
+   parent in the BOM structure. **Already-linked components are only ever referenced**,
+   never re-uploaded — regardless of status — just attached to the BOM with the
+   calculated quantity; if one of them currently has status "Under review" or
+   "Released", it's listed in the final success message too, as a reminder that any
+   local changes to it were NOT sent.
 4. Checks the main document's **Custom Properties**:
    - **Already linked** (has a saved `EasyPDM_ItemId`) — asks locally for consent to
      attach the current version as a new revision, without opening the browser (see

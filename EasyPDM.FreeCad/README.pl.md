@@ -221,7 +221,10 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   `match_existing_item` co lokalny skrót na górnym poziomie, krok 1b wyżej) — taki
   komponent jest czysto **referencyjny**: żadnej wysyłki, żadnego biletu przeglądarki,
   nic dla niego nie jest wysyłane — tylko podpinany do BOM-u z wyliczoną ilością, po
-  swoim istniejącym ID.
+  swoim istniejącym ID — niezależnie od statusu. Jeśli ten status to "Sprawdzany" albo
+  "Wydany", jest to też oznaczone w końcowym komunikacie sukcesu — przypomnienie, że
+  ewentualne lokalne zmiany w nim NIE zostały wysłane (już podlinkowany komponent nigdy
+  nie jest wysyłany ponownie, niezależnie od statusu).
 - **Nowe komponenty też idą przez przeglądarkę, jeden po drugim** — każdy jeszcze
   nierozpoznany plik dostaje WŁASNY bilet przeglądarki (ten sam wybór Nowy element/
   Duplikuj/Dograj do istniejącego, wraz z własnymi checkboksami STEP/PDF, co dokument
