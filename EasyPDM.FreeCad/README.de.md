@@ -253,7 +253,11 @@ automatisch gesendet werden soll:
   `match_existing_item`-Prüfung wie die lokale Abkürzung auf oberster Ebene, Schritt 1b
   oben) — eine solche Komponente wird rein **referenziert**: kein Upload, kein
   Browser-Ticket, überhaupt nichts wird für sie gesendet, sie wird nur mit der
-  berechneten Menge und ihrer vorhandenen Element-ID an die Stückliste angehängt.
+  berechneten Menge und ihrer vorhandenen Element-ID an die Stückliste angehängt —
+  unabhängig von ihrem Status. Ist dieser Status „In Prüfung" oder „Freigegeben", wird
+  das auch in der abschließenden Erfolgsmeldung markiert — als Erinnerung, dass lokale
+  Änderungen daran NICHT gesendet wurden (eine bereits verknüpfte Komponente wird nie
+  erneut gesendet, unabhängig vom Status).
 - **Neue Komponenten laufen ebenfalls über den Browser, eine nach der anderen** — jede
   noch nicht erkannte Datei erhält ihr EIGENES Browser-Ticket (dieselbe Wahl Neu/
   Duplizieren/An Vorhandenes anhängen, einschließlich eigener STEP-/PDF-Checkboxen, wie

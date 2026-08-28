@@ -228,6 +228,10 @@ Private Function T_PL(ByVal key As String) As String
         Case "TitleUploadBlocked": T_PL = "Wysylka zablokowana"
         Case "UploadBlockedReviewPrefix": T_PL = "Nie mozna wyslac -- element nr "
         Case "UploadBlockedReviewSuffix": T_PL = " ma status ""Sprawdzany"". Poczekaj, az recenzja sie zakonczy (element wroci do statusu ""W pracy""), albo zmien status recznie w aplikacji webowej."
+        Case "StatusLabelSprawdzany": T_PL = "Sprawdzany"
+        Case "StatusLabelWydany": T_PL = "Wydany"
+        Case "LockedComponentsTailPrefix": T_PL = "Uwaga: "
+        Case "LockedComponentsTailSuffix": T_PL = " juz podlinkowany(-e) komponent(y) w zlozeniu ma zablokowany status -- NIE zostaly zaktualizowane (drzewo zlozenia nigdy nie dosyla ponownie juz-istniejacych komponentow, ale te akurat sa dodatkowo zablokowane statusem -- jesli je zmieniales lokalnie, wyslij je osobno po cofnieciu statusu do ""W pracy""):"
         Case "PromptRevisionComment": T_PL = "Komentarz do nowej rewizji (opcjonalnie):"
         Case "PromptTargetFolder": T_PL = "Folder docelowy na lokalne kopie (nazwane pod numerem PDM):"
         Case "TitleTargetFolder": T_PL = "Folder docelowy"
@@ -286,6 +290,10 @@ Private Function T_EN(ByVal key As String) As String
         Case "TitleUploadBlocked": T_EN = "Upload blocked"
         Case "UploadBlockedReviewPrefix": T_EN = "Cannot upload -- item #"
         Case "UploadBlockedReviewSuffix": T_EN = " has status ""Under review"". Wait until the review finishes (the item returns to ""In progress""), or change the status manually in the web application."
+        Case "StatusLabelSprawdzany": T_EN = "Under review"
+        Case "StatusLabelWydany": T_EN = "Released"
+        Case "LockedComponentsTailPrefix": T_EN = "Note: "
+        Case "LockedComponentsTailSuffix": T_EN = " already-linked component(s) in the assembly have a locked status -- they were NOT updated (the assembly tree never re-sends already-existing components, but these are additionally locked by status -- if you changed them locally, upload them separately after moving the status back to ""In progress""):"
         Case "PromptRevisionComment": T_EN = "New revision comment (optional):"
         Case "PromptTargetFolder": T_EN = "Target folder for local copies (named under the PDM number):"
         Case "TitleTargetFolder": T_EN = "Target folder"
@@ -344,6 +352,10 @@ Private Function T_DE(ByVal key As String) As String
         Case "TitleUploadBlocked": T_DE = "Hochladen blockiert"
         Case "UploadBlockedReviewPrefix": T_DE = "Hochladen nicht moeglich -- Element Nr. "
         Case "UploadBlockedReviewSuffix": T_DE = " hat den Status ""In Pruefung"". Warten Sie, bis die Pruefung abgeschlossen ist (das Element kehrt zu ""In Bearbeitung"" zurueck), oder aendern Sie den Status manuell in der Web-Anwendung."
+        Case "StatusLabelSprawdzany": T_DE = "In Pruefung"
+        Case "StatusLabelWydany": T_DE = "Freigegeben"
+        Case "LockedComponentsTailPrefix": T_DE = "Hinweis: "
+        Case "LockedComponentsTailSuffix": T_DE = " bereits verknuepfte Komponente(n) in der Baugruppe haben einen gesperrten Status -- sie wurden NICHT aktualisiert (der Baugruppenbaum sendet bereits vorhandene Komponenten nie erneut, aber diese sind zusaetzlich durch ihren Status gesperrt -- falls Sie sie lokal geaendert haben, laden Sie sie separat hoch, nachdem der Status wieder auf ""In Bearbeitung"" gesetzt wurde):"
         Case "PromptRevisionComment": T_DE = "Kommentar zur neuen Revision (optional):"
         Case "PromptTargetFolder": T_DE = "Zielordner fuer lokale Kopien (benannt nach der PDM-Nummer):"
         Case "TitleTargetFolder": T_DE = "Zielordner"
@@ -1900,7 +1912,17 @@ End Function
 ' created before the cancellation -- like the rest of this macro, already-created PDM
 ' items are NOT rolled back). "edgesForTop" collects (childItemId, qty) pairs where the
 ' parent is topModel ITSELF, for the caller to attach once topModel has its own item id.
-Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Collection, ByVal targetFolder As String) As Boolean
+' "lockedComponents" collects one formatted line per already-linked component whose status
+' is "sprawdzany"/"wydany" -- see the summary-building loop below for why.
+Function StatusLabel(ByVal status As String) As String
+    Select Case status
+        Case "sprawdzany": StatusLabel = T("StatusLabelSprawdzany")
+        Case "wydany": StatusLabel = T("StatusLabelWydany")
+        Case Else: StatusLabel = status
+    End Select
+End Function
+
+Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Collection, ByVal targetFolder As String, ByRef lockedComponents As Collection) As Boolean
     ProcessAssemblyTree = False
     If topModel.GetType() <> SW_DOC_ASSEMBLY Then Exit Function
 
@@ -1964,6 +1986,18 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             If Not summaryLinkedInfo Is Nothing Then
                 summaryLine = summaryLine & T("AlreadyInPdmAsPrefix") & JsonGetLong(summaryLinkedInfo, "itemNumber", 0) & _
                               " (" & JsonGetString(summaryLinkedInfo, "fileName", "") & ")"
+
+                ' Already-linked components are ONLY ever referenced, never re-uploaded,
+                ' regardless of status (the assembly tree never updates already-existing
+                ' components) -- but if status is "sprawdzany"/"wydany", flag it here so the
+                ' final summary in main() can tell the user which linked components did NOT
+                ' get updated, in case they changed one of them locally.
+                Dim summaryStatus As String
+                summaryStatus = JsonGetString(summaryLinkedInfo, "status", "")
+                If summaryStatus = "sprawdzany" Or summaryStatus = "wydany" Then
+                    lockedComponents.Add JsonGetLong(summaryLinkedInfo, "itemNumber", 0) & " (" & _
+                                         JsonGetString(summaryLinkedInfo, "fileName", "") & ") -- " & StatusLabel(summaryStatus)
+                End If
             End If
         End If
 
@@ -2353,8 +2387,9 @@ Sub main()
     ' below is itself saved, any of its references to a just-processed component already
     ' point at the new, PDM-named path.
     Dim edgesForTop As New Collection
+    Dim lockedComponents As New Collection
     If itemTypeGuess = "assembly" Then
-        If ProcessAssemblyTree(swApp.ActiveDoc, edgesForTop, targetFolder) Then
+        If ProcessAssemblyTree(swApp.ActiveDoc, edgesForTop, targetFolder, lockedComponents) Then
             LogLine "Cancelled during assembly tree processing -- done."
             Exit Sub
         End If
@@ -2526,9 +2561,21 @@ Sub main()
         SetLinkedItem linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0))
         LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
                 ", revision " & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & " ==="
+
+        Dim lockedTail As String
+        lockedTail = ""
+        If lockedComponents.Count > 0 Then
+            Dim lockedLine As Variant
+            For Each lockedLine In lockedComponents
+                lockedTail = lockedTail & "- " & lockedLine & vbCrLf
+            Next lockedLine
+            lockedTail = vbCrLf & vbCrLf & T("LockedComponentsTailPrefix") & lockedComponents.Count & _
+                         T("LockedComponentsTailSuffix") & vbCrLf & lockedTail
+        End If
+
         MsgBox T("UploadedSuccessPart1") & JsonGetLong(resultInfo, "itemNumber", 0) & _
                T("UploadedSuccessPart2") & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & ")." & vbCrLf & vbCrLf & _
-               T("RunLogPrefix") & LogFilePath(), vbInformation, T("AppTitle")
+               T("RunLogPrefix") & LogFilePath() & lockedTail, vbInformation, T("AppTitle")
     Else
         LogLine "=== Finished without uploading (cancelled or no new revision) ==="
     End If

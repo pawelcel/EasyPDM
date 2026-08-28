@@ -234,7 +234,9 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
   `match_existing_item` check as the top-level "local shortcut", step 1b above) — such a
   component is purely **referenced**: no upload, no browser ticket, nothing sent for it
   at all, it's just attached to the BOM with the calculated quantity using its existing
-  item ID.
+  item ID — regardless of its status. If that status is "Under review" or "Released",
+  it's flagged in the final success message too, as a reminder that any local changes to
+  it were NOT sent (nothing ever re-sends an already-linked component, status or not).
 - **New components go through the browser too, one at a time** — each not-yet-recognized
   file gets its OWN browser ticket (same New item/Duplicate/Attach to existing choice,
   including its own STEP/PDF checkboxes, as the top-level document), opened sequentially,

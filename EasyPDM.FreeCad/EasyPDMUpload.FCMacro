@@ -317,6 +317,15 @@ TRANSLATIONS = {
             "recenzja się zakończy (element wróci do statusu \"W pracy\"), albo zmień "
             "status ręcznie w aplikacji webowej."
         ),
+        "status_label_sprawdzany": "Sprawdzany",
+        "status_label_wydany": "Wydany",
+        "locked_components_tail": (
+            "\n\nUwaga: {count} już podlinkowany(-e) komponent(y) w złożeniu ma "
+            "zablokowany status — NIE zostały zaktualizowane (drzewo złożenia nigdy nie "
+            "dosyła ponownie już-istniejących komponentów, ale te akurat są dodatkowo "
+            "zablokowane statusem, więc gdybyś je zmieniał lokalnie, wyślij je osobno po "
+            "cofnięciu statusu do \"W pracy\"):\n{lines}"
+        ),
     },
     "en": {
         "no_connection": "Could not connect to {url}: {reason}",
@@ -409,6 +418,15 @@ TRANSLATIONS = {
             "Cannot upload — item #{number} has status \"Under review\". Wait until the "
             "review finishes (the item returns to \"In progress\"), or change the status "
             "manually in the web application."
+        ),
+        "status_label_sprawdzany": "Under review",
+        "status_label_wydany": "Released",
+        "locked_components_tail": (
+            "\n\nNote: {count} already-linked component(s) in the assembly have a locked "
+            "status — they were NOT updated (the assembly tree never re-sends "
+            "already-existing components, but these are additionally locked by status, "
+            "so if you changed them locally, upload them separately after moving the "
+            "status back to \"In progress\"):\n{lines}"
         ),
     },
     "de": {
@@ -507,6 +525,16 @@ TRANSLATIONS = {
             "Warten Sie, bis die Prüfung abgeschlossen ist (das Element kehrt zu \"In "
             "Bearbeitung\" zurück), oder ändern Sie den Status manuell in der "
             "Web-Anwendung."
+        ),
+        "status_label_sprawdzany": "In Prüfung",
+        "status_label_wydany": "Freigegeben",
+        "locked_components_tail": (
+            "\n\nHinweis: {count} bereits verknüpfte Komponente(n) in der Baugruppe haben "
+            "einen gesperrten Status — sie wurden NICHT aktualisiert (der Baugruppenbaum "
+            "sendet bereits vorhandene Komponenten nie erneut, aber diese sind zusätzlich "
+            "durch ihren Status gesperrt — falls Sie sie lokal geändert haben, laden Sie "
+            "sie separat hoch, nachdem der Status wieder auf \"In Bearbeitung\" gesetzt "
+            "wurde):\n{lines}"
         ),
     },
 }
@@ -1652,16 +1680,24 @@ def process_assembly_tree(top_doc, target_folder=None):
     swojego item_id w PDM (może to być nowy ALBO już istniejący element — o tym decyduje
     reszta run(), przez submit_via_browser); te relacje dopina run() po jego utworzeniu.
 
-    Zwraca (edges_for_top, cancelled):
-        edges_for_top — lista (child_item_id, quantity, newly_created) do podpięcia pod
-                        element top_doc (newly_created mówi run(), czy po podpięciu trzeba
-                        ukryć ten element z korzenia projektu, zob. niżej),
-        cancelled     — True, jeśli użytkownik przerwał w trakcie. Komponenty utworzone
-                        PRZED przerwaniem zostają w PDM (tak samo jak reszta makra nie
-                        cofa częściowo wykonanych kroków w razie błędu w połowie)."""
+    Zwraca (edges_for_top, cancelled, locked_matches):
+        edges_for_top   — lista (child_item_id, quantity, newly_created) do podpięcia pod
+                          element top_doc (newly_created mówi run(), czy po podpięciu
+                          trzeba ukryć ten element z korzenia projektu, zob. niżej),
+        cancelled       — True, jeśli użytkownik przerwał w trakcie. Komponenty utworzone
+                          PRZED przerwaniem zostają w PDM (tak samo jak reszta makra nie
+                          cofa częściowo wykonanych kroków w razie błędu w połowie),
+        locked_matches  — lista (itemNumber, fileName, status) dla już-podlinkowanych
+                          komponentów (dopasowanych po etykiecie, patrz niżej) których
+                          status to "sprawdzany"/"wydany" — takie komponenty są WYŁĄCZNIE
+                          referencjonowane, nigdy nie próbujemy ich ponownie wysłać
+                          niezależnie od statusu (drzewo złożenia w ogóle nie aktualizuje
+                          już-istniejących komponentów, tylko podpina nowe) — ale run()
+                          pokazuje tę listę w podsumowaniu na końcu, żeby było wiadomo,
+                          które ewentualnie zmienione lokalnie części NIE zostały wysłane."""
     order, docs, edges = discover_component_tree(top_doc)
     if not order:
-        return [], False
+        return [], False, []
 
     try:
         existing_items = api_get("/items") or []
@@ -1698,9 +1734,9 @@ def process_assembly_tree(top_doc, target_folder=None):
         QtWidgets.QMessageBox.Yes,
     )
     if choice == QtWidgets.QMessageBox.Cancel:
-        return [], True
+        return [], True, []
     if choice == QtWidgets.QMessageBox.No:
-        return [], False
+        return [], False, []
 
     # Ścieżki UTWORZONE w tym biegu (w odróżnieniu od już-istniejących komponentów, tylko
     # podpinanych) -- gdy taki element zostanie podpięty pod swojego prawdziwego rodzica
@@ -1711,6 +1747,9 @@ def process_assembly_tree(top_doc, target_folder=None):
     # tutaj NIE może ruszać jego istniejącej widoczności na korzeniu (ta sama zasada co przy
     # ręcznym dodaniu istniejącego elementu do złożenia w aplikacji webowej).
     newly_created_paths = set()
+    # Już-podlinkowane komponenty o zablokowanym statusie -- zbierane tu, pokazywane
+    # dopiero w podsumowaniu na końcu run() (patrz docstring wyżej).
+    locked_matches = []
 
     doc_to_item_id = {}
     for file_path in order:
@@ -1718,6 +1757,9 @@ def process_assembly_tree(top_doc, target_folder=None):
         matched = match_existing_item(doc, existing_items)
         if matched:
             doc_to_item_id[file_path] = matched["id"]
+            matched_status = matched.get("status")
+            if matched_status in ("sprawdzany", "wydany"):
+                locked_matches.append((matched.get("itemNumber"), matched.get("fileName"), matched_status))
         else:
             # Ten sam bilet przeglądarki co główny dokument (submit_via_browser) --
             # otwierany JEDEN NA RAZ. Natywny popup tuż przed każdym otwarciem karty:
@@ -1737,11 +1779,11 @@ def process_assembly_tree(top_doc, target_folder=None):
                 webbrowser.open(url)
             except Exception as e:
                 QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
-                return [], True
+                return [], True, locked_matches
 
             wait_dlg = WaitForTicketDialog(ticket)
             if wait_dlg.exec() != QtWidgets.QDialog.Accepted:
-                return [], True
+                return [], True, locked_matches
 
             ticket_data = wait_dlg.result_data
             comp_export_step = ticket_data.get("exportStep")
@@ -1768,7 +1810,7 @@ def process_assembly_tree(top_doc, target_folder=None):
                         # nowej rewizji, albo ma status "sprawdzany" i push_to_existing_item
                         # zablokował wysyłkę z własnym komunikatem -- w obu przypadkach
                         # traktujemy jak każdą inną rezygnację w tej pętli.
-                        return [], True
+                        return [], True, locked_matches
                 else:
                     # Nowy element -- już istnieje po stronie serwera (przeglądarka
                     # wywołała POST /nodes z tym biletem), więc kończymy WPROST wysyłką
@@ -1783,7 +1825,7 @@ def process_assembly_tree(top_doc, target_folder=None):
                 QtWidgets.QMessageBox.critical(
                     None, t("pdm_title"), t("upload_component_failed", file=os.path.basename(file_path), error=e)
                 )
-                return [], True
+                return [], True, locked_matches
             doc_to_item_id[file_path] = result["itemId"]
 
         # Podpinamy relacje TERAZ, w TEJ SAMEJ iteracji w której file_path (jako rodzic)
@@ -1834,7 +1876,7 @@ def process_assembly_tree(top_doc, target_folder=None):
         if parent_file == top_doc.FileName and child_file in doc_to_item_id
     ]
 
-    return edges_for_top, False
+    return edges_for_top, False, locked_matches
 
 
 def run():
@@ -1887,7 +1929,7 @@ def run():
     #
     # Krok 1a: wykryj i (opcjonalnie) wyślij złożenie rekurencyjnie — części/pod-złożenia
     # znalezione przez App::Link, w kolejności liście-najpierw.
-    edges_for_top, cancelled = process_assembly_tree(doc, target_folder)
+    edges_for_top, cancelled, locked_matches = process_assembly_tree(doc, target_folder)
     if cancelled:
         QtWidgets.QMessageBox.information(None, t("pdm_title"), t("cancelled_upload"))
         return
@@ -1944,12 +1986,23 @@ def run():
     else:
         local_line = t("local_already_named_line", path=doc.FileName)
 
+    if locked_matches:
+        status_labels = {"sprawdzany": t("status_label_sprawdzany"), "wydany": t("status_label_wydany")}
+        lines = "\n".join(
+            f"- {number} ({name}) -- {status_labels.get(status, status)}"
+            for number, name, status in locked_matches
+        )
+        locked_tail = t("locked_components_tail", count=len(locked_matches), lines=lines)
+    else:
+        locked_tail = ""
+
     QtWidgets.QMessageBox.information(
         None,
         t("pdm_title"),
         t("upload_success_sent", number=info["itemNumber"])
         + (t("upload_success_with_subitems", count=len(edges_for_top)) if edges_for_top else "")
-        + t("upload_success_tail", path=info["newPath"], local=local_line),
+        + t("upload_success_tail", path=info["newPath"], local=local_line)
+        + locked_tail,
     )
 
 

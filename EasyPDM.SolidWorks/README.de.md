@@ -118,7 +118,12 @@ anders gelöst:
    FreeCAD-Makros" für das Fokus-`MsgBox` vor jedem Tab). Neu erstellte Komponenten
    erhalten ihren eigenen STEP/PDF-Export (je nach eigener Checkbox-Wahl dieser
    Komponente im Browser) und einen `EasyPDM_ItemId`-Eintrag und werden automatisch
-   unter ihrem Elternelement in der Stücklistenstruktur eingehängt.
+   unter ihrem Elternelement in der Stücklistenstruktur eingehängt. **Bereits verknüpfte
+   Komponenten werden nur referenziert**, nie erneut hochgeladen — unabhängig vom Status
+   — nur mit der berechneten Menge an die Stückliste angehängt; hat eine davon aktuell
+   den Status „In Prüfung" oder „Freigegeben", wird sie auch in der abschließenden
+   Erfolgsmeldung aufgeführt, als Erinnerung, dass lokale Änderungen daran NICHT gesendet
+   wurden.
 4. Prüft die **Custom Properties** des Hauptdokuments:
    - **Bereits verknüpft** (hat eine gespeicherte `EasyPDM_ItemId`) — fragt lokal nach der
      Zustimmung, die aktuelle Version als neue Revision anzuhängen, ohne den Browser zu
