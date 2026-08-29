@@ -158,6 +158,11 @@ TRANSLATIONS = {
         "wait_timeout": "Upłynął czas oczekiwania.",
         "log_no_attachments_list": "  {label}: nie udało się pobrać listy załączników ({error}).",
         "log_no_cad_files": "  {label}: brak plików CAD do pobrania (element nie ma żadnych załączników).",
+        "log_wrong_format": (
+            "  {label}: załącznik oznaczony jako plik CAD ma nieoczekiwane rozszerzenie "
+            "\"{ext}\" (oczekiwano .FCStd) — pomijam, żeby nie próbować otworzyć niewłaściwego "
+            "pliku ({fileName})."
+        ),
         "log_already_present": "  {label}: już jest w folderze (aktualna rewizja), pomijam.",
         "newer_revision_title": "Nowsza rewizja",
         "newer_revision_body": (
@@ -209,6 +214,11 @@ TRANSLATIONS = {
         "wait_timeout": "The waiting time has expired.",
         "log_no_attachments_list": "  {label}: failed to fetch the attachment list ({error}).",
         "log_no_cad_files": "  {label}: no CAD files to download (the item has no attachments).",
+        "log_wrong_format": (
+            "  {label}: the attachment marked as the CAD file has an unexpected extension "
+            "\"{ext}\" (expected .FCStd) — skipping it rather than trying to open the wrong "
+            "file ({fileName})."
+        ),
         "log_already_present": "  {label}: already in the folder (current revision), skipping.",
         "newer_revision_title": "Newer revision",
         "newer_revision_body": (
@@ -261,6 +271,11 @@ TRANSLATIONS = {
         "wait_timeout": "Die Wartezeit ist abgelaufen.",
         "log_no_attachments_list": "  {label}: Anhangsliste konnte nicht abgerufen werden ({error}).",
         "log_no_cad_files": "  {label}: keine CAD-Dateien zum Herunterladen (das Element hat keine Anhänge).",
+        "log_wrong_format": (
+            "  {label}: der als CAD-Datei markierte Anhang hat eine unerwartete Erweiterung "
+            "\"{ext}\" (erwartet .FCStd) — wird übersprungen, statt die falsche Datei zu "
+            "öffnen ({fileName})."
+        ),
         "log_already_present": "  {label}: bereits im Ordner vorhanden (aktuelle Revision), wird übersprungen.",
         "newer_revision_title": "Neuere Revision",
         "newer_revision_body": (
@@ -494,7 +509,15 @@ def _find_current_attachment(item, attachments):
     """Wybiera załącznik odpowiadający AKTUALNEJ rewizji elementu. Jeśli żaden załącznik
     nie pasuje do konwencji nazw makr PDM (np. element dograny ręcznie w aplikacji webowej),
     bierze po prostu najnowiej wgrany załącznik (lista jest posortowana rosnąco po dacie)
-    jako najlepsze przybliżenie."""
+    jako najlepsze przybliżenie.
+
+    Rozważane są TYLKO załączniki z rolą "cad" (albo bez roli w ogóle -- starsze/ręcznie
+    dograne pliki sprzed wprowadzenia ról, traktowane jako CAD dla wstecznej zgodności).
+    Załączniki "step"/"pdf" to osobne eksporty do podglądu, nigdy pliki do otwarcia w CAD
+    -- bez tego filtra powyższy fallback "najnowiej wgrany" mógł (i realnie potrafił, po
+    dodaniu eksportu PDF, który wgrywa się na końcu) wybrać PDF zamiast właściwego pliku
+    CAD, co kończyło się błędem przy próbie otwarcia go jako dokumentu FreeCAD."""
+    attachments = [a for a in attachments if a.get("role") in (None, "cad")]
     if not attachments:
         return None
     number = item.get("itemNumber")
@@ -550,6 +573,15 @@ def _download_item(item, target_dir, log):
     current = _find_current_attachment(item, attachments)
     if current is None:
         log(t("log_no_cad_files", label=label))
+        return None
+
+    # Dodatkowe zabezpieczenie NIEZALEŻNE od filtrowania po roli w _find_current_attachment
+    # -- gdyby jednak trafił się załącznik z rolą "cad" (albo bez roli) o nieoczekiwanym
+    # rozszerzeniu (np. ręcznie podmieniony w aplikacji webowej), makro odmawia otwarcia
+    # go jako dokumentu FreeCAD zamiast wywalać się z niejasnym błędem natywnym.
+    current_ext = os.path.splitext(current["fileName"])[1].lower()
+    if current_ext != ".fcstd":
+        log(t("log_wrong_format", label=label, ext=current_ext, fileName=current["fileName"]))
         return None
 
     target_path = os.path.join(target_dir, current["fileName"])
