@@ -204,6 +204,8 @@ Private Function T_PL(ByVal key As String) As String
         Case "DownloadNewestQuestion": T_PL = "Pobrac najnowsza wersje?"
         Case "Dl_FetchAttachmentsFailed": T_PL = ": nie udalo sie pobrac listy zalacznikow."
         Case "Dl_NoAttachments": T_PL = ": brak plikow CAD do pobrania (element nie ma zalacznikow)."
+        Case "Dl_WrongFormatPrefix": T_PL = ": zalacznik oznaczony jako plik CAD ma nieoczekiwane rozszerzenie """
+        Case "Dl_WrongFormatSuffix": T_PL = """ (oczekiwano .sldprt/.sldasm) -- pomijam, zeby nie probowac otworzyc niewlasciwego pliku ("
         Case "Dl_AlreadyInFolder": T_PL = ": juz jest w folderze (biezaca rewizja), pomijanie."
         Case "Dl_KeepingExistingRevisionPrefix": T_PL = ": zachowywanie istniejacej lokalnej rewizji ("
         Case "Dl_DownloadingPrefix": T_PL = "  Pobieranie "
@@ -249,6 +251,8 @@ Private Function T_EN(ByVal key As String) As String
         Case "DownloadNewestQuestion": T_EN = "Download the newest version?"
         Case "Dl_FetchAttachmentsFailed": T_EN = ": failed to fetch the attachment list."
         Case "Dl_NoAttachments": T_EN = ": no CAD files to download (the item has no attachments)."
+        Case "Dl_WrongFormatPrefix": T_EN = ": the attachment marked as the CAD file has an unexpected extension """
+        Case "Dl_WrongFormatSuffix": T_EN = """ (expected .sldprt/.sldasm) -- skipping it rather than trying to open the wrong file ("
         Case "Dl_AlreadyInFolder": T_EN = ": already in the folder (current revision), skipping."
         Case "Dl_KeepingExistingRevisionPrefix": T_EN = ": keeping the existing local revision ("
         Case "Dl_DownloadingPrefix": T_EN = "  Downloading "
@@ -294,6 +298,8 @@ Private Function T_DE(ByVal key As String) As String
         Case "DownloadNewestQuestion": T_DE = "Neueste Version herunterladen?"
         Case "Dl_FetchAttachmentsFailed": T_DE = ": Abrufen der Anhangsliste fehlgeschlagen."
         Case "Dl_NoAttachments": T_DE = ": keine CAD-Dateien zum Herunterladen (das Element hat keine Anhaenge)."
+        Case "Dl_WrongFormatPrefix": T_DE = ": der als CAD-Datei markierte Anhang hat eine unerwartete Erweiterung """
+        Case "Dl_WrongFormatSuffix": T_DE = """ (erwartet .sldprt/.sldasm) -- wird uebersprungen, statt die falsche Datei zu oeffnen ("
         Case "Dl_AlreadyInFolder": T_DE = ": bereits im Ordner vorhanden (aktuelle Revision), wird uebersprungen."
         Case "Dl_KeepingExistingRevisionPrefix": T_DE = ": vorhandene lokale Revision wird beibehalten ("
         Case "Dl_DownloadingPrefix": T_DE = "  Herunterladen von "
@@ -1121,6 +1127,22 @@ End Sub
 Private Function FindCurrentAttachment(ByVal item As Object, ByVal attachments As Object) As Object
     If attachments Is Nothing Or attachments.Count = 0 Then Exit Function
 
+    ' Only "cad"-role attachments (or no role at all -- older/manually-attached files from
+    ' before roles existed, treated as CAD for backward compatibility) are actual files to
+    ' download/open -- "step"/"pdf" attachments are separate preview exports, never files to
+    ' open in the CAD program. Without this filter, the fallbacks below (newest upload, or
+    ' the last regex match) could -- and in practice did, once PDF export was added, since
+    ' PDF uploads last -- pick a PDF instead of the real CAD file, causing an error when the
+    ' macro tried to open it.
+    Dim cadAttachments As New Collection
+    Dim rawAttachment As Variant
+    For Each rawAttachment In attachments
+        Dim attRole As String
+        attRole = JsonGetString(rawAttachment, "role", "")
+        If attRole = "" Or attRole = "cad" Then cadAttachments.Add rawAttachment
+    Next rawAttachment
+    If cadAttachments.Count = 0 Then Exit Function
+
     Dim number As Long
     number = JsonGetLong(item, "itemNumber", 0)
     Dim name As String
@@ -1137,7 +1159,7 @@ Private Function FindCurrentAttachment(ByVal item As Object, ByVal attachments A
     Dim a As Variant
     Dim lastMatch As Object
     Set lastMatch = Nothing
-    For Each a In attachments
+    For Each a In cadAttachments
         Dim fname As String
         fname = JsonGetString(a, "fileName", "")
         If re.Test(fname) Then
@@ -1158,12 +1180,12 @@ Private Function FindCurrentAttachment(ByVal item As Object, ByVal attachments A
         Exit Function
     End If
 
-    ' No attachment matches the naming convention -- fall back to the newest one.
+    ' No attachment matches the naming convention -- fall back to the newest CAD one.
     Dim count As Long
-    count = attachments.Count
+    count = cadAttachments.Count
     Dim idx As Long
     idx = 0
-    For Each a In attachments
+    For Each a In cadAttachments
         idx = idx + 1
         If idx = count Then Set FindCurrentAttachment = a
     Next a
@@ -1232,6 +1254,20 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
 
     Dim currentName As String
     currentName = JsonGetString(current, "fileName", "")
+
+    ' Extra safeguard INDEPENDENT of the role filtering in FindCurrentAttachment -- in case
+    ' a "cad"-role (or role-less) attachment somehow has an unexpected extension (e.g.
+    ' manually swapped in the web application), refuse to open it as a SolidWorks document
+    ' instead of failing with an unclear native error.
+    Dim currentExt As String
+    Dim currentDotPos As Long
+    currentDotPos = InStrRev(currentName, ".")
+    currentExt = ""
+    If currentDotPos > 0 Then currentExt = LCase(Mid(currentName, currentDotPos))
+    If currentExt <> ".sldprt" And currentExt <> ".sldasm" Then
+        AppendLog "  " & label & T("Dl_WrongFormatPrefix") & currentExt & T("Dl_WrongFormatSuffix") & currentName & ")"
+        Exit Function
+    End If
     Dim targetPath As String
     targetPath = targetDir & "\" & currentName
 
