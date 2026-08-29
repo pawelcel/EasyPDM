@@ -1720,10 +1720,11 @@ def sync_stale_children(parent_item_id, local_child_ids):
     w PDM nietkniętą. Przed usunięciem pyta natywnie o potwierdzenie (relacja mogła zostać
     dodana ręcznie w aplikacji webowej z innego powodu, niezwiązanego z tym plikiem
     FreeCAD) -- odmowa albo błąd pobrania listy NIC nie usuwa. Po każdym udanym usunięciu
-    przywraca widoczność usuniętego dziecka w korzeniu projektu (showInTree=true) --
-    dokładnie ten sam dwuetapowy mechanizm co ręczne "Usuń ze struktury" w aplikacji
-    webowej (inaczej element zostałby całkowicie niewidoczny, jeśli wcześniej był ukryty
-    jako efekt uboczny leaves-first, zob. newly_created_paths)."""
+    odpina usunięte dziecko od JAKIEGOKOLWIEK projektu (PATCH .../project {projectId:null})
+    zamiast wrzucać je do korzenia bieżącego projektu -- element zostaje w pełni widoczny i
+    znajdywalny przez globalne wyszukiwanie ("Cała baza"), tylko przestaje zaśmiecać
+    strukturę projektu, z którym nie ma już nic wspólnego. Dokładnie ten sam mechanizm co
+    ręczne "Usuń ze struktury" w aplikacji webowej."""
     try:
         existing_children = api_get(f"/items/{parent_item_id}/children") or []
     except Exception:
@@ -1750,7 +1751,7 @@ def sync_stale_children(parent_item_id, local_child_ids):
     for c in stale:
         try:
             api_delete(f"/items/{parent_item_id}/children/{c.get('id')}")
-            api_patch_json(f"/items/{c.get('id')}/visibility", {"showInTree": True})
+            api_patch_json(f"/items/{c.get('id')}/project", {"projectId": None})
         except Exception:
             pass
 

@@ -114,7 +114,12 @@ inaczej:
    głównego i każdego pod-złożenia), przed podpięciem jego aktualnych lokalnych dzieci,
    makro sprawdza czy PDM nadal ma relację BOM do dziecka, którego nie ma już lokalnie,
    i pyta natywnie o potwierdzenie przed usunięciem tej relacji (same elementy nigdy nie
-   są kasowane, tylko ich podpięcie pod tego konkretnego rodzica).
+   są kasowane, tylko ich podpięcie pod tego konkretnego rodzica). Potwierdzenie
+   dodatkowo odpina usunięte dziecko od JAKIEGOKOLWIEK projektu, zamiast wrzucać je do
+   korzenia bieżącego projektu — zostaje w pełni widoczne i znajdywalne przez globalną
+   wyszukiwarkę "Cała baza", tylko przestaje zaśmiecać strukturę projektu, z którym nie
+   ma już nic wspólnego (ten sam mechanizm co ręczne "Usuń ze struktury" w aplikacji
+   webowej).
 4. Sprawdza **Właściwości niestandardowe** dokumentu głównego:
    - **Już podpięty** (ma zapisane `EasyPDM_ItemId`) — pyta lokalnie o zgodę na dogranie
      bieżącej wersji jako nowej rewizji, bez otwierania przeglądarki (patrz "Różnice

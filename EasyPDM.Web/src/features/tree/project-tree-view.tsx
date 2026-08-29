@@ -104,13 +104,14 @@ function ProjectTreeView({
   async function handleRemoveFromStructure() {
     if (selection.kind !== "item") return
     if (selection.parentId) {
-      // Element z rodzicem — odpinamy konkretną krawędź, sam rekord zostaje. Dodatkowo
-      // wymuszamy showInTree=true: element mógł powstać OD RAZU jako podelement (wtedy ma
-      // showInTree=false, żeby nie dublować się na korzeniu — zob. komentarz przy insertach w
-      // ItemEndpoints.cs) — po odpięciu jedynej relacji musi dostać szansę pokazać się jako
-      // korzeń, inaczej zniknąłby całkowicie z drzewka mimo że nadal należy do projektu.
+      // Element z rodzicem — odpinamy konkretną krawędź, sam rekord zostaje. Element
+      // staje się BEZ PROJEKTU (moveItemToProject(id, null)) zamiast pokazywać się w
+      // korzeniu bieżącego projektu — zaśmiecałoby to jego strukturę czymś, co z tym
+      // projektem nie ma już nic wspólnego. Nadal w pełni widoczny i znajdywalny przez
+      // globalne wyszukiwanie ("Cała baza"); to samo zachowanie co synchronizacja BOM w
+      // makrach CAD (zob. sync_stale_children/SyncStaleChildren).
       await api.removeChild(selection.parentId, selection.id)
-      await api.setShowInTree(selection.id, true)
+      await api.moveItemToProject(selection.id, null)
     } else {
       // Element bez rodzica — nie ma czego odpiąć, więc przestaje być widoczny
       // jako korzeń w drzewku (rekord i przynależność do projektu zostają).

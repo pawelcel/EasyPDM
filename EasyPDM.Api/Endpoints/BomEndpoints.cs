@@ -18,11 +18,8 @@ static class BomEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            var projectId = await GetProjectId(conn, id);
-            if (projectId is null)
+            if (!await ItemExistsAsync(conn, id))
                 return Results.NotFound();
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId.Value))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             var rows = await FetchBomRowsAsync(conn, id);
             var result = rows
@@ -51,11 +48,8 @@ static class BomEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            var projectId = await GetProjectId(conn, id);
-            if (projectId is null)
+            if (!await ItemExistsAsync(conn, id))
                 return Results.NotFound();
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId.Value))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             var rows = await FetchBomRowsAsync(conn, id);
 
@@ -94,11 +88,8 @@ static class BomEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            var projectId = await GetProjectId(conn, id);
-            if (projectId is null)
+            if (!await ItemExistsAsync(conn, id))
                 return Results.NotFound();
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId.Value))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             var rows = await FetchBomRowsAsync(conn, id);
             var aggregated = rows
@@ -138,12 +129,14 @@ static class BomEndpoints
         });
     }
 
-    private static async Task<Guid?> GetProjectId(NpgsqlConnection conn, Guid id)
+    // Odczyt BOM-u (te trzy endpointy) jest świadomie otwarty dla KAŻDEGO zalogowanego
+    // użytkownika (zob. GET /api/items) — bez sprawdzenia dostępu do projektu, stąd
+    // tylko zwykłe sprawdzenie istnienia elementu, bez pobierania jego project_id.
+    private static async Task<bool> ItemExistsAsync(NpgsqlConnection conn, Guid id)
     {
-        await using var cmd = new NpgsqlCommand("SELECT project_id FROM items WHERE id = @id;", conn);
+        await using var cmd = new NpgsqlCommand("SELECT 1 FROM items WHERE id = @id;", conn);
         cmd.Parameters.AddWithValue("id", id);
-        var result = await cmd.ExecuteScalarAsync();
-        return result is null ? null : (Guid)result;
+        return await cmd.ExecuteScalarAsync() is not null;
     }
 
     private static async Task<string> GetItemLabel(NpgsqlConnection conn, Guid id)

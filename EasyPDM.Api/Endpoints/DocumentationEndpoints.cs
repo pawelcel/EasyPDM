@@ -11,34 +11,33 @@ static class DocumentationEndpoints
 {
     public static void MapDocumentationEndpoints(this WebApplication app, string connectionString)
     {
-        // GET /api/items/{id}/documentation/extensions
+        // GET /api/items/{id}/documentation/extensions — odczyt, świadomie otwarty dla
+        // KAŻDEGO zalogowanego użytkownika (zob. GET /api/items), bez sprawdzenia dostępu
+        // do projektu. W odróżnieniu od tego, endpointy /api/projects/{projectId}/documentation*
+        // niżej dotyczą całego PROJEKTU (jego struktury), więc zostają ograniczone do
+        // project_users.
         app.MapGet("/api/items/{id:guid}/documentation/extensions", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            var projectId = await GetItemProjectIdAsync(conn, id);
-            if (projectId is null)
+            if (!await ItemExistsAsync(conn, id))
                 return Results.NotFound();
-            if (!await HasProjectAccessAsync(conn, ctx, projectId.Value))
-                return AccessForbidden();
 
             var itemIds = await GetSelfAndDescendantIdsAsync(conn, id);
             var extensions = await GetExtensionsAsync(conn, itemIds);
             return Results.Ok(extensions);
         });
 
-        // GET /api/items/{id}/documentation?ext=txt&ext=pdf — bez "ext" pobiera wszystkie rozszerzenia.
+        // GET /api/items/{id}/documentation?ext=txt&ext=pdf — bez "ext" pobiera wszystkie
+        // rozszerzenia. Odczyt, świadomie otwarty dla KAŻDEGO zalogowanego użytkownika.
         app.MapGet("/api/items/{id:guid}/documentation", async (Guid id, string[]? ext, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            var projectId = await GetItemProjectIdAsync(conn, id);
-            if (projectId is null)
+            if (!await ItemExistsAsync(conn, id))
                 return Results.NotFound();
-            if (!await HasProjectAccessAsync(conn, ctx, projectId.Value))
-                return AccessForbidden();
 
             var itemIds = await GetSelfAndDescendantIdsAsync(conn, id);
             var zip = await BuildZipAsync(conn, itemIds, ext);
@@ -106,12 +105,11 @@ static class DocumentationEndpoints
         return await cmd.ExecuteScalarAsync() is not null;
     }
 
-    private static async Task<Guid?> GetItemProjectIdAsync(NpgsqlConnection conn, Guid id)
+    private static async Task<bool> ItemExistsAsync(NpgsqlConnection conn, Guid id)
     {
-        await using var cmd = new NpgsqlCommand("SELECT project_id FROM items WHERE id = @id;", conn);
+        await using var cmd = new NpgsqlCommand("SELECT 1 FROM items WHERE id = @id;", conn);
         cmd.Parameters.AddWithValue("id", id);
-        var result = await cmd.ExecuteScalarAsync();
-        return result is null ? null : (Guid)result;
+        return await cmd.ExecuteScalarAsync() is not null;
     }
 
     // Element sam + wszyscy jego potomkowie w strukturze (item_relations) — dla Części

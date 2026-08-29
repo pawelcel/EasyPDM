@@ -13,7 +13,8 @@ static class AttachmentEndpoints
 
     public static void MapAttachmentEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
     {
-        // GET /api/items/{itemId}/attachments
+        // GET /api/items/{itemId}/attachments — odczyt, świadomie otwarty dla KAŻDEGO
+        // zalogowanego użytkownika (zob. GET /api/items), bez sprawdzenia dostępu do projektu.
         app.MapGet("/api/items/{itemId:guid}/attachments", async (Guid itemId, HttpContext ctx) =>
         {
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
@@ -22,9 +23,6 @@ static class AttachmentEndpoints
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
-
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = """
                 SELECT id, file_name, file_size, uploaded_at, preview_role
@@ -213,22 +211,23 @@ static class AttachmentEndpoints
             return Results.Created($"/api/attachments/{attachmentId}", new { id = attachmentId, fileName, role = body.Role });
         });
 
-        // GET /api/attachments/{id}/file — pobranie załącznika.
+        // GET /api/attachments/{id}/file — pobranie załącznika, świadomie otwarte dla
+        // KAŻDEGO zalogowanego użytkownika (zob. GET /api/items), bez sprawdzenia dostępu
+        // do projektu.
         app.MapGet("/api/attachments/{id:guid}/file", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
             const string sql = """
-                SELECT ia.file_path, ia.file_name, i.project_id
-                FROM item_attachments ia JOIN items i ON i.id = ia.item_id
+                SELECT ia.file_path, ia.file_name
+                FROM item_attachments ia
                 WHERE ia.id = @id;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
 
             string path, fileName;
-            Guid projectId;
             await using (var reader = await cmd.ExecuteReaderAsync())
             {
                 if (!await reader.ReadAsync())
@@ -236,11 +235,7 @@ static class AttachmentEndpoints
 
                 path = reader.GetString(0);
                 fileName = reader.GetString(1);
-                projectId = reader.GetGuid(2);
             }
-
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             if (!File.Exists(path))
                 return Results.NotFound("Plik zniknął z magazynu na dysku serwera.");

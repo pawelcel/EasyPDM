@@ -251,7 +251,11 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   strukturze (usuniętego z drzewa FreeCAD od poprzedniej wysyłki). Jeśli tak, pyta
   natywnie o potwierdzenie przed usunięciem tej relacji (same elementy nigdy nie są
   kasowane, tylko ich podpięcie pod tego konkretnego rodzica) — odmowa zostawia
-  wszystko bez zmian.
+  wszystko bez zmian. Potwierdzenie dodatkowo odpina usunięte dziecko od JAKIEGOKOLWIEK
+  projektu, zamiast wrzucać je do korzenia bieżącego projektu — zostaje w pełni widoczne
+  i znajdywalne przez globalną wyszukiwarkę "Cała baza", tylko przestaje zaśmiecać
+  strukturę projektu, z którym nie ma już nic wspólnego (ten sam mechanizm co ręczne
+  "Usuń ze struktury" w aplikacji webowej).
 
 ## Ograniczenia pierwszej wersji
 

@@ -285,7 +285,12 @@ automatisch gesendet werden soll:
   das nicht mehr in der lokalen Struktur ist (seit dem letzten Hochladen aus dem
   FreeCAD-Baum entfernt). Falls ja, wird nativ um Bestätigung vor dem Entfernen dieser
   Beziehung gebeten (die Elemente selbst werden nie gelöscht, nur ihre Zuordnung zu
-  diesem konkreten Elternelement) — eine Ablehnung lässt alles unverändert.
+  diesem konkreten Elternelement) — eine Ablehnung lässt alles unverändert. Eine
+  Bestätigung entfernt das Kind zusätzlich aus JEDEM Projekt, statt es in den Stamm des
+  aktuellen Projekts zu werfen — es bleibt vollständig sichtbar und über die globale
+  Suche „Cała baza" auffindbar, hört aber auf, die Struktur eines Projekts zu belasten,
+  mit dem es nichts mehr zu tun hat (derselbe Mechanismus wie beim manuellen „Aus der
+  Struktur entfernen" in der Web-Anwendung).
 
 ## Einschränkungen der ersten Version
 
