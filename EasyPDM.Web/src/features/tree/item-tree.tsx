@@ -302,12 +302,11 @@ function TreeNode({
               variant="ghost"
               aria-label={t("addNode.removeRelationAria")}
               onClick={async () => {
-                // showInTree=true na wszelki wypadek — element mógł powstać OD RAZU jako
-                // podelement (showInTree=false, żeby nie dublować się na korzeniu), więc po
-                // odpięciu jedynej relacji musi dostać szansę pokazać się jako korzeń zamiast
-                // zniknąć z drzewka (patrz project-tree-view.tsx: handleRemoveFromStructure).
+                // Element staje się BEZ PROJEKTU zamiast pokazywać się w korzeniu bieżącego
+                // projektu (patrz project-tree-view.tsx: handleRemoveFromStructure) — nadal
+                // w pełni widoczny i znajdywalny przez globalne wyszukiwanie ("Cała baza").
                 await api.removeChild(parentId, item.id)
-                await api.setShowInTree(item.id, true)
+                await api.moveItemToProject(item.id, null)
                 await onRefetch()
               }}
             >

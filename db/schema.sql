@@ -54,7 +54,7 @@ GRANT SELECT, INSERT, DELETE ON project_users TO pdm_user;
 -- ============================================================
 CREATE TABLE items (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id          UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    project_id          UUID REFERENCES projects(id) ON DELETE CASCADE, -- NULL = element bez projektu, widoczny tylko przez "Cała baza"
     item_type           TEXT NOT NULL DEFAULT 'file'
                             CHECK (item_type IN ('folder', 'part', 'file', 'assembly')),
     item_number         INTEGER,                -- numer nadawany automatycznie Częściom i Złożeniom (item_number_seq)
@@ -345,4 +345,4 @@ INSERT INTO schema_migrations (filename) VALUES
     ('025_backup_schedule.sql'), ('026_backup_retention.sql'),
     ('027_schema_migrations_tracking.sql'), ('028_attachment_preview_role.sql'),
     ('029_item_number_prefix.sql'), ('030_attachment_cad_role.sql'),
-    ('031_clients.sql');
+    ('031_clients.sql'), ('032_nullable_item_project.sql');

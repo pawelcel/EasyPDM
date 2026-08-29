@@ -185,7 +185,7 @@ export const api = {
       body: JSON.stringify({ showInTree }),
     }).then((r) => handleResponse<void>(r)),
 
-  moveItemToProject: (itemId: string, projectId: string) =>
+  moveItemToProject: (itemId: string, projectId: string | null) =>
     fetch(`${BASE}/items/${itemId}/project`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

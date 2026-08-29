@@ -129,6 +129,11 @@ anders gelöst:
    das PDM noch eine Stücklistenbeziehung zu einem nicht mehr lokal vorhandenen Kind hat,
    und bittet nativ um Bestätigung vor dem Entfernen dieser Beziehung (die Elemente
    selbst werden nie gelöscht, nur ihre Zuordnung zu diesem konkreten Elternelement).
+   Eine Bestätigung entfernt das Kind zusätzlich aus JEDEM Projekt, statt es in den
+   Stamm des aktuellen Projekts zu werfen — es bleibt vollständig sichtbar und über die
+   globale Suche „Cała baza" auffindbar, hört aber auf, die Struktur eines Projekts zu
+   belasten, mit dem es nichts mehr zu tun hat (derselbe Mechanismus wie beim manuellen
+   „Aus der Struktur entfernen" in der Web-Anwendung).
 4. Prüft die **Custom Properties** des Hauptdokuments:
    - **Bereits verknüpft** (hat eine gespeicherte `EasyPDM_ItemId`) — fragt lokal nach der
      Zustimmung, die aktuelle Version als neue Revision anzuhängen, ohne den Browser zu

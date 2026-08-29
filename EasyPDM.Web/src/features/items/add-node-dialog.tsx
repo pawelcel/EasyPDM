@@ -77,10 +77,10 @@ function AddNodeDialog({
   trigger: ReactElement
   // Gdy podane (zwykłe użycie — pasek narzędzi projektu, węzeł drzewa, panel szczegółów):
   // dialog tworzy od razu w TYM projekcie/pod TYM rodzicem, bez pytania o nic dodatkowego.
-  // Gdy POMINIĘTE (zob. PendingTicketBanner "Nowy element"): dialog SAM pyta o projekt i
-  // (opcjonalnie) element nadrzędny jako pierwszy krok — nie wymaga wcześniejszej nawigacji
-  // po panelu projektów, wszystko dzieje się w tym jednym okienku.
-  projectId?: string
+  // Gdy POMINIĘTE albo `null` (element bez projektu — zob. Item.projectId): dialog SAM
+  // pyta o projekt i (opcjonalnie) element nadrzędny jako pierwszy krok — nie wymaga
+  // wcześniejszej nawigacji po panelu projektów, wszystko dzieje się w tym jednym okienku.
+  projectId?: string | null
   parentId?: string | null
   parentType?: ItemType | null
   lockMode?: ItemType
@@ -126,7 +126,7 @@ function AddNodeDialog({
   }
 
   const { t } = useLanguage()
-  const needsProjectPicker = fixedProjectId === undefined
+  const needsProjectPicker = fixedProjectId == null
   const [open, setOpenState] = useState(initialOpen ?? false)
   function setOpen(next: boolean) {
     setOpenState(next)

@@ -10,24 +10,16 @@ static class HistoryEndpoints
 {
     public static void MapHistoryEndpoints(this WebApplication app, string connectionString)
     {
-        // GET /api/items/{id}/history
+        // GET /api/items/{id}/history — odczyt, świadomie otwarty dla KAŻDEGO zalogowanego
+        // użytkownika (zob. GET /api/items), bez sprawdzenia dostępu do projektu.
         app.MapGet("/api/items/{id:guid}/history", async (Guid id, HttpContext ctx) =>
         {
+            var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
-
-            Guid projectId;
-            await using (var checkCmd = new NpgsqlCommand("SELECT project_id FROM items WHERE id = @id;", conn))
-            {
-                checkCmd.Parameters.AddWithValue("id", id);
-                var projectIdResult = await checkCmd.ExecuteScalarAsync();
-                if (projectIdResult is null)
-                    return Results.NotFound();
-                projectId = (Guid)projectIdResult;
-            }
-
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = """
                 SELECT 'created' AS type, i.created_at AS at, u.display_name AS user_display_name,

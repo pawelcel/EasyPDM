@@ -424,13 +424,12 @@ static class ItemEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            const string sql = "SELECT file_path, file_name, project_id FROM items WHERE id = @id;";
+            const string sql = "SELECT file_path, file_name FROM items WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
 
             string? path;
             string fileName;
-            Guid projectId;
             await using (var reader = await cmd.ExecuteReaderAsync())
             {
                 if (!await reader.ReadAsync())
@@ -441,12 +440,10 @@ static class ItemEndpoints
 
                 path = reader.GetString(0);
                 fileName = reader.GetString(1);
-                projectId = reader.GetGuid(2);
             }
 
-            if (!await HasProjectAccessAsync(conn, ctx, projectId))
-                return ProjectAccessForbidden();
-
+            // Odczyt pliku elementu — świadomie otwarty dla KAŻDEGO zalogowanego użytkownika,
+            // zob. GET /api/items niżej.
             if (!File.Exists(path))
                 return Results.NotFound("Plik zniknął z magazynu na dysku serwera.");
 
@@ -456,16 +453,21 @@ static class ItemEndpoints
         // ============================================================
         // GET /api/items?search=&tag=&projectId=
         // Lista elementów z opcjonalnym filtrem po nazwie/właściwościach, tagu i projekcie.
-        // Zwykły użytkownik widzi tylko elementy z projektów, do których został przypisany
-        // (project_users) — spójnie z tym, że w ogóle nie widzi nieprzypisanych projektów.
+        // Świadomie otwarta dla KAŻDEGO zalogowanego użytkownika, niezależnie od przypisania
+        // do projektu (project_users) — ograniczenia project_users dotyczą pracy w konkretnym
+        // projekcie (jego drzewa/struktury) i zapisów, nie samego globalnego odczytu/
+        // wyszukiwania elementów ("Cała baza" ma być czytelna dla wszystkich).
         // ============================================================
         app.MapGet("/api/items", async (string? search, string? tag, Guid? projectId, HttpContext ctx) =>
         {
-            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
+            // "Cała baza" — świadomie otwarta dla KAŻDEGO zalogowanego użytkownika,
+            // niezależnie od przypisania do projektu (project_users) danego elementu, także
+            // dla elementów bez projektu (i.project_id IS NULL). Ograniczenia project_users
+            // dotyczą wyłącznie PRACY w konkretnym projekcie (jego drzewa/struktury, zob.
+            // GET /api/projects/{id}/relations) i wszystkich zapisów — nie samego odczytu.
             const string sql = """
                 SELECT i.id, i.project_id, i.file_name, i.file_type, i.file_path, i.properties, i.modified_at,
                        i.item_type, i.item_number, i.item_number_prefix, i.show_in_tree, i.status, i.revision_number,
@@ -480,9 +482,6 @@ static class ItemEndpoints
                         JOIN tags t ON t.id = it.tag_id
                         WHERE it.item_id = i.id AND t.name = @tag))
                   AND (@projectId::uuid IS NULL OR i.project_id = @projectId)
-                  AND (@isAdmin OR EXISTS (
-                        SELECT 1 FROM project_users pu WHERE pu.project_id = i.project_id AND pu.user_id = @userId
-                  ))
                 ORDER BY i.file_name;
                 """;
 
@@ -490,8 +489,6 @@ static class ItemEndpoints
             cmd.Parameters.AddWithValue("search", (object?)search ?? DBNull.Value);
             cmd.Parameters.AddWithValue("tag", (object?)tag ?? DBNull.Value);
             cmd.Parameters.AddWithValue("projectId", (object?)projectId ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("isAdmin", user.Role == "admin");
-            cmd.Parameters.AddWithValue("userId", user.Id);
 
             var items = new List<Dictionary<string, object?>>();
             var ids = new List<Guid>();
@@ -505,7 +502,7 @@ static class ItemEndpoints
                     items.Add(new Dictionary<string, object?>
                     {
                         ["id"] = id,
-                        ["projectId"] = reader.GetGuid(1),
+                        ["projectId"] = reader.IsDBNull(1) ? null : reader.GetGuid(1),
                         ["fileName"] = reader.GetString(2),
                         ["fileType"] = reader.IsDBNull(3) ? null : reader.GetString(3),
                         ["filePath"] = reader.IsDBNull(4) ? null : reader.GetString(4),
@@ -560,18 +557,18 @@ static class ItemEndpoints
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
 
+            // Odczyt szczegółów elementu — świadomie otwarty dla KAŻDEGO zalogowanego
+            // użytkownika (zob. GET /api/items powyżej) — bez sprawdzenia HasProjectAccessAsync.
             Dictionary<string, object?> result;
-            Guid projectId;
             await using (var reader = await cmd.ExecuteReaderAsync())
             {
                 if (!await reader.ReadAsync())
                     return Results.NotFound();
 
-                projectId = reader.GetGuid(1);
                 result = new Dictionary<string, object?>
                 {
                     ["id"] = reader.GetGuid(0),
-                    ["projectId"] = projectId,
+                    ["projectId"] = reader.IsDBNull(1) ? null : reader.GetGuid(1),
                     ["fileName"] = reader.GetString(2),
                     ["fileType"] = reader.IsDBNull(3) ? null : reader.GetString(3),
                     ["filePath"] = reader.IsDBNull(4) ? null : reader.GetString(4),
@@ -589,9 +586,6 @@ static class ItemEndpoints
                     ["ownerDisplayName"] = reader.IsDBNull(16) ? null : reader.GetString(16),
                 };
             }
-
-            if (!await HasProjectAccessAsync(conn, ctx, projectId))
-                return ProjectAccessForbidden();
 
             var tagsByItem = await LoadTagsForItems(connectionString, new List<Guid> { id });
             result["tags"] = tagsByItem.TryGetValue(id, out var t) ? t : new List<string>();
@@ -823,9 +817,8 @@ static class ItemEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ProjectAccessForbidden();
-
+            // Odczyt historii rewizji — świadomie otwarty dla KAŻDEGO zalogowanego
+            // użytkownika, zob. GET /api/items.
             const string sql = """
                 SELECT revision_number, comment, created_at
                 FROM item_revision_comments
@@ -878,11 +871,14 @@ static class ItemEndpoints
             return affected == 0 ? Results.NotFound() : Results.Ok();
         });
 
-        // PATCH /api/items/{id}/project   body: { "projectId": "..." }
+        // PATCH /api/items/{id}/project   body: { "projectId": "..." | null }
         // Przenosi Część/Złożenie do innego projektu jako widoczny korzeń jego drzewka — używane,
         // gdy dodajemy "Istniejący element" z całej bazy na poziomie głównym (bez rodzica) projektu,
         // do którego element jeszcze nie należy. Zagnieżdżone odwołania w item_relations (element
         // jako komponent BOM w innych złożeniach) zostają nienaruszone niezależnie od project_id.
+        // projectId=null ODPINA element od jakiegokolwiek projektu (zob. "Usuń ze struktury" w
+        // aplikacji webowej i synchronizację BOM w makrach CAD) — element pozostaje w pełni
+        // widoczny przez "Cała baza", tylko nie należy już do żadnego konkretnego projektu.
         app.MapPatch("/api/items/{id:guid}/project", async (Guid id, MoveToProjectRequest body, HttpContext ctx) =>
         {
             var info = await GetItemTypeAndStatus(connectionString, id);
@@ -899,20 +895,23 @@ static class ItemEndpoints
             if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return OwnerLockedForbidden();
 
-            await using (var checkCmd = new NpgsqlCommand("SELECT 1 FROM projects WHERE id = @projectId;", conn))
+            if (body.ProjectId is not null)
             {
-                checkCmd.Parameters.AddWithValue("projectId", body.ProjectId);
-                if (await checkCmd.ExecuteScalarAsync() is null)
-                    return Results.NotFound("Projekt docelowy nie istnieje.");
-            }
+                await using (var checkCmd = new NpgsqlCommand("SELECT 1 FROM projects WHERE id = @projectId;", conn))
+                {
+                    checkCmd.Parameters.AddWithValue("projectId", body.ProjectId.Value);
+                    if (await checkCmd.ExecuteScalarAsync() is null)
+                        return Results.NotFound("Projekt docelowy nie istnieje.");
+                }
 
-            if (!await HasProjectAccessAsync(conn, ctx, body.ProjectId))
-                return ProjectAccessForbidden();
+                if (!await HasProjectAccessAsync(conn, ctx, body.ProjectId))
+                    return ProjectAccessForbidden();
+            }
 
             const string sql = "UPDATE items SET project_id = @projectId, show_in_tree = true WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
-            cmd.Parameters.AddWithValue("projectId", body.ProjectId);
+            cmd.Parameters.AddWithValue("projectId", (object?)body.ProjectId ?? DBNull.Value);
             var affected = await cmd.ExecuteNonQueryAsync();
 
             return affected == 0 ? Results.NotFound() : Results.Ok();
@@ -1020,7 +1019,7 @@ static class ItemEndpoints
         _ => false
     };
 
-    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked, Guid ProjectId)?> GetItemTypeAndStatus(string connectionString, Guid id)
+    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked, Guid? ProjectId)?> GetItemTypeAndStatus(string connectionString, Guid id)
     {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync();
@@ -1038,7 +1037,7 @@ static class ItemEndpoints
             reader.IsDBNull(1) ? null : reader.GetString(1),
             reader.IsDBNull(2) ? null : reader.GetGuid(2),
             reader.GetBoolean(3),
-            reader.GetGuid(4)
+            reader.IsDBNull(4) ? null : reader.GetGuid(4)
         );
     }
 
@@ -1046,14 +1045,20 @@ static class ItemEndpoints
     // użytkownik musi być przypisany do projektu (project_users), administrator zawsze ma
     // dostęp. Używane zarówno dla odczytu, jak i mutacji — nieprzypisany użytkownik nie
     // powinien móc ani przeglądać, ani zmieniać niczego w projekcie, którego nie widzi.
-    internal static async Task<bool> HasProjectAccessAsync(NpgsqlConnection conn, HttpContext ctx, Guid projectId)
+    // Element BEZ projektu (projectId == null) nie należy do żadnego projektu do którego
+    // dostęp trzeba by sprawdzać — otwarty dla każdego zalogowanego, także przy zapisie
+    // (widoczny wyłącznie przez globalne "Cała baza", które jest jawnie otwarte dla
+    // wszystkich, zob. GET /api/items).
+    internal static async Task<bool> HasProjectAccessAsync(NpgsqlConnection conn, HttpContext ctx, Guid? projectId)
     {
+        if (projectId is null) return true;
+
         var user = (CurrentUser)ctx.Items["CurrentUser"]!;
         if (user.Role == "admin") return true;
 
         await using var cmd = new NpgsqlCommand(
             "SELECT 1 FROM project_users WHERE project_id = @projectId AND user_id = @userId;", conn);
-        cmd.Parameters.AddWithValue("projectId", projectId);
+        cmd.Parameters.AddWithValue("projectId", projectId.Value);
         cmd.Parameters.AddWithValue("userId", user.Id);
         return await cmd.ExecuteScalarAsync() is not null;
     }
@@ -1158,5 +1163,5 @@ record AttachExistingTicketRequest(Guid ItemId, bool? ExportStep, bool? ExportPd
 record VisibilityRequest(bool ShowInTree);
 record RenameRequest(string Name);
 record StatusRequest(string Status, string? Comment = null);
-record MoveToProjectRequest(Guid ProjectId);
+record MoveToProjectRequest(Guid? ProjectId);
 record DuplicateItemRequest(Guid? ParentId = null, bool InsertAfterOriginal = false);

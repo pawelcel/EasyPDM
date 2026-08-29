@@ -107,7 +107,7 @@ export function revisionLabel(n: number): string {
 
 export interface Item {
   id: string
-  projectId: string
+  projectId: string | null
   fileName: string
   fileType: string | null
   filePath: string | null

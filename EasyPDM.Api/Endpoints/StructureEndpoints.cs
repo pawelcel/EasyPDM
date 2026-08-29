@@ -10,9 +10,8 @@ static class StructureEndpoints
         // elementu jako PEŁNE obiekty Item + quantity/position — dla widoków, które (w
         // odróżnieniu od widoku jednego projektu) nie mają załadowanego całego drzewka
         // relacji z góry, np. "Cała baza" (item-list.tsx), gdzie zaznaczony element może
-        // być z dowolnego projektu. Dziecko może formalnie należeć do INNEGO projektu niż
-        // rodzic (współdzielone komponenty) — dostęp sprawdzany jest tylko do projektu
-        // RODZICA, spójnie z resztą struktury (item_relations, BOM, dokumentacja).
+        // być z dowolnego projektu. Odczyt elementu — świadomie otwarty dla KAŻDEGO
+        // zalogowanego użytkownika (zob. GET /api/items), bez sprawdzenia dostępu do projektu.
         app.MapGet("/api/items/{id:guid}/children", async (Guid id, HttpContext ctx) =>
         {
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
@@ -21,9 +20,6 @@ static class StructureEndpoints
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
-
-            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
-                return ItemEndpoints.ProjectAccessForbidden();
 
             const string sql = """
                 SELECT i.id, i.project_id, i.file_name, i.file_type, i.file_path, i.properties, i.modified_at,
@@ -49,7 +45,7 @@ static class StructureEndpoints
                     var itemDict = new Dictionary<string, object?>
                     {
                         ["id"] = childId,
-                        ["projectId"] = reader.GetGuid(1),
+                        ["projectId"] = reader.IsDBNull(1) ? null : reader.GetGuid(1),
                         ["fileName"] = reader.GetString(2),
                         ["fileType"] = reader.IsDBNull(3) ? null : reader.GetString(3),
                         ["filePath"] = reader.IsDBNull(4) ? null : reader.GetString(4),

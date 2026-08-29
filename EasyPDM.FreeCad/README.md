@@ -262,7 +262,11 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
   structure (removed from the FreeCAD tree since the last upload). If so, it asks
   natively for confirmation before removing that link (the items themselves are never
   deleted, only their attachment under this specific parent) — declining leaves
-  everything untouched.
+  everything untouched. Confirming also unassigns the removed child from ANY project
+  instead of dumping it into the current project's root — it stays fully visible and
+  findable via the global "whole database" search, it just stops cluttering the
+  structure of a project it no longer has anything to do with (the same mechanism the
+  web application's own "Remove from structure" uses).
 
 ## First-version limitations
 

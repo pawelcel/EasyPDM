@@ -1936,10 +1936,11 @@ End Function
 ' untouched, a real bug found and fixed in practice. Asks natively for confirmation before
 ' removing anything (the relation may have been added manually in the web app for an
 ' unrelated reason) -- declining, or a failed fetch of the current children, removes
-' nothing. Each successful removal also restores the removed child's visibility at the
-' project root (showInTree=true), mirroring the same two-step "remove from structure"
-' mechanism the web application itself uses -- otherwise a child hidden earlier as a
-' leaves-first side effect (see "newlyCreatedPaths") would become invisible entirely.
+' nothing. Each successful removal also unassigns the removed child from ANY project
+' (PATCH .../project {projectId:null}) instead of dumping it into the current project's
+' root -- the item stays fully visible and findable via the global search ("Cala baza"),
+' it just stops cluttering the structure of a project it no longer has anything to do
+' with. The exact same mechanism as the web application's own "Remove from structure".
 Sub SyncStaleChildren(ByVal parentItemId As String, ByVal localChildIds As Object)
     Dim rows As Object
     On Error Resume Next
@@ -1982,7 +1983,7 @@ Sub SyncStaleChildren(ByVal parentItemId As String, ByVal localChildIds As Objec
         cid = JsonGetString(c, "id", "")
         On Error Resume Next
         ApiDeleteRequest "/items/" & parentItemId & "/children/" & cid
-        ApiPatchJson "/items/" & cid & "/visibility", "{""showInTree"":true}"
+        ApiPatchJson "/items/" & cid & "/project", "{""projectId"":null}"
         On Error GoTo 0
     Next c
 End Sub
