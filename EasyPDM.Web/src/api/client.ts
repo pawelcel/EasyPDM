@@ -48,12 +48,14 @@ type MaterialWriteBody = {
   subgroup: string | null
 }
 
+// Współdzielony przez osoby kontaktowe producenta i klienta (te same pola po obu stronach).
 type ContactWriteBody = {
   firstName: string | null
   lastName: string | null
   phone: string | null
   position: string | null
   email: string | null
+  address: string | null
 }
 
 type ClientWriteBody = {

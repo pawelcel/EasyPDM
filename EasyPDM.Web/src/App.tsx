@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 
+import { cn } from "@/lib/utils"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Button } from "@/components/ui/button"
 import { Hint } from "@/components/ui/hint"
@@ -135,8 +136,8 @@ function App() {
         />
       )}
 
-      <div className="min-w-0 flex-1 overflow-y-auto">
-        <header className="sticky top-0 z-10 border-b bg-background px-8 py-5">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="border-b bg-background px-8 py-5">
           <div className="mb-3.5 flex items-center justify-between">
             <div className="flex items-baseline gap-1.5">
               <button
@@ -215,7 +216,15 @@ function App() {
           )}
         </header>
 
-        <main className="px-8 py-6">
+        <main
+          className={cn(
+            "min-h-0 flex-1 px-8 py-6",
+            // Widoki Projektu i Całej bazy mają WŁASNY, dwukolumnowy scroll (lista/drzewo i
+            // panel elementu przewijają się niezależnie, zob. ProjectTreeView/ItemList) —
+            // reszta widoków przewija się normalnie, jako jeden, wspólny obszar.
+            view === "projects" || view === "database" ? "overflow-hidden" : "overflow-y-auto"
+          )}
+        >
           {view === "welcome" && <WelcomeView onNavigate={setView} />}
 
           {view === "projects" &&

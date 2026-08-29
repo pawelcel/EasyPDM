@@ -2,9 +2,13 @@ import { useEffect, useState } from "react"
 
 import { api } from "@/api/client"
 import type { Item, Project } from "@/api/types"
+import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
+import { ResizeHandle } from "@/components/ui/resize-handle"
 import type { DatabaseFilters } from "@/features/items/database-filters"
+import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
 import { ItemRow } from "@/features/items/item-row"
 import { PartKindSelect, type PartKindFilter } from "@/features/items/part-kind-select"
@@ -13,6 +17,7 @@ import { SavedFiltersBar } from "@/features/items/saved-filters-bar"
 import { ManufacturerFilterSelect } from "@/features/manufacturers/manufacturer-filter-select"
 import { ProjectDetailPanel } from "@/features/projects/project-detail-panel"
 import { ProjectRow } from "@/features/projects/project-row"
+import { useResizableWidth } from "@/hooks/use-resizable-width"
 import { useLanguage } from "@/i18n/use-language"
 
 type Selection = { kind: "item"; id: string } | { kind: "project"; id: string }
@@ -51,6 +56,9 @@ function ItemList({
   const [partKind, setPartKind] = useState<PartKindFilter>("all")
   const [manufacturer, setManufacturer] = useState("")
   const [selection, setSelection] = useState<Selection | null>(null)
+  // Zapamiętywana per przeglądarka, niezależnie od szerokości drzewa w widoku projektu
+  // (features/tree/project-tree-view.tsx) — to inny układ (płaska lista, nie drzewo).
+  const { width: listWidth, startResize } = useResizableWidth("easypdm.databaseListWidth", 220, 640, 320)
   // Element pobrany BEZPOŚREDNIO po ID (przez przycisk "Przejdź" na wierszu BOM-u), z
   // pominięciem aktualnie przefiltrowanej/wyszukanej listy po lewej — cel nawigacji może
   // wcale nie pasować do bieżących filtrów (inny rodzaj/producent/wynik wyszukiwania), więc
@@ -59,6 +67,10 @@ function ItemList({
   // selection — czyszczony przy każdym zwykłym kliknięciu w lewej liście.
   const [externalItem, setExternalItem] = useState<Item | null>(null)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [confirmingProjectDelete, setConfirmingProjectDelete] = useState(false)
+  // Błąd akcji przy zaznaczonym projekcie/elemencie z belki nad listą (duplikuj) — zob.
+  // features/tree/project-tree-view.tsx, ta sama belka co w widoku projektu.
+  const [itemActionError, setItemActionError] = useState<string | null>(null)
   const [selectedItemChildren, setSelectedItemChildren] = useState<
     { item: Item; quantity: number; position: number }[]
   >([])
@@ -121,6 +133,27 @@ function ItemList({
     setSelection(null)
     setExternalItem(null)
     await onItemsRefetch()
+  }
+
+  async function handleDuplicateSelected() {
+    if (!selectedItem) return
+    setItemActionError(null)
+    try {
+      const { id: newItemId } = await api.duplicateItem(selectedItem.id)
+      await refetchItemsAndExternal()
+      setExternalItem(null)
+      setSelection({ kind: "item", id: newItemId })
+    } catch (err) {
+      setItemActionError(err instanceof Error ? err.message : t("item.duplicateFailed"))
+    }
+  }
+
+  async function confirmProjectDelete() {
+    if (!selectedProject) return
+    await api.deleteProject(selectedProject.id)
+    setConfirmingProjectDelete(false)
+    setSelection(null)
+    await onProjectsRefetch()
   }
 
   const visibleProjects =
@@ -197,7 +230,7 @@ function ItemList({
     : null
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         <RecordTypeSelect value={recordType} onChange={changeRecordType} />
         <PartKindSelect value={partKind} onChange={changePartKind} disabled={recordType !== "part"} />
@@ -212,14 +245,82 @@ function ItemList({
         />
       </div>
 
+      {/* Belka zawsze widoczna (nie tylko po zaznaczeniu czegoś) — zmieniają się jedynie
+          przyciski w środku, żeby układ się nie "przeskakiwał" przy zaznaczaniu/odznaczaniu.
+          Akcje dotyczące aktualnie zaznaczonego wiersza (projekt albo element) — wyrównane
+          (absolute, position: relative na belce) do lewej krawędzi panelu podglądu poniżej
+          (listWidth + szerokość ResizeHandle), tak samo jak w widoku projektu (zob.
+          features/tree/project-tree-view.tsx). Dawniej renderowane wewnątrz
+          ProjectDetailPanel/ItemDetailPanel — stamtąd całkowicie usunięte (hideActions). */}
+      <div className="relative h-9 rounded-xl bg-card p-2 ring-1 ring-foreground/10">
+        {selectedProject && (
+          <div
+            className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1.5"
+            style={{ left: listWidth + 16 }}
+          >
+            <Button size="sm" variant="outline" onClick={() => onNavigateToProject(selectedProject.id)}>
+              {t("project.goToProject")}
+            </Button>
+            <DocumentationDialog
+              trigger={
+                <Button size="sm" variant="outline">
+                  {t("documentation.button")}
+                </Button>
+              }
+              fetchExtensions={() => api.getProjectDocumentationExtensions(selectedProject.id)}
+              buildDownloadUrl={(extensions) => api.projectDocumentationUrl(selectedProject.id, extensions)}
+            />
+            {isAdmin && (
+              <Button size="sm" variant="destructive" onClick={() => setConfirmingProjectDelete(true)}>
+                {t("project.deleteButton")}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {selectedItem && (
+          <div
+            className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1.5"
+            style={{ left: listWidth + 16 }}
+          >
+            {(selectedItem.itemType === "part" || selectedItem.itemType === "assembly") && (
+              <Button size="sm" variant="outline" onClick={handleDuplicateSelected}>
+                {t("item.duplicate")}
+              </Button>
+            )}
+            {(selectedItem.itemType === "part" || selectedItem.itemType === "assembly") && (
+              <DocumentationDialog
+                trigger={
+                  <Button size="sm" variant="outline">
+                    {t("documentation.button")}
+                  </Button>
+                }
+                fetchExtensions={() => api.getItemDocumentationExtensions(selectedItem.id)}
+                buildDownloadUrl={(extensions) => api.itemDocumentationUrl(selectedItem.id, extensions)}
+              />
+            )}
+            {isAdmin && (
+              <Button size="sm" variant="destructive" onClick={() => setConfirmingDeleteId(selectedItem.id)}>
+                {t("item.deleteCompletely")}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+      <FormError>{itemActionError}</FormError>
+
       {visibleProjects.length === 0 && visibleItems.length === 0 ? (
         <Hint>{t("database.empty")}</Hint>
       ) : (
-        <div className="grid grid-cols-4 items-start gap-4">
-          {/* max-h + overflow-y-auto — przy dużej bazie ta kolumna ma WŁASNY, ograniczony
-              scroll zamiast rozciągać całą stronę do wysokości pełnej listy elementów
-              (sticky top pod nagłówkiem, który sam jest "sticky top-0"). */}
-          <div className="sticky top-24 col-span-1 flex max-h-[calc(100vh-6rem)] flex-col gap-0.5 overflow-y-auto rounded-xl bg-card p-2 ring-1 ring-foreground/10">
+        <div className="flex min-h-0 flex-1">
+          {/* Własny, niezależny scroll tej kolumny (a nie całej strony) — przy dużej bazie
+              lista elementów rośnie dowolnie, ale rodzic ma ograniczoną wysokość (h-full na
+              korzeniu + overflow-hidden na <main> dla tego widoku, zob. App.tsx). Szerokość
+              przeciągalna uchwytem niżej (zob. useResizableWidth). */}
+          <div
+            className="flex min-h-0 shrink-0 flex-col gap-0.5 overflow-y-auto rounded-xl bg-card p-2 ring-1 ring-foreground/10"
+            style={{ width: listWidth }}
+          >
             {visibleProjects.map((project) => (
               <ProjectRow
                 key={project.id}
@@ -245,7 +346,9 @@ function ItemList({
             ))}
           </div>
 
-          <div className="col-span-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+          <ResizeHandle onMouseDown={startResize} />
+
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl bg-card p-4 ring-1 ring-foreground/10">
             {selectedItem ? (
               <ItemDetailPanel
                 key={selectedItem.id}
@@ -255,11 +358,9 @@ function ItemList({
                 onSelectChild={handleSelectChild}
                 onItemsRefetch={refetchItemsAndExternal}
                 onTagsRefetch={onTagsRefetch}
-                onDeleteCompletely={isAdmin ? () => setConfirmingDeleteId(selectedItem.id) : undefined}
-                onDuplicated={(newId) => {
-                  setExternalItem(null)
-                  setSelection({ kind: "item", id: newId })
-                }}
+                // Akcje (duplikuj/dokumentacja/usuń całkowicie) renderowane w belce nad
+                // listą zamiast tutaj — zob. hideActions.
+                hideActions
               />
             ) : selectedProject ? (
               <ProjectDetailPanel
@@ -271,7 +372,7 @@ function ItemList({
                   setSelection(null)
                   await onProjectsRefetch()
                 }}
-                onNavigateToProject={() => onNavigateToProject(selectedProject.id)}
+                hideActions
               />
             ) : (
               <Hint>{t("database.selectItemHint")}</Hint>
@@ -289,6 +390,21 @@ function ItemList({
           variant="destructive"
           onConfirm={confirmDeleteCompletely}
           onCancel={() => setConfirmingDeleteId(null)}
+        />
+      )}
+
+      {confirmingProjectDelete && selectedProject && (
+        <ConfirmDialog
+          open
+          title={t("project.deleteButton")}
+          description={t("project.deleteConfirmDescription", {
+            name: selectedProject.name,
+            count: selectedProject.itemCount,
+          })}
+          confirmLabel={t("project.deleteButton")}
+          variant="destructive"
+          onConfirm={confirmProjectDelete}
+          onCancel={() => setConfirmingProjectDelete(false)}
         />
       )}
     </div>

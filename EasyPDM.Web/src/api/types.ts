@@ -225,6 +225,7 @@ export interface ManufacturerContact {
   phone: string | null
   position: string | null
   email: string | null
+  address: string | null
 }
 
 export interface ManufacturerDetail {
@@ -252,6 +253,7 @@ export interface ClientContact {
   phone: string | null
   position: string | null
   email: string | null
+  address: string | null
 }
 
 export interface ClientDetail {
