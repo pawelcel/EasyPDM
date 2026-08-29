@@ -107,6 +107,7 @@ function ItemDetailPanel({
   onDeleteCompletely,
   onDuplicated,
   duplicateParentId,
+  hideActions = false,
 }: {
   item: Item
   projectName?: string
@@ -130,6 +131,10 @@ function ItemDetailPanel({
   // pola (undefined — np. duplikowanie z widoku całej bazy, bez załadowanej struktury/relacji)
   // po prostu dopisuje kopię na koniec listy korzeni projektu.
   duplicateParentId?: string | null
+  // Widok projektu (ProjectTreeView) pokazuje te same akcje w belce nad drzewem (razem z
+  // akcjami zaznaczonego projektu) zamiast w tym panelu — tu renderowane są tylko przy
+  // wywołaniu z "Cała baza" (item-list.tsx), gdzie osobnej belki nie ma.
+  hideActions?: boolean
 }) {
   const { t } = useLanguage()
   const { user } = useAuth()
@@ -258,7 +263,8 @@ function ItemDetailPanel({
 
   return (
     <div>
-      {(onRemoveFromStructure || canDuplicate || canDownloadDocumentation || onDeleteCompletely) && (
+      {!hideActions &&
+        (onRemoveFromStructure || canDuplicate || canDownloadDocumentation || onDeleteCompletely) && (
         <div className="mb-3 flex flex-col gap-1.5 border-b pb-3">
           <div className="flex gap-1.5">
             {onRemoveFromStructure && (

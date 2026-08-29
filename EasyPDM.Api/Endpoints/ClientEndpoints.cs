@@ -69,7 +69,7 @@ static class ClientEndpoints
             }
 
             const string contactsSql = """
-                SELECT id, first_name, last_name, phone, position, email
+                SELECT id, first_name, last_name, phone, position, email, address
                 FROM client_contacts
                 WHERE client_id = @id
                 ORDER BY last_name, first_name;
@@ -182,8 +182,8 @@ static class ClientEndpoints
             }
 
             const string sql = """
-                INSERT INTO client_contacts (client_id, first_name, last_name, phone, position, email)
-                VALUES (@clientId, @firstName, @lastName, @phone, @position, @email)
+                INSERT INTO client_contacts (client_id, first_name, last_name, phone, position, email, address)
+                VALUES (@clientId, @firstName, @lastName, @phone, @position, @email, @address)
                 RETURNING id;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -202,7 +202,7 @@ static class ClientEndpoints
             const string sql = """
                 UPDATE client_contacts SET
                     first_name = @firstName, last_name = @lastName, phone = @phone,
-                    position = @position, email = @email
+                    position = @position, email = @email, address = @address
                 WHERE id = @contactId AND client_id = @clientId;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -518,6 +518,7 @@ static class ClientEndpoints
         cmd.Parameters.AddWithValue("phone", (object?)NullIfBlank(body.Phone) ?? DBNull.Value);
         cmd.Parameters.AddWithValue("position", (object?)NullIfBlank(body.Position) ?? DBNull.Value);
         cmd.Parameters.AddWithValue("email", (object?)NullIfBlank(body.Email) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("address", (object?)NullIfBlank(body.Address) ?? DBNull.Value);
     }
 
     private static object ReadContact(NpgsqlDataReader reader) => new
@@ -527,7 +528,8 @@ static class ClientEndpoints
         lastName = reader.IsDBNull(2) ? null : reader.GetString(2),
         phone = reader.IsDBNull(3) ? null : reader.GetString(3),
         position = reader.IsDBNull(4) ? null : reader.GetString(4),
-        email = reader.IsDBNull(5) ? null : reader.GetString(5)
+        email = reader.IsDBNull(5) ? null : reader.GetString(5),
+        address = reader.IsDBNull(6) ? null : reader.GetString(6)
     };
 
     private static object ReadNode(NpgsqlDataReader reader) => new
@@ -544,6 +546,6 @@ static class ClientEndpoints
 }
 
 record ClientRequest(string Name, string? Name2, string? Location);
-record ClientContactRequest(string? FirstName, string? LastName, string? Phone, string? Position, string? Email);
+record ClientContactRequest(string? FirstName, string? LastName, string? Phone, string? Position, string? Email, string? Address);
 record CreateFolderRequest(Guid? ParentId, string Name);
 record RenameNodeRequest(string Name);

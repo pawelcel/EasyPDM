@@ -330,6 +330,7 @@ type ContactFormBody = {
   phone: string | null
   position: string | null
   email: string | null
+  address: string | null
 }
 
 function ContactDialog({
@@ -352,6 +353,7 @@ function ContactDialog({
   const [phone, setPhone] = useState(initial?.phone ?? "")
   const [position, setPosition] = useState(initial?.position ?? "")
   const [email, setEmail] = useState(initial?.email ?? "")
+  const [address, setAddress] = useState(initial?.address ?? "")
   const [error, setError] = useState("")
 
   function reset() {
@@ -360,6 +362,7 @@ function ContactDialog({
     setPhone(initial?.phone ?? "")
     setPosition(initial?.position ?? "")
     setEmail(initial?.email ?? "")
+    setAddress(initial?.address ?? "")
     setError("")
   }
 
@@ -372,6 +375,7 @@ function ContactDialog({
         phone: phone.trim() || null,
         position: position.trim() || null,
         email: email.trim() || null,
+        address: address.trim() || null,
       })
       setOpen(false)
       reset()
@@ -414,6 +418,9 @@ function ContactDialog({
 
           <Label htmlFor="contact-email">{t("common.email")}</Label>
           <Input id="contact-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+
+          <Label htmlFor="contact-address">{t("common.address")}</Label>
+          <Input id="contact-address" value={address} onChange={(e) => setAddress(e.target.value)} />
 
           <FormError>{error}</FormError>
         </div>

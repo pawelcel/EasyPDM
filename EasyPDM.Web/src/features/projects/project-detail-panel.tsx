@@ -52,12 +52,17 @@ function ProjectDetailPanel({
   onUpdated,
   onDeleted,
   onNavigateToProject,
+  hideActions = false,
 }: {
   project: Project
   isAdmin: boolean
   onUpdated: () => void | Promise<void>
   onDeleted: () => void | Promise<void>
   onNavigateToProject?: () => void
+  // Widok projektu (ProjectTreeView) pokazuje te same akcje w belce nad drzewem
+  // (razem z akcjami zaznaczonego elementu) zamiast w tym panelu — tu renderowane są
+  // tylko przy wywołaniu z "Cała baza" (item-list.tsx), gdzie osobnej belki nie ma.
+  hideActions?: boolean
 }) {
   const { t } = useLanguage()
   const { clients } = useClients("")
@@ -99,29 +104,31 @@ function ProjectDetailPanel({
 
   return (
     <div>
-      <div className="mb-3 flex flex-col gap-1.5 border-b pb-3">
-        <div className="flex gap-1.5">
-          {onNavigateToProject && (
-            <Button size="sm" variant="outline" onClick={onNavigateToProject}>
-              {t("project.goToProject")}
-            </Button>
-          )}
-          <DocumentationDialog
-            trigger={
-              <Button size="sm" variant="outline">
-                {t("documentation.button")}
+      {!hideActions && (
+        <div className="mb-3 flex flex-col gap-1.5 border-b pb-3">
+          <div className="flex gap-1.5">
+            {onNavigateToProject && (
+              <Button size="sm" variant="outline" onClick={onNavigateToProject}>
+                {t("project.goToProject")}
               </Button>
-            }
-            fetchExtensions={() => api.getProjectDocumentationExtensions(project.id)}
-            buildDownloadUrl={(extensions) => api.projectDocumentationUrl(project.id, extensions)}
-          />
-          {isAdmin && (
-            <Button size="sm" variant="destructive" onClick={() => setConfirmingDelete(true)}>
-              {t("project.deleteButton")}
-            </Button>
-          )}
+            )}
+            <DocumentationDialog
+              trigger={
+                <Button size="sm" variant="outline">
+                  {t("documentation.button")}
+                </Button>
+              }
+              fetchExtensions={() => api.getProjectDocumentationExtensions(project.id)}
+              buildDownloadUrl={(extensions) => api.projectDocumentationUrl(project.id, extensions)}
+            />
+            {isAdmin && (
+              <Button size="sm" variant="destructive" onClick={() => setConfirmingDelete(true)}>
+                {t("project.deleteButton")}
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="text-[15px] font-semibold">{project.name}</div>
       <div className="text-[12.5px] text-muted-foreground">
@@ -218,7 +225,7 @@ function ProjectDetailPanel({
         <FormError>{error}</FormError>
       </div>
 
-      {confirmingDelete && (
+      {!hideActions && confirmingDelete && (
         <ConfirmDialog
           open
           title={t("project.deleteButton")}

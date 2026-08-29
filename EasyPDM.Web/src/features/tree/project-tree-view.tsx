@@ -12,11 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ResizeHandle } from "@/components/ui/resize-handle"
 import { AddTagRow } from "@/features/tags/add-tag-row"
+import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
 import { ProjectDetailPanel } from "@/features/projects/project-detail-panel"
 import { ItemTree } from "@/features/tree/item-tree"
 import { useProjectTree } from "@/features/tree/use-project-tree"
+import { useResizableWidth } from "@/hooks/use-resizable-width"
 import { useLanguage } from "@/i18n/use-language"
 
 // parentId: string (zwykłe dziecko) | null (prawdziwy korzeń projektu, bez rodzica) |
@@ -45,6 +48,10 @@ function ProjectTreeView({
   // w strukturze, więc naturalnie jest tym, co widać po wejściu w projekt.
   const [selection, setSelection] = useState<Selection>({ kind: "project" })
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmingProjectDelete, setConfirmingProjectDelete] = useState(false)
+  // Błędy akcji przy zaznaczonym projekcie/elemencie z belki nad drzewem (usuń ze
+  // struktury, duplikuj) — osobne od bulkError (akcje masowe) i od formularza projektu.
+  const [itemActionError, setItemActionError] = useState<string | null>(null)
 
   // Zaznaczenie "checkboxami" (do akcji masowych) jest niezależne od "selection" powyżej —
   // to drugie decyduje, co pokazuje panel po prawej, pierwsze służy wyłącznie do wsadowego
@@ -55,6 +62,9 @@ function ProjectTreeView({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
+  // Zapamiętywana per przeglądarka (nie per projekt), żeby użytkownik ustawił ją raz i
+  // miał tak samo w każdym projekcie.
+  const { width: treeWidth, startResize } = useResizableWidth("easypdm.projectTreeWidth", 220, 640, 320)
 
   function toggleSelectionMode() {
     setSelectionMode((prev) => {
@@ -103,22 +113,44 @@ function ProjectTreeView({
 
   async function handleRemoveFromStructure() {
     if (selection.kind !== "item") return
-    if (selection.parentId) {
-      // Element z rodzicem — odpinamy konkretną krawędź, sam rekord zostaje. Element
-      // staje się BEZ PROJEKTU (moveItemToProject(id, null)) zamiast pokazywać się w
-      // korzeniu bieżącego projektu — zaśmiecałoby to jego strukturę czymś, co z tym
-      // projektem nie ma już nic wspólnego. Nadal w pełni widoczny i znajdywalny przez
-      // globalne wyszukiwanie ("Cała baza"); to samo zachowanie co synchronizacja BOM w
-      // makrach CAD (zob. sync_stale_children/SyncStaleChildren).
-      await api.removeChild(selection.parentId, selection.id)
-      await api.moveItemToProject(selection.id, null)
-    } else {
-      // Element bez rodzica — nie ma czego odpiąć, więc przestaje być widoczny
-      // jako korzeń w drzewku (rekord i przynależność do projektu zostają).
-      await api.setShowInTree(selection.id, false)
+    setItemActionError(null)
+    try {
+      if (selection.parentId) {
+        // Element z rodzicem — odpinamy konkretną krawędź, sam rekord zostaje. Element
+        // staje się BEZ PROJEKTU (moveItemToProject(id, null)) zamiast pokazywać się w
+        // korzeniu bieżącego projektu — zaśmiecałoby to jego strukturę czymś, co z tym
+        // projektem nie ma już nic wspólnego. Nadal w pełni widoczny i znajdywalny przez
+        // globalne wyszukiwanie ("Cała baza"); to samo zachowanie co synchronizacja BOM w
+        // makrach CAD (zob. sync_stale_children/SyncStaleChildren).
+        await api.removeChild(selection.parentId, selection.id)
+        await api.moveItemToProject(selection.id, null)
+      } else {
+        // Element bez rodzica — nie ma czego odpiąć, więc przestaje być widoczny
+        // jako korzeń w drzewku (rekord i przynależność do projektu zostają).
+        await api.setShowInTree(selection.id, false)
+      }
+      setSelection({ kind: "project" })
+      await tree.refetch()
+    } catch (err) {
+      setItemActionError(err instanceof Error ? err.message : t("item.removeFromStructureFailed"))
     }
-    setSelection({ kind: "project" })
-    await tree.refetch()
+  }
+
+  async function handleDuplicateSelected() {
+    if (!selectedItem) return
+    setItemActionError(null)
+    try {
+      const { id: newItemId } = await api.duplicateItem(
+        selectedItem.id,
+        selectedItemParentId !== undefined
+          ? { parentId: selectedItemParentId, insertAfterOriginal: true }
+          : undefined
+      )
+      await tree.refetch()
+      setSelection({ kind: "item", id: newItemId, parentId: selectedItemParentId })
+    } catch (err) {
+      setItemActionError(err instanceof Error ? err.message : t("item.duplicateFailed"))
+    }
   }
 
   async function confirmDeleteCompletely() {
@@ -127,6 +159,12 @@ function ProjectTreeView({
     setConfirmingDelete(false)
     setSelection({ kind: "project" })
     await tree.refetch()
+  }
+
+  async function confirmProjectDelete() {
+    await api.deleteProject(project.id)
+    setConfirmingProjectDelete(false)
+    await onProjectDeleted()
   }
 
   async function handleBulkAddTag(name: string) {
@@ -175,8 +213,8 @@ function ProjectTreeView({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl bg-card p-2 ring-1 ring-foreground/10">
+    <div className="flex h-full flex-col gap-3">
+      <div className="relative flex flex-wrap items-center gap-2 rounded-xl bg-card p-2 ring-1 ring-foreground/10">
         <Button
           size="sm"
           variant={selectionMode ? "default" : "outline"}
@@ -215,11 +253,78 @@ function ProjectTreeView({
             </Button>
           </>
         )}
+
+        {/* Akcje dotyczące aktualnie zaznaczonego węzła drzewa (projekt albo element) —
+            wyrównane (absolute, position: relative na belce) do lewej krawędzi panelu
+            podglądu poniżej (treeWidth + szerokość ResizeHandle, zob. useResizableWidth),
+            żeby nie mieszać się z przyciskiem "Zaznacz wiele"/akcjami masowymi po lewej,
+            a jednocześnie podążały za suwakiem szerokości drzewa. Dawniej renderowane
+            wewnątrz ProjectDetailPanel/ItemDetailPanel — stamtąd całkowicie usunięte
+            (hideActions). */}
+        {selection.kind === "project" && (
+          <div
+            className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1.5"
+            style={{ left: treeWidth + 16 }}
+          >
+            <DocumentationDialog
+              trigger={
+                <Button size="sm" variant="outline">
+                  {t("documentation.button")}
+                </Button>
+              }
+              fetchExtensions={() => api.getProjectDocumentationExtensions(project.id)}
+              buildDownloadUrl={(extensions) => api.projectDocumentationUrl(project.id, extensions)}
+            />
+            {isAdmin && (
+              <Button size="sm" variant="destructive" onClick={() => setConfirmingProjectDelete(true)}>
+                {t("project.deleteButton")}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {selection.kind === "item" && selectedItem && (
+          <div
+            className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1.5"
+            style={{ left: treeWidth + 16 }}
+          >
+            {selectedItemParentId !== undefined && (
+              <Button size="sm" variant="outline" onClick={handleRemoveFromStructure}>
+                {t("item.removeFromStructure")}
+              </Button>
+            )}
+            {(selectedItem.itemType === "part" || selectedItem.itemType === "assembly") && (
+              <Button size="sm" variant="outline" onClick={handleDuplicateSelected}>
+                {t("item.duplicate")}
+              </Button>
+            )}
+            {(selectedItem.itemType === "part" || selectedItem.itemType === "assembly") && (
+              <DocumentationDialog
+                trigger={
+                  <Button size="sm" variant="outline">
+                    {t("documentation.button")}
+                  </Button>
+                }
+                fetchExtensions={() => api.getItemDocumentationExtensions(selectedItem.id)}
+                buildDownloadUrl={(extensions) => api.itemDocumentationUrl(selectedItem.id, extensions)}
+              />
+            )}
+            {isAdmin && (
+              <Button size="sm" variant="destructive" onClick={() => setConfirmingDelete(true)}>
+                {t("item.deleteCompletely")}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       <FormError>{bulkError}</FormError>
+      <FormError>{itemActionError}</FormError>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-1 rounded-xl bg-card ring-1 ring-foreground/10">
+      <div className="flex min-h-0 flex-1">
+        <div
+          className="flex min-h-0 shrink-0 flex-col overflow-y-auto rounded-xl bg-card ring-1 ring-foreground/10"
+          style={{ width: treeWidth }}
+        >
           <ItemTree
             tree={tree}
             projectId={project.id}
@@ -234,7 +339,9 @@ function ProjectTreeView({
           />
         </div>
 
-        <div className="col-span-2 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+        <ResizeHandle onMouseDown={startResize} />
+
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl bg-card p-4 ring-1 ring-foreground/10">
           {selectedItem ? (
             <ItemDetailPanel
               key={selectedItem.id}
@@ -244,16 +351,9 @@ function ProjectTreeView({
               onSelectChild={(childId, parentId) => setSelection({ kind: "item", id: childId, parentId })}
               onItemsRefetch={tree.refetch}
               onTagsRefetch={onTagsRefetch}
-              // parentId undefined = przejście tu przyciskiem "Przejdź" na zagłębionym wpisie
-              // BOM-u, prawdziwy rodzic nieznany — nie oferujemy "Usuń ze struktury" w ogóle,
-              // zamiast zgadywać (błędnie odpiąć od niewłaściwego rodzica albo błędnie
-              // schować jako "korzeń", którym ten element wcale nie jest).
-              onRemoveFromStructure={selectedItemParentId !== undefined ? handleRemoveFromStructure : undefined}
-              onDeleteCompletely={isAdmin ? () => setConfirmingDelete(true) : undefined}
-              onDuplicated={(newId) =>
-                setSelection({ kind: "item", id: newId, parentId: selectedItemParentId })
-              }
-              duplicateParentId={selectedItemParentId}
+              // Akcje (usuń ze struktury/duplikuj/dokumentacja/usuń całkowicie) renderowane
+              // w belce nad drzewem zamiast tutaj — zob. hideActions.
+              hideActions
             />
           ) : (
             <ProjectDetailPanel
@@ -261,6 +361,7 @@ function ProjectTreeView({
               isAdmin={isAdmin}
               onUpdated={onProjectUpdated}
               onDeleted={onProjectDeleted}
+              hideActions
             />
           )}
         </div>
@@ -275,6 +376,21 @@ function ProjectTreeView({
           variant="destructive"
           onConfirm={confirmDeleteCompletely}
           onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
+
+      {confirmingProjectDelete && (
+        <ConfirmDialog
+          open
+          title={t("project.deleteButton")}
+          description={t("project.deleteConfirmDescription", {
+            name: project.name,
+            count: project.itemCount,
+          })}
+          confirmLabel={t("project.deleteButton")}
+          variant="destructive"
+          onConfirm={confirmProjectDelete}
+          onCancel={() => setConfirmingProjectDelete(false)}
         />
       )}
 

@@ -57,7 +57,7 @@ static class ManufacturerEndpoints
             }
 
             const string contactsSql = """
-                SELECT id, first_name, last_name, phone, position, email
+                SELECT id, first_name, last_name, phone, position, email, address
                 FROM manufacturer_contacts
                 WHERE manufacturer_id = @id
                 ORDER BY last_name, first_name;
@@ -136,7 +136,7 @@ static class ManufacturerEndpoints
         });
 
         // POST /api/manufacturers/{id}/contacts
-        // body: { firstName, lastName, phone, position, email } — wszystkie pola opcjonalne.
+        // body: { firstName, lastName, phone, position, email, address } — wszystkie pola opcjonalne.
         app.MapPost("/api/manufacturers/{id:int}/contacts", async (int id, ContactRequest body) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
@@ -150,8 +150,8 @@ static class ManufacturerEndpoints
             }
 
             const string sql = """
-                INSERT INTO manufacturer_contacts (manufacturer_id, first_name, last_name, phone, position, email)
-                VALUES (@manufacturerId, @firstName, @lastName, @phone, @position, @email)
+                INSERT INTO manufacturer_contacts (manufacturer_id, first_name, last_name, phone, position, email, address)
+                VALUES (@manufacturerId, @firstName, @lastName, @phone, @position, @email, @address)
                 RETURNING id;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -170,7 +170,7 @@ static class ManufacturerEndpoints
             const string sql = """
                 UPDATE manufacturer_contacts SET
                     first_name = @firstName, last_name = @lastName, phone = @phone,
-                    position = @position, email = @email
+                    position = @position, email = @email, address = @address
                 WHERE id = @contactId AND manufacturer_id = @manufacturerId;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -205,6 +205,7 @@ static class ManufacturerEndpoints
         cmd.Parameters.AddWithValue("phone", (object?)NullIfBlank(body.Phone) ?? DBNull.Value);
         cmd.Parameters.AddWithValue("position", (object?)NullIfBlank(body.Position) ?? DBNull.Value);
         cmd.Parameters.AddWithValue("email", (object?)NullIfBlank(body.Email) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("address", (object?)NullIfBlank(body.Address) ?? DBNull.Value);
     }
 
     private static object ReadContact(NpgsqlDataReader reader) => new
@@ -214,11 +215,12 @@ static class ManufacturerEndpoints
         lastName = reader.IsDBNull(2) ? null : reader.GetString(2),
         phone = reader.IsDBNull(3) ? null : reader.GetString(3),
         position = reader.IsDBNull(4) ? null : reader.GetString(4),
-        email = reader.IsDBNull(5) ? null : reader.GetString(5)
+        email = reader.IsDBNull(5) ? null : reader.GetString(5),
+        address = reader.IsDBNull(6) ? null : reader.GetString(6)
     };
 
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 record ManufacturerRequest(string Name);
-record ContactRequest(string? FirstName, string? LastName, string? Phone, string? Position, string? Email);
+record ContactRequest(string? FirstName, string? LastName, string? Phone, string? Position, string? Email, string? Address);
