@@ -64,7 +64,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   (`workflow_dispatch`) albo przez `gh workflow run <plik>`:
   - `build.yml` — przy każdym pushu/PR: build backendu + testy integracyjne
     (`EasyPDM.Api.Tests`, przeciwko usłudze `postgres` w CI) i typy/lint/build frontendu.
-  - `build-windows-installer.yml` — buduje `EasyPDMSetup.exe` (zob. wyżej) i dodatkowo
+  - `build-windows-installer.yml` — buduje `EasyPDM_Windows_v<wersja>.exe` (zob. wyżej) i dodatkowo
     **realnie go instaluje** na windowsowym runnerze (PostgreSQL przez Chocolatey,
     `/VERYSILENT`), sprawdzając dwukrotnie (świeża instalacja + symulacja aktualizacji), że
     usługa startuje i serwer odpowiada — jedyny sposób, żeby to sprawdzić bez posiadania
@@ -352,11 +352,12 @@ automatycznie przy starcie — nic dodatkowego nie trzeba robić ręcznie.
 ### Windows — instalator (`.exe`, Inno Setup)
 
 **Najprościej: `.github/workflows/build-windows-installer.yml`** buduje gotowy
-`EasyPDMSetup.exe` automatycznie na windowsowym runnerze GitHuba (ma Inno Setup Compiler
-fabrycznie) przy każdym pushu dotykającym backendu/frontendu/instalatora — nie trzeba mieć
-Windows ani Inno Setup lokalnie. Uruchom ręcznie przez `gh workflow run
+`EasyPDM_Windows_v<wersja>.exe` (numer wersji z `MyAppVersion`/`OutputBaseFilename` w
+`packaging/windows/EasyPDM.iss`) automatycznie na windowsowym runnerze GitHuba (ma Inno
+Setup Compiler fabrycznie) przy każdym pushu dotykającym backendu/frontendu/instalatora —
+nie trzeba mieć Windows ani Inno Setup lokalnie. Uruchom ręcznie przez `gh workflow run
 build-windows-installer.yml`, poczekaj (`gh run watch`), pobierz artefakt (`gh run download
-<id> -n EasyPDMSetup`).
+<id> -n EasyPDM_Windows_v<wersja>`).
 
 Alternatywnie, do zbudowania lokalnie na maszynie z Windows (.NET 10 SDK + Node.js +
 [Inno Setup Compiler](https://jrsoftware.org/isinfo.php)):
@@ -366,7 +367,7 @@ powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
 iscc packaging\windows\EasyPDM.iss
 ```
 
-Powstaje `packaging\windows\Output\EasyPDMSetup.exe`. Instalator: sprawdza, czy
+Powstaje `packaging\windows\Output\EasyPDM_Windows_v<wersja>.exe`. Instalator: sprawdza, czy
 PostgreSQL jest już zainstalowany (jeśli nie — kieruje na stronę pobierania i przerywa,
 świadomie NIE próbuje cicho doinstalować kilkusetmegabajtowego instalatora PostgreSQL w
 tle), pyta o hasło superużytkownika `postgres` (jednorazowo, do założenia własnej roli
@@ -377,7 +378,7 @@ tle), pyta o hasło superużytkownika `postgres` (jednorazowo, do założenia w�
 `http://localhost:5000`. Odinstalowanie zatrzymuje i usuwa usługę (standardowy deinstalator
 Inno Setup) — tak samo jak na Linuksie, celowo nie rusza samej bazy danych.
 
-**Aktualizacja**: zbuduj nowy `EasyPDMSetup.exe` (jak wyżej) i uruchom go ponownie —
+**Aktualizacja**: zbuduj nowy `EasyPDM_Windows_v<wersja>.exe` (jak wyżej) i uruchom go ponownie —
 `PrepareToInstall` w skrypcie `.iss` zatrzymuje usługę PRZED podmianą plików (inaczej
 Windows zablokowałby nadpisanie działającego `.exe`), instalator wykrywa istniejącą
 rolę/bazę (pomija zakładanie schematu) i istniejącą usługę (uruchamia ją z powrotem zamiast

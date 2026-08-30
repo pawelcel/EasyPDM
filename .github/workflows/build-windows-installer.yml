@@ -1,7 +1,8 @@
 name: Build Windows Installer
 
 # Buduje frontend + self-contained backend (win-x64) i kompiluje packaging/windows/EasyPDM.iss
-# do prawdziwego EasyPDMSetup.exe na windowsowym runnerze GitHuba (ma Inno Setup Compiler
+# do prawdziwego instalatora (EasyPDM_Windows_v{wersja}.exe — nazwa niesie numer wersji z
+# MyAppVersion w EasyPDM.iss) na windowsowym runnerze GitHuba (ma Inno Setup Compiler
 # preinstalowany, w odróżnieniu od lokalnego środowiska deweloperskiego opartego o Linux) —
 # efekt trafia jako pobieralny artefakt tego przebiegu, bez potrzeby posiadania Windows/Inno
 # Setup lokalnie przez kogokolwiek.
@@ -45,10 +46,21 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\windows\EasyPDM.iss
 
+      # Nazwa pliku niesie numer wersji (OutputBaseFilename w EasyPDM.iss, np.
+      # "EasyPDM_Windows_v0.1.exe") -- odczytujemy ją tutaj zamiast hardkodować w tym
+      # workflow, żeby nazwa artefaktu i kolejne kroki same nadążały za bumpem wersji.
+      - name: Odczytaj nazwę zbudowanego instalatora
+        id: setup_exe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "packaging\windows\Output\*.exe" | Select-Object -First 1
+          "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+          "name=$([System.IO.Path]::GetFileNameWithoutExtension($exe.Name))" >> $env:GITHUB_OUTPUT
+
       - uses: actions/upload-artifact@v5
         with:
-          name: EasyPDMSetup
-          path: packaging/windows/Output/EasyPDMSetup.exe
+          name: ${{ steps.setup_exe.outputs.name }}
+          path: ${{ steps.setup_exe.outputs.path }}
           if-no-files-found: error
 
       # Od tego miejsca: prawdziwy test end-to-end samej INSTALACJI (nie tylko kompilacji
@@ -115,10 +127,10 @@ jobs:
           }
           Write-Host "Połączenie jako postgres/postgres działa poprawnie."
 
-      - name: Uruchom EasyPDMSetup.exe w trybie cichym (/VERYSILENT)
+      - name: Uruchom instalator w trybie cichym (/VERYSILENT)
         shell: pwsh
         run: |
-          $exe = (Resolve-Path "packaging\windows\Output\EasyPDMSetup.exe").Path
+          $exe = "${{ steps.setup_exe.outputs.path }}"
           $logPath = Join-Path $PWD "install.log"
           # Start-Process -PassThru zamiast "& $exe ...; $LASTEXITCODE" — to drugie w tym
           # przebiegu CI dało PUSTY (nie zerowy, PUSTY) kod wyjścia, co wygląda na to, że
@@ -132,7 +144,7 @@ jobs:
           Write-Host "=== install.log ==="
           Get-Content $logPath -ErrorAction SilentlyContinue
           if ($proc.ExitCode -ne 0) {
-            Write-Error "EasyPDMSetup.exe zakończył się kodem $($proc.ExitCode)."
+            Write-Error "Instalator zakończył się kodem $($proc.ExitCode)."
             exit 1
           }
 
@@ -197,7 +209,7 @@ jobs:
       - name: Uruchom instalator drugi raz (symulacja aktualizacji)
         shell: pwsh
         run: |
-          $exe = (Resolve-Path "packaging\windows\Output\EasyPDMSetup.exe").Path
+          $exe = "${{ steps.setup_exe.outputs.path }}"
           $logPath = Join-Path $PWD "install2.log"
           $proc = Start-Process -FilePath $exe -ArgumentList @(
             "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
@@ -207,7 +219,7 @@ jobs:
           Write-Host "=== install2.log ==="
           Get-Content $logPath -ErrorAction SilentlyContinue
           if ($proc.ExitCode -ne 0) {
-            Write-Error "Drugie uruchomienie EasyPDMSetup.exe zakończyło się kodem $($proc.ExitCode)."
+            Write-Error "Drugie uruchomienie instalatora zakończyło się kodem $($proc.ExitCode)."
             exit 1
           }
 

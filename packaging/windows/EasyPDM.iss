@@ -25,7 +25,7 @@
 ; stosuje sam automatycznie przy starcie (nic nie trzeba robić ręcznie).
 ;
 ; Kompilacja: automatyczna, przy każdym pushu dotykającym tych plików —
-; .github/workflows/build-windows-installer.yml buduje EasyPDMSetup.exe na windowsowym
+; .github/workflows/build-windows-installer.yml buduje EasyPDM_Windows_v{#MyAppVersion}.exe na windowsowym
 ; runnerze GitHuba (ma Inno Setup Compiler fabrycznie) i wystawia go jako pobieralny
 ; artefakt przebiegu — nie trzeba mieć Windows/Inno Setup lokalnie, żeby dostać gotowy
 ; instalator. Skompilowane i zweryfikowane realnym kompilatorem (kilka błędów Pascal
@@ -49,7 +49,7 @@ AppVersion={#MyAppVersion}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-OutputBaseFilename=EasyPDMSetup
+OutputBaseFilename=EasyPDM_Windows_v{#MyAppVersion}
 OutputDir=Output
 Compression=lzma2/max
 SolidCompression=yes

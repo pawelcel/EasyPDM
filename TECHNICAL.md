@@ -68,7 +68,7 @@ PostgreSQL 18.
   - `build.yml` — on every push/PR: backend build + integration tests
     (`EasyPDM.Api.Tests`, against a `postgres` service in CI) and frontend
     types/lint/build.
-  - `build-windows-installer.yml` — builds `EasyPDMSetup.exe` (see above) and
+  - `build-windows-installer.yml` — builds `EasyPDM_Windows_v<version>.exe` (see above) and
     additionally **actually installs it** on a Windows runner (PostgreSQL via
     Chocolatey, `/VERYSILENT`), checking twice (fresh install + a simulated update)
     that the service starts and the server responds — the only way to check this
@@ -376,14 +376,15 @@ needs to be done manually.
 `.github/workflows/build-linux-package.yml` builds the frontend + self-contained backend
 on a GitHub Ubuntu runner and packages them together with
 `install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`/`db/schema.sql` into one
-downloadable `easypdm-linux-x64.tar.gz` artifact — rebuilt automatically on every push
-touching the backend/frontend/installer scripts, same trigger pattern as
-`build-windows-installer.yml` below. The target machine then needs only `sudo`, no
-`.NET SDK` or `Node.js` at all:
+downloadable `EasyPDM-Linux-x64_v<version>.tar.gz` artifact (the version number comes
+from `MyAppVersion` in `packaging/windows/EasyPDM.iss`, the one place in the repo that
+tracks it) — rebuilt automatically on every push touching the backend/frontend/installer
+scripts, same trigger pattern as `build-windows-installer.yml` below. The target machine
+then needs only `sudo`, no `.NET SDK` or `Node.js` at all:
 
 ```bash
-tar xzf easypdm-linux-x64.tar.gz
-cd easypdm-linux-x64   # whatever directory you extracted into
+tar xzf EasyPDM-Linux-x64_v<version>.tar.gz
+cd EasyPDM-Linux-x64_v<version>   # whatever directory you extracted into
 sudo ./install-easypdm-linux.sh
 ```
 
@@ -395,26 +396,27 @@ runs this exact install → verify → uninstall sequence for real on a clean Ub
 (mirroring `test-linux-installer.yml`, which only covers the build-from-checkout path),
 so the packaged path is end-to-end tested too, not just the scripted one.
 
-Download the artifact via `gh run download <id> -n easypdm-linux-x64` or from the
-workflow run's page in the Actions tab — like `EasyPDMSetup.exe` below, this is
-currently **not** published to the repository's Releases page automatically (see the
-note under "Windows — installer" about the same gap there).
+Download the artifact via `gh run download <id> -n EasyPDM-Linux-x64_v<version>` or from
+the workflow run's page in the Actions tab — like `EasyPDM_Windows_v<version>.exe` below,
+this is currently **not** published to the repository's Releases page automatically (see
+the note under "Windows — installer" about the same gap there).
 
 ### Windows — installer (`.exe`, Inno Setup)
 
 **Simplest: `.github/workflows/build-windows-installer.yml`** builds a ready
-`EasyPDMSetup.exe` automatically on a GitHub Windows runner (which has the Inno Setup
-Compiler preinstalled) on every push touching the backend/frontend/installer — no need
-to have Windows or Inno Setup locally. Run it manually via `gh workflow run
+`EasyPDM_Windows_v<version>.exe` (version from `MyAppVersion`/`OutputBaseFilename` in
+`packaging/windows/EasyPDM.iss`) automatically on a GitHub Windows runner (which has the
+Inno Setup Compiler preinstalled) on every push touching the backend/frontend/installer —
+no need to have Windows or Inno Setup locally. Run it manually via `gh workflow run
 build-windows-installer.yml`, wait (`gh run watch`), download the artifact (`gh run
-download <id> -n EasyPDMSetup`).
+download <id> -n EasyPDM_Windows_v<version>`).
 
-> This workflow only uploads `EasyPDMSetup.exe` as a GitHub Actions run artifact
-> (`actions/upload-artifact`) — it does **not** create/attach anything to the
+> This workflow only uploads `EasyPDM_Windows_v<version>.exe` as a GitHub Actions run
+> artifact (`actions/upload-artifact`) — it does **not** create/attach anything to the
 > repository's Releases page automatically. The README's "go to the Releases page and
-> download `EasyPDMSetup.exe`" step currently assumes someone does that publish step by
-> hand after downloading the artifact; automating it (e.g. `softprops/action-gh-release`
-> on a version tag) hasn't been set up yet.
+> download `EasyPDM_Windows_v<version>.exe`" step currently assumes someone does that
+> publish step by hand after downloading the artifact; automating it (e.g.
+> `softprops/action-gh-release` on a version tag) hasn't been set up yet.
 
 Alternatively, to build locally on a Windows machine (.NET 10 SDK + Node.js +
 [Inno Setup Compiler](https://jrsoftware.org/isinfo.php)):
@@ -424,7 +426,7 @@ powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
 iscc packaging\windows\EasyPDM.iss
 ```
 
-Produces `packaging\windows\Output\EasyPDMSetup.exe`. The installer: checks whether
+Produces `packaging\windows\Output\EasyPDM_Windows_v<version>.exe`. The installer: checks whether
 PostgreSQL is already installed (if not — points to the download page and stops,
 deliberately does NOT try to silently install a several-hundred-megabyte PostgreSQL
 installer in the background), asks for the `postgres` superuser password (once, to
@@ -436,7 +438,7 @@ console window), and creates a shortcut that opens `http://localhost:5000`.
 Uninstalling stops and removes the service (the standard Inno Setup uninstaller) — same
 as on Linux, it deliberately doesn't touch the database itself.
 
-**Update**: build a new `EasyPDMSetup.exe` (as above) and run it again — `PrepareToInstall`
+**Update**: build a new `EasyPDM_Windows_v<version>.exe` (as above) and run it again — `PrepareToInstall`
 in the `.iss` script stops the service BEFORE replacing the files (otherwise Windows
 would block overwriting a running `.exe`), the installer detects the existing role/
 database (skips creating the schema) and the existing service (starts it back up instead

@@ -49,7 +49,7 @@ tak jak każdy inny adres strony internetowej, i zaloguj się.
 
 **Windows** (bez żadnej wiedzy informatycznej) — wejdź na stronę
 [Releases tego repozytorium](https://github.com/pawelcel/EasyPDM/releases), pobierz
-najnowszy plik `EasyPDMSetup.exe` i uruchom go — kreator instalacji przeprowadzi Cię
+najnowszy plik `EasyPDM_Windows_v<wersja>.exe` i uruchom go — kreator instalacji przeprowadzi Cię
 przez resztę krok po kroku i zostawi na pulpicie skrót do EasyPDM (jedyne, o co może
 zapytać: czy masz już zainstalowany PostgreSQL, czyli program przechowujący dane — jeśli
 nie, wskaże stronę, skąd go pobrać, zanim będzie mógł kontynuować).
@@ -62,12 +62,12 @@ nie, wskaże stronę, skąd go pobrać, zanim będzie mógł kontynuować).
   cd EasyPDM
   ./install-easypdm-docker.sh
   ```
-- *Instalacja natywna, bez Dockera* — pobierz gotową paczkę `easypdm-linux-x64`
+- *Instalacja natywna, bez Dockera* — pobierz gotową paczkę `EasyPDM-Linux-x64_v<wersja>`
   (budowaną automatycznie przez CI tego repo — z zakładki
   [Actions](https://github.com/pawelcel/EasyPDM/actions/workflows/build-linux-package.yml),
   najnowszy udany przebieg, sekcja "Artifacts") albo sklonuj repo samodzielnie, potem:
   ```bash
-  tar xzf easypdm-linux-x64.tar.gz && cd easypdm-linux-x64   # jeśli pobrałeś paczkę
+  tar xzf EasyPDM-Linux-x64_v<wersja>.tar.gz && cd EasyPDM-Linux-x64_v<wersja>   # jeśli pobrałeś paczkę
   sudo ./install-easypdm-linux.sh
   ```
   Instaluje PostgreSQL (jeśli go brakuje) i samo EasyPDM jako usługę `systemd`,

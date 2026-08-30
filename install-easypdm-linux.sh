@@ -7,7 +7,7 @@
 #   1. Z katalogu repo (klon z gita) -- skrypt SAM buduje frontend i backend na tej
 #      maszynie, wymaga .NET SDK + Node.js/npm zainstalowanych tu tylko na czas budowy.
 #   2. Z rozpakowanej gotowej paczki (patrz .github/workflows/build-linux-package.yml,
-#      artefakt "easypdm-linux-x64") -- obok tego skryptu leży już zbudowany katalog
+#      artefakt "EasyPDM-Linux-x64_v<wersja>") -- obok tego skryptu leży już zbudowany katalog
 #      publish/ (self-contained exe + wwwroot), więc budowanie jest pomijane i ta
 #      maszyna NIE musi mieć .NET SDK/npm w ogóle.
 #

@@ -2,11 +2,13 @@ name: Build Linux Package
 
 # Buduje frontend + self-contained backend (linux-x64) i pakuje je razem z
 # install-easypdm-linux.sh/uninstall-easypdm-linux.sh/db/schema.sql w jedno archiwum
-# "easypdm-linux-x64.tar.gz" -- pobieralny artefakt tego przebiegu, analogicznie do
-# build-windows-installer.yml, tylko że tu nie ma jednego pliku wykonywalnego-instalatora
-# (Linux nie ma odpowiednika Inno Setup w tym repo) -- paczka zawiera już zbudowaną
-# aplikację + skrypt instalujący ją jako usługę systemd, więc docelowa maszyna NIE
-# potrzebuje .NET SDK ani Node.js, tylko odpakować i uruchomić skrypt.
+# "EasyPDM-Linux-x64_v{wersja}.tar.gz" (numer wersji czytany z MyAppVersion w
+# packaging/windows/EasyPDM.iss -- jedyne miejsce, gdzie jest dziś śledzony) -- pobieralny
+# artefakt tego przebiegu, analogicznie do build-windows-installer.yml, tylko że tu nie ma
+# jednego pliku wykonywalnego-instalatora (Linux nie ma odpowiednika Inno Setup w tym repo)
+# -- paczka zawiera już zbudowaną aplikację + skrypt instalujący ją jako usługę systemd,
+# więc docelowa maszyna NIE potrzebuje .NET SDK ani Node.js, tylko odpakować i uruchomić
+# skrypt.
 on:
   workflow_dispatch:
   push:
@@ -44,19 +46,33 @@ jobs:
           dotnet publish EasyPDM.Api -c Release -r linux-x64 --self-contained true
           -p:PublishSingleFile=true -o pkg/publish
 
+      # Wersja czytana z packaging/windows/EasyPDM.iss (MyAppVersion) -- jedyne miejsce w
+      # repo, gdzie numer wersji jest dziś śledzony -- żeby nazwa paczki Linuksa i instalatora
+      # Windows nie mogły się rozjechać (dwa osobne hardkodowane numery wersji łatwo
+      # zapomnieć zbumpować oba naraz).
+      - name: Odczytaj wersję
+        id: version
+        run: |
+          VERSION=$(grep -oP '(?<=#define MyAppVersion ")[^"]+' packaging/windows/EasyPDM.iss)
+          echo "Wersja: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Złóż paczkę
+        env:
+          PKG_NAME: EasyPDM-Linux-x64_v${{ steps.version.outputs.version }}
         run: |
           mkdir -p pkg/db
           cp db/schema.sql pkg/db/schema.sql
           cp install-easypdm-linux.sh pkg/
           cp uninstall-easypdm-linux.sh pkg/
           chmod +x pkg/install-easypdm-linux.sh pkg/uninstall-easypdm-linux.sh
-          tar czf easypdm-linux-x64.tar.gz -C pkg .
+          tar czf "$PKG_NAME.tar.gz" -C pkg .
+          echo "PKG_NAME=$PKG_NAME" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v5
         with:
-          name: easypdm-linux-x64
-          path: easypdm-linux-x64.tar.gz
+          name: ${{ env.PKG_NAME }}
+          path: ${{ env.PKG_NAME }}.tar.gz
           if-no-files-found: error
 
       # Prawdziwy test end-to-end SAMEJ PACZKI (tryb PACKAGE_MODE w install-easypdm-linux.sh),
@@ -66,7 +82,7 @@ jobs:
       - name: Rozpakuj paczkę do czystego katalogu (symulacja pobrania przez użytkownika)
         run: |
           mkdir -p /tmp/easypdm-package-test
-          tar xzf easypdm-linux-x64.tar.gz -C /tmp/easypdm-package-test
+          tar xzf "$PKG_NAME.tar.gz" -C /tmp/easypdm-package-test
 
       - name: Zainstaluj z paczki (bez budowania)
         working-directory: /tmp/easypdm-package-test
