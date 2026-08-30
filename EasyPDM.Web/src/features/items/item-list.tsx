@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { ResizeHandle } from "@/components/ui/resize-handle"
+import { ClientFilterSelect } from "@/features/items/client-filter-select"
 import type { DatabaseFilters } from "@/features/items/database-filters"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
@@ -55,6 +56,11 @@ function ItemList({
   const [recordType, setRecordType] = useState<RecordType>("all")
   const [partKind, setPartKind] = useState<PartKindFilter>("all")
   const [manufacturer, setManufacturer] = useState("")
+  // clientId (jako string, jak wymagają wartości <Select>) klienta przypisanego do
+  // PROJEKTU elementu/projektu — w odróżnieniu od "rodzaju"/"producenta" to nie jest
+  // filtr specyficzny dla Części, więc działa niezależnie od recordType (na projektach
+  // i na elementach naraz).
+  const [client, setClient] = useState("")
   const [selection, setSelection] = useState<Selection | null>(null)
   // Zapamiętywana per przeglądarka, niezależnie od szerokości drzewa w widoku projektu
   // (features/tree/project-tree-view.tsx) — to inny układ (płaska lista, nie drzewo).
@@ -114,7 +120,7 @@ function ItemList({
     setManufacturer("")
   }
 
-  // Wczytanie zapisanego zestawu filtrów ustawia WSZYSTKIE pięć wartości naraz, więc celowo
+  // Wczytanie zapisanego zestawu filtrów ustawia WSZYSTKIE wartości naraz, więc celowo
   // omija powyższe funkcje z kaskadowym resetem (np. changeRecordType zerowałby partKind
   // i manufacturer, które ten sam zapis chce ustawić na coś innego niż "wszystkie").
   function applyFilters(f: DatabaseFilters) {
@@ -123,6 +129,7 @@ function ItemList({
     setRecordType(f.recordType)
     setPartKind(f.partKind)
     setManufacturer(f.manufacturer)
+    setClient(f.client)
     setSelection(null)
   }
 
@@ -156,9 +163,18 @@ function ItemList({
     await onProjectsRefetch()
   }
 
+  // Elementy same nie niosą klienta -- tylko ich PROJEKT (Project.clientId) -- stąd mapa
+  // do doczytania klienta elementu po projectId; element bez projektu (projectId=null,
+  // zob. elementy bez projektu) nigdy nie pasuje do żadnego wybranego klienta.
+  const projectsById = new Map(projects.map((p) => [p.id, p]))
+
   const visibleProjects =
     recordType === "project"
-      ? projects.filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()))
+      ? projects.filter(
+          (p) =>
+            (!search || p.name.toLowerCase().includes(search.toLowerCase())) &&
+            (!client || String(p.clientId) === client)
+        )
       : []
 
   const visibleItems =
@@ -174,6 +190,9 @@ function ItemList({
             return false
           }
           if (manufacturer && (item.itemType !== "part" || item.properties.manufacturer !== manufacturer)) {
+            return false
+          }
+          if (client && String(projectsById.get(item.projectId ?? "")?.clientId) !== client) {
             return false
           }
           return true
@@ -239,8 +258,9 @@ function ItemList({
           onChange={setManufacturer}
           disabled={partKind !== "Zakupowa"}
         />
+        <ClientFilterSelect projects={projects} value={client} onChange={setClient} />
         <SavedFiltersBar
-          currentFilters={{ search, tag, recordType, partKind, manufacturer }}
+          currentFilters={{ search, tag, recordType, partKind, manufacturer, client }}
           onApply={applyFilters}
         />
       </div>

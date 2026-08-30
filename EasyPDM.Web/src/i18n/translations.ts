@@ -7,6 +7,7 @@
 // (patrz use-language.ts). Używane tam, gdzie tekst zawiera dynamiczną wartość (liczbę, nazwę…).
 const pl = {
   "common.cancel": "Anuluj",
+  "common.ok": "OK",
   "common.confirm": "Potwierdź",
   "common.save": "Zapisz",
   "common.saving": "Zapisywanie…",
@@ -235,6 +236,7 @@ const pl = {
   "filter.allTypes": "Wszystkie typy",
   "filter.allKinds": "Wszystkie rodzaje",
   "filter.allManufacturers": "Wszyscy producenci",
+  "filter.allClients": "Wszyscy klienci",
   "filter.other": "Pozostałe",
 
   "part.lockedHint": "Właściwości (poza ceną) można edytować tylko w statusie „W pracy”.",
@@ -493,7 +495,10 @@ const pl = {
   "storage.clearDatabasePhrase": "USUŃ WSZYSTKO",
   "storage.clearDatabasePhraseLabel": "Wpisz \"{phrase}\", żeby odblokować przycisk",
   "storage.clearDatabaseConfirmButton": "Wyczyść bazę bezpowrotnie",
-  "storage.clearDatabaseSuccess": "Usunięto {projects} projektów i {files} plików z dysku.",
+  "storage.clearDatabaseInProgressTitle": "Czyszczenie bazy danych…",
+  "storage.clearDatabaseInProgressDescription": "Trwa usuwanie projektów, elementów i plików z dysku. To może chwilę potrwać — nie zamykaj tego okna.",
+  "storage.clearDatabaseDoneTitle": "Zakończono",
+  "storage.clearDatabaseDoneDescription": "Baza danych została wyczyszczona.",
   "storage.clearDatabaseFailed": "Nie udało się wyczyścić bazy.",
   "backup.autoLabel": "Automatyczna kopia zapasowa",
   "backup.enableToggle": "Włącz automatyczne kopie zapasowe",
@@ -529,6 +534,7 @@ type TranslationKey = keyof typeof pl
 
 const en: Record<TranslationKey, string> = {
   "common.cancel": "Cancel",
+  "common.ok": "OK",
   "common.confirm": "Confirm",
   "common.save": "Save",
   "common.saving": "Saving…",
@@ -757,6 +763,7 @@ const en: Record<TranslationKey, string> = {
   "filter.allTypes": "All types",
   "filter.allKinds": "All kinds",
   "filter.allManufacturers": "All manufacturers",
+  "filter.allClients": "All clients",
   "filter.other": "Other",
 
   "part.lockedHint": "Properties (except price) can only be edited while the status is \"In progress\".",
@@ -1015,7 +1022,10 @@ const en: Record<TranslationKey, string> = {
   "storage.clearDatabasePhrase": "DELETE ALL",
   "storage.clearDatabasePhraseLabel": "Type \"{phrase}\" to unlock the button",
   "storage.clearDatabaseConfirmButton": "Clear database permanently",
-  "storage.clearDatabaseSuccess": "Deleted {projects} projects and {files} files from disk.",
+  "storage.clearDatabaseInProgressTitle": "Clearing the database…",
+  "storage.clearDatabaseInProgressDescription": "Deleting projects, items, and files from disk. This may take a moment — don't close this window.",
+  "storage.clearDatabaseDoneTitle": "Done",
+  "storage.clearDatabaseDoneDescription": "The database has been cleared.",
   "storage.clearDatabaseFailed": "Could not clear the database.",
   "backup.autoLabel": "Automatic backup",
   "backup.enableToggle": "Enable automatic backups",
@@ -1049,6 +1059,7 @@ const en: Record<TranslationKey, string> = {
 
 const de: Record<TranslationKey, string> = {
   "common.cancel": "Abbrechen",
+  "common.ok": "OK",
   "common.confirm": "Bestätigen",
   "common.save": "Speichern",
   "common.saving": "Wird gespeichert…",
@@ -1277,6 +1288,7 @@ const de: Record<TranslationKey, string> = {
   "filter.allTypes": "Alle Typen",
   "filter.allKinds": "Alle Arten",
   "filter.allManufacturers": "Alle Hersteller",
+  "filter.allClients": "Alle Kunden",
   "filter.other": "Sonstige",
 
   "part.lockedHint": "Eigenschaften (außer Preis) können nur im Status „In Bearbeitung” bearbeitet werden.",
@@ -1535,7 +1547,10 @@ const de: Record<TranslationKey, string> = {
   "storage.clearDatabasePhrase": "ALLES LÖSCHEN",
   "storage.clearDatabasePhraseLabel": "Geben Sie \"{phrase}\" ein, um die Schaltfläche freizuschalten",
   "storage.clearDatabaseConfirmButton": "Datenbank endgültig leeren",
-  "storage.clearDatabaseSuccess": "{projects} Projekte und {files} Dateien von der Festplatte gelöscht.",
+  "storage.clearDatabaseInProgressTitle": "Datenbank wird geleert…",
+  "storage.clearDatabaseInProgressDescription": "Projekte, Elemente und Dateien werden von der Festplatte gelöscht. Dies kann einen Moment dauern — schließen Sie dieses Fenster nicht.",
+  "storage.clearDatabaseDoneTitle": "Fertig",
+  "storage.clearDatabaseDoneDescription": "Die Datenbank wurde geleert.",
   "storage.clearDatabaseFailed": "Die Datenbank konnte nicht geleert werden.",
   "backup.autoLabel": "Automatische Sicherung",
   "backup.enableToggle": "Automatische Sicherungen aktivieren",

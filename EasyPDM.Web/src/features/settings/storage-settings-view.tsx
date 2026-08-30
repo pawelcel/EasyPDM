@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { api } from "@/api/client"
@@ -465,13 +466,14 @@ function DangerZoneSection() {
   const [typedPhrase, setTypedPhrase] = useState("")
   const [clearing, setClearing] = useState(false)
   const [error, setError] = useState("")
-  const [result, setResult] = useState<{ deletedProjects: number; deletedFiles: number } | null>(null)
+  const [done, setDone] = useState(false)
 
   const phrase = t("storage.clearDatabasePhrase")
 
   function openConfirm() {
     setTypedPhrase("")
     setError("")
+    setDone(false)
     setConfirmOpen(true)
   }
 
@@ -479,9 +481,8 @@ function DangerZoneSection() {
     setClearing(true)
     setError("")
     try {
-      const res = await api.clearDatabase()
-      setConfirmOpen(false)
-      setResult(res)
+      await api.clearDatabase()
+      setDone(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : t("storage.clearDatabaseFailed"))
     } finally {
@@ -492,57 +493,72 @@ function DangerZoneSection() {
   return (
     <>
       <SectionLabel>{t("storage.dangerZoneLabel")}</SectionLabel>
-      {result ? (
-        <div className="flex flex-col gap-2">
-          <Hint>{t("storage.clearDatabaseSuccess", { projects: result.deletedProjects, files: result.deletedFiles })}</Hint>
-          <div>
-            <Button onClick={() => window.location.reload()}>{t("storage.reloadPageButton")}</Button>
-          </div>
+      <div className="flex flex-col gap-2">
+        <Hint>{t("storage.clearDatabaseHint")}</Hint>
+        <div>
+          <Button variant="destructive" onClick={openConfirm}>
+            {t("storage.clearDatabaseButton")}
+          </Button>
         </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <Hint>{t("storage.clearDatabaseHint")}</Hint>
-          <div>
-            <Button variant="destructive" onClick={openConfirm}>
-              {t("storage.clearDatabaseButton")}
-            </Button>
-          </div>
-        </div>
-      )}
+      </div>
 
-      <Dialog open={confirmOpen} onOpenChange={(next) => !clearing && setConfirmOpen(next)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("storage.clearDatabaseConfirmTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("storage.clearDatabaseConfirmDescription", { phrase })}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="clear-database-phrase">
-              {t("storage.clearDatabasePhraseLabel", { phrase })}
-            </Label>
-            <Input
-              id="clear-database-phrase"
-              value={typedPhrase}
-              onChange={(e) => setTypedPhrase(e.target.value)}
-              autoComplete="off"
-              disabled={clearing}
-            />
-            <FormError>{error}</FormError>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={clearing}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={performClear}
-              disabled={clearing || typedPhrase !== phrase}
-            >
-              {t("storage.clearDatabaseConfirmButton")}
-            </Button>
-          </DialogFooter>
+      {/* Trzy fazy w JEDNYM oknie (potwierdzenie -> w trakcie -> zakończono), zamiast
+          zamykać dialog i pokazywać wynik osobno w tle strony -- okno "w trakcie" i
+          "zakończono" celowo NIE da się zamknąć inaczej niż przyciskiem OK (który od razu
+          przeładowuje stronę), żeby po czyszczeniu nigdzie nie zostały żadne nieaktualne
+          dane wciąż trzymane w pamięci przeglądarki (zaznaczenia, zbuforowane listy itp.). */}
+      <Dialog open={confirmOpen} onOpenChange={(next) => !clearing && !done && setConfirmOpen(next)}>
+        <DialogContent showCloseButton={!clearing && !done}>
+          {done ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t("storage.clearDatabaseDoneTitle")}</DialogTitle>
+                <DialogDescription>{t("storage.clearDatabaseDoneDescription")}</DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={() => window.location.reload()}>{t("common.ok")}</Button>
+              </DialogFooter>
+            </>
+          ) : clearing ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t("storage.clearDatabaseInProgressTitle")}</DialogTitle>
+                <DialogDescription>{t("storage.clearDatabaseInProgressDescription")}</DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>{t("storage.clearDatabaseConfirmTitle")}</DialogTitle>
+                <DialogDescription>
+                  {t("storage.clearDatabaseConfirmDescription", { phrase })}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="clear-database-phrase">
+                  {t("storage.clearDatabasePhraseLabel", { phrase })}
+                </Label>
+                <Input
+                  id="clear-database-phrase"
+                  value={typedPhrase}
+                  onChange={(e) => setTypedPhrase(e.target.value)}
+                  autoComplete="off"
+                />
+                <FormError>{error}</FormError>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button variant="destructive" onClick={performClear} disabled={typedPhrase !== phrase}>
+                  {t("storage.clearDatabaseConfirmButton")}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>

@@ -7,6 +7,7 @@ export interface DatabaseFilters {
   recordType: RecordType
   partKind: PartKindFilter
   manufacturer: string
+  client: string
 }
 
 const RECORD_TYPES: RecordType[] = ["all", "project", "part", "assembly", "other"]
@@ -27,5 +28,6 @@ export function coerceDatabaseFilters(raw: Record<string, unknown>): DatabaseFil
       ? (raw.partKind as PartKindFilter)
       : "all",
     manufacturer: typeof raw.manufacturer === "string" ? raw.manufacturer : "",
+    client: typeof raw.client === "string" ? raw.client : "",
   }
 }

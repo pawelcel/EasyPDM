@@ -95,7 +95,8 @@ static class SettingsEndpoints
         // POST /api/settings/storage/clear-database — kasuje WSZYSTKIE projekty/elementy/
         // załączniki/historię (pomocne przy testach, żeby zacząć od czystego stanu bez
         // ręcznego usuwania elementu po elemencie). Zostają nietknięte: konta użytkowników,
-        // katalogi Materiały/Producenci, i ustawienia serwera (backup, prefiksy numeracji).
+        // katalogi Materiały/Producenci/Klienci, i ustawienia serwera (backup, prefiksy
+        // numeracji).
         app.MapPost("/api/settings/storage/clear-database", async (HttpContext ctx) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
@@ -103,6 +104,14 @@ static class SettingsEndpoints
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            // Elementy BEZ projektu (project_id IS NULL — "Cała baza" bez przypisania,
+            // zob. 032_nullable_item_project.sql) nie zostaną skasowane przez kaskadę z
+            // DELETE FROM projects poniżej (nie odwołują się do żadnego wiersza projects) —
+            // bez tego "całkowite" czyszczenie zostawiałoby osierocone Części/Złożenia z
+            // numerami, z którymi kolidowałby restart sekwencji numeracji niżej.
+            await using (var cmd = new NpgsqlCommand("DELETE FROM items WHERE project_id IS NULL;", conn))
+                await cmd.ExecuteNonQueryAsync();
 
             // DELETE FROM projects kaskadowo kasuje items (project_id ON DELETE CASCADE),
             // a przez items dalej item_attachments/item_relations/item_tags/
@@ -113,6 +122,14 @@ static class SettingsEndpoints
             int deletedProjects;
             await using (var cmd = new NpgsqlCommand("DELETE FROM projects;", conn))
                 deletedProjects = await cmd.ExecuteNonQueryAsync();
+
+            // Po skasowaniu WSZYSTKICH elementów (powyżej) baza gwarantowanie nie ma już
+            // żadnego item_number — restart sekwencji od 1 jest więc zawsze bezpieczny
+            // (bez ryzyka kolizji z czymkolwiek, co mogłoby jeszcze istnieć), w
+            // odróżnieniu od ręcznego resetu (POST .../item-number-sequence/reset), który
+            // musi się przed tym bronić.
+            await using (var cmd = new NpgsqlCommand("ALTER SEQUENCE item_number_seq RESTART WITH 1;", conn))
+                await cmd.ExecuteNonQueryAsync();
 
             // Kaskada powyżej NIE rusza fizycznych plików (ta sama lekcja co przy DELETE
             // /api/items/{id}) — każdy plik elementu leży pod storage.Path (attachments/,
