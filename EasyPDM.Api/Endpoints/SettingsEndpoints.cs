@@ -93,10 +93,11 @@ static class SettingsEndpoints
         });
 
         // POST /api/settings/storage/clear-database — kasuje WSZYSTKIE projekty/elementy/
-        // załączniki/historię (pomocne przy testach, żeby zacząć od czystego stanu bez
-        // ręcznego usuwania elementu po elemencie). Zostają nietknięte: konta użytkowników,
-        // katalogi Materiały/Producenci/Klienci, i ustawienia serwera (backup, prefiksy
-        // numeracji).
+        // załączniki/historię ORAZ katalog Klientów (razem z ich osobami kontaktowymi i
+        // własną strukturą plików) — pomocne przy testach, żeby zacząć od czystego stanu
+        // bez ręcznego usuwania rekordu po rekordzie. Zostają nietknięte: konta
+        // użytkowników, katalogi Materiały/Producenci, i ustawienia serwera (backup,
+        // prefiksy numeracji).
         app.MapPost("/api/settings/storage/clear-database", async (HttpContext ctx) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
@@ -122,6 +123,14 @@ static class SettingsEndpoints
             int deletedProjects;
             await using (var cmd = new NpgsqlCommand("DELETE FROM projects;", conn))
                 deletedProjects = await cmd.ExecuteNonQueryAsync();
+
+            // DELETE FROM clients kaskadowo kasuje client_contacts i client_nodes (obie
+            // ON DELETE CASCADE, zob. schema.sql) — projects.client_id ma ON DELETE SET
+            // NULL, ale to bez znaczenia, skoro projekty i tak są już skasowane powyżej.
+            // Fizyczne pliki węzłów klienta leżą pod storage.Path/clients/... — kasuje je
+            // ta sama, generyczna pętla po całym magazynie niżej.
+            await using (var cmd = new NpgsqlCommand("DELETE FROM clients;", conn))
+                await cmd.ExecuteNonQueryAsync();
 
             // Po skasowaniu WSZYSTKICH elementów (powyżej) baza gwarantowanie nie ma już
             // żadnego item_number — restart sekwencji od 1 jest więc zawsze bezpieczny
