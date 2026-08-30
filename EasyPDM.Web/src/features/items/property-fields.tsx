@@ -57,6 +57,19 @@ function MaterialField({
   const [groupFilter, setGroupFilter] = useState("")
   const [subgroupFilter, setSubgroupFilter] = useState("")
 
+  // Materiał ma z definicji jedną, konkretną grupę/podgrupę w katalogu — jeśli materiał
+  // wybrano wprost z wyszukiwarki (z pominięciem filtrów wyżej, np. przez wpisanie nazwy),
+  // te dwa Selecty muszą dogonić rzeczywistą grupę/podgrupę TEGO materiału, zamiast zostać
+  // na "Wszystkie grupy"/"Wszystkie podgrupy" — inaczej wyglądałoby, jakby wybór materiału
+  // nie ustawiał w ogóle grupy/podgrupy.
+  useEffect(() => {
+    if (!value) return
+    const selected = materials.find((m) => m.name === value)
+    if (!selected) return
+    setGroupFilter(selected.group ?? "")
+    setSubgroupFilter(selected.subgroup ?? "")
+  }, [value, materials])
+
   const existingGroups = useMemo(
     () => Array.from(new Set(materials.map((m) => m.group).filter((g): g is string => !!g))).sort(),
     [materials]

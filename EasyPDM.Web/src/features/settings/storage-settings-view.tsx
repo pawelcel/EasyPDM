@@ -467,13 +467,25 @@ function DangerZoneSection() {
   const [clearing, setClearing] = useState(false)
   const [error, setError] = useState("")
   const [done, setDone] = useState(false)
+  // Domyślnie wszystko zaznaczone (odtwarza dawne zachowanie "wyczyść wszystko"), ale
+  // administrator może odznaczyć wybrane kategorie — np. zostawić katalog Materiałów,
+  // czyszcząc tylko Projekty/Elementy.
+  const [scopeProjects, setScopeProjects] = useState(true)
+  const [scopeMaterials, setScopeMaterials] = useState(true)
+  const [scopeManufacturers, setScopeManufacturers] = useState(true)
+  const [scopeClients, setScopeClients] = useState(true)
 
   const phrase = t("storage.clearDatabasePhrase")
+  const noneSelected = !scopeProjects && !scopeMaterials && !scopeManufacturers && !scopeClients
 
   function openConfirm() {
     setTypedPhrase("")
     setError("")
     setDone(false)
+    setScopeProjects(true)
+    setScopeMaterials(true)
+    setScopeManufacturers(true)
+    setScopeClients(true)
     setConfirmOpen(true)
   }
 
@@ -481,7 +493,12 @@ function DangerZoneSection() {
     setClearing(true)
     setError("")
     try {
-      await api.clearDatabase()
+      await api.clearDatabase({
+        projects: scopeProjects,
+        materials: scopeMaterials,
+        manufacturers: scopeManufacturers,
+        clients: scopeClients,
+      })
       setDone(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : t("storage.clearDatabaseFailed"))
@@ -537,23 +554,70 @@ function DangerZoneSection() {
                   {t("storage.clearDatabaseConfirmDescription", { phrase })}
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="clear-database-phrase">
-                  {t("storage.clearDatabasePhraseLabel", { phrase })}
-                </Label>
-                <Input
-                  id="clear-database-phrase"
-                  value={typedPhrase}
-                  onChange={(e) => setTypedPhrase(e.target.value)}
-                  autoComplete="off"
-                />
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label>{t("storage.clearScopeLabel")}</Label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={scopeProjects}
+                      onChange={(e) => setScopeProjects(e.target.checked)}
+                      className="size-3.5 shrink-0 accent-primary"
+                    />
+                    {t("storage.clearScopeProjects")}
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={scopeMaterials}
+                      onChange={(e) => setScopeMaterials(e.target.checked)}
+                      className="size-3.5 shrink-0 accent-primary"
+                    />
+                    {t("storage.clearScopeMaterials")}
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={scopeManufacturers}
+                      onChange={(e) => setScopeManufacturers(e.target.checked)}
+                      className="size-3.5 shrink-0 accent-primary"
+                    />
+                    {t("storage.clearScopeManufacturers")}
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={scopeClients}
+                      onChange={(e) => setScopeClients(e.target.checked)}
+                      className="size-3.5 shrink-0 accent-primary"
+                    />
+                    {t("storage.clearScopeClients")}
+                  </label>
+                  {noneSelected && <Hint>{t("storage.clearScopeNoneSelected")}</Hint>}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="clear-database-phrase">
+                    {t("storage.clearDatabasePhraseLabel", { phrase })}
+                  </Label>
+                  <Input
+                    id="clear-database-phrase"
+                    value={typedPhrase}
+                    onChange={(e) => setTypedPhrase(e.target.value)}
+                    autoComplete="off"
+                  />
+                </div>
                 <FormError>{error}</FormError>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setConfirmOpen(false)}>
                   {t("common.cancel")}
                 </Button>
-                <Button variant="destructive" onClick={performClear} disabled={typedPhrase !== phrase}>
+                <Button
+                  variant="destructive"
+                  onClick={performClear}
+                  disabled={typedPhrase !== phrase || noneSelected}
+                >
                   {t("storage.clearDatabaseConfirmButton")}
                 </Button>
               </DialogFooter>

@@ -455,8 +455,8 @@ export const api = {
       handleResponse<{ path: string; migratedFiles: number }>(r)
     ),
 
-  clearDatabase: () =>
-    fetch(`${BASE}/settings/storage/clear-database`, { method: "POST" }).then((r) =>
+  clearDatabase: (scope: { projects: boolean; materials: boolean; manufacturers: boolean; clients: boolean }) =>
+    fetch(`${BASE}/settings/storage/clear-database`, json(scope)).then((r) =>
       handleResponse<{ deletedProjects: number; deletedFiles: number }>(r)
     ),
 

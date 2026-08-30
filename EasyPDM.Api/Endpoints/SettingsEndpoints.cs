@@ -92,64 +92,90 @@ static class SettingsEndpoints
             return Results.Ok(new { path = newPath, migratedFiles });
         });
 
-        // POST /api/settings/storage/clear-database — kasuje WSZYSTKIE projekty/elementy/
-        // załączniki/historię ORAZ katalog Klientów (razem z ich osobami kontaktowymi i
-        // własną strukturą plików) — pomocne przy testach, żeby zacząć od czystego stanu
-        // bez ręcznego usuwania rekordu po rekordzie. Zostają nietknięte: konta
-        // użytkowników, katalogi Materiały/Producenci, i ustawienia serwera (backup,
-        // prefiksy numeracji).
-        app.MapPost("/api/settings/storage/clear-database", async (HttpContext ctx) =>
+        // POST /api/settings/storage/clear-database — kasuje wybrane kategorie danych
+        // (projekty/elementy, katalog Materiałów, katalog Producentów, katalog Klientów),
+        // niezależnie od siebie — do wyboru w body. Zawsze zostają nietknięte: konta
+        // użytkowników i ustawienia serwera (backup, prefiksy numeracji).
+        app.MapPost("/api/settings/storage/clear-database", async (HttpContext ctx, ClearDatabaseRequest body) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
+            if (!body.Projects && !body.Materials && !body.Manufacturers && !body.Clients)
+                return Results.BadRequest("Wybierz przynajmniej jedną kategorię do wyczyszczenia.");
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            // Elementy BEZ projektu (project_id IS NULL — "Cała baza" bez przypisania,
-            // zob. 032_nullable_item_project.sql) nie zostaną skasowane przez kaskadę z
-            // DELETE FROM projects poniżej (nie odwołują się do żadnego wiersza projects) —
-            // bez tego "całkowite" czyszczenie zostawiałoby osierocone Części/Złożenia z
-            // numerami, z którymi kolidowałby restart sekwencji numeracji niżej.
-            await using (var cmd = new NpgsqlCommand("DELETE FROM items WHERE project_id IS NULL;", conn))
+            var deletedProjects = 0;
+            if (body.Projects)
+            {
+                // Elementy BEZ projektu (project_id IS NULL — "Cała baza" bez przypisania,
+                // zob. 032_nullable_item_project.sql) nie zostaną skasowane przez kaskadę z
+                // DELETE FROM projects poniżej (nie odwołują się do żadnego wiersza
+                // projects) — bez tego czyszczenie zostawiałoby osierocone Części/Złożenia
+                // z numerami, z którymi kolidowałby restart sekwencji numeracji niżej.
+                await using (var cmd = new NpgsqlCommand("DELETE FROM items WHERE project_id IS NULL;", conn))
+                    await cmd.ExecuteNonQueryAsync();
+
+                // DELETE FROM projects kaskadowo kasuje items (project_id ON DELETE
+                // CASCADE), a przez items dalej item_attachments/item_relations/
+                // item_tags/item_revision_comments/item_status_history/
+                // item_attachment_history/item_owner_history/project_users (wszystkie
+                // ON DELETE CASCADE, zob. schema.sql) — jedno zapytanie wystarcza, żeby
+                // wyczyścić wszystko powiązane z projektami/elementami na poziomie bazy.
+                await using (var cmd = new NpgsqlCommand("DELETE FROM projects;", conn))
+                    deletedProjects = await cmd.ExecuteNonQueryAsync();
+
+                // Po skasowaniu WSZYSTKICH elementów baza gwarantowanie nie ma już
+                // żadnego item_number — restart sekwencji od 1 jest więc zawsze
+                // bezpieczny (bez ryzyka kolizji z czymkolwiek, co mogłoby jeszcze
+                // istnieć), w odróżnieniu od ręcznego resetu
+                // (POST .../item-number-sequence/reset), który musi się przed tym bronić.
+                await using (var cmd = new NpgsqlCommand("ALTER SEQUENCE item_number_seq RESTART WITH 1;", conn))
+                    await cmd.ExecuteNonQueryAsync();
+            }
+
+            if (body.Clients)
+            {
+                // Kaskadowo kasuje client_contacts i client_nodes (obie ON DELETE
+                // CASCADE, zob. schema.sql) — projects.client_id ma ON DELETE SET NULL,
+                // nieszkodliwe niezależnie od tego, czy Projekty są w tym wywołaniu też
+                // czyszczone.
+                await using var cmd = new NpgsqlCommand("DELETE FROM clients;", conn);
                 await cmd.ExecuteNonQueryAsync();
+            }
 
-            // DELETE FROM projects kaskadowo kasuje items (project_id ON DELETE CASCADE),
-            // a przez items dalej item_attachments/item_relations/item_tags/
-            // item_revision_comments/item_status_history/item_attachment_history/
-            // item_owner_history/project_users (wszystkie ON DELETE CASCADE, zob.
-            // schema.sql) — jedno zapytanie wystarcza, żeby wyczyścić wszystko powiązane
-            // z projektami/elementami na poziomie bazy.
-            int deletedProjects;
-            await using (var cmd = new NpgsqlCommand("DELETE FROM projects;", conn))
-                deletedProjects = await cmd.ExecuteNonQueryAsync();
-
-            // DELETE FROM clients kaskadowo kasuje client_contacts i client_nodes (obie
-            // ON DELETE CASCADE, zob. schema.sql) — projects.client_id ma ON DELETE SET
-            // NULL, ale to bez znaczenia, skoro projekty i tak są już skasowane powyżej.
-            // Fizyczne pliki węzłów klienta leżą pod storage.Path/clients/... — kasuje je
-            // ta sama, generyczna pętla po całym magazynie niżej.
-            await using (var cmd = new NpgsqlCommand("DELETE FROM clients;", conn))
+            if (body.Materials)
+            {
+                // Prosty, samodzielny katalog bez własnych plików na dysku (Części
+                // trzymają tylko nazwę materiału jako wolny tekst we properties, bez FK).
+                await using var cmd = new NpgsqlCommand("DELETE FROM materials;", conn);
                 await cmd.ExecuteNonQueryAsync();
+            }
 
-            // Po skasowaniu WSZYSTKICH elementów (powyżej) baza gwarantowanie nie ma już
-            // żadnego item_number — restart sekwencji od 1 jest więc zawsze bezpieczny
-            // (bez ryzyka kolizji z czymkolwiek, co mogłoby jeszcze istnieć), w
-            // odróżnieniu od ręcznego resetu (POST .../item-number-sequence/reset), który
-            // musi się przed tym bronić.
-            await using (var cmd = new NpgsqlCommand("ALTER SEQUENCE item_number_seq RESTART WITH 1;", conn))
+            if (body.Manufacturers)
+            {
+                // DELETE FROM manufacturers kaskadowo kasuje też manufacturer_contacts
+                // (ON DELETE CASCADE) — analogicznie bez własnych plików na dysku.
+                await using var cmd = new NpgsqlCommand("DELETE FROM manufacturers;", conn);
                 await cmd.ExecuteNonQueryAsync();
+            }
 
-            // Kaskada powyżej NIE rusza fizycznych plików (ta sama lekcja co przy DELETE
-            // /api/items/{id}) — każdy plik elementu leży pod storage.Path (attachments/,
-            // components/), więc przy pełnym wyczyszczeniu prościej i pewniej jest skasować
-            // CAŁĄ zawartość tego katalogu (nie sam katalog), niż iterować pojedynczo po
-            // ścieżkach — nic nie może zostać przypadkiem pominięte jako sierota.
+            // Kaskady powyżej NIE ruszają fizycznych plików (ta sama lekcja co przy
+            // DELETE /api/items/{id}) — trzeba skasować je tu osobno, i to selektywnie
+            // wg wybranych kategorii: pliki elementów/załączników leżą pod storage.Path
+            // bezpośrednio (katalogi nazwane UUID projektu) i pod storage.Path/attachments/,
+            // a pliki węzłów Klientów osobno pod storage.Path/clients/ — więc przy
+            // czyszczeniu samych Projektów NIE wolno ruszać "clients/", i odwrotnie.
+            // Materiały/Producenci nigdy nie mają własnych plików na dysku.
             var deletedFiles = 0;
-            if (Directory.Exists(storage.Path))
+            if (body.Projects && Directory.Exists(storage.Path))
             {
                 foreach (var entry in Directory.EnumerateFileSystemEntries(storage.Path))
                 {
+                    if (string.Equals(Path.GetFileName(entry), "clients", StringComparison.OrdinalIgnoreCase))
+                        continue;
                     try
                     {
                         if (Directory.Exists(entry))
@@ -159,6 +185,20 @@ static class SettingsEndpoints
                         deletedFiles++;
                     }
                     catch (IOException) { /* nie blokujemy reszty czyszczenia z powodu jednego pliku */ }
+                }
+            }
+
+            if (body.Clients)
+            {
+                var clientsDir = Path.Combine(storage.Path, "clients");
+                if (Directory.Exists(clientsDir))
+                {
+                    try
+                    {
+                        Directory.Delete(clientsDir, recursive: true);
+                        deletedFiles++;
+                    }
+                    catch (IOException) { /* nie blokujemy reszty czyszczenia z powodu tego katalogu */ }
                 }
             }
 
@@ -663,6 +703,8 @@ static class SettingsEndpoints
 class BackupFailedException(string message) : Exception(message);
 
 record MoveStorageRequest(string NewPath, bool MigrateExisting);
+
+record ClearDatabaseRequest(bool Projects, bool Materials, bool Manufacturers, bool Clients);
 
 record BackupSchedule(
     bool Enabled, string Frequency, int? DayOfWeek, int? DayOfMonth, int Hour, int Minute, DateTime? LastRunAt,

@@ -6,6 +6,9 @@ All notable changes to EasyPDM are documented in this file.
 
 ### Added
 - "Whole database" view: filter/search items and projects by Client.
+- Clearing the database now lets you pick which categories to wipe (Whole
+  database/Projects, Materials, Manufacturers, Clients) instead of all-or-nothing —
+  each is its own checkbox in the confirmation dialog, all checked by default.
 
 ### Fixed
 - Clearing the database ("Danger zone") didn't delete project-less items (items with
@@ -13,8 +16,12 @@ All notable changes to EasyPDM are documented in this file.
   could collide with the item-numbering sequence after a reset.
 - Clearing the database didn't reset the item-numbering sequence, so the first item
   created afterwards continued the old numbering instead of starting at 1.
-- Clearing the database didn't delete the Clients catalog (contacts and their file
-  structure) even though everything else was wiped.
+- Clearing the database left the Clients, Materials, and Manufacturers catalogs
+  (contacts, groups/subgroups, and Clients' own file structure) untouched even though
+  everything else was wiped.
+- Selecting a Material on a Part didn't update the Group/Subgroup dropdowns shown
+  right below it — they stayed on "All groups"/"All subgroups" instead of reflecting
+  the chosen material's actual group/subgroup.
 
 ### Changed
 - Clearing the database now shows a single dialog that walks through
