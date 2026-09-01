@@ -1,0 +1,23 @@
+# Nakładka na docker-compose.yml -- pociąga/uruchamia obrazy ":edge" (najnowszy stan
+# "main", publikowany przez .github/workflows/publish-docker-image.yml przy każdym pushu)
+# zamiast ostatniego wydania ":latest" (publish-docker-release.yml, tylko po wypchnięciu
+# taga wersji). Do własnego sprawdzania stanu main przed wydaniem -- nie dla zwykłych
+# użytkowników, którzy mają zostać na ":latest".
+#
+# Świadomie NIE nazwane "docker-compose.override.yml" -- Compose ładowałby to automatycznie
+# przy KAŻDYM zwykłym "docker compose up" (nawet bez świadomego wyboru "edge"), skoro plik
+# o tej nazwie leży w tym samym katalogu. Ta nakładka wymaga jawnego -f, więc nigdy nie
+# aktywuje się przez przypadek.
+#
+# Użycie:
+#   docker compose -f docker-compose.yml -f docker-compose.edge.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.edge.yml up -d
+#
+# Powrót na zwykłe ":latest": zwykłe "docker compose pull && docker compose up -d" (bez
+# -f docker-compose.edge.yml) -- to nie zamienia obrazu w miejscu, trzeba jeszcze ręcznie
+# pociągnąć/podnieść z powrotem samym docker-compose.yml.
+services:
+  postgres:
+    image: ghcr.io/pawelcel/easypdm-postgres:edge
+  api:
+    image: ghcr.io/pawelcel/easypdm-api:edge

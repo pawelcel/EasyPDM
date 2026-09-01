@@ -310,7 +310,10 @@ itself):
 - `publish-docker-image.yml` — on every push to `main` touching server code, tags both
   images `:edge` (+ the commit SHA). This is for checking the latest state of `main`
   before cutting a release (`docker pull ghcr.io/pawelcel/easypdm-api:edge`) — it never
-  touches `:latest`.
+  touches `:latest`. To actually run the `:edge` images with `docker-compose.yml`
+  (which otherwise pulls `:latest`), layer `docker-compose.edge.yml` on top:
+  `docker compose -f docker-compose.yml -f docker-compose.edge.yml pull && docker
+  compose -f docker-compose.yml -f docker-compose.edge.yml up -d`.
 - `publish-docker-release.yml` — only on pushing a version tag (`v0.1.2`, matching
   `EasyPDM.Web/src/version.ts` and `packaging/windows/EasyPDM.iss`'s `MyAppVersion`),
   tags both images `:latest` AND `:v0.1.2`. This is the ONLY workflow that moves
