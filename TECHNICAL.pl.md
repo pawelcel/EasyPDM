@@ -74,8 +74,12 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
     środowisko deweloperskie (bez hasła do `sudo` w tej sesji) nie pozwalało zrobić.
   - `publish-docker-image.yml` — buduje i publikuje obrazy `api` i `postgres` (ten drugi
     z wbudowanym `db/schema.sql`) do GitHub Container Registry (`ghcr.io/pawelcel/easypdm-api`,
-    `ghcr.io/pawelcel/easypdm-postgres`) przy każdym pushu dotykającym kodu serwera —
-    umożliwia wdrożenie Dockerem bez klonowania repo, zob. "Docker" niżej.
+    `ghcr.io/pawelcel/easypdm-postgres`) z tagiem `:edge` (+ SHA commita) przy każdym pushu
+    dotykającym kodu serwera — do sprawdzenia najnowszego stanu `main` przed wydaniem, zob.
+    "Docker" niżej.
+  - `publish-docker-release.yml` — te same dwa obrazy, ale tylko przy wypchnięciu taga
+    wersji (`v*`); to jedyny workflow aktualizujący `:latest` (to, co realnie ściąga
+    `docker-compose.yml`), plus pasujący tag `:vX.Y.Z`. Zob. "Docker" niżej.
 
 ### Model danych — elementy i struktura
 
@@ -282,13 +286,27 @@ z `schema.sql` odpala się TYLKO przy pierwszym, zupełnie pustym starcie wolume
 
 #### Wdrożenie BEZ klonowania repo (tylko gotowy obraz)
 
-`.github/workflows/publish-docker-image.yml` publikuje dwa gotowe obrazy do GitHub
-Container Registry — `ghcr.io/pawelcel/easypdm-api` i `ghcr.io/pawelcel/easypdm-postgres`
-(ten drugi to zwykły `postgres:18` z wbudowanym `db/schema.sql` — bez tego świeża baza
-zostałaby pusta, bo `MigrationRunner.cs` świadomie nie tworzy sam podstawowego schematu) —
-przy każdym pushu na main dotykającym kodu serwera. Więc do samego wdrożenia NIE trzeba
-klonować całego repo (ze wszystkimi makrami CAD/instalatorami/testami, których serwer
-w ogóle nie potrzebuje). Wystarczą dwa pliki:
+Dwa workflowy publikują gotowe obrazy do GitHub Container Registry —
+`ghcr.io/pawelcel/easypdm-api` i `ghcr.io/pawelcel/easypdm-postgres` (ten drugi to zwykły
+`postgres:18` z wbudowanym `db/schema.sql` — bez tego świeża baza zostałaby pusta, bo
+`MigrationRunner.cs` świadomie nie tworzy sam podstawowego schematu):
+
+- `publish-docker-image.yml` — przy każdym pushu na `main` dotykającym kodu serwera,
+  taguje oba obrazy jako `:edge` (+ SHA commita). Do sprawdzenia najnowszego stanu `main`
+  przed wydaniem (`docker pull ghcr.io/pawelcel/easypdm-api:edge`) — nigdy nie rusza
+  `:latest`.
+- `publish-docker-release.yml` — tylko przy wypchnięciu taga wersji (`v0.1.2`, zgodnego
+  z `EasyPDM.Web/src/version.ts` i `MyAppVersion` w `packaging/windows/EasyPDM.iss`),
+  taguje oba obrazy jako `:latest` ORAZ `:v0.1.2`. To JEDYNY workflow ruszający
+  `:latest` — więc `docker-compose.yml` (który ściąga `:latest`) zawsze dostaje
+  świadomie wydaną wersję, nigdy przypadkowy commit z `main`. Żeby wydać nową wersję:
+  ```bash
+  git tag v0.1.2
+  git push origin v0.1.2
+  ```
+
+Więc do samego wdrożenia NIE trzeba klonować całego repo (ze wszystkimi makrami CAD/
+instalatorami/testami, których serwer w ogóle nie potrzebuje). Wystarczą dwa pliki:
 
 ```bash
 mkdir easypdm-deploy && cd easypdm-deploy
@@ -312,7 +330,8 @@ docker compose up -d
 > wcześniejszego `docker login` dostanie 403/404 nawet na publicznym repo.
 
 **Aktualizacja** tą ścieżką: `docker compose pull && docker compose up -d` — bez `git pull`
-(nie ma czego pullować, nie masz tu repo), po prostu ściąga nowszy `latest`.
+(nie ma czego pullować, nie masz tu repo), po prostu ściąga to, na co aktualnie wskazuje
+`:latest` — czyli najnowsze WYDANE wydanie, niekoniecznie najnowszy commit na `main`.
 
 ### Linux — instalacja natywna jako usługa systemd (bez Dockera)
 

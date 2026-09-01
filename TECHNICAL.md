@@ -78,9 +78,12 @@ PostgreSQL 18.
     development environment (no `sudo` password in this session) didn't allow doing.
   - `publish-docker-image.yml` — builds and publishes the `api` and `postgres` images
     (the latter with `db/schema.sql` baked in) to the GitHub Container Registry
-    (`ghcr.io/pawelcel/easypdm-api`, `ghcr.io/pawelcel/easypdm-postgres`) on every push
-    touching server code — enables Docker deployment without cloning the repo, see
-    "Docker" below.
+    (`ghcr.io/pawelcel/easypdm-api`, `ghcr.io/pawelcel/easypdm-postgres`), tagged `:edge`
+    (+ the commit SHA), on every push touching server code — for checking the latest
+    state of `main` before cutting a release, see "Docker" below.
+  - `publish-docker-release.yml` — same two images, but only on pushing a version tag
+    (`v*`); this is the only workflow that updates `:latest` (what `docker-compose.yml`
+    actually pulls), plus a matching `:vX.Y.Z` tag. See "Docker" below.
 
 ### Data model — items and structure
 
@@ -298,14 +301,28 @@ since the volume already exists.
 
 #### Deployment WITHOUT cloning the repo (image only)
 
-`.github/workflows/publish-docker-image.yml` publishes two ready-made images to the
-GitHub Container Registry — `ghcr.io/pawelcel/easypdm-api` and
-`ghcr.io/pawelcel/easypdm-postgres` (the latter is a plain `postgres:18` with
-`db/schema.sql` baked in — without it a fresh database would stay empty, since
-`MigrationRunner.cs` deliberately does not create the base schema itself) — on every push
-to main touching server code. So deployment alone does NOT require cloning the whole
-repo (with all the CAD macros/installers/tests the server doesn't need at all). Just two
-files are enough:
+Two workflows publish ready-made images to the GitHub Container Registry —
+`ghcr.io/pawelcel/easypdm-api` and `ghcr.io/pawelcel/easypdm-postgres` (the latter is a
+plain `postgres:18` with `db/schema.sql` baked in — without it a fresh database would
+stay empty, since `MigrationRunner.cs` deliberately does not create the base schema
+itself):
+
+- `publish-docker-image.yml` — on every push to `main` touching server code, tags both
+  images `:edge` (+ the commit SHA). This is for checking the latest state of `main`
+  before cutting a release (`docker pull ghcr.io/pawelcel/easypdm-api:edge`) — it never
+  touches `:latest`.
+- `publish-docker-release.yml` — only on pushing a version tag (`v0.1.2`, matching
+  `EasyPDM.Web/src/version.ts` and `packaging/windows/EasyPDM.iss`'s `MyAppVersion`),
+  tags both images `:latest` AND `:v0.1.2`. This is the ONLY workflow that moves
+  `:latest` — so `docker-compose.yml` (which pulls `:latest`) always gets a deliberately
+  released version, never an arbitrary commit on `main`. To cut a release:
+  ```bash
+  git tag v0.1.2
+  git push origin v0.1.2
+  ```
+
+So deployment alone does NOT require cloning the whole repo (with all the CAD
+macros/installers/tests the server doesn't need at all). Just two files are enough:
 
 ```bash
 mkdir easypdm-deploy && cd easypdm-deploy
@@ -330,8 +347,9 @@ docker compose up -d
 > repo.
 
 **Update** this way: `docker compose pull && docker compose up -d` — no `git pull`
-(there's nothing to pull, you don't have the repo here), it simply fetches the newer
-`latest`.
+(there's nothing to pull, you don't have the repo here), it simply fetches whatever
+`:latest` currently points to — i.e. the newest tagged release, not necessarily the
+newest commit on `main`.
 
 ### Linux — native installation as a systemd service (no Docker)
 

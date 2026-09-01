@@ -2,10 +2,11 @@
 #   1. Masz sklonowane całe repo (rozwój/testowanie zmian): "docker compose up -d --build"
 #      buduje obraz "api" lokalnie ze źródeł (sekcja "build:" niżej).
 #   2. Samo wdrożenie, bez klonowania repo (masz tylko ten plik + .env, np. ściągnięte przez
-#      curl): "docker compose pull && docker compose up -d" — ściąga gotowy obraz z GHCR
-#      (publikowany automatycznie przez .github/workflows/publish-docker-image.yml przy
-#      każdym pushu na main), sekcja "build:" jest wtedy po prostu ignorowana (nieużywana,
-#      dopóki ktoś jawnie nie poprosi o build).
+#      curl): "docker compose pull && docker compose up -d" — ściąga obraz z GHCR otagowany
+#      ":latest" (publikowany WYŁĄCZNIE przez .github/workflows/publish-docker-release.yml,
+#      uruchamiany ręcznym wypchnięciem taga wersji "vX.Y.Z" — nie przy każdym pushu na
+#      main, zob. ten workflow po szczegóły), sekcja "build:" jest wtedy po prostu
+#      ignorowana (nieużywana, dopóki ktoś jawnie nie poprosi o build).
 # W obu przypadkach najpierw: skopiuj .env.example do .env, ustaw PDM_DB_PASSWORD.
 # Pierwsze logowanie: admin / admin (zob. README.md -> "Jak uruchomić").
 services:

@@ -86,9 +86,13 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
     zuließ.
   - `publish-docker-image.yml` — baut und veröffentlicht die Images `api` und `postgres`
     (Letzteres mit eingebettetem `db/schema.sql`) in die GitHub Container Registry
-    (`ghcr.io/pawelcel/easypdm-api`, `ghcr.io/pawelcel/easypdm-postgres`) bei jedem Push,
-    der Server-Code betrifft — ermöglicht eine Docker-Bereitstellung ohne Klonen des
-    Repos, siehe "Docker" unten.
+    (`ghcr.io/pawelcel/easypdm-api`, `ghcr.io/pawelcel/easypdm-postgres`) mit dem Tag
+    `:edge` (+ Commit-SHA) bei jedem Push, der Server-Code betrifft — zum Prüfen des
+    neuesten Stands von `main` vor einem Release, siehe "Docker" unten.
+  - `publish-docker-release.yml` — dieselben zwei Images, aber nur beim Push eines
+    Versions-Tags (`v*`); der einzige Workflow, der `:latest` aktualisiert (das, was
+    `docker-compose.yml` tatsächlich zieht), plus einen passenden `:vX.Y.Z`-Tag. Siehe
+    "Docker" unten.
 
 ### Datenmodell — Elemente und Struktur
 
@@ -321,14 +325,30 @@ existiert.
 
 #### Bereitstellung OHNE Klonen des Repos (nur fertiges Image)
 
-`.github/workflows/publish-docker-image.yml` veröffentlicht zwei fertige Images in die
-GitHub Container Registry — `ghcr.io/pawelcel/easypdm-api` und
-`ghcr.io/pawelcel/easypdm-postgres` (Letzteres ist ein gewöhnliches `postgres:18` mit
-eingebettetem `db/schema.sql` — ohne dies bliebe eine frische Datenbank leer, da
-`MigrationRunner.cs` bewusst nicht selbst das Grundschema erstellt) — bei jedem Push auf
-main, der Server-Code betrifft. Für die Bereitstellung allein muss also NICHT das
-gesamte Repo geklont werden (mit allen CAD-Makros/Installern/Tests, die der Server
-überhaupt nicht braucht). Zwei Dateien genügen:
+Zwei Workflows veröffentlichen fertige Images in die GitHub Container Registry —
+`ghcr.io/pawelcel/easypdm-api` und `ghcr.io/pawelcel/easypdm-postgres` (Letzteres ist ein
+gewöhnliches `postgres:18` mit eingebettetem `db/schema.sql` — ohne dies bliebe eine
+frische Datenbank leer, da `MigrationRunner.cs` bewusst nicht selbst das Grundschema
+erstellt):
+
+- `publish-docker-image.yml` — bei jedem Push auf `main`, der Server-Code betrifft,
+  markiert beide Images mit `:edge` (+ Commit-SHA). Zum Prüfen des neuesten Stands von
+  `main` vor einem Release (`docker pull ghcr.io/pawelcel/easypdm-api:edge`) — rührt
+  `:latest` nie an.
+- `publish-docker-release.yml` — nur beim Push eines Versions-Tags (`v0.1.2`, passend
+  zu `EasyPDM.Web/src/version.ts` und `MyAppVersion` in
+  `packaging/windows/EasyPDM.iss`), markiert beide Images mit `:latest` UND `:v0.1.2`.
+  Das ist der EINZIGE Workflow, der `:latest` bewegt — `docker-compose.yml` (das
+  `:latest` zieht) bekommt also immer eine bewusst veröffentlichte Version, nie einen
+  beliebigen Commit von `main`. So wird ein neues Release veröffentlicht:
+  ```bash
+  git tag v0.1.2
+  git push origin v0.1.2
+  ```
+
+Für die Bereitstellung allein muss also NICHT das gesamte Repo geklont werden (mit allen
+CAD-Makros/Installern/Tests, die der Server überhaupt nicht braucht). Zwei Dateien
+genügen:
 
 ```bash
 mkdir easypdm-deploy && cd easypdm-deploy
@@ -355,7 +375,8 @@ docker compose up -d
 
 **Update** auf diesem Weg: `docker compose pull && docker compose up -d` — ohne
 `git pull` (es gibt nichts zu pullen, Sie haben hier kein Repo), es wird einfach das
-neuere `latest` abgerufen.
+abgerufen, worauf `:latest` gerade zeigt — also das neueste VERÖFFENTLICHTE Release,
+nicht zwangsläufig der neueste Commit auf `main`.
 
 ### Linux — native Installation als systemd-Dienst (ohne Docker)
 

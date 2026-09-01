@@ -1,0 +1,78 @@
+name: Publish Docker Image (release)
+
+# Odpowiednik publish-docker-image.yml, ale uruchamiany WYŁĄCZNIE wypchnięciem taga wersji
+# (np. "v0.1.2") — to jedyny workflow, który aktualizuje ":latest" na obu obrazach
+# (easypdm-api, easypdm-postgres). docker-compose.yml wskazuje właśnie ":latest", więc
+# zwykły użytkownik robiący "docker compose pull" dostaje TYLKO to, co świadomie wydano
+# tym tagiem — nigdy stan main sprzed/po wydaniu (tym zajmuje się osobny ":edge" z
+# publish-docker-image.yml, do własnego sprawdzania przed wydaniem).
+#
+# Jak wydać nową wersję (po zaktualizowaniu EasyPDM.Web/src/version.ts i
+# packaging/windows/EasyPDM.iss -> MyAppVersion na tę samą wartość):
+#   git tag v0.1.2
+#   git push origin v0.1.2
+# Obrazy trafią do GHCR otagowane ":latest" ORAZ ":v0.1.2" (ten drugi zostaje na zawsze,
+# do przypięcia/wycofania konkretnego wydania niezależnie od tego, co potem wskaże
+# ":latest").
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag wersji do zbudowania (np. v0.1.2) — tylko przy ręcznym uruchomieniu, normalnie bierze się z pushniętego taga.'
+        required: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Zaloguj do GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # github.ref_name to sam tag ("v0.1.2") przy pushu taga; przy ręcznym uruchomieniu
+      # (workflow_dispatch) bierzemy z inputu, bo ref_name wskazywałoby wtedy na gałąź.
+      - name: Ustal tag wersji
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Buduj i publikuj obraz api
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/easypdm-api:latest
+            ghcr.io/${{ github.repository_owner }}/easypdm-api:${{ steps.version.outputs.tag }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Buduj i publikuj obraz postgres
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.postgres
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/easypdm-postgres:latest
+            ghcr.io/${{ github.repository_owner }}/easypdm-postgres:${{ steps.version.outputs.tag }}
+          cache-from: type=gha,scope=postgres
+          cache-to: type=gha,mode=max,scope=postgres

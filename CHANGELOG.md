@@ -9,6 +9,13 @@ All notable changes to EasyPDM are documented in this file.
 - Clearing the database now lets you pick which categories to wipe (Whole
   database/Projects, Materials, Manufacturers, Clients) instead of all-or-nothing —
   each is its own checkbox in the confirmation dialog, all checked by default.
+- Docker images now have a real release process: `:latest` (what `docker-compose.yml`
+  pulls) only moves when a version tag (`vX.Y.Z`) is pushed, via the new
+  `publish-docker-release.yml` workflow, which also tags the exact version
+  (`:v0.1.1`, etc.). Every push to `main` still publishes a separate `:edge` tag for
+  checking the newest state before cutting a release — it no longer touches `:latest`.
+  Previously `:latest` was republished on every push to `main`, so a Docker deployment
+  had no way to get a specific, deliberately released version.
 
 ### Fixed
 - Clearing the database ("Danger zone") didn't delete project-less items (items with
