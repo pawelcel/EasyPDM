@@ -1,35 +1,59 @@
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { FormError } from "@/components/ui/form-error"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/i18n/use-language"
 
-function AddTagRow({ onAdd, className }: { onAdd: (name: string) => void; className?: string }) {
+function AddTagRow({
+  onAdd,
+  className,
+}: {
+  onAdd: (name: string) => void | Promise<void>
+  className?: string
+}) {
   const { t } = useLanguage()
   const [value, setValue] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
 
-  function submit() {
+  // Czyścimy pole i pokazujemy błąd DOPIERO po zakończeniu onAdd — wcześniej (przed tą
+  // poprawką) pole czyściło się od razu, niezależnie od wyniku, więc nieudane dodanie
+  // (np. tag już istnieje) cicho gubiło to, co użytkownik wpisał, bez żadnego komunikatu.
+  async function submit() {
     const trimmed = value.trim()
-    if (!trimmed) return
-    onAdd(trimmed)
-    setValue("")
+    if (!trimmed || submitting) return
+    setSubmitting(true)
+    setError("")
+    try {
+      await onAdd(trimmed)
+      setValue("")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("item.addTagFailed"))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
-    <div className={cn("flex gap-1.5", className)}>
-      <Input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") submit()
-        }}
-        placeholder={t("item.newTagPlaceholder")}
-        className="h-7 text-[13px]"
-      />
-      <Button size="sm" variant="secondary" onClick={submit}>
-        {t("common.add")}
-      </Button>
+    <div className={cn("flex flex-col gap-1", className)}>
+      <div className="flex gap-1.5">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit()
+          }}
+          placeholder={t("item.newTagPlaceholder")}
+          className="h-7 text-[13px]"
+          disabled={submitting}
+        />
+        <Button size="sm" variant="secondary" onClick={submit} disabled={submitting}>
+          {t("common.add")}
+        </Button>
+      </div>
+      <FormError className="text-[12.5px]">{error}</FormError>
     </div>
   )
 }

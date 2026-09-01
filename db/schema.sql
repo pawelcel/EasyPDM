@@ -24,6 +24,7 @@ CREATE TABLE sessions (
 );
 
 CREATE INDEX idx_sessions_user ON sessions (user_id);
+GRANT SELECT, INSERT, UPDATE, DELETE ON sessions TO pdm_user;
 
 -- ============================================================
 -- Projekty (kontener grupujący elementy)
@@ -197,7 +198,11 @@ CREATE TABLE item_relations (
     child_id  UUID REFERENCES items(id) ON DELETE CASCADE,
     quantity  NUMERIC DEFAULT 1,
     position  INTEGER NOT NULL DEFAULT 1,  -- L.p. w BOM rodzica — ręcznie edytowalne/przeciągalne w UI
-    PRIMARY KEY (parent_id, child_id)
+    PRIMARY KEY (parent_id, child_id),
+    -- DEFERRABLE INITIALLY DEFERRED (sprawdzane dopiero przy COMMIT) — .../children/reorder
+    -- przenumerowuje całe zestawienie 1..N w jednej transakcji, więc bez odroczenia
+    -- tymczasowe, przejściowe kolizje numerów w trakcie tej pętli przerywałyby transakcję.
+    CONSTRAINT item_relations_parent_position_unique UNIQUE (parent_id, position) DEFERRABLE INITIALLY DEFERRED
 );
 
 -- ============================================================
@@ -349,4 +354,4 @@ INSERT INTO schema_migrations (filename) VALUES
     ('029_item_number_prefix.sql'), ('030_attachment_cad_role.sql'),
     ('031_clients.sql'), ('032_nullable_item_project.sql'),
     ('033_manufacturer_contact_address.sql'), ('034_client_contact_address.sql'),
-    ('035_item_relations_position_default.sql');
+    ('035_item_relations_position_default.sql'), ('036_item_relations_position_unique.sql');

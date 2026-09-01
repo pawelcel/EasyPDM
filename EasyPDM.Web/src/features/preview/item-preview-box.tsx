@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from "react"
+import { Suspense, lazy, useEffect, useRef, useState } from "react"
 
 import { api } from "@/api/client"
 import type { Item } from "@/api/types"
@@ -25,8 +25,20 @@ function usePreviewSources(item: Item, refreshSignal: number): { pdf: PreviewSou
     pdf: null,
     step: null,
   })
+  // Do wykrycia PRAWDZIWEJ zmiany elementu (w odróżnieniu od samego odświeżenia
+  // refreshSignal na TYM SAMYM elemencie) — zob. reset stanu niżej.
+  const prevItemIdRef = useRef(item.id)
 
   useEffect(() => {
+    // Zerujemy od razu przy zmianie elementu — inaczej box pokazywałby przez chwilę
+    // podgląd POPRZEDNIEGO elementu, dopóki nowe api.getAttachments() nie wróci. Tylko
+    // przy faktycznej zmianie item.id (nie przy zwykłym odświeżeniu po wgraniu/usunięciu
+    // załącznika na TYM SAMYM elemencie — tam podgląd ma zostać widoczny do czasu
+    // odświeżenia, bez zbędnego mignięcia).
+    if (prevItemIdRef.current !== item.id) {
+      setAttachmentSources({ pdf: null, step: null })
+      prevItemIdRef.current = item.id
+    }
     if (item.itemType !== "part" && item.itemType !== "assembly") return
     let cancelled = false
     api.getAttachments(item.id).then((attachments) => {

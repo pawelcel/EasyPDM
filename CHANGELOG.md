@@ -70,6 +70,27 @@ All notable changes to EasyPDM are documented in this file.
   same missing error-handling issue already fixed elsewhere: a failed request left the
   dialog open with no feedback (or closed it before the result was known), with no
   guard against double-submitting.
+- Manually editing a BOM row's L.p. (position) had a race: two near-simultaneous edits
+  could both pass the "is this number free?" check and end up giving two different
+  parts the same position. Added a database-level unique constraint (migration 036,
+  deferred so the drag-to-reorder feature's temporary in-flight swaps still work) and
+  made the check-and-update atomic.
+- `AddTagRow` (adding a tag to an item, or to several at once in bulk) cleared the
+  input and moved on regardless of whether the request actually succeeded — a failed
+  add (e.g. a duplicate tag) silently discarded what you typed with no error shown.
+- Fixed the same "stale response overwrites the screen" race (already fixed once for
+  BOM cross-navigation) in the search behind "Whole database", the Manufacturers list,
+  the Clients list, and a client's file search — fast typing could show results for an
+  older, broader query instead of the latest one.
+- The attachments panel and the item preview box could briefly show a previous item's
+  attachments/preview for a moment after switching to a different item.
+- `db/schema.sql` was missing the `GRANT` on the `sessions` table that migration 012
+  already has — harmless on both official install paths (where `pdm_user` owns the
+  database outright) but a real drift from a fresh schema-only install.
+- The Windows installer's PostgreSQL-version detection compared version folder names
+  as plain text, which would pick an old PostgreSQL 9.x install over a newer 10+ one
+  if both existed on the same machine (`"9.6" > "18"` alphabetically). Now compares
+  the leading version number instead.
 
 ### Changed
 - Clearing the database now shows a single dialog that walks through

@@ -14,12 +14,21 @@ function ClientFileSearch({ clientId }: { clientId: number }) {
   const debouncedQuery = useDebouncedValue(query, 300)
   const [results, setResults] = useState<ClientFileSearchResult[]>([])
 
+  // "cancelled" -- bez tego szybkie pisanie mogłoby pokazać wyniki dla STARSZEGO
+  // zapytania, gdyby jego odpowiedź wróciła później niż dla już wpisanego, dłuższego
+  // tekstu (odpowiedzi mogą wrócić w innej kolejności niż zostały wysłane).
   useEffect(() => {
     if (!debouncedQuery.trim()) {
       setResults([])
       return
     }
-    api.searchClientFiles(clientId, debouncedQuery).then(setResults)
+    let cancelled = false
+    api.searchClientFiles(clientId, debouncedQuery).then((data) => {
+      if (!cancelled) setResults(data)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [clientId, debouncedQuery])
 
   return (

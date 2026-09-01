@@ -16,17 +16,24 @@ export function useItems(filters: ItemFilters) {
   // właściwości elementu mają zostawić starą listę widoczną, aż przyjdą nowe dane, inaczej
   // lista migałaby na pusto przy każdej edycji.
   const hasLoadedOnceRef = useRef(false)
+  // Licznik żądań — bez tego szybkie pisanie w wyszukiwarce (każdy znak odpala nowy
+  // refetch) mogłoby pokazać wyniki dla STARSZEGO zapytania, gdyby jego odpowiedź
+  // wróciła później niż odpowiedź na już wpisany, dłuższy tekst.
+  const requestIdRef = useRef(0)
 
   const refetch = useCallback(async () => {
+    const requestId = ++requestIdRef.current
     if (!hasLoadedOnceRef.current) setLoading(true)
     setError(false)
     try {
-      setItems(await api.getItems(filters))
+      const data = await api.getItems(filters)
+      if (requestIdRef.current !== requestId) return
+      setItems(data)
       hasLoadedOnceRef.current = true
     } catch {
-      setError(true)
+      if (requestIdRef.current === requestId) setError(true)
     } finally {
-      setLoading(false)
+      if (requestIdRef.current === requestId) setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.search, filters.tag])

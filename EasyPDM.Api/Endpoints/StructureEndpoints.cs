@@ -221,24 +221,25 @@ static class StructureEndpoints
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
 
-            await using (var checkCmd = new NpgsqlCommand(
-                "SELECT 1 FROM item_relations WHERE parent_id = @parentId AND child_id != @childId AND position = @position;", conn))
-            {
-                checkCmd.Parameters.AddWithValue("parentId", parentId);
-                checkCmd.Parameters.AddWithValue("childId", childId);
-                checkCmd.Parameters.AddWithValue("position", body.Position);
-                if (await checkCmd.ExecuteScalarAsync() is not null)
-                    return Results.BadRequest("Ten numer L.p. jest już zajęty w tym BOM-ie.");
-            }
-
+            // Sprawdzenie "czy numer wolny" i UPDATE są tu jednym atomowym zapytaniem (zamiast
+            // dawnych dwóch osobnych) — bazuje na ograniczeniu UNIQUE (parent_id, position)
+            // DEFERRABLE INITIALLY DEFERRED (zob. migracja 036) — dwa niemal jednoczesne żądania
+            // próbujące nadać ten sam numer dwóm różnym podelementom kończą się dla DRUGIEGO
+            // z nich naruszeniem ograniczenia (23505) zamiast cichej kolizji L.p. w bazie.
             const string sql = "UPDATE item_relations SET position = @position WHERE parent_id = @parentId AND child_id = @childId;";
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("parentId", parentId);
             cmd.Parameters.AddWithValue("childId", childId);
             cmd.Parameters.AddWithValue("position", body.Position);
-            var affected = await cmd.ExecuteNonQueryAsync();
-
-            return affected == 0 ? Results.NotFound() : Results.Ok();
+            try
+            {
+                var affected = await cmd.ExecuteNonQueryAsync();
+                return affected == 0 ? Results.NotFound() : Results.Ok();
+            }
+            catch (PostgresException ex) when (ex.SqlState == "23505")
+            {
+                return Results.Conflict("Ten numer L.p. jest już zajęty w tym BOM-ie.");
+            }
         });
 
         // PATCH /api/items/{parentId}/children/reorder   body: { "childIds": ["...", "...", ...] }

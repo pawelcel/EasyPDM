@@ -148,6 +148,29 @@ begin
     GetDateTimeString('yyyy/mm/dd hh:nn:ss', '-', ':') + '  ' + Msg + #13#10, True);
 end;
 
+{ Wyciąga wiodącą liczbę całkowitą z nazwy katalogu wersji ("18" -> 18, "9.6" -> 9,
+  cokolwiek bez cyfr na początku -> -1). Same tylko wiodące cyfry — PostgreSQL 10+ nazywa
+  katalogi samym numerem głównej wersji ("10".."18"...), a starsze 9.x dodatkowo mają
+  numer podwersji po kropce ("9.6", "9.5") — obie formy mają sensowną wiodącą liczbę
+  całkowitą do porównania. }
+function LeadingMajorVersion(const S: String): Integer;
+var
+  I: Integer;
+  Digits: String;
+begin
+  Digits := '';
+  I := 1;
+  while (I <= Length(S)) and (S[I] >= '0') and (S[I] <= '9') do
+  begin
+    Digits := Digits + S[I];
+    I := I + 1;
+  end;
+  if Digits = '' then
+    Result := -1
+  else
+    Result := StrToIntDef(Digits, -1);
+end;
+
 { Szuka psql.exe w typowej lokalizacji instalatora EDB: C:\Program Files\PostgreSQL\<wersja>\bin\ .
   Zwraca pełną ścieżkę do najnowszej znalezionej wersji, albo pusty string, jeśli nic nie ma. }
 function FindPsqlPath(): String;
@@ -169,10 +192,11 @@ begin
         begin
           Candidate := BaseDir + '\' + FindRec.Name + '\bin\psql.exe';
           if FileExists(Candidate) then
-            { Nazwy katalogów wersji sortują się leksykograficznie tak samo jak numerycznie
-              dla jednocyfrowych/dwucyfrowych głównych wersji PostgreSQL (9..99) — wystarczające
-              dla wyboru "najnowszej" bez pełnego parsowania wersji. }
-            if (Best = '') or (FindRec.Name > Best) then
+            { Porównanie po WIODĄCEJ LICZBIE głównej wersji (LeadingMajorVersion), nie po
+              samym stringu — samo porównanie leksykograficzne błędnie wybrałoby stary
+              "9.6" ponad nowym "18" (bo '9' > '1' jako znaki), gdyby na tej samej maszynie
+              współistniały stara instalacja PostgreSQL 9.x obok nowszej 10+. }
+            if (Best = '') or (LeadingMajorVersion(FindRec.Name) > LeadingMajorVersion(Best)) then
             begin
               Best := FindRec.Name;
               Result := Candidate;

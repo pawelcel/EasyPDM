@@ -129,9 +129,17 @@ function AttachmentsPanel({
     setAttachments(await api.getAttachments(itemId))
   }
 
+  // "cancelled" -- bez tego szybkie przełączanie między elementami mogłoby na chwilę
+  // pokazać listę załączników STARSZEGO elementu, gdyby jego odpowiedź wróciła później
+  // niż dla elementu, na który użytkownik już przeszedł.
   useEffect(() => {
-    refetch()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false
+    api.getAttachments(itemId).then((data) => {
+      if (!cancelled) setAttachments(data)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [itemId])
 
   async function uploadFile(file: File, role: "pdf" | "step" | "cad" | null) {

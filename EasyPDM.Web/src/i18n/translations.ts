@@ -436,6 +436,7 @@ const pl = {
   "item.noAttachments": "brak załączników",
   "item.addAttachment": "Dodaj załącznik",
   "item.newTagPlaceholder": "nowy tag…",
+  "item.addTagFailed": "Nie udało się dodać tagu.",
 
   "users.roleChangeFailed": "Nie udało się zmienić roli.",
   "users.deleteFailed": "Nie udało się usunąć użytkownika.",
@@ -977,6 +978,7 @@ const en: Record<TranslationKey, string> = {
   "item.noAttachments": "no attachments",
   "item.addAttachment": "Add attachment",
   "item.newTagPlaceholder": "new tag…",
+  "item.addTagFailed": "Failed to add the tag.",
 
   "users.roleChangeFailed": "Failed to change the role.",
   "users.deleteFailed": "Failed to delete the user.",
@@ -1516,6 +1518,7 @@ const de: Record<TranslationKey, string> = {
   "item.noAttachments": "keine Anhänge",
   "item.addAttachment": "Anhang hinzufügen",
   "item.newTagPlaceholder": "neuer Tag…",
+  "item.addTagFailed": "Der Tag konnte nicht hinzugefügt werden.",
 
   "users.roleChangeFailed": "Die Rolle konnte nicht geändert werden.",
   "users.deleteFailed": "Der Benutzer konnte nicht gelöscht werden.",
