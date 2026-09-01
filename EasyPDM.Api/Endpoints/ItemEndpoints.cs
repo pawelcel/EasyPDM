@@ -677,21 +677,41 @@ static class ItemEndpoints
 
             // Wydany element nie może mieć właściciela ani być zablokowany — zawsze jest zwolniony
             // (patrz też /lock i /release, które odrzucają próby zmiany blokady w tym statusie).
+            //
+            // WHERE status IS NOT DISTINCT FROM @currentStatus zamyka wyścig: currentStatus
+            // przeczytany jest OSOBNYM zapytaniem wyżej (GetItemTypeAndStatus), więc dwa niemal
+            // jednoczesne żądania (np. przypadkowy podwójny klik) mogłyby oba przejść walidację
+            // przejścia i oba wykonać UPDATE, podwójnie podbijając revision_number. Warunek w
+            // WHERE sprawia, że tylko PIERWSZE z nich faktycznie zmieni wiersz — drugie trafia
+            // w 0 dopasowanych wierszy i dostaje 409 zamiast cichej podwójnej zmiany.
             string sql = bumpRevision
                 ? """
                   UPDATE items SET status = @status, revision_number = COALESCE(revision_number, 0) + 1
-                  WHERE id = @id RETURNING revision_number;
+                  WHERE id = @id AND status IS NOT DISTINCT FROM @currentStatus
+                  RETURNING revision_number;
                   """
                 : """
                   UPDATE items SET status = @status,
                          owner_id = CASE WHEN @status = 'wydany' THEN NULL ELSE owner_id END,
                          owner_locked = CASE WHEN @status = 'wydany' THEN false ELSE owner_locked END
-                  WHERE id = @id RETURNING revision_number;
+                  WHERE id = @id AND status IS NOT DISTINCT FROM @currentStatus
+                  RETURNING revision_number;
                   """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("status", body.Status);
-            var revisionNumber = (int?)await cmd.ExecuteScalarAsync();
+            cmd.Parameters.AddWithValue("currentStatus", (object?)currentStatus ?? DBNull.Value);
+
+            int? revisionNumber;
+            bool rowFound;
+            await using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                rowFound = await reader.ReadAsync();
+                revisionNumber = rowFound && !reader.IsDBNull(0) ? reader.GetInt32(0) : null;
+            }
+
+            if (!rowFound)
+                return Results.Conflict("Status elementu zmienił się w międzyczasie — odśwież i spróbuj ponownie.");
 
             if (bumpRevision && revisionNumber is not null && !string.IsNullOrWhiteSpace(body.Comment))
             {
@@ -754,11 +774,23 @@ static class ItemEndpoints
             if (IsOwnerLocked(info.Value.OwnerId, info.Value.OwnerLocked) && info.Value.OwnerId != user.Id)
                 return OwnerLockedForbidden();
 
-            const string sql = "UPDATE items SET owner_id = @ownerId, owner_locked = true WHERE id = @id;";
+            // WHERE (owner_locked = false OR owner_id = @ownerId) odtwarza dokładnie ten sam
+            // warunek co sprawdzenie wyżej, ale ATOMOWO w samym UPDATE — bez tego dwóch
+            // użytkowników klikających "Zablokuj" na tym samym, właśnie odblokowanym elemencie
+            // niemal jednocześnie mogłoby OBAJ przejść powyższe sprawdzenie (czytane z osobnego
+            // zapytania chwilę wcześniej) i oboje dostać 200 OK, choć w bazie wygrywa tylko ten,
+            // czyj UPDATE się wykona jako drugi.
+            const string sql = """
+                UPDATE items SET owner_id = @ownerId, owner_locked = true
+                WHERE id = @id AND (owner_locked = false OR owner_id = @ownerId);
+                """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("ownerId", user.Id);
-            await cmd.ExecuteNonQueryAsync();
+            var affected = await cmd.ExecuteNonQueryAsync();
+
+            if (affected == 0)
+                return OwnerLockedForbidden();
 
             await LogOwnerHistoryAsync(conn, id, "locked", user.Id);
 

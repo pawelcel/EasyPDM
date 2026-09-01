@@ -69,6 +69,8 @@ function ProjectDetailPanel({
   const [form, setForm] = useState(() => formFromProject(project))
   const [error, setError] = useState("")
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deletingPending, setDeletingPending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Odśwież formularz, gdy z zewnątrz przyjdą nowe dane projektu (np. po zapisie albo
   // przełączeniu na inny projekt) — nie ma osobnego trybu "edycji", pola są edytowalne
@@ -95,9 +97,17 @@ function ProjectDetailPanel({
   }
 
   async function confirmDelete() {
-    await api.deleteProject(project.id)
-    setConfirmingDelete(false)
-    await onDeleted()
+    setDeletingPending(true)
+    setDeleteError(null)
+    try {
+      await api.deleteProject(project.id)
+      setConfirmingDelete(false)
+      await onDeleted()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : t("project.deleteFailed"))
+    } finally {
+      setDeletingPending(false)
+    }
   }
 
   const created = new Date(project.createdAt).toLocaleString("pl-PL")
@@ -122,7 +132,14 @@ function ProjectDetailPanel({
               buildDownloadUrl={(extensions) => api.projectDocumentationUrl(project.id, extensions)}
             />
             {isAdmin && (
-              <Button size="sm" variant="destructive" onClick={() => setConfirmingDelete(true)}>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setDeleteError(null)
+                  setConfirmingDelete(true)
+                }}
+              >
                 {t("project.deleteButton")}
               </Button>
             )}
@@ -237,6 +254,8 @@ function ProjectDetailPanel({
           variant="destructive"
           onConfirm={confirmDelete}
           onCancel={() => setConfirmingDelete(false)}
+          pending={deletingPending}
+          error={deleteError}
         />
       )}
     </div>

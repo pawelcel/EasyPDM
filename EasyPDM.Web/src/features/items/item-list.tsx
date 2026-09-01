@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { api } from "@/api/client"
 import type { Item, Project } from "@/api/types"
@@ -73,7 +73,11 @@ function ItemList({
   // selection — czyszczony przy każdym zwykłym kliknięciu w lewej liście.
   const [externalItem, setExternalItem] = useState<Item | null>(null)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [deletingPending, setDeletingPending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [confirmingProjectDelete, setConfirmingProjectDelete] = useState(false)
+  const [projectDeletingPending, setProjectDeletingPending] = useState(false)
+  const [projectDeleteError, setProjectDeleteError] = useState<string | null>(null)
   // Błąd akcji przy zaznaczonym projekcie/elemencie z belki nad listą (duplikuj) — zob.
   // features/tree/project-tree-view.tsx, ta sama belka co w widoku projektu.
   const [itemActionError, setItemActionError] = useState<string | null>(null)
@@ -81,12 +85,20 @@ function ItemList({
     { item: Item; quantity: number; position: number }[]
   >([])
 
+  // Licznik żądań — jeśli użytkownik kliknie "Przejdź" na drugim wierszu BOM-u zanim
+  // odpowiedź na pierwsze kliknięcie wróci, a odpowiedzi dotrą w innej kolejności niż
+  // zostały wysłane, bez tego strażnika panel pokazałby element ze STARSZEGO kliknięcia
+  // zamiast tego, na który użytkownik faktycznie czeka.
+  const selectChildRequestId = useRef(0)
+
   async function handleSelectChild(childId: string) {
     setSelection(null)
+    const requestId = ++selectChildRequestId.current
     try {
-      setExternalItem(await api.getItem(childId))
+      const item = await api.getItem(childId)
+      if (selectChildRequestId.current === requestId) setExternalItem(item)
     } catch {
-      setExternalItem(null)
+      if (selectChildRequestId.current === requestId) setExternalItem(null)
     }
   }
 
@@ -135,11 +147,19 @@ function ItemList({
 
   async function confirmDeleteCompletely() {
     if (!confirmingDeleteId) return
-    await api.deleteItem(confirmingDeleteId)
-    setConfirmingDeleteId(null)
-    setSelection(null)
-    setExternalItem(null)
-    await onItemsRefetch()
+    setDeletingPending(true)
+    setDeleteError(null)
+    try {
+      await api.deleteItem(confirmingDeleteId)
+      setConfirmingDeleteId(null)
+      setSelection(null)
+      setExternalItem(null)
+      await onItemsRefetch()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : t("item.deleteFailed"))
+    } finally {
+      setDeletingPending(false)
+    }
   }
 
   async function handleDuplicateSelected() {
@@ -157,10 +177,18 @@ function ItemList({
 
   async function confirmProjectDelete() {
     if (!selectedProject) return
-    await api.deleteProject(selectedProject.id)
-    setConfirmingProjectDelete(false)
-    setSelection(null)
-    await onProjectsRefetch()
+    setProjectDeletingPending(true)
+    setProjectDeleteError(null)
+    try {
+      await api.deleteProject(selectedProject.id)
+      setConfirmingProjectDelete(false)
+      setSelection(null)
+      await onProjectsRefetch()
+    } catch (err) {
+      setProjectDeleteError(err instanceof Error ? err.message : t("project.deleteFailed"))
+    } finally {
+      setProjectDeletingPending(false)
+    }
   }
 
   // Elementy same nie niosą klienta -- tylko ich PROJEKT (Project.clientId) -- stąd mapa
@@ -275,8 +303,8 @@ function ItemList({
       <div className="relative h-9 rounded-xl bg-card p-2 ring-1 ring-foreground/10">
         {selectedProject && (
           <div
-            className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1.5"
-            style={{ left: listWidth + 16 }}
+            className="absolute top-1/2 flex -translate-y-1/2 flex-wrap items-center gap-1.5"
+            style={{ left: listWidth + 16, maxWidth: `calc(100% - ${listWidth + 16}px)` }}
           >
             <Button size="sm" variant="outline" onClick={() => onNavigateToProject(selectedProject.id)}>
               {t("project.goToProject")}
@@ -291,7 +319,14 @@ function ItemList({
               buildDownloadUrl={(extensions) => api.projectDocumentationUrl(selectedProject.id, extensions)}
             />
             {isAdmin && (
-              <Button size="sm" variant="destructive" onClick={() => setConfirmingProjectDelete(true)}>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setProjectDeleteError(null)
+                  setConfirmingProjectDelete(true)
+                }}
+              >
                 {t("project.deleteButton")}
               </Button>
             )}
@@ -300,8 +335,8 @@ function ItemList({
 
         {selectedItem && (
           <div
-            className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1.5"
-            style={{ left: listWidth + 16 }}
+            className="absolute top-1/2 flex -translate-y-1/2 flex-wrap items-center gap-1.5"
+            style={{ left: listWidth + 16, maxWidth: `calc(100% - ${listWidth + 16}px)` }}
           >
             {(selectedItem.itemType === "part" || selectedItem.itemType === "assembly") && (
               <Button size="sm" variant="outline" onClick={handleDuplicateSelected}>
@@ -320,7 +355,14 @@ function ItemList({
               />
             )}
             {isAdmin && (
-              <Button size="sm" variant="destructive" onClick={() => setConfirmingDeleteId(selectedItem.id)}>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setDeleteError(null)
+                  setConfirmingDeleteId(selectedItem.id)
+                }}
+              >
                 {t("item.deleteCompletely")}
               </Button>
             )}
@@ -410,6 +452,8 @@ function ItemList({
           variant="destructive"
           onConfirm={confirmDeleteCompletely}
           onCancel={() => setConfirmingDeleteId(null)}
+          pending={deletingPending}
+          error={deleteError}
         />
       )}
 
@@ -425,6 +469,8 @@ function ItemList({
           variant="destructive"
           onConfirm={confirmProjectDelete}
           onCancel={() => setConfirmingProjectDelete(false)}
+          pending={projectDeletingPending}
+          error={projectDeleteError}
         />
       )}
     </div>

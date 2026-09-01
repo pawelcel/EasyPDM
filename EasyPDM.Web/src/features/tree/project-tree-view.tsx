@@ -48,7 +48,11 @@ function ProjectTreeView({
   // w strukturze, więc naturalnie jest tym, co widać po wejściu w projekt.
   const [selection, setSelection] = useState<Selection>({ kind: "project" })
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deletingPending, setDeletingPending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [confirmingProjectDelete, setConfirmingProjectDelete] = useState(false)
+  const [projectDeletingPending, setProjectDeletingPending] = useState(false)
+  const [projectDeleteError, setProjectDeleteError] = useState<string | null>(null)
   // Błędy akcji przy zaznaczonym projekcie/elemencie z belki nad drzewem (usuń ze
   // struktury, duplikuj) — osobne od bulkError (akcje masowe) i od formularza projektu.
   const [itemActionError, setItemActionError] = useState<string | null>(null)
@@ -61,6 +65,7 @@ function ProjectTreeView({
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false)
+  const [bulkDeletingPending, setBulkDeletingPending] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
   // Zapamiętywana per przeglądarka (nie per projekt), żeby użytkownik ustawił ją raz i
   // miał tak samo w każdym projekcie.
@@ -155,16 +160,32 @@ function ProjectTreeView({
 
   async function confirmDeleteCompletely() {
     if (!selectedItem) return
-    await api.deleteItem(selectedItem.id)
-    setConfirmingDelete(false)
-    setSelection({ kind: "project" })
-    await tree.refetch()
+    setDeletingPending(true)
+    setDeleteError(null)
+    try {
+      await api.deleteItem(selectedItem.id)
+      setConfirmingDelete(false)
+      setSelection({ kind: "project" })
+      await tree.refetch()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : t("item.deleteFailed"))
+    } finally {
+      setDeletingPending(false)
+    }
   }
 
   async function confirmProjectDelete() {
-    await api.deleteProject(project.id)
-    setConfirmingProjectDelete(false)
-    await onProjectDeleted()
+    setProjectDeletingPending(true)
+    setProjectDeleteError(null)
+    try {
+      await api.deleteProject(project.id)
+      setConfirmingProjectDelete(false)
+      await onProjectDeleted()
+    } catch (err) {
+      setProjectDeleteError(err instanceof Error ? err.message : t("project.deleteFailed"))
+    } finally {
+      setProjectDeletingPending(false)
+    }
   }
 
   async function handleBulkAddTag(name: string) {
@@ -204,12 +225,23 @@ function ProjectTreeView({
   }
 
   async function confirmBulkDelete() {
-    for (const id of selectedIds) {
-      await api.deleteItem(id)
+    setBulkDeletingPending(true)
+    setBulkError(null)
+    try {
+      for (const id of selectedIds) {
+        await api.deleteItem(id)
+      }
+      setConfirmingBulkDelete(false)
+      setSelectedIds(new Set())
+    } catch (err) {
+      // Elementy usunięte PRZED tym, który zawiódł, zostają usunięte — tree.refetch()
+      // poniżej (w finally) zsynchronizuje listę, a okno zostaje otwarte z komunikatem
+      // zamiast cicho "zawiesić się" bez żadnej informacji i bez odświeżenia.
+      setBulkError(err instanceof Error ? err.message : t("bulk.deleteFailed"))
+    } finally {
+      setBulkDeletingPending(false)
+      await tree.refetch()
     }
-    setConfirmingBulkDelete(false)
-    setSelectedIds(new Set())
-    await tree.refetch()
   }
 
   return (
@@ -244,7 +276,14 @@ function ProjectTreeView({
               </SelectContent>
             </Select>
             {isAdmin && (
-              <Button size="sm" variant="destructive" onClick={() => setConfirmingBulkDelete(true)}>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setBulkError(null)
+                  setConfirmingBulkDelete(true)
+                }}
+              >
                 {t("bulk.deleteButton")}
               </Button>
             )}
@@ -260,11 +299,19 @@ function ProjectTreeView({
             żeby nie mieszać się z przyciskiem "Zaznacz wiele"/akcjami masowymi po lewej,
             a jednocześnie podążały za suwakiem szerokości drzewa. Dawniej renderowane
             wewnątrz ProjectDetailPanel/ItemDetailPanel — stamtąd całkowicie usunięte
-            (hideActions). */}
+            (hideActions).
+            top-2 (nie top-1/2+translate) -- wyrównuje do GÓRNEJ krawędzi belki (tej samej,
+            co pierwsza linia "Zaznacz wiele"/akcji masowych), niezależnie od tego, ile linii
+            zajmą te ostatnie po zawinięciu -- przy wyśrodkowaniu względem CAŁEJ (zmiennej)
+            wysokości belki te dwa bloki mogłyby się wizualnie nałożyć.
+            maxWidth+flex-wrap -- przy dużej szerokości drzewa (blisko 640px z
+            useResizableWidth) na wąskim oknie przeglądarki, bez tego przyciski
+            renderowałyby się poza <main> (overflow-hidden) i byłyby niewidoczne/nieklikalne;
+            teraz zamiast tego zawijają się w tym samym, ograniczonym pasie. */}
         {selection.kind === "project" && (
           <div
-            className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1.5"
-            style={{ left: treeWidth + 16 }}
+            className="absolute top-2 flex flex-wrap items-center gap-1.5"
+            style={{ left: treeWidth + 16, maxWidth: `calc(100% - ${treeWidth + 16}px)` }}
           >
             <DocumentationDialog
               trigger={
@@ -276,7 +323,14 @@ function ProjectTreeView({
               buildDownloadUrl={(extensions) => api.projectDocumentationUrl(project.id, extensions)}
             />
             {isAdmin && (
-              <Button size="sm" variant="destructive" onClick={() => setConfirmingProjectDelete(true)}>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setProjectDeleteError(null)
+                  setConfirmingProjectDelete(true)
+                }}
+              >
                 {t("project.deleteButton")}
               </Button>
             )}
@@ -285,8 +339,8 @@ function ProjectTreeView({
 
         {selection.kind === "item" && selectedItem && (
           <div
-            className="absolute top-1/2 flex -translate-y-1/2 items-center gap-1.5"
-            style={{ left: treeWidth + 16 }}
+            className="absolute top-2 flex flex-wrap items-center gap-1.5"
+            style={{ left: treeWidth + 16, maxWidth: `calc(100% - ${treeWidth + 16}px)` }}
           >
             {selectedItemParentId !== undefined && (
               <Button size="sm" variant="outline" onClick={handleRemoveFromStructure}>
@@ -310,7 +364,14 @@ function ProjectTreeView({
               />
             )}
             {isAdmin && (
-              <Button size="sm" variant="destructive" onClick={() => setConfirmingDelete(true)}>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setDeleteError(null)
+                  setConfirmingDelete(true)
+                }}
+              >
                 {t("item.deleteCompletely")}
               </Button>
             )}
@@ -376,6 +437,8 @@ function ProjectTreeView({
           variant="destructive"
           onConfirm={confirmDeleteCompletely}
           onCancel={() => setConfirmingDelete(false)}
+          pending={deletingPending}
+          error={deleteError}
         />
       )}
 
@@ -391,6 +454,8 @@ function ProjectTreeView({
           variant="destructive"
           onConfirm={confirmProjectDelete}
           onCancel={() => setConfirmingProjectDelete(false)}
+          pending={projectDeletingPending}
+          error={projectDeleteError}
         />
       )}
 
@@ -403,6 +468,8 @@ function ProjectTreeView({
           variant="destructive"
           onConfirm={confirmBulkDelete}
           onCancel={() => setConfirmingBulkDelete(false)}
+          pending={bulkDeletingPending}
+          error={bulkError}
         />
       )}
     </div>

@@ -368,18 +368,28 @@ function ItemDetailPanel({
 
       {item.itemType === "folder" && (
         <div className="mt-3">
-          <AddNodeDialog
-            trigger={
-              <Button size="sm" variant="outline">
-                <Upload className="size-3.5" /> {t("item.uploadFile")}
-              </Button>
-            }
-            projectId={item.projectId}
-            parentId={item.id}
-            parentType={item.itemType}
-            lockMode="file"
-            onCreated={onItemsRefetch}
-          />
+          {item.projectId != null ? (
+            <AddNodeDialog
+              trigger={
+                <Button size="sm" variant="outline">
+                  <Upload className="size-3.5" /> {t("item.uploadFile")}
+                </Button>
+              }
+              projectId={item.projectId}
+              parentId={item.id}
+              parentType={item.itemType}
+              lockMode="file"
+              onCreated={onItemsRefetch}
+            />
+          ) : (
+            // Folder bez projektu (np. odpięty przez "Usuń ze struktury") -- AddNodeDialog z
+            // fixedParentId ZAWSZE wymaga też realnego fixedProjectId, bo POST tworzący nowy
+            // element jest w API zapięty pod konkretnym projektem
+            // (/api/projects/{projectId}/nodes|items) -- nie istnieje droga stworzenia
+            // elementu z project_id=null wprost. Bez tej podpowiedzi przycisk "Wgraj plik"
+            // wyglądałby tak samo jak zwykle, ale nic by nie robił.
+            <Hint>{t("item.uploadFileNoProjectHint")}</Hint>
+          )}
         </div>
       )}
 

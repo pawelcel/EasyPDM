@@ -78,6 +78,12 @@ static class SettingsEndpoints
 
                 await RewriteFilePathsAsync(conn, tx, "items", oldPath, newPath);
                 await RewriteFilePathsAsync(conn, tx, "item_attachments", oldPath, newPath);
+                // client_nodes (dokumenty Klientów, zob. ClientEndpoints.cs) ma dokładnie ten
+                // sam kształt (id UUID + file_path TEXT) — bez tego wpisu pliki fizycznie
+                // przenoszone przez CopyDirectoryRecursive wyżej (obejmuje CAŁY storage.Path,
+                // w tym podkatalog "clients/") zostawałyby z file_path wskazującym na STARĄ,
+                // zaraz kasowaną lokalizację — każdy dokument Klienta 404-owałby trwale.
+                await RewriteFilePathsAsync(conn, tx, "client_nodes", oldPath, newPath);
 
                 await tx.CommitAsync();
 

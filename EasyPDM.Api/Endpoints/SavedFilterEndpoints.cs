@@ -51,6 +51,12 @@ static class SavedFilterEndpoints
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest("Nazwa jest wymagana.");
 
+            // Brak pola "filters" w body nie wywala wiązania requestu (System.Text.Json
+            // wstawia domyślny JsonElement z ValueKind=Undefined zamiast błędu) — bez tego
+            // sprawdzenia body.Filters.GetRawText() niżej rzuciłoby niezłapany wyjątek (500).
+            if (body.Filters.ValueKind is JsonValueKind.Undefined)
+                return Results.BadRequest("Pole 'filters' jest wymagane.");
+
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 

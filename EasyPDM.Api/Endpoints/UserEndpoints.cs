@@ -142,8 +142,13 @@ static class UserEndpoints
     // ŻADNEGO administratora — tylko wtedy, gdy TEN użytkownik sam jest adminem.
     private static async Task<bool> IsLastAdmin(NpgsqlConnection conn, Guid userId)
     {
+        // COALESCE(..., false) na pierwszym warunku -- bez tego, dla nieistniejącego @id
+        // podzapytanie "role" daje SQL NULL, a "NULL = 'admin'" to NULL (nie false), więc
+        // całe wyrażenie (NULL AND ...) wraca jako NULL zamiast booleana -- ExecuteScalarAsync
+        // zwróciłby wtedy DBNull.Value, a rzutowanie (bool) niżej rzucałoby InvalidCastException
+        // zamiast zwrócić poprawne "nie, to nie jest ostatni admin" dla nieistniejącego usera.
         const string sql = """
-            SELECT (SELECT role FROM users WHERE id = @id) = 'admin'
+            SELECT COALESCE((SELECT role FROM users WHERE id = @id) = 'admin', false)
                AND (SELECT COUNT(*) FROM users WHERE role = 'admin') <= 1;
             """;
         await using var cmd = new NpgsqlCommand(sql, conn);

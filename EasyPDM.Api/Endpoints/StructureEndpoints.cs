@@ -131,6 +131,9 @@ static class StructureEndpoints
             if (parentId == body.ChildId)
                 return Results.BadRequest("Element nie może być podelementem samego siebie.");
 
+            if (body.Quantity is <= 0)
+                return Results.BadRequest("Ilość musi być większa od zera.");
+
             var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
             if (parentInfo is null)
                 return Results.NotFound("Element nadrzędny nie istnieje.");
@@ -144,6 +147,12 @@ static class StructureEndpoints
             await conn.OpenAsync();
 
             if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, parentInfo.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
+            // Dostęp sprawdzany też do projektu DZIECKA, nie tylko rodzica — bez tego
+            // użytkownik z dostępem tylko do projektu A mógłby dopisać do BOM-u element z
+            // zupełnie innego, prywatnego projektu B, do którego nie ma żadnych uprawnień.
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, childInfo.Value.ProjectId))
                 return ItemEndpoints.ProjectAccessForbidden();
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;

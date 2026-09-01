@@ -17,6 +17,12 @@ static class PropertyEndpoints
         // ============================================================
         app.MapPatch("/api/items/{id:guid}/properties", async (Guid id, JsonElement body, HttpContext ctx) =>
         {
+            // Bez tego sprawdzenia np. body `5` albo `[1,2]` (poprawny JSON, ale nie obiekt)
+            // rzucałoby niezłapany wyjątek niżej (EnumerateObject()/JSONB `||` na nie-obiekcie) —
+            // 500 zamiast czytelnego 400.
+            if (body.ValueKind != JsonValueKind.Object)
+                return Results.BadRequest("Body musi być obiektem JSON.");
+
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
             if (info is null)
                 return Results.NotFound();

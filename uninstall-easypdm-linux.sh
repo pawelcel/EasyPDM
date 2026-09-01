@@ -22,7 +22,11 @@ systemctl daemon-reload
 echo "Usuwam aplikację i konfigurację (${APP_DIR}, ${CONFIG_DIR})..."
 rm -rf "${APP_DIR}" "${CONFIG_DIR}"
 
-getent passwd "${SERVICE_USER}" >/dev/null && userdel "${SERVICE_USER}"
+# "|| true" na obu liniach -- bez tego, pod `set -e`, uruchomienie skryptu DRUGI raz (np.
+# odinstalowanie już odinstalowanego) przerywałoby się w milczeniu na pierwszej linii (konto
+# już nie istnieje -> getent zwraca niezerowy kod -> cała lista `&&` kończy się niezerowo),
+# nigdy nie docierając do komunikatu "Gotowe" poniżej.
+getent passwd "${SERVICE_USER}" >/dev/null && userdel "${SERVICE_USER}" || true
 getent group "${SERVICE_USER}" >/dev/null && groupdel "${SERVICE_USER}" 2>/dev/null || true
 
 echo

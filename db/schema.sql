@@ -348,4 +348,5 @@ INSERT INTO schema_migrations (filename) VALUES
     ('027_schema_migrations_tracking.sql'), ('028_attachment_preview_role.sql'),
     ('029_item_number_prefix.sql'), ('030_attachment_cad_role.sql'),
     ('031_clients.sql'), ('032_nullable_item_project.sql'),
-    ('033_manufacturer_contact_address.sql'), ('034_client_contact_address.sql');
+    ('033_manufacturer_contact_address.sql'), ('034_client_contact_address.sql'),
+    ('035_item_relations_position_default.sql');

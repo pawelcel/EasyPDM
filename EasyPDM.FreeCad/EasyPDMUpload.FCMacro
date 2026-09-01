@@ -599,11 +599,11 @@ def set_session_token(token):
 
 
 def get_saved_username():
-    return App.ParamGet(PARAM_GROUP).GetString("SessionDisplayName", "") or None
+    return App.ParamGet(PARAM_GROUP).GetString("SavedDisplayName", "") or None
 
 
 def set_saved_username(name):
-    App.ParamGet(PARAM_GROUP).SetString("SessionDisplayName", name or "")
+    App.ParamGet(PARAM_GROUP).SetString("SavedDisplayName", name or "")
 
 
 def get_download_folder():
