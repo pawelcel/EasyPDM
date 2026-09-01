@@ -35,7 +35,16 @@ if (!Path.IsPathRooted(storageRoot))
     storageRoot = Path.Combine(AppContext.BaseDirectory, storageRoot);
 Directory.CreateDirectory(storageRoot);
 var storage = new StorageSettings(storageRoot);
-string appSettingsPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.json");
+// CELOWO appsettings.Local.json, NIE appsettings.json — "Zmień lokalizację" (Ustawienia ->
+// Magazyn plików) zapisuje tu nowy StorageRoot na przyszłość (po restarcie). Local.json jest
+// dodany do konfiguracji (linia 8 wyżej) PO WSZYSTKICH domyślnych źródłach ASP.NET Core
+// (appsettings.json, appsettings.{Environment}.json, zmienne środowiskowe) — więc ma
+// najwyższy priorytet WSZĘDZIE (Windows: appsettings.Production.json pisane raz przez
+// instalator; Linux/Docker: zmienna środowiskowa StorageRoot z pliku usługi/obrazu). Zapis
+// do samego appsettings.json byłby cicho nadpisywany przez którekolwiek z tamtych przy
+// każdym kolejnym starcie aplikacji — zmiana lokalizacji "wracałaby" do starej ścieżki po
+// restarcie usługi/kontenera, mimo że baza i pliki są już w nowym miejscu.
+string appSettingsPath = Path.Combine(builder.Environment.ContentRootPath, "appsettings.Local.json");
 
 // Katalog na automatyczne kopie zapasowe (Ustawienia -> Magazyn plików -> Automatyczna kopia)
 // — celowo NIEZALEŻNY od StorageRoot: gdyby leżał wewnątrz magazynu plików, każda kolejna

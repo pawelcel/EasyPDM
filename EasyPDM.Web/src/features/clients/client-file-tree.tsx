@@ -68,6 +68,7 @@ function ClientFileTree({ clientId }: { clientId: number }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [error, setError] = useState("")
   const [deletingNode, setDeletingNode] = useState<TreeNode | null>(null)
+  const [deletingPending, setDeletingPending] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadParentId = useRef<string | null>(null)
 
@@ -111,9 +112,17 @@ function ClientFileTree({ clientId }: { clientId: number }) {
 
   async function confirmDelete() {
     if (!deletingNode) return
-    await api.removeClientNode(clientId, deletingNode.id)
-    setDeletingNode(null)
-    await refetch()
+    setDeletingPending(true)
+    setError("")
+    try {
+      await api.removeClientNode(clientId, deletingNode.id)
+      setDeletingNode(null)
+      await refetch()
+    } catch {
+      setError(t("client.deleteNodeFailed"))
+    } finally {
+      setDeletingPending(false)
+    }
   }
 
   const tree = buildTree(nodes)
@@ -177,7 +186,10 @@ function ClientFileTree({ clientId }: { clientId: number }) {
                 await api.renameClientNode(clientId, nodeId, name)
                 await refetch()
               }}
-              onDelete={setDeletingNode}
+              onDelete={(node) => {
+                setError("")
+                setDeletingNode(node)
+              }}
               onDownload={(nodeId) => window.open(api.clientNodeDownloadUrl(clientId, nodeId), "_blank")}
             />
           ))}
@@ -200,6 +212,8 @@ function ClientFileTree({ clientId }: { clientId: number }) {
           variant="destructive"
           onConfirm={confirmDelete}
           onCancel={() => setDeletingNode(null)}
+          pending={deletingPending}
+          error={error}
         />
       )}
     </div>

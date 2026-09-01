@@ -54,6 +54,22 @@ All notable changes to EasyPDM are documented in this file.
   never set it) — added migration 035 to fix upgraded installs.
 - `uninstall-easypdm-linux.sh` aborted partway through (skipping the rest of the
   cleanup) if run a second time, because of an unguarded command under `set -e`.
+- "Change storage location" persisted the new path to `appsettings.json`, but on every
+  deployment path (Windows installer's `appsettings.Production.json`, Docker/Linux's
+  `StorageRoot` environment variable, or a developer's `appsettings.Local.json`) a
+  higher-precedence config source still had the *old* path — so the change silently
+  reverted to the old, already-deleted location on the next restart even though the
+  database and files had already moved. Now persisted to `appsettings.Local.json`,
+  which this app always loads last (highest precedence) regardless of deployment.
+- The automatic backup schedule's "already ran today" check compared a UTC timestamp
+  from the database against the server's local clock — for schedules close to
+  midnight in a non-UTC timezone, the guard could never engage, so the service kept
+  re-running the backup every minute until local time caught up with the UTC offset.
+- Six confirm-delete dialogs (delete manufacturer, delete client, delete a client
+  file/folder, change item status, delete user, reset item-numbering sequence) had the
+  same missing error-handling issue already fixed elsewhere: a failed request left the
+  dialog open with no feedback (or closed it before the result was known), with no
+  guard against double-submitting.
 
 ### Changed
 - Clearing the database now shows a single dialog that walks through

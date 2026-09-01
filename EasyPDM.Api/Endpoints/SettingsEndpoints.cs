@@ -695,7 +695,10 @@ static class SettingsEndpoints
 
     private static async Task PersistStorageRootAsync(string appSettingsPath, string newPath)
     {
-        var json = await File.ReadAllTextAsync(appSettingsPath);
+        // Plik może jeszcze nie istnieć (typowe dla appsettings.Local.json na "czystej"
+        // instalacji — zob. komentarz przy wywołaniu w Program.cs, dlaczego to musi być
+        // WŁAŚNIE ten plik) — zaczynamy wtedy od pustego obiektu zamiast rzucać wyjątkiem.
+        var json = File.Exists(appSettingsPath) ? await File.ReadAllTextAsync(appSettingsPath) : "{}";
         var node = JsonNode.Parse(json) ?? throw new InvalidOperationException("Niepoprawny appsettings.json.");
         node["StorageRoot"] = newPath;
         await File.WriteAllTextAsync(appSettingsPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));

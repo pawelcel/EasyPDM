@@ -36,6 +36,8 @@ function StatusControl({
   const [pending, setPending] = useState<ItemStatus | null>(null)
   const [comment, setComment] = useState("")
   const [revisions, setRevisions] = useState<RevisionComment[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     api.getRevisionComments(item.id).then(setRevisions).catch(() => setRevisions([]))
@@ -44,10 +46,18 @@ function StatusControl({
 
   async function confirmChange() {
     if (!pending) return
-    await api.setStatus(item.id, pending, isRevisionBump ? comment.trim() : undefined)
-    setPending(null)
-    setComment("")
-    await onChanged()
+    setSubmitting(true)
+    setError(null)
+    try {
+      await api.setStatus(item.id, pending, isRevisionBump ? comment.trim() : undefined)
+      setPending(null)
+      setComment("")
+      await onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("item.statusChangeFailed"))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const isRevisionBump = status === "wydany" && pending === "w_pracy"
@@ -69,6 +79,7 @@ function StatusControl({
               disabled={disabled || !NEXT_STATUSES[status].includes(s)}
               onClick={() => {
                 setComment("")
+                setError(null)
                 setPending(s)
               }}
             >
@@ -127,6 +138,8 @@ function StatusControl({
             setPending(null)
             setComment("")
           }}
+          pending={submitting}
+          error={error}
         />
       )}
     </div>

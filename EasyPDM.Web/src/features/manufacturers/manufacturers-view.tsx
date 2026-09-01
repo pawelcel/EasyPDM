@@ -169,6 +169,8 @@ function ManufacturerDetailPanel({
   const [name, setName] = useState("")
   const [nameError, setNameError] = useState("")
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deletingPending, setDeletingPending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   async function refetch() {
     const data = await api.getManufacturer(id)
@@ -203,10 +205,18 @@ function ManufacturerDetailPanel({
   }
 
   async function confirmDelete() {
-    await api.removeManufacturer(id)
-    setConfirmingDelete(false)
-    await onManufacturersRefetch()
-    onDeleted()
+    setDeletingPending(true)
+    setDeleteError(null)
+    try {
+      await api.removeManufacturer(id)
+      setConfirmingDelete(false)
+      await onManufacturersRefetch()
+      onDeleted()
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : t("manufacturer.deleteFailed"))
+    } finally {
+      setDeletingPending(false)
+    }
   }
 
   async function removeContact(contactId: number) {
@@ -229,7 +239,14 @@ function ManufacturerDetailPanel({
           />
           <FormError>{nameError}</FormError>
         </div>
-        <Button size="sm" variant="destructive" onClick={() => setConfirmingDelete(true)}>
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={() => {
+            setDeleteError(null)
+            setConfirmingDelete(true)
+          }}
+        >
           {t("manufacturer.deleteButton")}
         </Button>
       </div>
@@ -318,6 +335,8 @@ function ManufacturerDetailPanel({
           variant="destructive"
           onConfirm={confirmDelete}
           onCancel={() => setConfirmingDelete(false)}
+          pending={deletingPending}
+          error={deleteError}
         />
       )}
     </div>

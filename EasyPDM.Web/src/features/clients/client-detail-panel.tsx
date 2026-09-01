@@ -39,6 +39,8 @@ function ClientDetailPanel({
   const [location, setLocation] = useState("")
   const [nameError, setNameError] = useState("")
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deletingPending, setDeletingPending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   async function refetch() {
     const data = await api.getClient(id)
@@ -87,10 +89,18 @@ function ClientDetailPanel({
   }
 
   async function confirmDelete() {
-    await api.removeClient(id)
-    setConfirmingDelete(false)
-    await onClientsRefetch()
-    onDeleted()
+    setDeletingPending(true)
+    setDeleteError(null)
+    try {
+      await api.removeClient(id)
+      setConfirmingDelete(false)
+      await onClientsRefetch()
+      onDeleted()
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : t("client.deleteFailed"))
+    } finally {
+      setDeletingPending(false)
+    }
   }
 
   async function removeContact(contactId: number) {
@@ -136,7 +146,14 @@ function ClientDetailPanel({
           </div>
           <FormError>{nameError}</FormError>
         </div>
-        <Button size="sm" variant="destructive" onClick={() => setConfirmingDelete(true)}>
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={() => {
+            setDeleteError(null)
+            setConfirmingDelete(true)
+          }}
+        >
           {t("client.deleteButton")}
         </Button>
       </div>
@@ -233,6 +250,8 @@ function ClientDetailPanel({
           variant="destructive"
           onConfirm={confirmDelete}
           onCancel={() => setConfirmingDelete(false)}
+          pending={deletingPending}
+          error={deleteError}
         />
       )}
     </div>

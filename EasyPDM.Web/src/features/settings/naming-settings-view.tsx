@@ -147,12 +147,12 @@ function ResetSequenceSection() {
   const targetValid = target.trim() !== "" && Number.isInteger(targetValue) && targetValue >= 1
 
   async function performReset() {
-    setConfirmOpen(false)
     setResetting(true)
     setError("")
     setSuccess(false)
     try {
       await api.resetItemNumberSequence(targetValue)
+      setConfirmOpen(false)
       setSuccess(true)
       refresh()
     } catch (err) {
@@ -195,7 +195,10 @@ function ResetSequenceSection() {
             </div>
             <Button
               variant="destructive"
-              onClick={() => setConfirmOpen(true)}
+              onClick={() => {
+                setError("")
+                setConfirmOpen(true)
+              }}
               disabled={resetting || !targetValid}
             >
               {t("naming.resetSequenceButton")}
@@ -219,6 +222,8 @@ function ResetSequenceSection() {
         variant="destructive"
         onConfirm={performReset}
         onCancel={() => setConfirmOpen(false)}
+        pending={resetting}
+        error={error}
       />
     </div>
   )

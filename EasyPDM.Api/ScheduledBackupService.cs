@@ -53,9 +53,18 @@ class ScheduledBackupService(
 
         var now = DateTime.Now;
 
+        // LastRunAt wraca z Npgsql jako DateTime o Kind=Utc (kolumna last_run_at jest
+        // TIMESTAMPTZ) — porównanie ".Date" wprost z "now" (Kind=Local) byłoby błędne w
+        // strefach czasowych innych niż UTC: blisko północy (np. harmonogram na 00:15 w
+        // Polsce, UTC+1/+2) obie daty kalendarzowe różniłyby się, zabezpieczenie "już dziś
+        // była kopia" nigdy by się nie włączało, a usługa odpalałaby kopię ponownie co
+        // minutę, dopóki czas lokalny nie doszedłby do przesunięcia strefy. ToLocalTime()
+        // sprowadza obie strony porównania do tej samej, lokalnej doby.
+        var lastRunLocal = schedule.LastRunAt?.ToLocalTime();
+
         // Niezależnie od częstotliwości: nie uruchamiaj drugi raz tego samego dnia (jedno
         // uruchomienie dziennie to i tak najczęstszy dopuszczalny wybór — "codziennie").
-        if (schedule.LastRunAt is not null && schedule.LastRunAt.Value.Date == now.Date)
+        if (lastRunLocal is not null && lastRunLocal.Value.Date == now.Date)
             return;
 
         // Od zaplanowanej minuty AŻ DO KOŃCA DNIA (nie tylko dokładnie w niej) — dzięki temu

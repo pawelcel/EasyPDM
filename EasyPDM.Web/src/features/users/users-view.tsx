@@ -35,6 +35,8 @@ function UsersView() {
   const { user: me } = useAuth()
   const [error, setError] = useState("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deletingPending, setDeletingPending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [resettingId, setResettingId] = useState<string | null>(null)
 
   async function changeRole(u: ManagedUser, role: UserRole) {
@@ -50,13 +52,16 @@ function UsersView() {
 
   async function confirmDelete() {
     if (!deletingId) return
-    const id = deletingId
-    setDeletingId(null)
+    setDeletingPending(true)
+    setDeleteError(null)
     try {
-      await api.deleteUser(id)
+      await api.deleteUser(deletingId)
+      setDeletingId(null)
       await refetch()
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("users.deleteFailed"))
+      setDeleteError(err instanceof ApiError ? err.message : t("users.deleteFailed"))
+    } finally {
+      setDeletingPending(false)
     }
   }
 
@@ -116,7 +121,10 @@ function UsersView() {
                   variant="ghost"
                   aria-label={t("common.deleteNamed", { name: u.username })}
                   disabled={u.id === me?.id}
-                  onClick={() => setDeletingId(u.id)}
+                  onClick={() => {
+                    setDeleteError(null)
+                    setDeletingId(u.id)
+                  }}
                 >
                   <Trash2 className="size-3.5 text-muted-foreground" />
                 </Button>
@@ -139,6 +147,8 @@ function UsersView() {
           variant="destructive"
           onConfirm={confirmDelete}
           onCancel={() => setDeletingId(null)}
+          pending={deletingPending}
+          error={deleteError}
         />
       )}
 
