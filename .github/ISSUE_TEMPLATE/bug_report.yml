@@ -1,0 +1,54 @@
+name: Bug report
+description: Report something that isn't working as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: false
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: How is EasyPDM installed?
+      options:
+        - Docker
+        - Windows installer
+        - Linux native install
+        - Built from source
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: EasyPDM version
+      description: Shown top-left in the app (e.g. v0.1.1)
+      placeholder: v0.1.1
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Paste any relevant logs (admins can view/download them under Settings, or find them on disk near the configured storage folder) or attach screenshots.
+    validations:
+      required: false
