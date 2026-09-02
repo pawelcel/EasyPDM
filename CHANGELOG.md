@@ -2,6 +2,73 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.2]
+
+### Added
+- Notifications: a bell icon (top right, next to your name) shows a scrollable list
+  of events — an item you own waiting for review/released/reverted to "In progress",
+  a new revision on your item, being assigned to or removed from a project, an
+  assigned project being deleted, your password being changed by an admin, or (admins
+  only) low disk space on the file storage. Each type can be turned off individually
+  in Settings → Notifications, and each notification can be marked as read or deleted
+  individually (an "X" button next to each one in the bell's dropdown).
+- Item detail panel now shows a "Used in" section (right above History): every
+  assembly that contains the item, directly or through a sub-assembly, across
+  projects — with a button to jump straight to it. Scrollable, capped at 5
+  visible rows like History.
+- A brand new, empty database now gets one sample project on first startup (an
+  assembly with two parts in different statuses, forming a small BOM, plus a tag) —
+  something to explore instead of a blank slate. A notification points it out and
+  reminds you to clear it (Settings → File storage → Danger zone) before real use.
+  Only ever created once, on a genuinely empty database.
+
+### Changed
+- Admins can now bypass another user's item lock for three actions: changing its
+  status, taking over the lock (locking it to themselves), and releasing it —
+  useful when a coworker is away and their in-progress item needs to move forward.
+  Editing properties still requires actually being the owner.
+- Deleting a project no longer deletes its Parts/Assemblies. It now only removes the
+  project itself — the items become project-less (same state as "Remove from
+  structure"), still fully intact with their files, attachments, tags, history, and
+  BOM relations, reachable through "Whole database". This also protects items shared
+  into another project's BOM: deleting the owning project used to silently remove
+  that shared item from the other project's BOM too — it no longer does.
+
+### Fixed
+- Adding a *new* item under a locked assembly bypassed the owner lock entirely —
+  anyone with project access could insert a new BOM row under someone else's locked
+  assembly, even though every other change to that assembly was correctly blocked.
+- Editing a BOM row's quantity had no error handling — a failed save (e.g. the
+  parent got locked by someone else) silently left the input showing the unsaved
+  value with no indication anything went wrong.
+- Deleting a Material had no confirmation dialog and no error handling — the only
+  one-click, unconfirmed delete left in the app.
+- The automatic backup schedule wrote a local-time timestamp into a column that
+  expects UTC. If that write failed (or silently stored the wrong time), the "did
+  it already run today" check could never engage, and the service would keep
+  retrying — creating a fresh backup every 15 minutes and pruning older, legitimate
+  ones well within a day.
+- Deleting a contact (Clients/Manufacturers) had no confirmation dialog and no error
+  handling — the last one-click, unconfirmed delete left in the app besides Materials
+  (fixed above).
+- A number of inline "save on blur"/"save on click" fields had no error handling —
+  item name, custom properties, price/currency, part kind, removing a tag, saved
+  filters, and per-project user access checkboxes. A failed save could look like it
+  went through with no indication anything was wrong.
+- Dragging to reorder items in the project tree, and "Remove from structure" there,
+  silently swallowed errors with no feedback (the equivalent actions inside a BOM
+  already showed errors correctly).
+- Deleting or demoting the last administrator had a narrow race: two near-simultaneous
+  requests (e.g. two admins demoting each other, or one deleting the other at the same
+  moment) could both pass a stale "is this the last admin" check and leave the system
+  with zero administrators.
+- Releasing an item's owner lock as part of releasing it to "Released" status wasn't
+  recorded in the item's History (unlike releasing it explicitly).
+- Quickly switching the selected project while adding a new item without a fixed
+  project could show parent-folder options from the previously selected project.
+- The Logs page could show content for the wrong date if you switched dates or hit
+  "Refresh" again before the previous request finished.
+
 ## [0.1.1]
 
 ### Added

@@ -15,6 +15,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
   { id: "storage", labelKey: "settings.storage", adminOnly: true },
   { id: "logs", labelKey: "settings.logs", adminOnly: true },
   { id: "naming", labelKey: "settings.naming", adminOnly: true },
+  { id: "notifications", labelKey: "settings.notifications" },
   { id: "appearance", labelKey: "settings.appearance" },
   { id: "language", labelKey: "settings.language" },
   { id: "author", labelKey: "settings.author" },

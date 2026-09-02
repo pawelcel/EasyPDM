@@ -48,7 +48,16 @@ static class ProjectAccessEndpoints
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("projectId", projectId);
             cmd.Parameters.AddWithValue("userId", userId);
-            await cmd.ExecuteNonQueryAsync();
+            var affected = await cmd.ExecuteNonQueryAsync();
+
+            // affected == 0 znaczy, że przypisanie już istniało (ON CONFLICT DO NOTHING) —
+            // nie powiadamiamy o czymś, co faktycznie się nie zmieniło.
+            if (affected > 0)
+            {
+                var projectName = await GetProjectNameAsync(conn, projectId);
+                if (projectName is not null)
+                    await Notifications.NotifyAsync(conn, app.Logger, userId, "project_assigned", new { projectName }, projectId: projectId);
+            }
 
             return Results.Ok();
         });
@@ -62,15 +71,30 @@ static class ProjectAccessEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
+            // Nazwa projektu doczytana PRZED DELETE z project_users (projekt sam w sobie nie
+            // jest tu kasowany, ale i tak najprościej trzymać się tego samego "czytaj przed
+            // usunięciem" nawyku co przy /api/projects/{id}).
+            var projectName = await GetProjectNameAsync(conn, projectId);
+
             const string sql = "DELETE FROM project_users WHERE project_id = @projectId AND user_id = @userId;";
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("projectId", projectId);
             cmd.Parameters.AddWithValue("userId", userId);
-            await cmd.ExecuteNonQueryAsync();
+            var affected = await cmd.ExecuteNonQueryAsync();
+
+            if (affected > 0 && projectName is not null)
+                await Notifications.NotifyAsync(conn, app.Logger, userId, "project_unassigned", new { projectName }, projectId: projectId);
 
             return Results.Ok();
         });
     }
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+
+    private static async Task<string?> GetProjectNameAsync(NpgsqlConnection conn, Guid projectId)
+    {
+        await using var cmd = new NpgsqlCommand("SELECT name FROM projects WHERE id = @id;", conn);
+        cmd.Parameters.AddWithValue("id", projectId);
+        return (string?)await cmd.ExecuteScalarAsync();
+    }
 }

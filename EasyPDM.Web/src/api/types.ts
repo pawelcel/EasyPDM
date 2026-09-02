@@ -201,6 +201,49 @@ export function bomPositionLabel(path: number[]): string {
   return path.join(".")
 }
 
+// Złożenie, w którym dany element jest używany (bezpośrednio albo pośrednio) —
+// zwracane przez GET /api/items/{id}/used-in. Odwrotność BomEntry: tam schodzimy
+// w dół drzewa, tu wchodzimy w górę.
+export interface UsedInEntry {
+  id: string
+  itemNumber: number | null
+  itemNumberPrefix: string | null
+  fileName: string
+  itemType: ItemType
+  projectId: string | null
+  projectName: string | null
+  revisionNumber: number | null
+}
+
+export type NotificationType =
+  | "status_review"
+  | "status_released"
+  | "status_regressed"
+  | "new_revision"
+  | "project_assigned"
+  | "project_unassigned"
+  | "project_deleted"
+  | "password_changed"
+  | "low_disk_space"
+  | "sample_project"
+
+// "data" niesie surowe dane zapisane w momencie zdarzenia (np. itemLabel, projectName) —
+// treść jest renderowana po stronie frontu (i18n), zob. describe() w notification-bell.tsx.
+export interface NotificationEntry {
+  id: string
+  type: NotificationType
+  data: Record<string, unknown>
+  itemId: string | null
+  projectId: string | null
+  readAt: string | null
+  createdAt: string
+}
+
+export interface NotificationPreference {
+  type: NotificationType
+  enabled: boolean
+}
+
 // "group" jest wyłącznie polem porządkowym/filtrującym katalogu materiałów —
 // nigdy nie trafia do właściwości Części (Część zapisuje tylko "name").
 export interface Material {

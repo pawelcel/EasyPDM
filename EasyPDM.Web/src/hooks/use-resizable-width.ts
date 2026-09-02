@@ -29,6 +29,7 @@ function useResizableWidth(storageKey: string, min: number, max: number, default
     function onMouseUp() {
       document.removeEventListener("mousemove", onMouseMove)
       document.removeEventListener("mouseup", onMouseUp)
+      window.removeEventListener("blur", onMouseUp)
       try {
         localStorage.setItem(storageKey, String(latestWidth))
       } catch {
@@ -37,6 +38,12 @@ function useResizableWidth(storageKey: string, min: number, max: number, default
     }
     document.addEventListener("mousemove", onMouseMove)
     document.addEventListener("mouseup", onMouseUp)
+    // Puszczenie przycisku myszy POZA oknem przeglądarki (np. przeciągnięcie na pasek
+    // zadań/inną aplikację) nie generuje "mouseup" w tym dokumencie w ogóle — bez tego
+    // nasłuchy zostałyby podpięte na zawsze, a kolejne przeciągnięcie dokładałoby drugi
+    // komplet na wierzch. "blur" (okno traci fokus) to najbliższy niezawodny sygnał
+    // "przeciąganie na pewno się skończyło" dostępny bez Pointer Capture API.
+    window.addEventListener("blur", onMouseUp)
   }
 
   return { width, startResize }

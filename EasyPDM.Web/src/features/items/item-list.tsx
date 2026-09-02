@@ -37,6 +37,8 @@ function ItemList({
   onTagsRefetch,
   onProjectsRefetch,
   onNavigateToProject,
+  pendingSelectedItemId,
+  onPendingSelectedItemIdConsumed,
 }: {
   items: Item[]
   loading: boolean
@@ -51,6 +53,11 @@ function ItemList({
   onTagsRefetch: () => void | Promise<void>
   onProjectsRefetch: () => void | Promise<void>
   onNavigateToProject: (projectId: string) => void
+  // Nawigacja z zewnątrz (np. z dzwonka powiadomień) do konkretnego elementu, niezależnie
+  // od aktualnych filtrów/wyszukiwania — zob. useEffect niżej, korzysta z tego samego
+  // mechanizmu co "Przejdź" na wierszu BOM-u (handleSelectChild/externalItem).
+  pendingSelectedItemId?: string | null
+  onPendingSelectedItemIdConsumed?: () => void
 }) {
   const { t } = useLanguage()
   const [recordType, setRecordType] = useState<RecordType>("all")
@@ -101,6 +108,13 @@ function ItemList({
       if (selectChildRequestId.current === requestId) setExternalItem(null)
     }
   }
+
+  useEffect(() => {
+    if (!pendingSelectedItemId) return
+    handleSelectChild(pendingSelectedItemId)
+    onPendingSelectedItemIdConsumed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSelectedItemId])
 
   // externalItem to zamrożona migawka (pobrana raz przez handleSelectChild), niepowiązana
   // z odświeżeniem listy items — bez tego edycje (zmiana nazwy/statusu/właściwości) na

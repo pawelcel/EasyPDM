@@ -106,6 +106,14 @@ static class ItemEndpoints
                     return Results.NotFound("Element nadrzędny nie istnieje.");
                 if (!IsChildTypeAllowed(parentInfo.Value.ItemType, "file"))
                     return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
+                // Rodzic zablokowany przez innego właściciela nie może dostać nowego dziecka —
+                // ta sama reguła co dla dopięcia JUŻ ISTNIEJĄCEGO elementu (POST .../children).
+                // W praktyce rodzicem "file" może tu być tylko folder (IsChildTypeAllowed), a
+                // foldery nigdy nie mają owner_locked=true — sprawdzenie i tak dodane dla
+                // spójności z resztą API, na wypadek gdyby ta reguła kiedyś się rozszerzyła.
+                var uploadUser = (CurrentUser)ctx.Items["CurrentUser"]!;
+                if (!CanEditOwnerLocked(uploadUser.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
+                    return OwnerLockedForbidden();
             }
 
             string propertiesJson = "{}";
@@ -223,6 +231,14 @@ static class ItemEndpoints
                     return Results.NotFound("Element nadrzędny nie istnieje.");
                 if (!IsChildTypeAllowed(parentInfo.Value.ItemType, body.ItemType))
                     return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
+                // Rodzic zablokowany przez innego właściciela nie może dostać nowego dziecka —
+                // ta sama reguła co dla dopięcia JUŻ ISTNIEJĄCEGO elementu (POST .../children,
+                // StructureEndpoints.cs). Bez tego dowolny użytkownik z dostępem do projektu
+                // mógł dopisać nową pozycję BOM-u pod zablokowanym złożeniem, mimo że każda
+                // INNA zmiana tego złożenia (nazwa, właściwości, dopięcie istniejącego dziecka)
+                // była poprawnie blokowana.
+                if (!CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
+                    return OwnerLockedForbidden();
             }
 
             var itemId = Guid.NewGuid();
@@ -658,7 +674,13 @@ static class ItemEndpoints
                 return Results.BadRequest("Status dotyczy tylko Części i Złożeń.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+            // Jedyne miejsce w API, gdzie admin OMIJA blokadę właściciela (w odróżnieniu od
+            // /lock, /release i edycji właściwości) — świadoma decyzja, żeby powiadomienia o
+            // statusie (status_review/status_released/status_regressed/new_revision) miały w
+            // ogóle szansę się uruchomić: bez tego wyjątku tylko sam właściciel mógłby zmienić
+            // status zablokowanego elementu, więc "ktoś inny zmienił status" nigdy by nie
+            // zaszło, dopóki element ma właściciela.
+            if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked) && user.Role != "admin")
                 return OwnerLockedForbidden();
 
             bool isValidTransition = body.Status == currentStatus || (currentStatus, body.Status) switch
@@ -713,6 +735,14 @@ static class ItemEndpoints
             if (!rowFound)
                 return Results.Conflict("Status elementu zmienił się w międzyczasie — odśwież i spróbuj ponownie.");
 
+            // Przejście na "wydany" niejawnie zwalnia właściciela (CASE WHEN w UPDATE-cie
+            // wyżej) — w odróżnieniu od jawnego POST /release to zdarzenie nigdzie się dotąd
+            // nie logowało, więc panel Historii milczał o tym zwolnieniu mimo że faktycznie
+            // nastąpiło. info.Value.OwnerId to stan SPRZED tego UPDATE-u (patrz komentarz przy
+            // "recipientId" niżej) — poprawny warunek "był właściciel do zwolnienia".
+            if (body.Status == "wydany" && info.Value.OwnerId is not null)
+                await LogOwnerHistoryAsync(conn, id, "released", user.Id);
+
             if (bumpRevision && revisionNumber is not null && !string.IsNullOrWhiteSpace(body.Comment))
             {
                 const string commentSql = """
@@ -744,14 +774,46 @@ static class ItemEndpoints
                 await historyCmd.ExecuteNonQueryAsync();
             }
 
+            // Powiadomienia — nigdy o własnej akcji, i tylko gdy jest kogo powiadomić.
+            // info.Value.OwnerId to stan SPRZED tego UPDATE-u (dla przejścia na "wydany" SQL
+            // wyżej dopiero za chwilę zeruje owner_id, więc to wciąż poprawny odbiorca TEGO
+            // przejścia) — ale element w statusie "wydany" ZAWSZE ma owner_id=NULL (nadane przy
+            // poprzednim przejściu NA "wydany"), więc przejście "wydany" -> "w_pracy"
+            // (jedyne, przy którym bumpRevision w ogóle się zdarza) zastałoby OwnerId puste.
+            // Stąd zapasowy odbiorca: created_by (jedyne NIGDY niekasowane pole wskazujące
+            // "czyj to element", w odróżnieniu od owner_id) — bez tego "new_revision" nigdy
+            // nie miałoby komu się pokazać.
+            var recipientId = info.Value.OwnerId ?? info.Value.CreatedBy;
+            if (recipientId is not null && recipientId != user.Id)
+            {
+                var itemLabel = ItemLabel(info.Value.FileName, info.Value.ItemNumber, info.Value.ItemNumberPrefix);
+                var notifyData = new { itemLabel };
+                // body.Status != currentStatus — tak samo jak zapis do historii wyżej — bez
+                // tego zduplikowany/powtórzony request (np. retry po zgubionej odpowiedzi z
+                // makra CAD) z tym samym, JUŻ ustawionym statusem ponownie wysyłałby to samo
+                // powiadomienie, mimo że faktycznie nic się nie zmieniło.
+                if (body.Status != currentStatus && body.Status == "sprawdzany")
+                    await Notifications.NotifyAsync(conn, app.Logger, recipientId.Value, "status_review", notifyData, itemId: id);
+                else if (body.Status != currentStatus && body.Status == "wydany")
+                    await Notifications.NotifyAsync(conn, app.Logger, recipientId.Value, "status_released", notifyData, itemId: id);
+                else if (body.Status == "w_pracy" && (currentStatus == "sprawdzany" || currentStatus == "wydany"))
+                    await Notifications.NotifyAsync(conn, app.Logger, recipientId.Value, "status_regressed", notifyData, itemId: id);
+
+                if (bumpRevision && revisionNumber is not null)
+                    await Notifications.NotifyAsync(conn, app.Logger, recipientId.Value, "new_revision", notifyData, itemId: id);
+            }
+
             return Results.Ok(new { status = body.Status, revisionNumber });
         });
 
         // ============================================================
         // POST /api/items/{id}/lock — "Zablokuj". Dostępne dla KAŻDEGO, ale tylko gdy element
         // jest aktualnie zwolniony — zablokowanie ustawia wywołującego jako nowego właściciela.
-        // Jeśli element jest już zablokowany przez kogoś innego, odrzucamy (nawet admin nie
-        // może "przejąć" cudzej blokady tędy).
+        // Jeśli element jest już zablokowany przez kogoś innego, odrzucamy — Z WYJĄTKIEM
+        // admina, który może "przejąć" cudzą blokadę (np. nieobecny pracownik) i staje się
+        // nowym właścicielem. To jedyne dwa miejsca w całym API, gdzie admin omija blokadę
+        // właściciela (obok /release poniżej i zmiany statusu) — edycja właściwości nadal
+        // wymaga bycia właścicielem nawet dla admina.
         // ============================================================
         app.MapPost("/api/items/{id:guid}/lock", async (Guid id, HttpContext ctx) =>
         {
@@ -771,22 +833,24 @@ static class ItemEndpoints
                 return Results.BadRequest("Wydanych elementów nie można blokować — są zawsze zwolnione.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            if (IsOwnerLocked(info.Value.OwnerId, info.Value.OwnerLocked) && info.Value.OwnerId != user.Id)
+            var isAdmin = user.Role == "admin";
+            if (IsOwnerLocked(info.Value.OwnerId, info.Value.OwnerLocked) && info.Value.OwnerId != user.Id && !isAdmin)
                 return OwnerLockedForbidden();
 
-            // WHERE (owner_locked = false OR owner_id = @ownerId) odtwarza dokładnie ten sam
-            // warunek co sprawdzenie wyżej, ale ATOMOWO w samym UPDATE — bez tego dwóch
+            // WHERE (owner_locked = false OR owner_id = @ownerId OR @isAdmin) odtwarza dokładnie
+            // ten sam warunek co sprawdzenie wyżej, ale ATOMOWO w samym UPDATE — bez tego dwóch
             // użytkowników klikających "Zablokuj" na tym samym, właśnie odblokowanym elemencie
             // niemal jednocześnie mogłoby OBAJ przejść powyższe sprawdzenie (czytane z osobnego
             // zapytania chwilę wcześniej) i oboje dostać 200 OK, choć w bazie wygrywa tylko ten,
             // czyj UPDATE się wykona jako drugi.
             const string sql = """
                 UPDATE items SET owner_id = @ownerId, owner_locked = true
-                WHERE id = @id AND (owner_locked = false OR owner_id = @ownerId);
+                WHERE id = @id AND (owner_locked = false OR owner_id = @ownerId OR @isAdmin);
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("ownerId", user.Id);
+            cmd.Parameters.AddWithValue("isAdmin", isAdmin);
             var affected = await cmd.ExecuteNonQueryAsync();
 
             if (affected == 0)
@@ -798,8 +862,9 @@ static class ItemEndpoints
         });
 
         // ============================================================
-        // POST /api/items/{id}/release — "Zwolnij". Tylko AKTUALNY właściciel może zwolnić
-        // zablokowany element — nawet administrator nie omija tego.
+        // POST /api/items/{id}/release — "Zwolnij". Zwykle tylko AKTUALNY właściciel może
+        // zwolnić zablokowany element — WYJĄTEK: admin może zwolnić blokadę należącą do
+        // kogokolwiek (np. nieobecny pracownik), tak samo jak w /lock powyżej.
         // ============================================================
         app.MapPost("/api/items/{id:guid}/release", async (Guid id, HttpContext ctx) =>
         {
@@ -821,17 +886,30 @@ static class ItemEndpoints
                 return Results.BadRequest("Element nie jest zablokowany.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            if (info.Value.OwnerId != user.Id)
+            var isAdmin = user.Role == "admin";
+            if (info.Value.OwnerId != user.Id && !isAdmin)
                 return Results.Text(
                     "Tylko właściciel może zwolnić ten element.", statusCode: StatusCodes.Status403Forbidden);
 
             // Zwolniony element nie ma właściciela — i tak może go edytować każdy, więc nie ma
             // sensu pamiętać, kto ostatnio go blokował. Nowego właściciela nadaje dopiero
             // kolejne "Zablokuj" (patrz endpoint /lock powyżej).
-            const string sql = "UPDATE items SET owner_id = NULL, owner_locked = false WHERE id = @id;";
+            //
+            // WHERE (owner_id = @userId OR @isAdmin) zamyka wyścig analogiczny do tego w /lock:
+            // "info" i sprawdzenie wyżej czytane są z osobnego zapytania chwilę wcześniej — bez
+            // tego warunku w UPDATE, spóźnione /release (np. stary, właśnie odrzucony request
+            // pierwotnego właściciela) mogłoby wyzerować blokadę, którą w międzyczasie
+            // legalnie przejął ktoś inny (np. admin przez /lock), cicho kasując cudzą, świeżo
+            // nabytą własność.
+            const string sql = "UPDATE items SET owner_id = NULL, owner_locked = false WHERE id = @id AND (owner_id = @userId OR @isAdmin);";
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
-            await cmd.ExecuteNonQueryAsync();
+            cmd.Parameters.AddWithValue("userId", user.Id);
+            cmd.Parameters.AddWithValue("isAdmin", isAdmin);
+            var affected = await cmd.ExecuteNonQueryAsync();
+
+            if (affected == 0)
+                return Results.Conflict("Właściciel elementu zmienił się w międzyczasie — odśwież i spróbuj ponownie.");
 
             await LogOwnerHistoryAsync(conn, id, "released", user.Id);
 
@@ -1051,12 +1129,12 @@ static class ItemEndpoints
         _ => false
     };
 
-    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked, Guid? ProjectId)?> GetItemTypeAndStatus(string connectionString, Guid id)
+    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked, Guid? ProjectId, string FileName, int? ItemNumber, string? ItemNumberPrefix, Guid? CreatedBy)?> GetItemTypeAndStatus(string connectionString, Guid id)
     {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync();
 
-        const string sql = "SELECT item_type, status, owner_id, owner_locked, project_id FROM items WHERE id = @id;";
+        const string sql = "SELECT item_type, status, owner_id, owner_locked, project_id, file_name, item_number, item_number_prefix, created_by FROM items WHERE id = @id;";
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("id", id);
 
@@ -1069,9 +1147,19 @@ static class ItemEndpoints
             reader.IsDBNull(1) ? null : reader.GetString(1),
             reader.IsDBNull(2) ? null : reader.GetGuid(2),
             reader.GetBoolean(3),
-            reader.IsDBNull(4) ? null : reader.GetGuid(4)
+            reader.IsDBNull(4) ? null : reader.GetGuid(4),
+            reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetInt32(6),
+            reader.IsDBNull(7) ? null : reader.GetString(7),
+            reader.IsDBNull(8) ? null : reader.GetGuid(8)
         );
     }
+
+    // Etykieta elementu do zapisania w powiadomieniu (data JSONB) -- ten sam format co
+    // itemDisplayLabel() po stronie frontu, zamrożony w momencie zdarzenia (przetrwa
+    // późniejszą zmianę nazwy/numeru elementu).
+    internal static string ItemLabel(string fileName, int? itemNumber, string? itemNumberPrefix) =>
+        itemNumber is not null ? $"{itemNumberPrefix}{itemNumber} ({fileName})" : fileName;
 
     // Wspólne dla wszystkich endpointów operujących na elemencie/projekcie po ID — zwykły
     // użytkownik musi być przypisany do projektu (project_users), administrator zawsze ma

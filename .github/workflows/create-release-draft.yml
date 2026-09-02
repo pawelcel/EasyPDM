@@ -1,0 +1,89 @@
+name: Create Release Draft
+
+# Po wypchnięciu taga wersji ("vX.Y.Z"): buduje instalator Windows i paczkę Linux (te same
+# workflowy co "on: push do main", wołane tu jako reużywalne przez workflow_call — zob.
+# "outputs" w build-windows-installer.yml/build-linux-package.yml), potem tworzy SZKIC
+# (draft) Release'a na GitHubie z tymi dwoma plikami i notatkami wyciągniętymi z
+# CHANGELOG.md. Świadomie NIE publikuje go automatycznie — to jedyny moment w całym
+# procesie wydania, który zostaje ręczny: ktoś musi przejrzeć szkic i kliknąć
+# "Publish release" na GitHubie. Obraz Docker (":latest"/":vX.Y.Z") publikuje się
+# niezależnie, tym samym pushem taga, przez osobny publish-docker-release.yml.
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  # Sprawdza PRZED zbudowaniem czegokolwiek (te dwa buildy trwają razem ~15-20 min), że
+  # wersja w pushniętym tagu faktycznie zgadza się z oboma ręcznie utrzymywanymi numerami
+  # wersji w repo — bez tego łatwo zapomnieć zaktualizować EasyPDM.iss/version.ts przed
+  # tagowaniem, a wynikiem byłby Release opisany właściwym tagiem/CHANGELOG-iem, ale z
+  # instalatorami wciąż podpisanymi starym numerem wersji.
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Sprawdź zgodność wersji z tagiem
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          ISS_VERSION=$(grep -oP '(?<=#define MyAppVersion ")[^"]+' packaging/windows/EasyPDM.iss)
+          WEB_VERSION=$(grep -oP '(?<=APP_VERSION = ")[^"]+' EasyPDM.Web/src/version.ts)
+          echo "Tag: $TAG_VERSION | EasyPDM.iss (MyAppVersion): $ISS_VERSION | version.ts (APP_VERSION): $WEB_VERSION"
+          if [ "$TAG_VERSION" != "$ISS_VERSION" ] || [ "$TAG_VERSION" != "$WEB_VERSION" ]; then
+            echo "::error::Niezgodność wersji — tag mówi '$TAG_VERSION', ale EasyPDM.iss ma '$ISS_VERSION', a version.ts ma '$WEB_VERSION'. Zaktualizuj oba pliki na '$TAG_VERSION', scommituj i wypchnij tag ponownie."
+            exit 1
+          fi
+
+  windows:
+    needs: check-version
+    uses: ./.github/workflows/build-windows-installer.yml
+
+  linux:
+    needs: check-version
+    uses: ./.github/workflows/build-linux-package.yml
+
+  draft-release:
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.windows.outputs.artifact-name }}
+          path: artifacts/windows
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.linux.outputs.artifact-name }}
+          path: artifacts/linux
+
+      # Tag to np. "v0.2", nagłówek w CHANGELOG.md to "## [0.2]" (bez "v") — wycina samą
+      # sekcję dla tej wersji (od nagłówka do NASTĘPNEGO "## [", wyłącznie), do notatek
+      # Release'a. Jeśli tag nie ma odpowiadającego nagłówka (literówka/zapomniany wpis),
+      # plik notatek wychodzi po prostu pusty — "gh release create" i tak przyjmie pusty
+      # --notes-file, świadomie bez twardego błędu (Release i tak jest szkicem do
+      # ręcznego przejrzenia przed publikacją).
+      - name: Wyciągnij notatki z CHANGELOG.md
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v header="## [$VERSION]" '
+            $0 == header { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          echo "=== release-notes.md ==="
+          cat release-notes.md
+
+      - name: Utwórz szkic Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            artifacts/windows/* artifacts/linux/*

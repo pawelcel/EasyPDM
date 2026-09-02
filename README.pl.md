@@ -29,8 +29,9 @@ powstał i działa — czemu nie udostępnić go innym.
   ręcznie za każdym razem, więc nazwy się nie rozjeżdżają między projektami.
 - **Wyszukiwanie po całej firmowej bazie**, nie tylko w bieżącym projekcie — przydatne, gdy
   szukasz, czy podobna część już gdzieś powstała.
-- **Blokada elementu** — dopóki nad czymś pracujesz, nikt inny (nawet administrator) nie
-  nadpisze Twoich zmian bez Twojej zgody.
+- **Blokada elementu** — dopóki nad czymś pracujesz, nikt inny nie nadpisze Twoich zmian
+  bez Twojej zgody (administrator może w razie potrzeby przejąć albo zwolnić cudzą
+  blokadę — np. gdy właściciel jest nieobecny).
 
 ## Pierwsze uruchomienie
 
@@ -147,10 +148,12 @@ dodany/usunięty załącznik, każda blokada/zwolnienie.
 ### Kto edytuje — blokada elementu
 
 Twórca Części/Złożenia od razu staje się jej właścicielem, a element jest zablokowany —
-dopóki blokada trwa, tylko właściciel może go edytować (nawet administrator jej nie
-omija). W drzewku widać to po kolorze kłódki: zielona — zablokowane przez Ciebie, żółta —
-przez kogoś innego, otwarta — zwolnione (może zablokować każdy). Element wydany jest
-zawsze zwolniony.
+dopóki blokada trwa, właściwości może edytować tylko właściciel (tego nie omija nawet
+administrator). Administrator może za to przejąć albo zwolnić cudzą blokadę i zmienić
+status zablokowanego elementu — np. gdy pracownik jest nieobecny, a jego niedokończony
+element trzeba odblokować. W drzewku widać to po kolorze kłódki: zielona — zablokowane
+przez Ciebie, żółta — przez kogoś innego, otwarta — zwolnione (może zablokować każdy).
+Element wydany jest zawsze zwolniony.
 
 ### Zestawienie części (BOM)
 

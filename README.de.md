@@ -32,8 +32,9 @@ existiert und funktioniert — warum es nicht auch anderen zur Verfügung stelle
   auseinanderentwickeln.
 - **Suche über die gesamte Firmendatenbank**, nicht nur im aktuellen Projekt — praktisch,
   wenn Sie prüfen wollen, ob ein ähnliches Teil schon irgendwo existiert.
-- **Elementsperre** — solange Sie an etwas arbeiten, überschreibt niemand sonst (auch
-  kein Administrator) Ihre Änderungen ohne Ihre Zustimmung.
+- **Elementsperre** — solange Sie an etwas arbeiten, überschreibt niemand sonst Ihre
+  Änderungen ohne Ihre Zustimmung (ein Administrator kann bei Bedarf eine fremde Sperre
+  übernehmen oder aufheben — z. B. wenn der Besitzer abwesend ist).
 
 ## Erste Inbetriebnahme
 
@@ -160,10 +161,13 @@ Sperrung/Freigabe.
 ### Wer bearbeitet — Elementsperre
 
 Der Ersteller eines Teils/einer Baugruppe wird sofort dessen/deren Eigentümer, und das
-Element wird gesperrt — solange die Sperre besteht, kann nur der Eigentümer es bearbeiten
-(nicht einmal ein Administrator umgeht dies). Im Baum wird dies durch die Farbe des
-Schloss-Symbols angezeigt: grün — von Ihnen gesperrt, gelb — von jemand anderem, offen —
-freigegeben (jeder kann es sperren). Ein freigegebenes Element ist immer entsperrt.
+Element wird gesperrt — solange die Sperre besteht, kann nur der Eigentümer dessen
+Eigenschaften bearbeiten (nicht einmal ein Administrator umgeht dies). Ein Administrator
+kann jedoch eine fremde Sperre übernehmen oder aufheben und den Status eines gesperrten
+Elements ändern — z. B. wenn ein Mitarbeiter abwesend ist und dessen unfertiges Element
+freigegeben werden muss. Im Baum wird dies durch die Farbe des Schloss-Symbols angezeigt:
+grün — von Ihnen gesperrt, gelb — von jemand anderem, offen — freigegeben (jeder kann es
+sperren). Ein freigegebenes Element ist immer entsperrt.
 
 ### Stückliste (BOM)
 

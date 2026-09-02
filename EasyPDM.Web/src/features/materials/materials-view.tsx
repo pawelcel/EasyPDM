@@ -4,6 +4,7 @@ import { Pencil, Trash2 } from "lucide-react"
 import { api, ApiError } from "@/api/client"
 import type { Material } from "@/api/types"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
   Dialog,
   DialogContent,
@@ -60,9 +61,24 @@ function MaterialsView() {
     (m) => (!groupFilter || m.group === groupFilter) && (!subgroupFilter || m.subgroup === subgroupFilter)
   )
 
-  async function remove(id: number) {
-    await api.removeMaterial(id)
-    await refetch()
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null)
+  const [deletingPending, setDeletingPending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const confirmingDeleteMaterial = materials.find((m) => m.id === confirmingDeleteId) ?? null
+
+  async function confirmDelete() {
+    if (confirmingDeleteId === null) return
+    setDeletingPending(true)
+    setDeleteError(null)
+    try {
+      await api.removeMaterial(confirmingDeleteId)
+      setConfirmingDeleteId(null)
+      await refetch()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : t("material.deleteFailed"))
+    } finally {
+      setDeletingPending(false)
+    }
   }
 
   return (
@@ -173,7 +189,7 @@ function MaterialsView() {
                     size="icon-xs"
                     variant="ghost"
                     aria-label={t("common.deleteNamed", { name: m.name })}
-                    onClick={() => remove(m.id)}
+                    onClick={() => setConfirmingDeleteId(m.id)}
                   >
                     <Trash2 className="size-3.5 text-muted-foreground" />
                   </Button>
@@ -187,6 +203,20 @@ function MaterialsView() {
           </Hint>
         )}
       </div>
+
+      {confirmingDeleteMaterial && (
+        <ConfirmDialog
+          open
+          title={t("common.deleteNamed", { name: confirmingDeleteMaterial.name })}
+          description={t("material.deleteConfirmDescription", { name: confirmingDeleteMaterial.name })}
+          confirmLabel={t("common.delete")}
+          variant="destructive"
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirmingDeleteId(null)}
+          pending={deletingPending}
+          error={deleteError}
+        />
+      )}
     </div>
   )
 }

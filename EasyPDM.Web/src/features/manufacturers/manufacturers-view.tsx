@@ -171,6 +171,9 @@ function ManufacturerDetailPanel({
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deletingPending, setDeletingPending] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [confirmingDeleteContactId, setConfirmingDeleteContactId] = useState<number | null>(null)
+  const [contactDeletePending, setContactDeletePending] = useState(false)
+  const [contactDeleteError, setContactDeleteError] = useState<string | null>(null)
 
   async function refetch() {
     const data = await api.getManufacturer(id)
@@ -219,13 +222,25 @@ function ManufacturerDetailPanel({
     }
   }
 
-  async function removeContact(contactId: number) {
-    await api.removeManufacturerContact(id, contactId)
-    await refetch()
-    await onManufacturersRefetch()
+  async function confirmRemoveContact() {
+    if (confirmingDeleteContactId === null) return
+    setContactDeletePending(true)
+    setContactDeleteError(null)
+    try {
+      await api.removeManufacturerContact(id, confirmingDeleteContactId)
+      setConfirmingDeleteContactId(null)
+      await refetch()
+      await onManufacturersRefetch()
+    } catch (err) {
+      setContactDeleteError(err instanceof ApiError ? err.message : t("manufacturer.deleteContactFailed"))
+    } finally {
+      setContactDeletePending(false)
+    }
   }
 
   if (!manufacturer) return null
+
+  const confirmingDeleteContact = manufacturer.contacts.find((c) => c.id === confirmingDeleteContactId) ?? null
 
   return (
     <div>
@@ -309,7 +324,7 @@ function ManufacturerDetailPanel({
                       size="icon-xs"
                       variant="ghost"
                       aria-label={t("manufacturer.deleteContactAria")}
-                      onClick={() => removeContact(c.id)}
+                      onClick={() => setConfirmingDeleteContactId(c.id)}
                     >
                       <Trash2 className="size-3.5 text-muted-foreground" />
                     </Button>
@@ -337,6 +352,22 @@ function ManufacturerDetailPanel({
           onCancel={() => setConfirmingDelete(false)}
           pending={deletingPending}
           error={deleteError}
+        />
+      )}
+
+      {confirmingDeleteContact && (
+        <ConfirmDialog
+          open
+          title={t("manufacturer.deleteContactAria")}
+          description={t("manufacturer.deleteContactConfirmDescription", {
+            name: [confirmingDeleteContact.firstName, confirmingDeleteContact.lastName].filter(Boolean).join(" ") || "-",
+          })}
+          confirmLabel={t("common.delete")}
+          variant="destructive"
+          onConfirm={confirmRemoveContact}
+          onCancel={() => setConfirmingDeleteContactId(null)}
+          pending={contactDeletePending}
+          error={contactDeleteError}
         />
       )}
     </div>

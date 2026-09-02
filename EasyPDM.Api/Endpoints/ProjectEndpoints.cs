@@ -124,12 +124,18 @@ static class ProjectEndpoints
             }
         });
 
-        // DELETE /api/projects/{id} — usuwa projekt razem ze WSZYSTKIMI jego elementami
-        // (kaskadowo w bazie: items/item_attachments/item_relations/item_tags mają
-        // ON DELETE CASCADE). Pliki fizyczne "głównych" plików elementów (items.file_path)
-        // są kasowane z magazynu tak samo, jak przy pełnym usuwaniu pojedynczego elementu
-        // (DELETE /api/items/{id}) — kopie załączników/rewizji nie są dziś sprzątane ani tu,
-        // ani tam (znane, istniejące ograniczenie, nie nowe).
+        // DELETE /api/projects/{id} — usuwa TYLKO sam projekt. Części/Złożenia, które do
+        // niego należały, NIE są kasowane — zostają odpięte (project_id = NULL), czyli
+        // stają się elementami "bez projektu", dokładnie w tym samym stanie co po ręcznym
+        // "Usuń ze struktury" (zob. nullable_item_project): nadal w pełni istnieją, razem ze
+        // swoimi plikami, załącznikami, tagami, historią i relacjami BOM, widoczne wyłącznie
+        // przez globalne wyszukiwanie "Cała baza". Świadoma decyzja — usunięcie projektu to
+        // usunięcie samego "kontenera", nie masowe kasowanie danych.
+        //
+        // items.project_id ma ON DELETE CASCADE (potrzebne osobno dla "Wyczyść bazę" w
+        // Ustawieniach, które MA kasować elementy kaskadowo) — stąd jawne odpięcie PRZED
+        // DELETE FROM projects, w jednej transakcji: bez tego kaskada zabrałaby ze sobą
+        // wszystkie elementy projektu, zanim zdążylibyśmy je odpiąć.
         app.MapDelete("/api/projects/{id:guid}", async (Guid id, HttpContext ctx) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
@@ -138,26 +144,46 @@ static class ProjectEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            var filePaths = new List<string>();
-            await using (var selectCmd = new NpgsqlCommand(
-                "SELECT file_path FROM items WHERE project_id = @id AND file_path IS NOT NULL;", conn))
+            // Nazwa projektu + kto był przypisany — zebrane PRZED DELETE (project_users jest
+            // kaskadowo kasowane razem z projektem), żeby móc powiadomić przypisanych już PO
+            // udanym usunięciu.
+            string? projectName = null;
+            await using (var nameCmd = new NpgsqlCommand("SELECT name FROM projects WHERE id = @id;", conn))
             {
-                selectCmd.Parameters.AddWithValue("id", id);
-                await using var reader = await selectCmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
-                    filePaths.Add(reader.GetString(0));
+                nameCmd.Parameters.AddWithValue("id", id);
+                projectName = (string?)await nameCmd.ExecuteScalarAsync();
             }
-
-            await using var deleteCmd = new NpgsqlCommand("DELETE FROM projects WHERE id = @id;", conn);
-            deleteCmd.Parameters.AddWithValue("id", id);
-            var affected = await deleteCmd.ExecuteNonQueryAsync();
-            if (affected == 0)
+            if (projectName is null)
                 return Results.NotFound();
 
-            foreach (var path in filePaths)
+            var assignedUserIds = new List<Guid>();
+            await using (var usersCmd = new NpgsqlCommand("SELECT user_id FROM project_users WHERE project_id = @id;", conn))
             {
-                try { File.Delete(path); } catch (IOException) { /* magazyn i tak jest sierocy — nie blokujemy usunięcia rekordu */ }
+                usersCmd.Parameters.AddWithValue("id", id);
+                await using var reader = await usersCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    assignedUserIds.Add(reader.GetGuid(0));
             }
+
+            await using (var tx = await conn.BeginTransactionAsync())
+            {
+                await using (var detachCmd = new NpgsqlCommand("UPDATE items SET project_id = NULL WHERE project_id = @id;", conn, tx))
+                {
+                    detachCmd.Parameters.AddWithValue("id", id);
+                    await detachCmd.ExecuteNonQueryAsync();
+                }
+
+                await using (var deleteCmd = new NpgsqlCommand("DELETE FROM projects WHERE id = @id;", conn, tx))
+                {
+                    deleteCmd.Parameters.AddWithValue("id", id);
+                    await deleteCmd.ExecuteNonQueryAsync();
+                }
+
+                await tx.CommitAsync();
+            }
+
+            foreach (var userId in assignedUserIds)
+                await Notifications.NotifyAsync(conn, app.Logger, userId, "project_deleted", new { projectName });
 
             return Results.Ok();
         });

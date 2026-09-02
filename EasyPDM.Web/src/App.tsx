@@ -25,6 +25,8 @@ import { LogsView } from "@/features/settings/logs-view"
 import { MyProjectsView } from "@/features/settings/my-projects-view"
 import { SettingsSidebar } from "@/features/settings/settings-sidebar"
 import { NamingSettingsView } from "@/features/settings/naming-settings-view"
+import { NotificationSettingsView } from "@/features/settings/notification-settings-view"
+import { NotificationBell } from "@/features/notifications/notification-bell"
 import { StorageSettingsView } from "@/features/settings/storage-settings-view"
 import { SupportSettingsView } from "@/features/settings/support-settings-view"
 import { TagFilterSelect } from "@/features/tags/tag-filter-select"
@@ -65,6 +67,10 @@ function App() {
   const [search, setSearch] = useState("")
   const [treeRefreshKey, setTreeRefreshKey] = useState(0)
   const debouncedSearch = useDebouncedValue(search, 300)
+  // Cel nawigacji z dzwonka powiadomień do konkretnego elementu w "Cała baza" — ItemList
+  // konsumuje to raz (zob. jego własny useEffect) i zgłasza zużycie przez
+  // onPendingItemSelectionConsumed, żeby nie zaznaczać tego samego elementu w kółko.
+  const [pendingItemSelection, setPendingItemSelection] = useState<string | null>(null)
 
   const { projects, refetch: refetchProjects } = useProjects()
   const { tags, refetch: refetchTags } = useTags()
@@ -120,6 +126,16 @@ function App() {
     setTreeRefreshKey((k) => k + 1)
   }
 
+  function navigateToProject(id: string) {
+    setProjectId(id)
+    setView("projects")
+  }
+
+  function navigateToItem(id: string) {
+    setView("database")
+    setPendingItemSelection(id)
+  }
+
   if (authLoading) return null
   if (!user) return <LoginView onLoggedIn={refetchAuth} />
 
@@ -153,6 +169,14 @@ function App() {
               <span>
                 {user.displayName} ({t(user.role === "admin" ? "app.role.admin" : "app.role.user")})
               </span>
+              <NotificationBell
+                onNavigateToItem={navigateToItem}
+                onNavigateToProject={navigateToProject}
+                onNavigateToSettings={() => {
+                  setView("settings")
+                  setSettingsSection("storage")
+                }}
+              />
               <LanguageSelect className="w-24" />
               <Button size="sm" variant="outline" onClick={logout}>
                 {t("app.logout")}
@@ -258,10 +282,9 @@ function App() {
               onItemsRefetch={refetchItems}
               onTagsRefetch={refetchTags}
               onProjectsRefetch={refetchProjects}
-              onNavigateToProject={(id) => {
-                setProjectId(id)
-                setView("projects")
-              }}
+              onNavigateToProject={navigateToProject}
+              pendingSelectedItemId={pendingItemSelection}
+              onPendingSelectedItemIdConsumed={() => setPendingItemSelection(null)}
             />
           )}
 
@@ -286,6 +309,10 @@ function App() {
           {view === "settings" &&
             settingsSection === "naming" &&
             (isAdmin ? <NamingSettingsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
+
+          {view === "settings" && settingsSection === "notifications" && (
+            <NotificationSettingsView isAdmin={isAdmin} />
+          )}
 
           {view === "settings" && settingsSection === "appearance" && <AppearanceSettingsView />}
 

@@ -41,6 +41,9 @@ function ClientDetailPanel({
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deletingPending, setDeletingPending] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [confirmingDeleteContactId, setConfirmingDeleteContactId] = useState<number | null>(null)
+  const [contactDeletePending, setContactDeletePending] = useState(false)
+  const [contactDeleteError, setContactDeleteError] = useState<string | null>(null)
 
   async function refetch() {
     const data = await api.getClient(id)
@@ -103,13 +106,25 @@ function ClientDetailPanel({
     }
   }
 
-  async function removeContact(contactId: number) {
-    await api.removeClientContact(id, contactId)
-    await refetch()
-    await onClientsRefetch()
+  async function confirmRemoveContact() {
+    if (confirmingDeleteContactId === null) return
+    setContactDeletePending(true)
+    setContactDeleteError(null)
+    try {
+      await api.removeClientContact(id, confirmingDeleteContactId)
+      setConfirmingDeleteContactId(null)
+      await refetch()
+      await onClientsRefetch()
+    } catch (err) {
+      setContactDeleteError(err instanceof ApiError ? err.message : t("client.deleteContactFailed"))
+    } finally {
+      setContactDeletePending(false)
+    }
   }
 
   if (!client) return null
+
+  const confirmingDeleteContact = client.contacts.find((c) => c.id === confirmingDeleteContactId) ?? null
 
   return (
     <div className="flex flex-col gap-4">
@@ -215,7 +230,7 @@ function ClientDetailPanel({
                         size="icon-xs"
                         variant="ghost"
                         aria-label={t("client.deleteContactAria")}
-                        onClick={() => removeContact(c.id)}
+                        onClick={() => setConfirmingDeleteContactId(c.id)}
                       >
                         <Trash2 className="size-3.5 text-muted-foreground" />
                       </Button>
@@ -252,6 +267,22 @@ function ClientDetailPanel({
           onCancel={() => setConfirmingDelete(false)}
           pending={deletingPending}
           error={deleteError}
+        />
+      )}
+
+      {confirmingDeleteContact && (
+        <ConfirmDialog
+          open
+          title={t("client.deleteContactAria")}
+          description={t("client.deleteContactConfirmDescription", {
+            name: [confirmingDeleteContact.firstName, confirmingDeleteContact.lastName].filter(Boolean).join(" ") || "-",
+          })}
+          confirmLabel={t("common.delete")}
+          variant="destructive"
+          onConfirm={confirmRemoveContact}
+          onCancel={() => setConfirmingDeleteContactId(null)}
+          pending={contactDeletePending}
+          error={contactDeleteError}
         />
       )}
     </div>

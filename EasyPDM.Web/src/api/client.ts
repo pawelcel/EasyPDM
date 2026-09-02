@@ -18,12 +18,16 @@ import type {
   Manufacturer,
   ManufacturerDetail,
   Material,
+  NotificationEntry,
+  NotificationPreference,
+  NotificationType,
   Project,
   ProjectUserAssignment,
   RevisionComment,
   SavedFilter,
   StorageInfo,
   Tag,
+  UsedInEntry,
   UserRole,
 } from "./types"
 
@@ -213,6 +217,33 @@ export const api = {
 
   getItemHistory: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/history`).then((r) => handleResponse<HistoryEntry[]>(r)),
+
+  getUsedIn: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/used-in`).then((r) => handleResponse<UsedInEntry[]>(r)),
+
+  getNotifications: () =>
+    fetch(`${BASE}/notifications`).then((r) =>
+      handleResponse<{ unreadCount: number; items: NotificationEntry[] }>(r)
+    ),
+
+  markNotificationRead: (id: string) =>
+    fetch(`${BASE}/notifications/${id}/read`, { method: "POST" }).then((r) => handleResponse<void>(r)),
+
+  markAllNotificationsRead: () =>
+    fetch(`${BASE}/notifications/read-all`, { method: "POST" }).then((r) => handleResponse<void>(r)),
+
+  deleteNotification: (id: string) =>
+    fetch(`${BASE}/notifications/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  getNotificationPreferences: () =>
+    fetch(`${BASE}/notification-preferences`).then((r) => handleResponse<NotificationPreference[]>(r)),
+
+  updateNotificationPreference: (type: NotificationType, enabled: boolean) =>
+    fetch(`${BASE}/notification-preferences`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, enabled }),
+    }).then((r) => handleResponse<void>(r)),
 
   lockItem: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/lock`, { method: "POST" }).then((r) =>

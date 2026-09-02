@@ -98,7 +98,13 @@ class ScheduledBackupService(
 
             const string sql = "UPDATE backup_schedule SET last_run_at = @now WHERE id = true;";
             await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("now", now);
+            // "now" jest Kind=Local (DateTime.Now, linia wyżej) — last_run_at to TIMESTAMPTZ,
+            // więc zapis wymaga jawnego ToUniversalTime() (symetrycznie do odczytu, który
+            // celowo robi ToLocalTime() na linii 63). Bez tego zapis albo rzuca wyjątkiem, albo
+            // zapisuje przesunięty w czasie znacznik — w obu przypadkach strażnik "już dziś była
+            // kopia" nigdy by się poprawnie nie włączył, a usługa próbowałaby ponownie co
+            // RetryInterval bez końca.
+            cmd.Parameters.AddWithValue("now", now.ToUniversalTime());
             await cmd.ExecuteNonQueryAsync(stoppingToken);
 
             _lastFailedAttemptAt = null;

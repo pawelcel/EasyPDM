@@ -24,16 +24,21 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`027` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`039` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
   per-user project access, item owner/lock, removal of the dead revision/checkout
   schema, history (status/revisions/attachments/lock), automatic backup schedule,
-  tracking of applied migrations. Since migration 027, files in this folder are
-  embedded in the program (embedded resources) and applied **automatically on every
-  startup** — see `MigrationRunner.cs` and "How to run" below — you no longer need to
-  run them manually through psql.
+  tracking of applied migrations, attachment preview/CAD role, item number letter
+  prefix per kind, Clients (catalog + own file tree), project-less items (an item can
+  exist with no project, reachable only through "Whole database"), manufacturer/client
+  contact address, BOM position default/uniqueness, notifications + per-type
+  preferences, the sample-project marker, and a small internal `system_state` flag
+  table. Since migration 027, files in this folder are embedded in the program
+  (embedded resources) and applied **automatically on every startup** — see
+  `MigrationRunner.cs` and "How to run" below — you no longer need to run them
+  manually through psql.
 - **`EasyPDM.Api/`** — ASP.NET Core (minimal API, Npgsql with no ORM), endpoints split
   by function under `Endpoints/` — full list below in "API endpoints". Also serves the
   built frontend from its own `wwwroot/`. A custom `FileLoggerProvider` (no extra NuGet
@@ -63,7 +68,7 @@ PostgreSQL 18.
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** and **`packaging/windows/`**
   (the `.exe` installer, Inno Setup) — three deployment paths without manually assembling
   the backend/frontend/database separately, see "How to run" below.
-- **`.github/workflows/`** — four CI workflows, all also runnable manually
+- **`.github/workflows/`** — seven CI workflows, all also runnable manually
   (`workflow_dispatch`) or via `gh workflow run <file>`:
   - `build.yml` — on every push/PR: backend build + integration tests
     (`EasyPDM.Api.Tests`, against a `postgres` service in CI) and frontend
@@ -72,7 +77,12 @@ PostgreSQL 18.
     additionally **actually installs it** on a Windows runner (PostgreSQL via
     Chocolatey, `/VERYSILENT`), checking twice (fresh install + a simulated update)
     that the service starts and the server responds — the only way to check this
-    without owning a physical/virtual Windows machine.
+    without owning a physical/virtual Windows machine. Also declared as a reusable
+    `workflow_call` (see `create-release-draft.yml` below).
+  - `build-linux-package.yml` — builds `EasyPDM-Linux-x64_v<version>.tar.gz` (self-contained
+    backend + built frontend + install/uninstall scripts + `db/schema.sql`) and actually
+    installs it on a clean Ubuntu runner to verify the service starts. Also declared as a
+    reusable `workflow_call`.
   - `test-linux-installer.yml` — actually runs `install-easypdm-linux.sh` on a clean
     Ubuntu (fresh install, "update", `uninstall-easypdm-linux.sh`), which the local
     development environment (no `sudo` password in this session) didn't allow doing.
@@ -84,6 +94,14 @@ PostgreSQL 18.
   - `publish-docker-release.yml` — same two images, but only on pushing a version tag
     (`v*`); this is the only workflow that updates `:latest` (what `docker-compose.yml`
     actually pulls), plus a matching `:vX.Y.Z` tag. See "Docker" below.
+  - `create-release-draft.yml` — also on pushing a version tag (`v*`), independently of
+    `publish-docker-release.yml`: first checks that `MyAppVersion` (`EasyPDM.iss`) and
+    `APP_VERSION` (`version.ts`) actually match the tag (fails fast otherwise), then calls
+    `build-windows-installer.yml`/`build-linux-package.yml` as reusable workflows and
+    creates a **draft** GitHub Release with both artifacts attached and release notes
+    extracted from the matching `## [X.Y]` section of `CHANGELOG.md`. Deliberately never
+    publishes it automatically — someone still has to review the draft and click
+    "Publish release".
 
 ### Data model — items and structure
 
@@ -127,12 +145,15 @@ owner lock/release (when/who), joined into one chronological list.
 
 **Owner and lock** (`owner_id`/`owner_locked`) — independent of status. The creator of a
 Part/Assembly immediately becomes its owner and the item is locked: while the lock
-lasts, only the owner can edit it (properties, name, status, visibility, moving to
-another project, attachments, the BOM structure underneath it) — **not even an
-administrator bypasses this**. Anyone can lock a released item, becoming its new owner;
-only the current owner can release it. An item in the `wydany`/released status is
-always released and has no owner — it cannot be locked. In the tree this is shown by a
-lock icon: green (locked by you), yellow (by someone else), open (released).
+lasts, only the owner can edit it (properties, name, visibility, moving to another
+project, attachments, the BOM structure underneath it) — **not even an administrator
+bypasses this**. Anyone can lock a released item, becoming its new owner; only the
+current owner can release it — **except an administrator, who can also take over
+(`POST /lock`) or force-release (`POST /release`) a lock held by someone else, and can
+change a locked item's status (`PATCH /status`) regardless of who owns it**, for cases
+like a coworker being away. An item in the `wydany`/released status is always released
+and has no owner — it cannot be locked. In the tree this is shown by a lock icon: green
+(locked by you), yellow (by someone else), open (released).
 
 An Assembly's BOM shows: position (editable by typing an integer — must be unique within
 that BOM — or by dragging the row), Name, Quantity, Material, Manufacturer, Order
@@ -418,9 +439,10 @@ runs this exact install → verify → uninstall sequence for real on a clean Ub
 so the packaged path is end-to-end tested too, not just the scripted one.
 
 Download the artifact via `gh run download <id> -n EasyPDM-Linux-x64_v<version>` or from
-the workflow run's page in the Actions tab — like `EasyPDM_Windows_v<version>.exe` below,
-this is currently **not** published to the repository's Releases page automatically (see
-the note under "Windows — installer" about the same gap there).
+the workflow run's page in the Actions tab — same as `EasyPDM_Windows_v<version>.exe`
+below, this only happens automatically when run manually; pushing a version tag instead
+attaches it to a draft GitHub Release automatically (see the note under "Windows —
+installer").
 
 ### Windows — installer (`.exe`, Inno Setup)
 
@@ -432,12 +454,13 @@ no need to have Windows or Inno Setup locally. Run it manually via `gh workflow 
 build-windows-installer.yml`, wait (`gh run watch`), download the artifact (`gh run
 download <id> -n EasyPDM_Windows_v<version>`).
 
-> This workflow only uploads `EasyPDM_Windows_v<version>.exe` as a GitHub Actions run
-> artifact (`actions/upload-artifact`) — it does **not** create/attach anything to the
-> repository's Releases page automatically. The README's "go to the Releases page and
-> download `EasyPDM_Windows_v<version>.exe`" step currently assumes someone does that
-> publish step by hand after downloading the artifact; automating it (e.g.
-> `softprops/action-gh-release` on a version tag) hasn't been set up yet.
+> Run manually (`workflow_dispatch`, e.g. after a plain push to `main`), this workflow
+> only uploads `EasyPDM_Windows_v<version>.exe` as a GitHub Actions run artifact
+> (`actions/upload-artifact`) — it does **not** touch the repository's Releases page.
+> Pushing a version tag (`vX.Y.Z`) is different: `create-release-draft.yml` calls this
+> workflow (and `build-linux-package.yml`) and attaches both artifacts to a **draft**
+> GitHub Release automatically — see the workflow list above. Publishing that draft
+> (reviewing it, then clicking "Publish release") is still a manual, deliberate step.
 
 Alternatively, to build locally on a Windows machine (.NET 10 SDK + Node.js +
 [Inno Setup Compiler](https://jrsoftware.org/isinfo.php)):

@@ -24,17 +24,23 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
 
 - **`db/schema.sql`** — das vollständige Schema von Grund auf (aktueller Stand nach allen
   Migrationen).
-- **`db/migrations/`** — Migrationen `002`–`027` für eine bereits bestehende Datenbank:
+- **`db/migrations/`** — Migrationen `002`–`039` für eine bereits bestehende Datenbank:
   Projekte, Elementtypen, Sichtbarkeit im Baum, Status/Revisionen, Materialien
   (+ Gruppen/Untergruppen), Anhänge, Stücklisten-Reihenfolge, Revisionskommentare,
   Anmeldung und Rollen, Projekteigenschaften, kaskadierendes Löschen, Reihenfolge der
   Baum-Wurzeln, Hersteller, gespeicherte Filter, projektbezogener Zugriff pro Benutzer,
   Eigentümer/Sperre eines Elements, Entfernung des toten Revisions-/Checkout-Schemas,
   Historie (Status/Revisionen/Anhänge/Sperre), Zeitplan für automatische Sicherungen,
-  Nachverfolgung angewendeter Migrationen. Seit Migration 027 sind die Dateien aus diesem
-  Ordner in das Programm eingebettet (embedded resources) und werden **automatisch bei
-  jedem Start** angewendet — siehe `MigrationRunner.cs` und "Inbetriebnahme" unten — sie
-  müssen nicht mehr manuell per psql ausgeführt werden.
+  Nachverfolgung angewendeter Migrationen, Vorschau-/CAD-Rolle von Anhängen, Buchstaben-
+  Präfix der Elementnummer pro Art, Kunden (Katalog + eigener Dateibaum), projektlose
+  Elemente (ein Element kann ohne Projekt existieren, nur über "Gesamte Datenbank"
+  erreichbar), Kontaktadresse von Hersteller/Kunde, Standardwert/Eindeutigkeit der
+  Stücklistenposition, Benachrichtigungen + deren Einstellungen pro Typ, Markierung des
+  Beispielprojekts sowie eine kleine interne Zustandstabelle `system_state`. Seit
+  Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
+  resources) und werden **automatisch bei jedem Start** angewendet — siehe
+  `MigrationRunner.cs` und "Inbetriebnahme" unten — sie müssen nicht mehr manuell per
+  psql ausgeführt werden.
 - **`EasyPDM.Api/`** — ASP.NET Core (minimale API, Npgsql ohne ORM), Endpunkte nach
   Funktion aufgeteilt unter `Endpoints/` — vollständige Liste unten unter
   "API-Endpunkte". Liefert auch das gebaute Frontend aus dem eigenen `wwwroot/` aus. Ein
@@ -70,7 +76,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** und **`packaging/windows/`**
   (der `.exe`-Installer, Inno Setup) — drei Bereitstellungswege, ohne Backend/Frontend/
   Datenbank manuell einzeln zusammenzusetzen, siehe "Inbetriebnahme" unten.
-- **`.github/workflows/`** — vier CI-Workflows, alle auch manuell ausführbar
+- **`.github/workflows/`** — sieben CI-Workflows, alle auch manuell ausführbar
   (`workflow_dispatch`) oder über `gh workflow run <datei>`:
   - `build.yml` — bei jedem Push/PR: Backend-Build + Integrationstests
     (`EasyPDM.Api.Tests`, gegen einen `postgres`-Dienst in der CI) sowie
@@ -79,7 +85,12 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
     **installiert es zusätzlich tatsächlich** auf einem Windows-Runner (PostgreSQL über
     Chocolatey, `/VERYSILENT`), wobei zweimal geprüft wird (frische Installation +
     simuliertes Update), dass der Dienst startet und der Server antwortet — der einzige
-    Weg, dies ohne einen physischen/virtuellen Windows-Rechner zu prüfen.
+    Weg, dies ohne einen physischen/virtuellen Windows-Rechner zu prüfen. Auch als
+    wiederverwendbarer `workflow_call` deklariert (siehe `create-release-draft.yml` unten).
+  - `build-linux-package.yml` — baut `EasyPDM-Linux-x64_v<Version>.tar.gz` (self-contained
+    Backend + gebautes Frontend + Installations-/Deinstallationsskripte + `db/schema.sql`)
+    und installiert es tatsächlich auf einem sauberen Ubuntu-Runner, um zu prüfen, dass der
+    Dienst startet. Ebenfalls als wiederverwendbarer `workflow_call` deklariert.
   - `test-linux-installer.yml` — führt `install-easypdm-linux.sh` tatsächlich auf einem
     sauberen Ubuntu aus (frische Installation, "Update", `uninstall-easypdm-linux.sh`),
     was die lokale Entwicklungsumgebung (kein `sudo`-Passwort in dieser Sitzung) nicht
@@ -93,6 +104,14 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
     Versions-Tags (`v*`); der einzige Workflow, der `:latest` aktualisiert (das, was
     `docker-compose.yml` tatsächlich zieht), plus einen passenden `:vX.Y.Z`-Tag. Siehe
     "Docker" unten.
+  - `create-release-draft.yml` — ebenfalls beim Push eines Versions-Tags (`v*`), unabhängig
+    von `publish-docker-release.yml`: prüft zuerst, ob `MyAppVersion` (`EasyPDM.iss`) und
+    `APP_VERSION` (`version.ts`) tatsächlich mit dem Tag übereinstimmen (bricht sonst sofort
+    ab), ruft dann `build-windows-installer.yml`/`build-linux-package.yml` als
+    wiederverwendbare Workflows auf und erstellt einen **Entwurf** (draft) eines GitHub
+    Release mit beiden angehängten Artefakten und Versionshinweisen aus dem passenden
+    `## [X.Y]`-Abschnitt der `CHANGELOG.md`. Veröffentlicht ihn bewusst nie automatisch —
+    jemand muss den Entwurf noch prüfen und auf "Publish release" klicken.
 
 ### Datenmodell — Elemente und Struktur
 
@@ -141,13 +160,16 @@ hinzugefügte/entfernte Anhang (wann/wer/Dateiname) und jede Eigentümersperre/-
 **Eigentümer und Sperre** (`owner_id`/`owner_locked`) — unabhängig vom Status. Der
 Ersteller eines Teils/einer Baugruppe wird sofort dessen/deren Eigentümer, und das
 Element wird gesperrt: Solange die Sperre besteht, kann nur der Eigentümer es bearbeiten
-(Eigenschaften, Name, Status, Sichtbarkeit, Verschieben in ein anderes Projekt, Anhänge,
-die Stücklistenstruktur darunter) — **nicht einmal ein Administrator umgeht dies**. Jeder
+(Eigenschaften, Name, Sichtbarkeit, Verschieben in ein anderes Projekt, Anhänge, die
+Stücklistenstruktur darunter) — **nicht einmal ein Administrator umgeht dies**. Jeder
 kann ein freigegebenes Element sperren und wird dadurch dessen neuer Eigentümer; nur der
-aktuelle Eigentümer kann es freigeben. Ein Element im Status `wydany`/freigegeben ist
-immer freigegeben und ohne Eigentümer — es kann nicht gesperrt werden. Im Baum wird dies
-durch ein Schloss-Symbol angezeigt: grün (von Ihnen gesperrt), gelb (von jemand
-anderem), offen (freigegeben).
+aktuelle Eigentümer kann es freigeben — **außer einem Administrator, der auch eine fremde
+Sperre übernehmen (`POST /lock`) oder erzwungen aufheben (`POST /release`) sowie den
+Status eines gesperrten Elements ändern kann (`PATCH /status`), unabhängig vom
+Eigentümer** — etwa bei Abwesenheit eines Mitarbeiters. Ein Element im Status
+`wydany`/freigegeben ist immer freigegeben und ohne Eigentümer — es kann nicht gesperrt
+werden. Im Baum wird dies durch ein Schloss-Symbol angezeigt: grün (von Ihnen gesperrt),
+gelb (von jemand anderem), offen (freigegeben).
 
 Die Stückliste einer Baugruppe zeigt: Position (editierbar durch Eingabe einer
 Ganzzahl — muss innerhalb dieser Stückliste eindeutig sein — oder durch Ziehen der

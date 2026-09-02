@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { api } from "@/api/client"
 import type { LogFile } from "@/api/types"
@@ -65,19 +65,28 @@ function LogsView() {
       .catch(() => setLoadError(true))
   }, [])
 
+  // Licznik żądań — "Odśwież" i zmiana daty w Select mogą odpalić dwa GET-y niemal
+  // jednocześnie; bez tego strażnika odpowiedź, która wróci PÓŹNIEJ (niekoniecznie ta,
+  // której użytkownik czeka jako ostatniej), mogłaby nadpisać zawartość nowszym-a-już-
+  // nieaktualnym wynikiem dla innej daty.
+  const loadRequestId = useRef(0)
+
   async function loadContent(date: string) {
     if (!date) return
+    const requestId = ++loadRequestId.current
     setLoading(true)
     setError("")
     try {
       const content = await api.getLogContent(date)
+      if (loadRequestId.current !== requestId) return
       setLines(content.lines)
       setTotalLines(content.totalLines)
       setTruncated(content.truncated)
     } catch (err) {
+      if (loadRequestId.current !== requestId) return
       setError(err instanceof Error ? err.message : t("logs.loadFailed"))
     } finally {
-      setLoading(false)
+      if (loadRequestId.current === requestId) setLoading(false)
     }
   }
 

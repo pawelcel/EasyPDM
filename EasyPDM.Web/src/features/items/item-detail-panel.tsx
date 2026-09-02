@@ -38,6 +38,7 @@ import { AttachmentsPanel } from "@/features/items/attachments-panel"
 import { useAuth } from "@/features/auth/use-auth"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { ItemHistoryPanel } from "@/features/items/item-history-panel"
+import { UsedInPanel } from "@/features/items/used-in-panel"
 import { OwnerControl } from "@/features/items/owner-control"
 import { PartPropertyForm, PartSummaryFields } from "@/features/items/part-property-form"
 import { PropertyEditor } from "@/features/items/property-editor"
@@ -67,6 +68,7 @@ function ItemNameField({
 }) {
   const { t } = useLanguage()
   const [name, setName] = useState(item.fileName)
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => setName(item.fileName), [item.fileName])
 
   async function saveName() {
@@ -75,8 +77,14 @@ function ItemNameField({
       setName(item.fileName)
       return
     }
-    await api.renameItem(item.id, trimmed)
-    await onChanged()
+    try {
+      setError(null)
+      await api.renameItem(item.id, trimmed)
+      await onChanged()
+    } catch (err) {
+      setName(item.fileName)
+      setError(err instanceof Error ? err.message : t("item.renameFailed"))
+    }
   }
 
   return (
@@ -91,6 +99,7 @@ function ItemNameField({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur()
         }}
       />
+      <FormError>{error}</FormError>
     </div>
   )
 }
@@ -257,8 +266,13 @@ function ItemDetailPanel({
   }
 
   async function handleRemoveTag(tagName: string) {
-    await api.removeTag(item.id, tagName)
-    await onItemsRefetch()
+    try {
+      setActionError(null)
+      await api.removeTag(item.id, tagName)
+      await onItemsRefetch()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t("tag.removeFailed"))
+    }
   }
 
   return (
@@ -551,6 +565,10 @@ function ItemDetailPanel({
       )}
 
       {(item.itemType === "part" || item.itemType === "assembly") && (
+        <UsedInPanel itemId={item.id} onSelectChild={onSelectChild} />
+      )}
+
+      {(item.itemType === "part" || item.itemType === "assembly") && (
         <ItemHistoryPanel itemId={item.id} refreshSignal={historyRefreshSignal} />
       )}
     </div>
@@ -626,6 +644,7 @@ function SortableBomRow({
             childId={child.id}
             quantity={quantity}
             onChanged={onItemsRefetch}
+            onError={setBomError}
             disabled={disabled}
           />
         </TableCell>
@@ -710,14 +729,17 @@ function BomQuantityCell({
   childId,
   quantity,
   onChanged,
+  onError,
   disabled = false,
 }: {
   parentId: string
   childId: string
   quantity: number
   onChanged: () => void | Promise<void>
+  onError: (message: string | null) => void
   disabled?: boolean
 }) {
+  const { t } = useLanguage()
   const initial = String(quantity)
   const [value, setValue] = useState(initial)
   useEffect(() => setValue(initial), [initial])
@@ -729,8 +751,14 @@ function BomQuantityCell({
       return
     }
     if (value === initial) return
-    await api.addChild(parentId, childId, parsed)
-    await onChanged()
+    try {
+      onError(null)
+      await api.addChild(parentId, childId, parsed)
+      await onChanged()
+    } catch (err) {
+      setValue(initial)
+      onError(err instanceof Error ? err.message : t("item.quantityFailed"))
+    }
   }
 
   return (

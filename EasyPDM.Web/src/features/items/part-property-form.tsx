@@ -4,6 +4,7 @@ import { api } from "@/api/client"
 import { canEditOwnerLocked, isLocked, type Item } from "@/api/types"
 import { useAuth } from "@/features/auth/use-auth"
 import { Button } from "@/components/ui/button"
+import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -45,6 +46,7 @@ function PartSummaryFields({
   const locked = statusLocked || ownerBlocked
 
   const [name, setName] = useState(item.fileName)
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => setName(item.fileName), [item.fileName])
 
   async function saveName() {
@@ -53,13 +55,24 @@ function PartSummaryFields({
       setName(item.fileName)
       return
     }
-    await api.renameItem(item.id, trimmed)
-    await onChanged()
+    try {
+      setError(null)
+      await api.renameItem(item.id, trimmed)
+      await onChanged()
+    } catch (err) {
+      setName(item.fileName)
+      setError(err instanceof Error ? err.message : t("item.renameFailed"))
+    }
   }
 
   async function changeRodzaj(next: string) {
-    await api.updateProperties(item.id, { rodzaj: next })
-    await onChanged()
+    try {
+      setError(null)
+      await api.updateProperties(item.id, { rodzaj: next })
+      await onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("part.saveFieldFailed"))
+    }
   }
 
   async function saveField(key: string, value: string) {
@@ -129,10 +142,12 @@ function PartSummaryFields({
           value={typeof item.properties.material === "string" ? item.properties.material : ""}
           onSave={saveField}
           disabled={locked}
+          onError={setError}
         />
       )}
 
       {!isAssembly && !rodzaj && <Hint>{t("part.selectKindHint")}</Hint>}
+      <FormError>{error}</FormError>
     </div>
   )
 }
@@ -150,6 +165,7 @@ function PartPropertyForm({
   const statusLocked = isLocked(item)
   const ownerBlocked = user ? !canEditOwnerLocked(item, user.id) : false
   const locked = statusLocked || ownerBlocked
+  const [error, setError] = useState<string | null>(null)
 
   async function saveField(key: string, value: string) {
     await api.updateProperties(item.id, { [key]: value })
@@ -165,32 +181,34 @@ function PartPropertyForm({
     <div className="flex flex-col gap-2">
       {rodzaj === "Wykonywana" && (
         <>
-          <PriceRow item={item} onChanged={onChanged} />
-          <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} />
+          <PriceRow item={item} onChanged={onChanged} onError={setError} />
+          <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
         </>
       )}
 
       {rodzaj === "Zakupowa" && (
         <>
-          <ManufacturerField value={propValue("manufacturer")} onSave={saveField} disabled={locked} />
-          <PropField label={t("part.orderNumber")} propKey="orderNumber" value={propValue("orderNumber")} onSave={saveField} disabled={locked} />
-          <PropField label={t("part.orderNumber2")} propKey="orderNumber2" value={propValue("orderNumber2")} onSave={saveField} disabled={locked} />
-          <PropField label={t("part.mass")} propKey="mass" value={propValue("mass")} onSave={saveField} type="number" disabled={locked} />
-          <PriceRow item={item} onChanged={onChanged} />
-          <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} />
+          <ManufacturerField value={propValue("manufacturer")} onSave={saveField} disabled={locked} onError={setError} />
+          <PropField label={t("part.orderNumber")} propKey="orderNumber" value={propValue("orderNumber")} onSave={saveField} disabled={locked} onError={setError} />
+          <PropField label={t("part.orderNumber2")} propKey="orderNumber2" value={propValue("orderNumber2")} onSave={saveField} disabled={locked} onError={setError} />
+          <PropField label={t("part.mass")} propKey="mass" value={propValue("mass")} onSave={saveField} type="number" disabled={locked} onError={setError} />
+          <PriceRow item={item} onChanged={onChanged} onError={setError} />
+          <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
         </>
       )}
 
       {rodzaj === "Normalia" && (
         <>
-          <PropField label={t("part.norm")} propKey="norm" value={propValue("norm")} onSave={saveField} disabled={locked} />
-          <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} />
+          <PropField label={t("part.norm")} propKey="norm" value={propValue("norm")} onSave={saveField} disabled={locked} onError={setError} />
+          <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
         </>
       )}
 
       {rodzaj === "Klienta" && (
-        <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} />
+        <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
       )}
+
+      <FormError>{error}</FormError>
     </div>
   )
 }
@@ -198,9 +216,11 @@ function PartPropertyForm({
 function PriceRow({
   item,
   onChanged,
+  onError,
 }: {
   item: Item
   onChanged: () => void | Promise<void>
+  onError?: (message: string | null) => void
 }) {
   const { t } = useLanguage()
   const stored = item.properties.price
@@ -213,11 +233,17 @@ function PriceRow({
   useEffect(() => setPrice(initial), [initial])
 
   async function save(fields: Record<string, string>) {
-    await api.updateProperties(item.id, {
-      ...fields,
-      priceDate: new Date().toISOString().slice(0, 10),
-    })
-    await onChanged()
+    try {
+      onError?.(null)
+      await api.updateProperties(item.id, {
+        ...fields,
+        priceDate: new Date().toISOString().slice(0, 10),
+      })
+      await onChanged()
+    } catch (err) {
+      if ("price" in fields) setPrice(initial)
+      onError?.(err instanceof Error ? err.message : t("part.saveFieldFailed"))
+    }
   }
 
   return (

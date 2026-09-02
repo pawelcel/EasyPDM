@@ -11,6 +11,15 @@ name: Build Linux Package
 # skrypt.
 on:
   workflow_dispatch:
+  # Wołane też z create-release-draft.yml (fan-in: ten workflow + build-windows-installer.yml
+  # razem tworzą artefakty, z których create-release-draft.yml składa szkic Release'a) —
+  # "outputs" niżej wynosi nazwę zbudowanej paczki do workflow wołającego, żeby mógł ją
+  # pobrać przez actions/download-artifact bez zgadywania/parsowania nazwy.
+  workflow_call:
+    outputs:
+      artifact-name:
+        description: "Nazwa artefaktu (paczka Linux)"
+        value: ${{ jobs.build.outputs.artifact-name }}
   push:
     branches: [main]
     paths:
@@ -24,6 +33,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.package.outputs.pkg-name }}
     steps:
       - uses: actions/checkout@v5
 
@@ -58,6 +69,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Złóż paczkę
+        id: package
         env:
           PKG_NAME: EasyPDM-Linux-x64_v${{ steps.version.outputs.version }}
         run: |
@@ -68,6 +80,7 @@ jobs:
           chmod +x pkg/install-easypdm-linux.sh pkg/uninstall-easypdm-linux.sh
           tar czf "$PKG_NAME.tar.gz" -C pkg .
           echo "PKG_NAME=$PKG_NAME" >> "$GITHUB_ENV"
+          echo "pkg-name=$PKG_NAME" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v5
         with:

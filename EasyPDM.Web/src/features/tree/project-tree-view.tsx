@@ -397,6 +397,7 @@ function ProjectTreeView({
             selectionMode={selectionMode}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
+            onError={setItemActionError}
           />
         </div>
 

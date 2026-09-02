@@ -91,17 +91,23 @@ static class UserEndpoints
             await conn.OpenAsync();
 
             // Nie pozwalamy odebrać roli administratora ostatniemu adminowi w systemie —
-            // inaczej nikt nie mógłby już zarządzać użytkownikami.
-            if (body.Role == "user" && await IsLastAdmin(conn, id))
-                return Results.BadRequest("Nie można odebrać roli administratora ostatniemu adminowi.");
-
+            // inaczej nikt nie mógłby już zarządzać użytkownikami. Warunek w WHERE (nie osobne
+            // sprawdzenie przed UPDATE-em) zamyka wyścig: dwóch adminów degradujących się
+            // niemal jednocześnie (albo degradujący się nawzajem) czytaliby "liczba adminów"
+            // z osobnych zapytań chwilę wcześniej i oboje mogliby przejść starą, nieatomową
+            // wersję tego sprawdzenia, zostawiając system bez żadnego administratora.
+            // "@role IS DISTINCT FROM 'user'" (NULL-safe) — bez tego NULL (czyli "nie zmieniaj
+            // roli") w porównaniu z 'user' dawałoby SQL NULL zamiast true, więc zwykłe zmiany
+            // nazwy/e-maila/hasła (bez dotykania roli) byłyby błędnie blokowane dla adminów.
             const string sql = """
                 UPDATE users SET
                     display_name = COALESCE(@displayName, display_name),
                     email = CASE WHEN @emailProvided THEN @email ELSE email END,
                     role = COALESCE(@role, role),
                     password_hash = COALESCE(@hash, password_hash)
-                WHERE id = @id;
+                WHERE id = @id
+                  AND (@role IS DISTINCT FROM 'user' OR role <> 'admin'
+                       OR (SELECT COUNT(*) FROM users WHERE role = 'admin') > 1);
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
@@ -113,7 +119,24 @@ static class UserEndpoints
                 "hash", string.IsNullOrEmpty(body.Password) ? DBNull.Value : PasswordHasher.Hash(body.Password));
             var affected = await cmd.ExecuteNonQueryAsync();
 
-            return affected == 0 ? Results.NotFound() : Results.Ok();
+            if (affected == 0)
+            {
+                // 0 wierszy — albo user nie istnieje, albo (gdy body.Role == "user") to był
+                // ostatni admin. Osobny odczyt tylko po to, żeby zwrócić właściwy komunikat.
+                await using var existsCmd = new NpgsqlCommand("SELECT 1 FROM users WHERE id = @id;", conn);
+                existsCmd.Parameters.AddWithValue("id", id);
+                if (await existsCmd.ExecuteScalarAsync() is not null)
+                    return Results.BadRequest("Nie można odebrać roli administratora ostatniemu adminowi.");
+                return Results.NotFound();
+            }
+
+            // Pomiń, gdy admin zmienia WŁASNE hasło tędy — nie ma sensu informować kogoś o
+            // czymś, co sam właśnie zrobił.
+            var actor = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!string.IsNullOrEmpty(body.Password) && actor.Id != id)
+                await Notifications.NotifyAsync(conn, app.Logger, id, "password_changed", new { });
+
+            return Results.Ok();
         });
 
         // DELETE /api/users/{id}
@@ -125,36 +148,30 @@ static class UserEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            if (await IsLastAdmin(conn, id))
-                return Results.BadRequest("Nie można usunąć ostatniego administratora.");
-
-            await using var cmd = new NpgsqlCommand("DELETE FROM users WHERE id = @id;", conn);
+            // Atomowe — ten sam wyścig i to samo uzasadnienie co w PATCH powyżej (zob.
+            // komentarz tam): warunek "czy to ostatni admin" musi siedzieć w samym WHERE, nie
+            // w osobnym sprawdzeniu przed DELETE.
+            const string sql = """
+                DELETE FROM users
+                WHERE id = @id
+                  AND (role <> 'admin' OR (SELECT COUNT(*) FROM users WHERE role = 'admin') > 1);
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             var affected = await cmd.ExecuteNonQueryAsync();
 
-            return affected == 0 ? Results.NotFound() : Results.Ok();
+            if (affected > 0)
+                return Results.Ok();
+
+            await using var existsCmd = new NpgsqlCommand("SELECT 1 FROM users WHERE id = @id;", conn);
+            existsCmd.Parameters.AddWithValue("id", id);
+            if (await existsCmd.ExecuteScalarAsync() is not null)
+                return Results.BadRequest("Nie można usunąć ostatniego administratora.");
+            return Results.NotFound();
         });
     }
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
-
-    // Sprawdza, czy usunięcie/zdegradowanie danego użytkownika zostawiłoby system bez
-    // ŻADNEGO administratora — tylko wtedy, gdy TEN użytkownik sam jest adminem.
-    private static async Task<bool> IsLastAdmin(NpgsqlConnection conn, Guid userId)
-    {
-        // COALESCE(..., false) na pierwszym warunku -- bez tego, dla nieistniejącego @id
-        // podzapytanie "role" daje SQL NULL, a "NULL = 'admin'" to NULL (nie false), więc
-        // całe wyrażenie (NULL AND ...) wraca jako NULL zamiast booleana -- ExecuteScalarAsync
-        // zwróciłby wtedy DBNull.Value, a rzutowanie (bool) niżej rzucałoby InvalidCastException
-        // zamiast zwrócić poprawne "nie, to nie jest ostatni admin" dla nieistniejącego usera.
-        const string sql = """
-            SELECT COALESCE((SELECT role FROM users WHERE id = @id) = 'admin', false)
-               AND (SELECT COUNT(*) FROM users WHERE role = 'admin') <= 1;
-            """;
-        await using var cmd = new NpgsqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("id", userId);
-        return (bool)(await cmd.ExecuteScalarAsync())!;
-    }
 }
 
 record CreateUserRequest(string Username, string Password, string DisplayName, string? Email, string Role);

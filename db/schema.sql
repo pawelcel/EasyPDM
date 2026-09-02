@@ -36,7 +36,8 @@ CREATE TABLE projects (
     client      TEXT,  -- wolny tekst, historyczny -- nowe projekty łączy się z klientem przez client_id (patrz sekcja Klienci, kolumna dołożona niżej przez ALTER TABLE, bo clients jest zdefiniowane dalej w pliku)
     start_date  DATE,
     end_date    DATE,
-    created_at  TIMESTAMPTZ DEFAULT now()
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    is_sample   BOOLEAN NOT NULL DEFAULT false  -- projekt startowy zasiany przez EnsureSampleProjectAsync (Program.cs)
 );
 
 -- Przypisania użytkowników do projektów — zwykły użytkownik ("user") widzi i może
@@ -184,6 +185,44 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON clients, client_contacts, client_nodes T
 ALTER TABLE projects ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL;
 CREATE INDEX idx_projects_client ON projects (client_id);
 
+-- ============================================================
+-- Powiadomienia -- zdarzenia dotyczące elementów/projektów/konta, adresowane do
+-- konkretnego użytkownika, plus per-użytkownik wyłączenia poszczególnych typów.
+-- ============================================================
+CREATE TABLE notifications (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type       TEXT NOT NULL CHECK (type IN (
+        'status_review', 'status_released', 'status_regressed', 'new_revision',
+        'project_assigned', 'project_unassigned', 'project_deleted',
+        'password_changed', 'low_disk_space', 'sample_project'
+    )),
+    -- Dane do wyrenderowania treści PO STRONIE FRONTU (i18n, 3 języki) -- ten sam
+    -- wzorzec co HistoryEntry/ItemHistoryPanel: zapisujemy surowe dane (nazwy/numery
+    -- w momencie zdarzenia, żeby przetrwały ewentualne późniejsze zmiany/usunięcia),
+    -- front dobiera odpowiedni klucz tłumaczenia wg "type".
+    data       JSONB NOT NULL DEFAULT '{}',
+    -- Cele nawigacji "przejdź do" -- ON DELETE SET NULL (nie CASCADE), żeby sama
+    -- wiadomość i jej treść (data) przetrwały nawet po skasowaniu elementu/projektu;
+    -- front po prostu nie pokazuje przycisku "przejdź", gdy pole jest NULL.
+    item_id    UUID REFERENCES items(id) ON DELETE SET NULL,
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+    read_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_notifications_user ON notifications (user_id, created_at DESC);
+GRANT SELECT, INSERT, UPDATE, DELETE ON notifications TO pdm_user;
+
+-- Per-użytkownik wyłączenia (opt-out): brak wiersza = włączone (domyślnie wszystko
+-- włączone bez potrzeby zasiewania wiersza dla każdego usera x każdy typ).
+CREATE TABLE notification_preferences (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type    TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    PRIMARY KEY (user_id, type)
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO pdm_user;
+
 CREATE TABLE item_tags (
     item_id UUID REFERENCES items(id) ON DELETE CASCADE,
     tag_id  INT REFERENCES tags(id) ON DELETE CASCADE,
@@ -308,6 +347,16 @@ INSERT INTO backup_schedule (id, day_of_week, day_of_month) VALUES (true, 0, 1);
 
 GRANT SELECT, INSERT, UPDATE ON backup_schedule TO pdm_user;
 
+-- Trwały znacznik stanu serwera, którego celowo NIE dotyka "Wyczyść bazę" (czyści tylko
+-- projects/materials/manufacturers/clients) -- bez tego, po ręcznym wyczyszczeniu Projektów
+-- na już zasiedlonej instancji, kolejny restart procesu widziałby pustą tabelę projects i
+-- ponownie zasiewał przykładowy projekt startowy (EnsureSampleProjectAsync w Program.cs).
+CREATE TABLE system_state (
+    id                     BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+    sample_project_seeded  BOOLEAN NOT NULL DEFAULT false
+);
+GRANT SELECT, INSERT, UPDATE ON system_state TO pdm_user;
+
 -- ============================================================
 -- Zapisane filtry widoku "Cała baza" — każdy użytkownik zapisuje własne zestawy filtrów
 -- (wyszukiwanie, tag, typ rekordu, rodzaj części, producent) pod wybraną nazwą; zapis pod
@@ -354,4 +403,5 @@ INSERT INTO schema_migrations (filename) VALUES
     ('029_item_number_prefix.sql'), ('030_attachment_cad_role.sql'),
     ('031_clients.sql'), ('032_nullable_item_project.sql'),
     ('033_manufacturer_contact_address.sql'), ('034_client_contact_address.sql'),
-    ('035_item_relations_position_default.sql'), ('036_item_relations_position_unique.sql');
+    ('035_item_relations_position_default.sql'), ('036_item_relations_position_unique.sql'),
+    ('037_notifications.sql'), ('038_project_is_sample.sql'), ('039_system_state.sql');

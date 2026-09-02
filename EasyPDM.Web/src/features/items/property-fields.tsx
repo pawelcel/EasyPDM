@@ -44,13 +44,24 @@ function MaterialField({
   value,
   onSave,
   disabled,
+  onError,
 }: {
   value: string
   onSave: (key: string, value: string) => void | Promise<void>
   disabled: boolean
+  onError?: (message: string | null) => void
 }) {
   const { t } = useLanguage()
   const { materials } = useMaterials()
+
+  async function save(next: string) {
+    try {
+      onError?.(null)
+      await onSave("material", next)
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : t("part.saveFieldFailed"))
+    }
+  }
 
   // Grupa/podgrupa tu to wyłącznie pomoc przy zawężaniu wyboru materiału poniżej — nie są
   // same w sobie zapisywane we właściwościach Części (ta zapisuje tylko nazwę materiału).
@@ -100,7 +111,7 @@ function MaterialField({
           <Combobox
             items={filteredMaterialNames}
             value={value || null}
-            onValueChange={(v) => onSave("material", (v as string | null) ?? "")}
+            onValueChange={(v) => save((v as string | null) ?? "")}
             itemToStringLabel={(name: string) => name}
             disabled={disabled}
           >
@@ -175,15 +186,26 @@ function ManufacturerField({
   value,
   onSave,
   disabled,
+  onError,
 }: {
   value: string
   onSave: (key: string, value: string) => void | Promise<void>
   disabled: boolean
+  onError?: (message: string | null) => void
 }) {
   const { t } = useLanguage()
   const { manufacturers } = useManufacturers("")
   const manufacturerNames = manufacturers.map((m) => m.name)
   const matched = manufacturers.find((m) => m.name === value)
+
+  async function save(next: string) {
+    try {
+      onError?.(null)
+      await onSave("manufacturer", next)
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : t("part.saveFieldFailed"))
+    }
+  }
 
   return (
     <>
@@ -194,7 +216,7 @@ function ManufacturerField({
             <Combobox
               items={manufacturerNames}
               value={value || null}
-              onValueChange={(v) => onSave("manufacturer", (v as string | null) ?? "")}
+              onValueChange={(v) => save((v as string | null) ?? "")}
               itemToStringLabel={(name: string) => name}
               disabled={disabled}
             >
@@ -294,6 +316,7 @@ function PropField({
   onSave,
   type = "text",
   disabled = false,
+  onError,
 }: {
   label: string
   propKey: string
@@ -301,9 +324,22 @@ function PropField({
   onSave: (key: string, value: string) => void | Promise<void>
   type?: "text" | "number"
   disabled?: boolean
+  onError?: (message: string | null) => void
 }) {
+  const { t } = useLanguage()
   const [localValue, setLocalValue] = useState(value)
   useEffect(() => setLocalValue(value), [value])
+
+  async function save() {
+    if (localValue === value) return
+    try {
+      onError?.(null)
+      await onSave(propKey, localValue)
+    } catch (err) {
+      setLocalValue(value)
+      onError?.(err instanceof Error ? err.message : t("part.saveFieldFailed"))
+    }
+  }
 
   return (
     <>
@@ -315,9 +351,7 @@ function PropField({
         value={localValue}
         disabled={disabled}
         onChange={(e) => setLocalValue(e.target.value)}
-        onBlur={() => {
-          if (localValue !== value) onSave(propKey, localValue)
-        }}
+        onBlur={save}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur()
         }}

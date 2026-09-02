@@ -55,6 +55,7 @@ function ItemTree({
   selectionMode,
   selectedIds,
   onToggleSelect,
+  onError,
 }: {
   tree: Tree
   projectId: string
@@ -66,6 +67,7 @@ function ItemTree({
   selectionMode: boolean
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
+  onError?: (message: string | null) => void
 }) {
   const { t } = useLanguage()
   const rootSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
@@ -83,8 +85,13 @@ function ItemTree({
     const toIndex = ids.indexOf(String(over.id))
     if (fromIndex === -1 || toIndex === -1) return
 
-    await api.reorderRoots(projectId, arrayMove(ids, fromIndex, toIndex))
-    await tree.refetch()
+    try {
+      onError?.(null)
+      await api.reorderRoots(projectId, arrayMove(ids, fromIndex, toIndex))
+      await tree.refetch()
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : t("item.reorderFailed"))
+    }
   }
 
   return (
@@ -146,6 +153,7 @@ function ItemTree({
                   selectionMode={selectionMode}
                   selectedIds={selectedIds}
                   onToggleSelect={onToggleSelect}
+                  onError={onError}
                 />
               ))}
             </SortableContext>
@@ -172,6 +180,7 @@ function TreeNode({
   selectionMode,
   selectedIds,
   onToggleSelect,
+  onError,
 }: {
   item: Item
   quantity: number | null
@@ -185,6 +194,7 @@ function TreeNode({
   selectionMode: boolean
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
+  onError?: (message: string | null) => void
 }) {
   const { t } = useLanguage()
   const { user } = useAuth()
@@ -212,8 +222,13 @@ function TreeNode({
     const toIndex = ids.indexOf(String(over.id))
     if (fromIndex === -1 || toIndex === -1) return
 
-    await api.reorderChildren(item.id, arrayMove(ids, fromIndex, toIndex))
-    await onRefetch()
+    try {
+      onError?.(null)
+      await api.reorderChildren(item.id, arrayMove(ids, fromIndex, toIndex))
+      await onRefetch()
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : t("item.reorderFailed"))
+    }
   }
 
   return (
@@ -305,9 +320,14 @@ function TreeNode({
                 // Element staje się BEZ PROJEKTU zamiast pokazywać się w korzeniu bieżącego
                 // projektu (patrz project-tree-view.tsx: handleRemoveFromStructure) — nadal
                 // w pełni widoczny i znajdywalny przez globalne wyszukiwanie ("Cała baza").
-                await api.removeChild(parentId, item.id)
-                await api.moveItemToProject(item.id, null)
-                await onRefetch()
+                try {
+                  onError?.(null)
+                  await api.removeChild(parentId, item.id)
+                  await api.moveItemToProject(item.id, null)
+                  await onRefetch()
+                } catch (err) {
+                  onError?.(err instanceof Error ? err.message : t("item.removeFromStructureFailed"))
+                }
               }}
             >
               <X className="size-3" />
@@ -341,6 +361,7 @@ function TreeNode({
                   selectionMode={selectionMode}
                   selectedIds={selectedIds}
                   onToggleSelect={onToggleSelect}
+                  onError={onError}
                 />
               ))}
             </div>

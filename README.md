@@ -29,8 +29,9 @@ my own use, and since it already exists and works — why not share it with othe
   in by hand every time, so names don't drift apart between projects.
 - **Search across the whole company database**, not just the current project — handy
   when you want to check whether a similar part already exists somewhere.
-- **Item locking** — while you're working on something, no one else (not even an
-  administrator) can overwrite your changes without your consent.
+- **Item locking** — while you're working on something, no one else can overwrite your
+  changes without your consent (an administrator can take over or release someone
+  else's lock if needed — e.g. when the owner is away).
 
 ## First run
 
@@ -151,10 +152,12 @@ added/removed attachment, every lock/release.
 ### Who's editing — item locking
 
 The creator of a Part/Assembly immediately becomes its owner, and the item is locked —
-while the lock lasts, only the owner can edit it (not even an administrator bypasses
-this). In the tree this is shown by the color of the lock icon: green — locked by you,
-yellow — by someone else, open — released (anyone can lock it). A released item is
-always released (unlocked).
+while the lock lasts, only the owner can edit its properties (not even an administrator
+bypasses this). An administrator can, however, take over or release someone else's lock
+and change a locked item's status — e.g. when a coworker is away and their unfinished
+item needs to be unblocked. In the tree this is shown by the color of the lock icon:
+green — locked by you, yellow — by someone else, open — released (anyone can lock it).
+A released item is always released (unlocked).
 
 ### Bill of materials (BOM)
 

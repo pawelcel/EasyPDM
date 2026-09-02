@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 
 import { api } from "@/api/client"
 import type { ManagedUser, Project, ProjectUserAssignment } from "@/api/types"
+import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { SectionLabel } from "@/components/ui/section-label"
 import {
@@ -21,6 +22,7 @@ function ProjectAccessView({ users }: { users: ManagedUser[] }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [assignments, setAssignments] = useState<ProjectUserAssignment[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const refetch = useCallback(async () => {
     const [projectsData, assignmentsData] = await Promise.all([
@@ -50,12 +52,17 @@ function ProjectAccessView({ users }: { users: ManagedUser[] }) {
 
   async function toggle(userId: string, checked: boolean) {
     if (!selectedProjectId) return
-    if (checked) {
-      await api.grantProjectAccess(selectedProjectId, userId)
-    } else {
-      await api.revokeProjectAccess(selectedProjectId, userId)
+    try {
+      setError(null)
+      if (checked) {
+        await api.grantProjectAccess(selectedProjectId, userId)
+      } else {
+        await api.revokeProjectAccess(selectedProjectId, userId)
+      }
+      await refetch()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("projectAccess.saveFailed"))
     }
-    await refetch()
   }
 
   return (
@@ -108,6 +115,7 @@ function ProjectAccessView({ users }: { users: ManagedUser[] }) {
               </ul>
             )}
           </div>
+          <FormError>{error}</FormError>
         </div>
       )}
     </div>

@@ -22,13 +22,18 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`027` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`039` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
   użytkownik, właściciel/blokada elementu, usunięcie martwego schematu rewizji/checkout,
   historia (status/rewizje/załączniki/blokada), harmonogram automatycznej kopii zapasowej,
-  śledzenie zastosowanych migracji. Od migracji 027 pliki z tego folderu są wbudowane
+  śledzenie zastosowanych migracji, rola podglądu/CAD załącznika, literowy prefiks numeru
+  elementu per rodzaj, Klienci (katalog + własne drzewko plików), elementy bez projektu
+  (element może istnieć bez żadnego projektu, dostępny wyłącznie przez "Cała baza"), adres
+  kontaktu producenta/klienta, domyślna wartość/unikalność pozycji BOM, powiadomienia + ich
+  preferencje per typ, znacznik przykładowego projektu oraz mała wewnętrzna tabela flag
+  `system_state`. Od migracji 027 pliki z tego folderu są wbudowane
   w program (embedded resources) i stosowane **automatycznie przy każdym starcie** — zob.
   `MigrationRunner.cs` i "Jak uruchomić" niżej — nie trzeba ich już odpalać ręcznie przez psql.
 - **`EasyPDM.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
@@ -60,7 +65,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i **`packaging/windows/`**
   (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez ręcznego składania z osobna
   backendu/frontendu/bazy, zob. "Jak uruchomić" niżej.
-- **`.github/workflows/`** — cztery workflowy CI, wszystkie uruchamialne też ręcznie
+- **`.github/workflows/`** — siedem workflowów CI, wszystkie uruchamialne też ręcznie
   (`workflow_dispatch`) albo przez `gh workflow run <plik>`:
   - `build.yml` — przy każdym pushu/PR: build backendu + testy integracyjne
     (`EasyPDM.Api.Tests`, przeciwko usłudze `postgres` w CI) i typy/lint/build frontendu.
@@ -68,7 +73,12 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
     **realnie go instaluje** na windowsowym runnerze (PostgreSQL przez Chocolatey,
     `/VERYSILENT`), sprawdzając dwukrotnie (świeża instalacja + symulacja aktualizacji), że
     usługa startuje i serwer odpowiada — jedyny sposób, żeby to sprawdzić bez posiadania
-    fizycznego/wirtualnego Windows.
+    fizycznego/wirtualnego Windows. Zadeklarowany też jako reużywalny `workflow_call` (zob.
+    `create-release-draft.yml` niżej).
+  - `build-linux-package.yml` — buduje `EasyPDM-Linux-x64_v<wersja>.tar.gz` (self-contained
+    backend + zbudowany frontend + skrypty instalacyjne + `db/schema.sql`) i realnie instaluje
+    go na czystym runnerze Ubuntu, żeby sprawdzić, że usługa startuje. Też zadeklarowany jako
+    reużywalny `workflow_call`.
   - `test-linux-installer.yml` — uruchamia `install-easypdm-linux.sh` naprawdę na czystym
     Ubuntu (świeża instalacja, "aktualizacja", `uninstall-easypdm-linux.sh`), czego lokalne
     środowisko deweloperskie (bez hasła do `sudo` w tej sesji) nie pozwalało zrobić.
@@ -80,6 +90,14 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   - `publish-docker-release.yml` — te same dwa obrazy, ale tylko przy wypchnięciu taga
     wersji (`v*`); to jedyny workflow aktualizujący `:latest` (to, co realnie ściąga
     `docker-compose.yml`), plus pasujący tag `:vX.Y.Z`. Zob. "Docker" niżej.
+  - `create-release-draft.yml` — też przy wypchnięciu taga wersji (`v*`), niezależnie od
+    `publish-docker-release.yml`: najpierw sprawdza, czy `MyAppVersion` (`EasyPDM.iss`) i
+    `APP_VERSION` (`version.ts`) faktycznie zgadzają się z tagiem (inaczej od razu przerywa),
+    potem woła `build-windows-installer.yml`/`build-linux-package.yml` jako reużywalne
+    workflowy i tworzy **szkic** (draft) Release'a na GitHubie z dołączonymi obydwoma
+    artefaktami i notatkami wyciągniętymi z pasującej sekcji `## [X.Y]` w `CHANGELOG.md`.
+    Świadomie nigdy nie publikuje go automatycznie — ktoś musi przejrzeć szkic i kliknąć
+    "Publish release".
 
 ### Model danych — elementy i struktura
 
@@ -120,13 +138,16 @@ w jedną chronologiczną listę.
 
 **Właściciel i blokada** (`owner_id`/`owner_locked`) — niezależne od statusu. Twórca
 Części/Złożenia staje się od razu jej właścicielem i element jest zablokowany: dopóki trwa
-blokada, tylko właściciel może go edytować (właściwości, nazwa, status, widoczność,
-przeniesienie do innego projektu, załączniki, struktura BOM pod nim) — **nawet
-administrator jej nie omija**. Każdy może zablokować zwolniony element, stając się jego
-nowym właścicielem; zwolnienie może wykonać tylko aktualny właściciel. Element w statusie
-`wydany` zawsze jest zwolniony i bez właściciela — nie da się go zablokować. W drzewku
-pokazuje to ikona kłódki: zielona (zablokowane przez Ciebie), żółta (przez kogoś innego),
-otwarta (zwolnione).
+blokada, tylko właściciel może go edytować (właściwości, nazwa, widoczność, przeniesienie
+do innego projektu, załączniki, struktura BOM pod nim) — **nawet administrator jej nie
+omija**. Każdy może zablokować zwolniony element, stając się jego nowym właścicielem;
+zwolnienie może wykonać tylko aktualny właściciel — **z wyjątkiem administratora, który
+może też przejąć (`POST /lock`) albo wymusić zwolnienie (`POST /release`) cudzej blokady,
+oraz zmienić status zablokowanego elementu (`PATCH /status`) niezależnie od tego, kto jest
+właścicielem** — na wypadek np. nieobecności pracownika. Element w statusie `wydany`
+zawsze jest zwolniony i bez właściciela — nie da się go zablokować. W drzewku pokazuje to
+ikona kłódki: zielona (zablokowane przez Ciebie), żółta (przez kogoś innego), otwarta
+(zwolnione).
 
 BOM złożenia pokazuje: L.p. (edytowalne wpisaniem liczby całkowitej — musi być unikalna
 w tym BOM-ie — albo przeciągnięciem wiersza), Nazwa, Ilość, Materiał, Producent, Numer

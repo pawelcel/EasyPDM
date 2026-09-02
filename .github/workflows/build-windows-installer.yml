@@ -8,6 +8,15 @@ name: Build Windows Installer
 # Setup lokalnie przez kogokolwiek.
 on:
   workflow_dispatch:
+  # Wołane też z create-release-draft.yml (fan-in: ten workflow + build-linux-package.yml
+  # razem tworzą artefakty, z których create-release-draft.yml składa szkic Release'a) —
+  # "outputs" niżej wynosi nazwę zbudowanego artefaktu do workflow wołającego, żeby mógł
+  # go pobrać przez actions/download-artifact bez zgadywania/parsowania nazwy.
+  workflow_call:
+    outputs:
+      artifact-name:
+        description: "Nazwa artefaktu (instalator Windows)"
+        value: ${{ jobs.build.outputs.artifact-name }}
   push:
     branches: [main]
     paths:
@@ -20,6 +29,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    outputs:
+      artifact-name: ${{ steps.setup_exe.outputs.name }}
     steps:
       - uses: actions/checkout@v5
 

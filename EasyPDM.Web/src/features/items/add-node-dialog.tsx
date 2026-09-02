@@ -155,9 +155,14 @@ function AddNodeDialog({
       setParentCandidates([])
       return
     }
-    api.getItems({ projectId }).then((items) =>
+    let cancelled = false
+    api.getItems({ projectId }).then((items) => {
+      if (cancelled) return
       setParentCandidates(items.filter((i) => i.itemType === "folder" || i.itemType === "assembly"))
-    )
+    })
+    return () => {
+      cancelled = true
+    }
   }, [needsProjectPicker, projectId])
 
   // Bilet doklejony do POST /nodes wymaga sensownego typu (Część/Złożenie) — makro nigdy

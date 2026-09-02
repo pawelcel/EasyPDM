@@ -38,6 +38,7 @@ function SavedFiltersBar({
   const [saveOpen, setSaveOpen] = useState(false)
   const [name, setName] = useState("")
   const [error, setError] = useState("")
+  const [deleteError, setDeleteError] = useState("")
 
   const refetch = useCallback(async () => {
     setSavedFilters(await api.getSavedFilters())
@@ -65,8 +66,13 @@ function SavedFiltersBar({
   }
 
   async function handleDelete(id: string) {
-    await api.deleteSavedFilter(id)
-    await refetch()
+    try {
+      setDeleteError("")
+      await api.deleteSavedFilter(id)
+      await refetch()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : t("savedFilters.deleteFailed"))
+    }
   }
 
   return (
@@ -145,6 +151,7 @@ function SavedFiltersBar({
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
+      {deleteError && <FormError>{deleteError}</FormError>}
     </>
   )
 }

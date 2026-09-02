@@ -78,6 +78,62 @@ static class BomEndpoints
             return Results.File(bytes, "text/csv; charset=utf-8", fileName);
         });
 
+        // GET /api/items/{id}/used-in — "gdzie używane": WSZYSTKIE złożenia (na dowolnej
+        // głębokości, nie tylko bezpośredni rodzic), do których ten element pośrednio albo
+        // bezpośrednio należy — odwrotność /bom (tam schodzimy w dół drzewa, tu wchodzimy w
+        // górę). Element współdzielony w wielu złożeniach/projektach (zob. komentarz przy
+        // "candidates" w add-node-dialog.tsx) może mieć wielu "rodziców" na różnych
+        // poziomach i w różnych projektach naraz — stąd DISTINCT po id złożenia, nawet gdyby
+        // dawało się do niego dojść kilkoma różnymi ścieżkami.
+        app.MapGet("/api/items/{id:guid}/used-in", async (Guid id, HttpContext ctx) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemExistsAsync(conn, id))
+                return Results.NotFound();
+
+            const string sql = """
+                WITH RECURSIVE ancestors AS (
+                    SELECT ir.parent_id, ARRAY[ir.child_id] AS visited
+                    FROM item_relations ir
+                    WHERE ir.child_id = @id
+                    UNION ALL
+                    SELECT ir.parent_id, a.visited || ir.child_id
+                    FROM item_relations ir
+                    JOIN ancestors a ON ir.child_id = a.parent_id
+                    WHERE NOT (ir.child_id = ANY(a.visited))
+                )
+                SELECT DISTINCT i.id, i.item_number, i.item_number_prefix, i.file_name,
+                       i.item_type, i.project_id, i.revision_number, p.name AS project_name
+                FROM ancestors a
+                JOIN items i ON i.id = a.parent_id
+                LEFT JOIN projects p ON p.id = i.project_id
+                ORDER BY i.file_name;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", id);
+
+            var result = new List<object>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                result.Add(new
+                {
+                    id = reader.GetGuid(0),
+                    itemNumber = reader.IsDBNull(1) ? (int?)null : reader.GetInt32(1),
+                    itemNumberPrefix = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    fileName = reader.GetString(3),
+                    itemType = reader.GetString(4),
+                    projectId = reader.IsDBNull(5) ? (Guid?)null : reader.GetGuid(5),
+                    revisionNumber = reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
+                    projectName = reader.IsDBNull(7) ? null : reader.GetString(7),
+                });
+            }
+
+            return Results.Ok(result);
+        });
+
         // GET /api/items/{id}/bom/aggregated-csv — ten sam zagłębiony BOM co /bom/csv, ale
         // zsumowany po elemencie: ten sam komponent użyty w kilku miejscach struktury (różne
         // złożenia, różne poziomy) daje JEDEN wiersz z łączną ilością. Ilość jest "rozwinięta"
