@@ -299,12 +299,18 @@ export interface ClientContact {
   address: string | null
 }
 
+export interface ClientProjectSummary {
+  id: string
+  name: string
+}
+
 export interface ClientDetail {
   id: number
   name: string
   name2: string | null
   location: string | null
   contacts: ClientContact[]
+  projects: ClientProjectSummary[]
 }
 
 export type ClientNodeType = "folder" | "file"

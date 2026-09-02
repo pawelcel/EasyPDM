@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from "react"
-import { Pencil, Trash2 } from "lucide-react"
+import { ArrowUpRight, Pencil, Trash2 } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
 import type { ClientContact, ClientDetail } from "@/api/types"
@@ -27,10 +27,12 @@ function ClientDetailPanel({
   id,
   onClientsRefetch,
   onDeleted,
+  onNavigateToProject,
 }: {
   id: number
   onClientsRefetch: () => void | Promise<void>
   onDeleted: () => void
+  onNavigateToProject?: (id: string) => void
 }) {
   const { t } = useLanguage()
   const [client, setClient] = useState<ClientDetail | null>(null)
@@ -171,6 +173,32 @@ function ClientDetailPanel({
         >
           {t("client.deleteButton")}
         </Button>
+      </div>
+
+      <div>
+        <SectionLabel>{t("client.projectsLabel")}</SectionLabel>
+        {client.projects.length > 0 ? (
+          <ul className="mt-1 flex max-h-[7.5rem] flex-col gap-1 overflow-y-auto">
+            {client.projects.map((p) => (
+              <li key={p.id} className="flex items-center gap-2 text-[12.5px]">
+                <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                {onNavigateToProject && (
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    onClick={() => onNavigateToProject(p.id)}
+                    aria-label={t("client.goToProjectAria")}
+                    title={t("client.goToProjectAria")}
+                  >
+                    <ArrowUpRight />
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Hint>{t("client.noProjects")}</Hint>
+        )}
       </div>
 
       <div>

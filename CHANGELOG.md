@@ -16,6 +16,8 @@ All notable changes to EasyPDM are documented in this file.
   assembly that contains the item, directly or through a sub-assembly, across
   projects — with a button to jump straight to it. Scrollable, capped at 5
   visible rows like History.
+- Client detail panel now lists the Projects assigned to that client (with a button
+  to jump straight to each one), scoped to what the current user can actually see.
 - A brand new, empty database now gets one sample project on first startup (an
   assembly with two parts in different statuses, forming a small BOM, plus a tag) —
   something to explore instead of a blank slate. A notification points it out and

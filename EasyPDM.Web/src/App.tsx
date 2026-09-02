@@ -292,7 +292,7 @@ function App() {
 
           {view === "manufacturers" && <ManufacturersView />}
 
-          {view === "clients" && <ClientsView />}
+          {view === "clients" && <ClientsView onNavigateToProject={navigateToProject} />}
 
           {view === "settings" &&
             settingsSection === "users" &&

@@ -20,7 +20,7 @@ import { ClientDetailPanel } from "@/features/clients/client-detail-panel"
 import { useClients } from "@/features/clients/use-clients"
 import { useLanguage } from "@/i18n/use-language"
 
-function ClientsView() {
+function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: string) => void }) {
   const { t } = useLanguage()
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search, 300)
@@ -79,6 +79,7 @@ function ClientsView() {
             id={selectedId}
             onClientsRefetch={refetch}
             onDeleted={() => setSelectedId(null)}
+            onNavigateToProject={onNavigateToProject}
           />
         ) : (
           <Hint>{t("client.selectHint")}</Hint>

@@ -396,6 +396,9 @@ const pl = {
   "client.searchFilesPlaceholder": "Szukaj pliku po nazwie…",
   "client.searchFilesNoResults": "Brak pasujących plików.",
   "client.noMatchingClients": "Brak pasujących klientów.",
+  "client.projectsLabel": "Projekty",
+  "client.noProjects": "Brak projektów przypisanych do tego klienta.",
+  "client.goToProjectAria": "Przejdź do projektu",
 
   "item.removeFromStructure": "Usuń ze struktury",
   "item.removeFromStructureFailed": "Nie udało się usunąć elementu ze struktury.",
@@ -982,6 +985,9 @@ const en: Record<TranslationKey, string> = {
   "client.searchFilesPlaceholder": "Search a file by name…",
   "client.searchFilesNoResults": "No matching files.",
   "client.noMatchingClients": "No matching clients.",
+  "client.projectsLabel": "Projects",
+  "client.noProjects": "No projects assigned to this client.",
+  "client.goToProjectAria": "Go to project",
 
   "item.removeFromStructure": "Remove from structure",
   "item.removeFromStructureFailed": "Failed to remove the item from the structure.",
@@ -1566,6 +1572,9 @@ const de: Record<TranslationKey, string> = {
   "client.searchFilesPlaceholder": "Datei nach Namen suchen…",
   "client.searchFilesNoResults": "Keine passenden Dateien.",
   "client.noMatchingClients": "Keine passenden Kunden.",
+  "client.projectsLabel": "Projekte",
+  "client.noProjects": "Diesem Kunden sind keine Projekte zugeordnet.",
+  "client.goToProjectAria": "Zum Projekt wechseln",
 
   "item.removeFromStructure": "Aus der Struktur entfernen",
   "item.removeFromStructureFailed": "Das Element konnte nicht aus der Struktur entfernt werden.",
