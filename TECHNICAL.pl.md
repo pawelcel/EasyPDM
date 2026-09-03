@@ -22,7 +22,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`040` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`041` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
@@ -33,7 +33,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   (element może istnieć bez żadnego projektu, dostępny wyłącznie przez "Cała baza"), adres
   kontaktu producenta/klienta, domyślna wartość/unikalność pozycji BOM, powiadomienia + ich
   preferencje per typ, znacznik przykładowego projektu, mała wewnętrzna tabela flag
-  `system_state` oraz typy produktów producenta. Od migracji 027 pliki z tego folderu są wbudowane
+  `system_state` oraz serie/typy producenta wraz z ich podtypami. Od migracji 027 pliki z tego folderu są wbudowane
   w program (embedded resources) i stosowane **automatycznie przy każdym starcie** — zob.
   `MigrationRunner.cs` i "Jak uruchomić" niżej — nie trzeba ich już odpalać ręcznie przez psql.
 - **`EasyPDM.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
@@ -123,22 +123,26 @@ właściciela) — z poziomu drzewka kopia ląduje zaraz pod oryginałem.
 
 Część ma cztery **rodzaje** (`properties.rodzaj`), każdy z innym zestawem pól i inną ikoną
 w drzewku: **Wykonywana** (Materiał, Cena, Dodatkowe informacje), **Zakupowa** (Producent,
-Typ produktu, Numer zamówieniowy 1/2, Masa, Cena, Dodatkowe informacje), **Normalia**
+Seria/Typ, Podtyp, Numer zamówieniowy 1/2, Masa, Cena, Dodatkowe informacje), **Normalia**
 (Materiał, Norma, Dodatkowe informacje), **Klienta** (bez dodatkowych pól poza Dodatkowymi
 informacjami).
 
 Złożenie ma trzy własne rodzaje w tym samym `properties.rodzaj`: **Wykonywane**,
-**Zakupowe** (Producent, Typ produktu) i **Klienta**. Napisy są CELOWO inne niż dla Części
+**Zakupowe** (Producent, Seria/Typ, Podtyp) i **Klienta**. Napisy są CELOWO inne niż dla Części
 ("Zakupowe" vs "Zakupowa"), bo ta sama wartość jest kluczem prefiksu numeracji — jedynym
 wspólnym napisem jest "Klienta", które i prefiks ma wspólny. Poza polami swojego rodzaju
 Złożenie ma dalej generyczny edytor właściwości (Masa i dowolne własne klucze). Złożenia
 sprzed tej wersji nie mają rodzaju i pokazują podpowiedź, żeby go wybrać.
 
-**Typ produktu** (`properties.productType`) to nazwa wybrana z listy typów danego
-producenta (`manufacturer_product_types`, zakładka Producenci) — powiązanie jest wyłącznie
-po nazwie, jak przy producencie i materiale, więc usunięcie typu z katalogu nie zmienia
-niczego w opisanych już elementach. Pole pojawia się dopiero po wybraniu producenta, a
-zmiana producenta czyści wcześniej wybrany typ.
+**Seria/Typ** (`properties.productType`, tabela `manufacturer_product_types`) i
+**Podtyp** (`properties.productSubtype`, tabela `manufacturer_product_subtypes` z kluczem
+obcym do serii) tworzą dwupoziomowy katalog per producent (zakładka Producenci).
+Powiązanie z elementem jest wyłącznie po nazwie, jak przy producencie i materiale, więc
+usunięcie pozycji z katalogu nie zmienia niczego w opisanych już elementach. Cały łańcuch
+Producent → Seria/Typ → Podtyp jest kaskadowy w obie strony: każde pole (i odpowiadający
+mu filtr w "Całej bazie") pojawia się dopiero po wypełnieniu poprzedniego i pokazuje
+wyłącznie pozycje do niego przypisane, a zmiana na wyższym poziomie czyści niższe.
+Podtyp jest opcjonalny — seria bez podtypów w ogóle nie pokazuje tego pola.
 
 Część/Złożenie mają maszynę stanów: `w_pracy → sprawdzany → (w_pracy | wydany) → w_pracy`
 (powrót z `wydany` podnosi numer rewizji, z opcjonalnym komentarzem do rewizji). Poza
@@ -233,7 +237,7 @@ po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
 | GET | `/api/items/{id}/revisions` | historia komentarzy rewizji (tylko rewizje z komentarzem) |
 | GET | `/api/items/{id}/history` | pełna historia: utworzenie, zmiany statusu, rewizje, dodanie/usunięcie załącznika, blokada/zwolnienie właściciela (kiedy/kto/opis), chronologicznie |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | katalog materiałów (nazwa + grupa/podgrupa) |
-| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}]` | katalog producentów + osoby kontaktowe + typy produktów |
+| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | katalog producentów + osoby kontaktowe + serie/typy i ich podtypy |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | załączniki (upload/rejestracja istniejącego pliku/lista/pobranie/usunięcie) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | zapisane zestawy filtrów widoku „Cała baza” (prywatne per użytkownik) |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | korelacja makro CAD ↔ przeglądarka (zob. `EasyPDM.FreeCad/README.md`) |

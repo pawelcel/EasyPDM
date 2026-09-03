@@ -126,9 +126,9 @@ solved differently:
      bridge) to the "pending request from a CAD macro" popup, with three options to
      choose THERE: **New item** (project, optionally a parent, type, name — for Parts
      additionally the kind and its dependent fields: Manufactured → Material; Purchased →
-     Manufacturer/Product type/Order numbers/Mass; Standard part → Material/Norm; Client's →
+     Manufacturer/Series-Type/Subtype/Order numbers/Mass; Standard part → Material/Norm; Client's →
      no additional fields; **an Assembly has kinds of its own** (Manufactured; Purchased →
-     Manufacturer/Product type; Client's) plus an always-optional Mass — plus
+     Manufacturer/Series-Type/Subtype; Client's) plus an always-optional Mass — plus
      STEP and PDF export checkboxes), **Duplicate** (points to an existing item, copies
      its properties to a new one, no files) or **Attach to existing** (search across the
      whole database + the same STEP/PDF checkboxes). The macro waits (polls every ~2s,

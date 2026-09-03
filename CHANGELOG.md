@@ -21,12 +21,15 @@ All notable changes to EasyPDM are documented in this file.
   and client assemblies are numbered with the prefix of the matching Part kind; only
   manufactured assemblies keep their own prefix (the existing "Assembly" one, now
   labelled accordingly in Settings → Numbering).
-- Manufacturers can now have a list of product types (Manufacturers tab). On a
-  purchased item — Part or Assembly — picking a manufacturer reveals an optional
-  "Product type" field offering exactly that manufacturer's types. In "Whole
-  database" the kind filter now covers Parts and Assemblies together (choosing
-  "Purchased" lists both), and once a manufacturer is selected a dependent product
-  type filter appears next to it.
+- Manufacturers can now have a two-level catalog of what they supply: Series/Types,
+  and Subtypes within a series (click a series in the Manufacturers tab to manage
+  its subtypes). On a purchased item — Part or Assembly — picking a manufacturer
+  reveals an optional "Series/Type" field, and picking one of those reveals an
+  optional "Subtype", each offering exactly the entries belonging to the level
+  above; changing a higher level clears the lower ones. In "Whole database" the kind
+  filter now covers Parts and Assemblies together (choosing "Purchased" lists both),
+  and the same Manufacturer → Series/Type → Subtype chain appears as dependent
+  filters next to it.
 - Client detail panel now lists the Projects assigned to that client (with a button
   to jump straight to each one), scoped to what the current user can actually see.
 - A brand new, empty database now gets one sample project on first startup (an

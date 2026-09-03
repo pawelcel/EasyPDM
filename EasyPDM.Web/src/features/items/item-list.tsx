@@ -20,6 +20,7 @@ import { PartKindSelect } from "@/features/items/part-kind-select"
 import { RecordTypeSelect, type RecordType } from "@/features/items/record-type-select"
 import { SavedFiltersBar } from "@/features/items/saved-filters-bar"
 import { ManufacturerFilterSelect } from "@/features/manufacturers/manufacturer-filter-select"
+import { ProductSubtypeFilterSelect } from "@/features/manufacturers/product-subtype-filter-select"
 import { ProductTypeFilterSelect } from "@/features/manufacturers/product-type-filter-select"
 import { ProjectDetailPanel } from "@/features/projects/project-detail-panel"
 import { ProjectRow } from "@/features/projects/project-row"
@@ -69,6 +70,7 @@ function ItemList({
   const [partKind, setPartKind] = useState<KindFilter>("all")
   const [manufacturer, setManufacturer] = useState("")
   const [productType, setProductType] = useState("")
+  const [productSubtype, setProductSubtype] = useState("")
   // clientId (jako string, jak wymagają wartości <Select>) klienta przypisanego do
   // PROJEKTU elementu/projektu — w odróżnieniu od "rodzaju"/"producenta" to nie jest
   // filtr specyficzny dla Części, więc działa niezależnie od recordType (na projektach
@@ -146,6 +148,7 @@ function ItemList({
     setPartKind("all")
     setManufacturer("")
     setProductType("")
+    setProductSubtype("")
     setSelection(null)
   }
 
@@ -153,11 +156,18 @@ function ItemList({
     setPartKind(next)
     setManufacturer("")
     setProductType("")
+    setProductSubtype("")
   }
 
   function changeManufacturer(next: string) {
     setManufacturer(next)
     setProductType("")
+    setProductSubtype("")
+  }
+
+  function changeProductType(next: string) {
+    setProductType(next)
+    setProductSubtype("")
   }
 
   // Wczytanie zapisanego zestawu filtrów ustawia WSZYSTKIE wartości naraz, więc celowo
@@ -170,6 +180,7 @@ function ItemList({
     setPartKind(f.partKind)
     setManufacturer(f.manufacturer)
     setProductType(f.productType)
+    setProductSubtype(f.productSubtype)
     setClient(f.client)
     setSelection(null)
   }
@@ -246,6 +257,7 @@ function ItemList({
           if (!matchesKindFilter(item, partKind)) return false
           if (manufacturer && item.properties.manufacturer !== manufacturer) return false
           if (productType && item.properties.productType !== productType) return false
+          if (productSubtype && item.properties.productSubtype !== productSubtype) return false
           if (client && String(projectsById.get(item.projectId ?? "")?.clientId) !== client) {
             return false
           }
@@ -320,12 +332,20 @@ function ItemList({
           <ProductTypeFilterSelect
             manufacturerName={manufacturer}
             value={productType}
-            onChange={setProductType}
+            onChange={changeProductType}
+          />
+        )}
+        {manufacturer && productType && (
+          <ProductSubtypeFilterSelect
+            manufacturerName={manufacturer}
+            productTypeName={productType}
+            value={productSubtype}
+            onChange={setProductSubtype}
           />
         )}
         <ClientFilterSelect projects={projects} value={client} onChange={setClient} />
         <SavedFiltersBar
-          currentFilters={{ search, tag, recordType, partKind, manufacturer, productType, client }}
+          currentFilters={{ search, tag, recordType, partKind, manufacturer, productType, productSubtype, client }}
           onApply={applyFilters}
         />
       </div>

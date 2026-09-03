@@ -33,6 +33,7 @@ import {
 import {
   ManufacturerField,
   MaterialField,
+  ProductSubtypeField,
   ProductTypeField,
   PropField,
 } from "@/features/items/property-fields"
@@ -123,7 +124,7 @@ function AddNodeDialog({
   }
   function seedExtraProps(): Record<string, string> {
     const result: Record<string, string> = {}
-    for (const key of ["material", "manufacturer", "productType", "orderNumber", "orderNumber2", "norm"]) {
+    for (const key of ["material", "manufacturer", "productType", "productSubtype", "orderNumber", "orderNumber2", "norm"]) {
       const v = initialProperties?.[key]
       if (typeof v === "string") result[key] = v
     }
@@ -293,7 +294,7 @@ function AddNodeDialog({
       properties.rodzaj = rodzaj
       if (mass.trim()) properties.mass = mass.trim()
       if (rodzaj === "Zakupowe") {
-        for (const key of ["manufacturer", "productType"]) {
+        for (const key of ["manufacturer", "productType", "productSubtype"]) {
           if (extraProps[key]?.trim()) properties[key] = extraProps[key].trim()
         }
       }
@@ -554,6 +555,13 @@ function AddNodeDialog({
                   onSave={setExtraField}
                   disabled={false}
                 />
+                <ProductSubtypeField
+                  manufacturerName={extraProps.manufacturer ?? ""}
+                  productTypeName={extraProps.productType ?? ""}
+                  value={extraProps.productSubtype ?? ""}
+                  onSave={setExtraField}
+                  disabled={false}
+                />
                 <PropField
                   label={t("part.orderNumber")}
                   propKey="orderNumber"
@@ -663,6 +671,13 @@ function AddNodeDialog({
                 <ProductTypeField
                   manufacturerName={extraProps.manufacturer ?? ""}
                   value={extraProps.productType ?? ""}
+                  onSave={setExtraField}
+                  disabled={false}
+                />
+                <ProductSubtypeField
+                  manufacturerName={extraProps.manufacturer ?? ""}
+                  productTypeName={extraProps.productType ?? ""}
+                  value={extraProps.productSubtype ?? ""}
                   onSave={setExtraField}
                   disabled={false}
                 />

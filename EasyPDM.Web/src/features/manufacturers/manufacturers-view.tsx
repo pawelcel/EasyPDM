@@ -179,6 +179,11 @@ function ManufacturerDetailPanel({
   const [confirmingDeleteTypeId, setConfirmingDeleteTypeId] = useState<number | null>(null)
   const [typeDeletePending, setTypeDeletePending] = useState(false)
   const [typeDeleteError, setTypeDeleteError] = useState<string | null>(null)
+  // Seria/typ, której podtypy są rozwinięte pod listą — czysto lokalny wybór widoku.
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null)
+  const [confirmingDeleteSubtypeId, setConfirmingDeleteSubtypeId] = useState<number | null>(null)
+  const [subtypeDeletePending, setSubtypeDeletePending] = useState(false)
+  const [subtypeDeleteError, setSubtypeDeleteError] = useState<string | null>(null)
 
   async function refetch() {
     const data = await api.getManufacturer(id)
@@ -272,10 +277,47 @@ function ManufacturerDetailPanel({
     }
   }
 
+  async function addProductSubtype(name: string) {
+    if (selectedTypeId === null) return
+    try {
+      await api.addManufacturerProductSubtype(id, selectedTypeId, name)
+    } catch (err) {
+      throw new Error(
+        err instanceof ApiError && err.status === 409
+          ? t("manufacturer.productSubtypeConflict")
+          : t("manufacturer.addProductSubtypeFailed")
+      )
+    }
+    await refetch()
+  }
+
+  async function confirmRemoveProductSubtype() {
+    if (confirmingDeleteSubtypeId === null || selectedTypeId === null) return
+    setSubtypeDeletePending(true)
+    setSubtypeDeleteError(null)
+    try {
+      await api.removeManufacturerProductSubtype(id, selectedTypeId, confirmingDeleteSubtypeId)
+      setConfirmingDeleteSubtypeId(null)
+      await refetch()
+    } catch (err) {
+      setSubtypeDeleteError(
+        err instanceof ApiError ? err.message : t("manufacturer.deleteProductSubtypeFailed")
+      )
+    } finally {
+      setSubtypeDeletePending(false)
+    }
+  }
+
   if (!manufacturer) return null
 
   const confirmingDeleteContact = manufacturer.contacts.find((c) => c.id === confirmingDeleteContactId) ?? null
   const confirmingDeleteType = manufacturer.productTypes.find((p) => p.id === confirmingDeleteTypeId) ?? null
+  // Zaznaczona seria/typ czytana z ŚWIEŻO pobranego producenta (nie z osobnego stanu), więc
+  // po dodaniu/usunięciu podtypu lista podtypów odświeża się sama; usunięcie zaznaczonej
+  // serii zostawia tu null i sekcja podtypów wraca do podpowiedzi.
+  const selectedType = manufacturer.productTypes.find((p) => p.id === selectedTypeId) ?? null
+  const confirmingDeleteSubtype =
+    selectedType?.subtypes.find((s) => s.id === confirmingDeleteSubtypeId) ?? null
 
   return (
     <div>
@@ -382,7 +424,13 @@ function ManufacturerDetailPanel({
         {manufacturer.productTypes.length > 0 ? (
           <div className="mt-1 flex flex-wrap gap-1">
             {manufacturer.productTypes.map((p) => (
-              <TagPill key={p.id} name={p.name} onRemove={() => setConfirmingDeleteTypeId(p.id)} />
+              <TagPill
+                key={p.id}
+                name={p.name}
+                selected={p.id === selectedTypeId}
+                onSelect={() => setSelectedTypeId(p.id === selectedTypeId ? null : p.id)}
+                onRemove={() => setConfirmingDeleteTypeId(p.id)}
+              />
             ))}
           </div>
         ) : (
@@ -393,6 +441,40 @@ function ManufacturerDetailPanel({
           className="mt-2"
           placeholder={t("manufacturer.productTypePlaceholder")}
         />
+      </div>
+
+      {/* Podtypy dotyczą JEDNEJ, klikniętej serii/typu — bez zaznaczenia pokazujemy tylko
+          podpowiedź, żeby nie sugerować, że wpisany podtyp trafi "gdziekolwiek". */}
+      <div className="mt-4">
+        <SectionLabel>
+          {selectedType
+            ? t("manufacturer.productSubtypesOfLabel", { name: selectedType.name })
+            : t("manufacturer.productSubtypesLabel")}
+        </SectionLabel>
+        {selectedType ? (
+          <>
+            {selectedType.subtypes.length > 0 ? (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {selectedType.subtypes.map((s) => (
+                  <TagPill
+                    key={s.id}
+                    name={s.name}
+                    onRemove={() => setConfirmingDeleteSubtypeId(s.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Hint>{t("manufacturer.noProductSubtypes")}</Hint>
+            )}
+            <AddTagRow
+              onAdd={addProductSubtype}
+              className="mt-2"
+              placeholder={t("manufacturer.productSubtypePlaceholder")}
+            />
+          </>
+        ) : (
+          <Hint>{t("manufacturer.selectProductTypeHint")}</Hint>
+        )}
       </div>
 
       {confirmingDelete && (
@@ -441,6 +523,22 @@ function ManufacturerDetailPanel({
           onCancel={() => setConfirmingDeleteTypeId(null)}
           pending={typeDeletePending}
           error={typeDeleteError}
+        />
+      )}
+
+      {confirmingDeleteSubtype && (
+        <ConfirmDialog
+          open
+          title={t("manufacturer.deleteProductSubtypeTitle")}
+          description={t("manufacturer.deleteProductSubtypeConfirmDescription", {
+            name: confirmingDeleteSubtype.name,
+          })}
+          confirmLabel={t("common.delete")}
+          variant="destructive"
+          onConfirm={confirmRemoveProductSubtype}
+          onCancel={() => setConfirmingDeleteSubtypeId(null)}
+          pending={subtypeDeletePending}
+          error={subtypeDeleteError}
         />
       )}
     </div>

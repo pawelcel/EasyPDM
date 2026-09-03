@@ -129,9 +129,9 @@ inaczej:
      token→ciasteczko) na popupie "oczekujące żądanie z makra CAD", z trzema opcjami do
      wyboru TAM: **Nowy element** (projekt, opcjonalnie rodzic, typ, nazwa — dla Części
      dodatkowo rodzaj i zależne od niego pola: Wykonywana → Materiał; Zakupowa →
-     Producent/Typ produktu/Numery zamówieniowe/Masa; Normalia → Materiał/Norma; Klienta →
+     Producent/Seria-Typ/Podtyp/Numery zamówieniowe/Masa; Normalia → Materiał/Norma; Klienta →
      brak dodatkowych pól; **Złożenie ma własne rodzaje** (Wykonywane; Zakupowe →
-     Producent/Typ produktu; Klienta) plus zawsze opcjonalną Masę — plus
+     Producent/Seria-Typ/Podtyp; Klienta) plus zawsze opcjonalną Masę — plus
      checkboxy eksportu STEP i PDF), **Duplikuj** (wskazuje istniejący element, kopiuje
      jego właściwości do nowego, bez plików) albo **Dograj do istniejącego**
      (wyszukiwarka po całej bazie + te same checkboxy STEP/PDF). Makro czeka (odpytuje

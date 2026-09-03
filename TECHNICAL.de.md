@@ -24,7 +24,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
 
 - **`db/schema.sql`** — das vollständige Schema von Grund auf (aktueller Stand nach allen
   Migrationen).
-- **`db/migrations/`** — Migrationen `002`–`040` für eine bereits bestehende Datenbank:
+- **`db/migrations/`** — Migrationen `002`–`041` für eine bereits bestehende Datenbank:
   Projekte, Elementtypen, Sichtbarkeit im Baum, Status/Revisionen, Materialien
   (+ Gruppen/Untergruppen), Anhänge, Stücklisten-Reihenfolge, Revisionskommentare,
   Anmeldung und Rollen, Projekteigenschaften, kaskadierendes Löschen, Reihenfolge der
@@ -37,7 +37,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   erreichbar), Kontaktadresse von Hersteller/Kunde, Standardwert/Eindeutigkeit der
   Stücklistenposition, Benachrichtigungen + deren Einstellungen pro Typ, Markierung des
   Beispielprojekts, eine kleine interne Zustandstabelle `system_state` sowie
-  Hersteller-Produkttypen. Seit
+  Hersteller-Serien/Typen samt ihren Untertypen. Seit
   Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
   resources) und werden **automatisch bei jedem Start** angewendet — siehe
   `MigrationRunner.cs` und "Inbetriebnahme" unten — sie müssen nicht mehr manuell per
@@ -142,12 +142,12 @@ direkt unter dem Original.
 
 Ein Teil hat vier **Arten** (`properties.rodzaj`), jede mit einem anderen Satz von
 Feldern und einem anderen Symbol im Baum: **Gefertigt** (Material, Preis, Zusätzliche
-Informationen), **Zugekauft** (Hersteller, Produkttyp, Bestellnummer 1/2, Masse, Preis,
+Informationen), **Zugekauft** (Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Masse, Preis,
 Zusätzliche Informationen), **Norm** (Material, Norm, Zusätzliche Informationen),
 **Kundenteil** (keine zusätzlichen Felder außer Zusätzlichen Informationen).
 
 Eine Baugruppe hat drei eigene Arten im selben `properties.rodzaj`: **Wykonywane**
-(gefertigt), **Zakupowe** (zugekauft — Hersteller, Produkttyp) und **Klienta** (vom
+(gefertigt), **Zakupowe** (zugekauft — Hersteller, Serie/Typ, Untertyp) und **Klienta** (vom
 Kunden). Die Zeichenketten unterscheiden sich BEWUSST von denen des Teils ("Zakupowe"
 statt "Zakupowa"), denn dieser Wert dient zugleich als Schlüssel für das Nummernpräfix —
 die einzige gemeinsame Zeichenkette ist "Klienta", die sich auch das Präfix teilt. Über
@@ -155,12 +155,16 @@ die Felder ihrer Art hinaus hat eine Baugruppe weiterhin den generischen
 Eigenschaften-Editor (Masse und beliebige eigene Schlüssel). Baugruppen aus früheren
 Versionen haben keine Art und zeigen einen Hinweis, eine auszuwählen.
 
-**Produkttyp** (`properties.productType`) ist ein Name aus der Typenliste des jeweiligen
-Herstellers (`manufacturer_product_types`, Reiter Hersteller) — die Verknüpfung erfolgt
-ausschließlich über den Namen, wie bei Hersteller und Material, sodass das Löschen eines
-Typs aus dem Katalog bereits beschriebene Elemente nie verändert. Das Feld erscheint erst
-nach der Wahl eines Herstellers, und ein Herstellerwechsel löscht einen zuvor gewählten
-Typ.
+**Serie/Typ** (`properties.productType`, Tabelle `manufacturer_product_types`) und
+**Untertyp** (`properties.productSubtype`, Tabelle `manufacturer_product_subtypes` mit
+Fremdschlüssel auf die Serie) bilden einen zweistufigen Katalog je Hersteller (Reiter
+Hersteller). Die Verknüpfung mit einem Element erfolgt ausschließlich über den Namen, wie
+bei Hersteller und Material, sodass das Löschen eines Katalogeintrags bereits beschriebene
+Elemente nie verändert. Die gesamte Kette Hersteller → Serie/Typ → Untertyp kaskadiert in
+beide Richtungen: Jedes Feld (und der zugehörige Filter in "Gesamte Datenbank") erscheint
+erst, wenn das darüber ausgefüllt ist, und zeigt ausschließlich die ihm zugeordneten
+Einträge; eine Änderung auf einer höheren Ebene löscht die darunter. Der Untertyp ist
+optional — eine Serie ohne Untertypen blendet das Feld ganz aus.
 
 Ein Teil/eine Baugruppe hat eine Zustandsmaschine: `w_pracy → sprawdzany → (w_pracy |
 wydany) → w_pracy` (in Bearbeitung → in Prüfung → (in Bearbeitung | freigegeben) → in
@@ -265,7 +269,7 @@ sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwend
 | GET | `/api/items/{id}/revisions` | Historie der Revisionskommentare (nur Revisionen mit Kommentar) |
 | GET | `/api/items/{id}/history` | vollständige Historie: Erstellung, Statusänderungen, Revisionen, hinzugefügter/entfernter Anhang, Eigentümersperre/-freigabe (wann/wer/Beschreibung), chronologisch |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | Materialkatalog (Name + Gruppe/Untergruppe) |
-| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}]` | Herstellerkatalog + Kontaktpersonen + Produkttypen |
+| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | Herstellerkatalog + Kontaktpersonen + Serien/Typen und deren Untertypen |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | Anhänge (Upload/Registrierung einer vorhandenen Datei/Liste/Download/Löschen) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | gespeicherte Filtersätze der Ansicht „Gesamte Datenbank" (privat pro Benutzer) |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | Korrelation CAD-Makro ↔ Browser (siehe `EasyPDM.FreeCad/README.md`) |

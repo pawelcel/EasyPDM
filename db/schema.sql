@@ -136,10 +136,11 @@ CREATE TABLE manufacturer_contacts (
 
 CREATE INDEX idx_manufacturer_contacts_manufacturer ON manufacturer_contacts (manufacturer_id);
 
--- Typy produktów producenta (np. "Łożyska", "Silniki krokowe") -- do wyboru przy elemencie
--- ZAKUPOWYM obok samego producenta i do filtrowania w widoku "Cała baza". Element trzyma
--- tylko NAZWĘ wybranego typu w properties.productType (tak samo jak nazwę producenta),
--- bez klucza obcego -- ta tabela jest katalogiem podpowiedzi, nie właścicielem tej relacji.
+-- Serie/typy produktów producenta (np. "Łożyska walcowe") i ich opcjonalne podtypy (np.
+-- "NU", "NJ") -- do wyboru przy elemencie ZAKUPOWYM obok samego producenta i do
+-- filtrowania w widoku "Cała baza". Element trzyma tylko NAZWY w properties.productType /
+-- properties.productSubtype (tak samo jak nazwę producenta), bez kluczy obcych -- te
+-- tabele są katalogiem podpowiedzi, nie właścicielem tej relacji.
 CREATE TABLE manufacturer_product_types (
     id              SERIAL PRIMARY KEY,
     manufacturer_id INTEGER NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
@@ -152,6 +153,21 @@ CREATE INDEX idx_manufacturer_product_types_manufacturer
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON manufacturer_product_types TO pdm_user;
 GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_types_id_seq TO pdm_user;
+
+-- Podtyp zawsze należy do konkretnej serii/typu (FK do typu, nie do producenta) -- element
+-- może wskazać sam typ albo typ + podtyp, nigdy sam podtyp.
+CREATE TABLE manufacturer_product_subtypes (
+    id              SERIAL PRIMARY KEY,
+    product_type_id INTEGER NOT NULL REFERENCES manufacturer_product_types(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    UNIQUE (product_type_id, name)
+);
+
+CREATE INDEX idx_manufacturer_product_subtypes_type
+    ON manufacturer_product_subtypes (product_type_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON manufacturer_product_subtypes TO pdm_user;
+GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_subtypes_id_seq TO pdm_user;
 
 -- ============================================================
 -- Klienci (katalog z osobami kontaktowymi i własną strukturą plików, zarządzany z panelu
@@ -422,4 +438,4 @@ INSERT INTO schema_migrations (filename) VALUES
     ('033_manufacturer_contact_address.sql'), ('034_client_contact_address.sql'),
     ('035_item_relations_position_default.sql'), ('036_item_relations_position_unique.sql'),
     ('037_notifications.sql'), ('038_project_is_sample.sql'), ('039_system_state.sql'),
-    ('040_manufacturer_product_types.sql');
+    ('040_manufacturer_product_types.sql'), ('041_manufacturer_product_subtypes.sql');

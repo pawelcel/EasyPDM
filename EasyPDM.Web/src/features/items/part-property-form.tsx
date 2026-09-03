@@ -18,6 +18,7 @@ import {
 import {
   ManufacturerField,
   MaterialField,
+  ProductSubtypeField,
   ProductTypeField,
   PropField,
 } from "@/features/items/property-fields"
@@ -168,12 +169,15 @@ function PartPropertyForm({
   const [error, setError] = useState<string | null>(null)
 
   async function saveField(key: string, value: string) {
-    // Typ produktu należy do KONKRETNEGO producenta — po zmianie producenta poprzedni typ
-    // byłby już spoza jego katalogu, więc znika razem z nim.
-    const fields: Record<string, string> =
-      key === "manufacturer" && value !== propValue("manufacturer")
-        ? { manufacturer: value, productType: "" }
-        : { [key]: value }
+    // Producent → Seria/Typ → Podtyp to łańcuch zależności: każdy poziom należy do
+    // konkretnej wartości poziomu wyżej, więc zmiana wyżej unieważnia to, co niżej
+    // (inaczej został by podtyp spoza wybranej serii albo seria spoza katalogu producenta).
+    let fields: Record<string, string> = { [key]: value }
+    if (key === "manufacturer" && value !== propValue("manufacturer")) {
+      fields = { manufacturer: value, productType: "", productSubtype: "" }
+    } else if (key === "productType" && value !== propValue("productType")) {
+      fields = { productType: value, productSubtype: "" }
+    }
     await api.updateProperties(item.id, fields)
     await onChanged()
   }
@@ -198,6 +202,14 @@ function PartPropertyForm({
           <ProductTypeField
             manufacturerName={propValue("manufacturer")}
             value={propValue("productType")}
+            onSave={saveField}
+            disabled={locked}
+            onError={setError}
+          />
+          <ProductSubtypeField
+            manufacturerName={propValue("manufacturer")}
+            productTypeName={propValue("productType")}
+            value={propValue("productSubtype")}
             onSave={saveField}
             disabled={locked}
             onError={setError}
@@ -230,6 +242,14 @@ function PartPropertyForm({
           <ProductTypeField
             manufacturerName={propValue("manufacturer")}
             value={propValue("productType")}
+            onSave={saveField}
+            disabled={locked}
+            onError={setError}
+          />
+          <ProductSubtypeField
+            manufacturerName={propValue("manufacturer")}
+            productTypeName={propValue("productType")}
+            value={propValue("productSubtype")}
             onSave={saveField}
             disabled={locked}
             onError={setError}

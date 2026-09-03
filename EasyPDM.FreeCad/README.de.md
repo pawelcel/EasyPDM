@@ -102,9 +102,9 @@ des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
      Projekt, optional ein übergeordnetes Element, den Typ (Teil/Baugruppe), den Namen
      (standardmäßig aus dem Label des Dokuments vorgeschlagen), die Art und die davon
      abhängigen Felder: bei einem Teil ist die Art erforderlich — **Gefertigt** →
-     Material, **Zugekauft** → Hersteller/Produkttyp/Bestellnummer 1 und 2/Masse, **Norm**
+     Material, **Zugekauft** → Hersteller/Serie-Typ/Untertyp/Bestellnummer 1 und 2/Masse, **Norm**
      → Material/Norm, **Kundenteil** → keine zusätzlichen Felder. Eine Baugruppe hat eigene,
-     ebenfalls erforderliche Arten — **Gefertigt**, **Zugekauft** → Hersteller/Produkttyp,
+     ebenfalls erforderliche Arten — **Gefertigt**, **Zugekauft** → Hersteller/Serie-Typ/Untertyp,
      **Vom Kunden** — und die Masse ist immer sichtbar, unabhängig von der gewählten Art;
      eine Baugruppe hat nie ein Materialfeld (nur ein Teil). Das Popup hat außerdem die **Checkboxen
      „STEP exportieren" und „PDF exportieren"** (STEP standardmäßig angehakt, PDF nicht —

@@ -24,7 +24,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`040` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`041` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -35,7 +35,7 @@ PostgreSQL 18.
   exist with no project, reachable only through "Whole database"), manufacturer/client
   contact address, BOM position default/uniqueness, notifications + per-type
   preferences, the sample-project marker, a small internal `system_state` flag table,
-  and manufacturer product types. Since migration 027, files in this folder are embedded in the program
+  and manufacturer series/types with their subtypes. Since migration 027, files in this folder are embedded in the program
   (embedded resources) and applied **automatically on every startup** — see
   `MigrationRunner.cs` and "How to run" below — you no longer need to run them
   manually through psql.
@@ -128,23 +128,27 @@ under the original.
 
 A Part has four **kinds** (`properties.rodzaj`), each with a different set of fields and
 a different icon in the tree: **Manufactured** (Material, Price, Additional notes),
-**Purchased** (Manufacturer, Product type, Order number 1/2, Mass, Price, Additional
+**Purchased** (Manufacturer, Series/Type, Subtype, Order number 1/2, Mass, Price, Additional
 notes), **Standard** (Material, Norm, Additional notes), **Client-supplied** (no
 additional fields besides Additional notes).
 
 An Assembly has three kinds of its own in the same `properties.rodzaj`: **Wykonywane**
-(manufactured), **Zakupowe** (purchased — Manufacturer, Product type) and **Klienta**
+(manufactured), **Zakupowe** (purchased — Manufacturer, Series/Type, Subtype) and **Klienta**
 (client-supplied). The strings deliberately differ from the Part ones ("Zakupowe" vs
 "Zakupowa"), because that value doubles as the numbering-prefix key — the one shared
 string is "Klienta", which shares its prefix too. Beyond its kind's fields an Assembly
 still has the generic property editor (Mass and any custom keys). Assemblies created
 before this version have no kind and show a hint prompting you to pick one.
 
-**Product type** (`properties.productType`) is a name picked from that manufacturer's
-list of types (`manufacturer_product_types`, Manufacturers tab) — the link is by name
-only, like manufacturer and material, so deleting a type from the catalog never rewrites
-items that already reference it. The field appears only once a manufacturer is selected,
-and changing the manufacturer clears a previously chosen type.
+**Series/Type** (`properties.productType`, table `manufacturer_product_types`) and
+**Subtype** (`properties.productSubtype`, table `manufacturer_product_subtypes`, keyed to
+the series) form a two-level catalog per manufacturer (Manufacturers tab). The link to an
+item is by name only, like manufacturer and material, so deleting a catalog entry never
+rewrites items that already reference it. The whole Manufacturer → Series/Type → Subtype
+chain cascades both ways: each field (and its matching filter in "Whole database") appears
+only once the one above it is filled in and offers exactly the entries belonging to it,
+and changing a higher level clears the lower ones. The subtype is optional — a series with
+no subtypes doesn't show the field at all.
 
 A Part/Assembly has a state machine: `w_pracy → sprawdzany → (w_pracy | wydany) →
 w_pracy` (in progress → under review → (in progress | released) → in progress; going
@@ -244,7 +248,7 @@ application).
 | GET | `/api/items/{id}/revisions` | revision comment history (only revisions with a comment) |
 | GET | `/api/items/{id}/history` | full history: creation, status changes, revisions, attachment added/removed, owner lock/release (when/who/description), chronologically |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | material catalog (name + group/subgroup) |
-| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}]` | manufacturer catalog + contact people + product types |
+| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | manufacturer catalog + contact people + series/types and their subtypes |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | attachments (upload/register an existing file/list/download/delete) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | saved filter sets for the "Whole database" view (private per user) |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | CAD macro ↔ browser correlation (see `EasyPDM.FreeCad/README.md`) |

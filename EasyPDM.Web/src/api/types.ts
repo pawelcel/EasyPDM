@@ -271,11 +271,19 @@ export interface ManufacturerContact {
   address: string | null
 }
 
-// Typ produktu w katalogu producenta (np. "Łożyska") — podpowiedź do wyboru przy elemencie
-// zakupowym. Element zapisuje samą NAZWĘ w properties.productType, nie to id.
+// Podtyp w obrębie serii/typu (np. "NU" w serii "Łożyska walcowe") — element zapisuje
+// samą NAZWĘ w properties.productSubtype, nie to id.
+export interface ManufacturerProductSubtype {
+  id: number
+  name: string
+}
+
+// Seria/typ produktu w katalogu producenta (np. "Łożyska walcowe") — podpowiedź do wyboru
+// przy elemencie zakupowym. Element zapisuje samą NAZWĘ w properties.productType, nie to id.
 export interface ManufacturerProductType {
   id: number
   name: string
+  subtypes: ManufacturerProductSubtype[]
 }
 
 export interface ManufacturerDetail {

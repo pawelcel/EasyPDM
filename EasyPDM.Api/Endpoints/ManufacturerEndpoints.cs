@@ -72,6 +72,29 @@ static class ManufacturerEndpoints
                     contacts.Add(ReadContact(reader));
             }
 
+            // Podtypy dociągane jednym zapytaniem dla WSZYSTKICH typów tego producenta i
+            // grupowane w pamięci — inaczej byłoby to N+1 zapytań (jedno na typ).
+            const string subtypesSql = """
+                SELECT s.product_type_id, s.id, s.name
+                FROM manufacturer_product_subtypes s
+                JOIN manufacturer_product_types t ON t.id = s.product_type_id
+                WHERE t.manufacturer_id = @id
+                ORDER BY s.name;
+                """;
+            var subtypesByType = new Dictionary<int, List<object>>();
+            await using (var subtypesCmd = new NpgsqlCommand(subtypesSql, conn))
+            {
+                subtypesCmd.Parameters.AddWithValue("id", id);
+                await using var reader = await subtypesCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var typeId = reader.GetInt32(0);
+                    if (!subtypesByType.TryGetValue(typeId, out var list))
+                        subtypesByType[typeId] = list = [];
+                    list.Add(new { id = reader.GetInt32(1), name = reader.GetString(2) });
+                }
+            }
+
             const string productTypesSql = """
                 SELECT id, name FROM manufacturer_product_types
                 WHERE manufacturer_id = @id
@@ -83,7 +106,15 @@ static class ManufacturerEndpoints
                 typesCmd.Parameters.AddWithValue("id", id);
                 await using var reader = await typesCmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
-                    productTypes.Add(new { id = reader.GetInt32(0), name = reader.GetString(1) });
+                {
+                    var typeId = reader.GetInt32(0);
+                    productTypes.Add(new
+                    {
+                        id = typeId,
+                        name = reader.GetString(1),
+                        subtypes = subtypesByType.TryGetValue(typeId, out var list) ? list : [],
+                    });
+                }
             }
 
             return Results.Ok(new { id, name, contacts, productTypes });
@@ -281,6 +312,98 @@ static class ManufacturerEndpoints
 
             await using var cmd = new NpgsqlCommand(
                 "DELETE FROM manufacturer_product_types WHERE id = @typeId AND manufacturer_id = @manufacturerId;", conn);
+            cmd.Parameters.AddWithValue("typeId", typeId);
+            cmd.Parameters.AddWithValue("manufacturerId", id);
+            await cmd.ExecuteNonQueryAsync();
+
+            return Results.Ok();
+        });
+
+        // POST /api/manufacturers/{id}/product-types/{typeId}/subtypes   body: { "name": "..." }
+        // Podtyp należy do serii/typu, a ta do producenta — oba ogniwa sprawdzane razem, żeby
+        // nie dało się dopisać podtypu do cudzego typu przez podmianę {id} w adresie.
+        app.MapPost("/api/manufacturers/{id:int}/product-types/{typeId:int}/subtypes", async (int id, int typeId, ProductTypeRequest body) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Name))
+                return Results.BadRequest("Nazwa podtypu nie może być pusta.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using (var checkCmd = new NpgsqlCommand(
+                "SELECT 1 FROM manufacturer_product_types WHERE id = @typeId AND manufacturer_id = @manufacturerId;", conn))
+            {
+                checkCmd.Parameters.AddWithValue("typeId", typeId);
+                checkCmd.Parameters.AddWithValue("manufacturerId", id);
+                if (await checkCmd.ExecuteScalarAsync() is null)
+                    return Results.NotFound("Seria/typ nie istnieje.");
+            }
+
+            await using var cmd = new NpgsqlCommand(
+                "INSERT INTO manufacturer_product_subtypes (product_type_id, name) VALUES (@typeId, @name) RETURNING id;",
+                conn);
+            cmd.Parameters.AddWithValue("typeId", typeId);
+            cmd.Parameters.AddWithValue("name", body.Name.Trim());
+
+            try
+            {
+                var subtypeId = (int)(await cmd.ExecuteScalarAsync())!;
+                return Results.Created($"/api/manufacturers/{id}/product-types/{typeId}/subtypes/{subtypeId}", new { id = subtypeId });
+            }
+            catch (PostgresException ex) when (ex.SqlState == "23505")
+            {
+                return Results.Conflict("Ta seria/typ ma już podtyp o tej nazwie.");
+            }
+        });
+
+        // PATCH /api/manufacturers/{id}/product-types/{typeId}/subtypes/{subtypeId}   body: { "name": "..." }
+        app.MapPatch("/api/manufacturers/{id:int}/product-types/{typeId:int}/subtypes/{subtypeId:int}",
+            async (int id, int typeId, int subtypeId, ProductTypeRequest body) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Name))
+                return Results.BadRequest("Nazwa podtypu nie może być pusta.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand(
+                """
+                UPDATE manufacturer_product_subtypes s SET name = @name
+                FROM manufacturer_product_types t
+                WHERE s.id = @subtypeId AND s.product_type_id = t.id
+                  AND t.id = @typeId AND t.manufacturer_id = @manufacturerId;
+                """, conn);
+            cmd.Parameters.AddWithValue("subtypeId", subtypeId);
+            cmd.Parameters.AddWithValue("typeId", typeId);
+            cmd.Parameters.AddWithValue("manufacturerId", id);
+            cmd.Parameters.AddWithValue("name", body.Name.Trim());
+
+            try
+            {
+                var affected = await cmd.ExecuteNonQueryAsync();
+                return affected == 0 ? Results.NotFound() : Results.Ok();
+            }
+            catch (PostgresException ex) when (ex.SqlState == "23505")
+            {
+                return Results.Conflict("Ta seria/typ ma już podtyp o tej nazwie.");
+            }
+        });
+
+        // DELETE /api/manufacturers/{id}/product-types/{typeId}/subtypes/{subtypeId}
+        app.MapDelete("/api/manufacturers/{id:int}/product-types/{typeId:int}/subtypes/{subtypeId:int}",
+            async (int id, int typeId, int subtypeId) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand(
+                """
+                DELETE FROM manufacturer_product_subtypes s
+                USING manufacturer_product_types t
+                WHERE s.id = @subtypeId AND s.product_type_id = t.id
+                  AND t.id = @typeId AND t.manufacturer_id = @manufacturerId;
+                """, conn);
+            cmd.Parameters.AddWithValue("subtypeId", subtypeId);
             cmd.Parameters.AddWithValue("typeId", typeId);
             cmd.Parameters.AddWithValue("manufacturerId", id);
             await cmd.ExecuteNonQueryAsync();

@@ -412,6 +412,28 @@ export const api = {
       method: "DELETE",
     }).then((r) => handleResponse<void>(r)),
 
+  addManufacturerProductSubtype: (manufacturerId: number, typeId: number, name: string) =>
+    fetch(`${BASE}/manufacturers/${manufacturerId}/product-types/${typeId}/subtypes`, json({ name })).then(
+      (r) => handleResponse<{ id: number }>(r)
+    ),
+
+  updateManufacturerProductSubtype: (
+    manufacturerId: number,
+    typeId: number,
+    subtypeId: number,
+    name: string
+  ) =>
+    fetch(`${BASE}/manufacturers/${manufacturerId}/product-types/${typeId}/subtypes/${subtypeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeManufacturerProductSubtype: (manufacturerId: number, typeId: number, subtypeId: number) =>
+    fetch(`${BASE}/manufacturers/${manufacturerId}/product-types/${typeId}/subtypes/${subtypeId}`, {
+      method: "DELETE",
+    }).then((r) => handleResponse<void>(r)),
+
   getClients: (search?: string) =>
     fetch(`${BASE}/clients${search ? `?search=${encodeURIComponent(search)}` : ""}`).then((r) =>
       handleResponse<Client[]>(r)

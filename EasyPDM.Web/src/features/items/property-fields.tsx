@@ -31,7 +31,10 @@ import {
 } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useMaterials } from "@/features/materials/use-materials"
-import { useManufacturerProductTypes } from "@/features/manufacturers/use-manufacturer-product-types"
+import {
+  useManufacturerProductSubtypes,
+  useManufacturerProductTypes,
+} from "@/features/manufacturers/use-manufacturer-product-types"
 import { useManufacturers } from "@/features/manufacturers/use-manufacturers"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -243,7 +246,7 @@ function ManufacturerField({
   )
 }
 
-// Typ produktu z katalogu WYBRANEGO producenta (zob. zakładka Producenci) — pole ma sens
+// Seria/typ z katalogu WYBRANEGO producenta (zob. zakładka Producenci) — pole ma sens
 // dopiero, gdy producent jest wybrany, więc bez niego w ogóle się nie renderuje. Zapisuje
 // samą nazwę typu, tak samo jak ManufacturerField zapisuje samą nazwę producenta.
 function ProductTypeField({
@@ -261,6 +264,7 @@ function ProductTypeField({
 }) {
   const { t } = useLanguage()
   const { productTypes } = useManufacturerProductTypes(manufacturerName)
+  const names = productTypes.map((p) => p.name)
 
   async function save(next: string) {
     try {
@@ -276,9 +280,9 @@ function ProductTypeField({
   return (
     <>
       <Label>{t("part.productType")}</Label>
-      {productTypes.length > 0 ? (
+      {names.length > 0 ? (
         <Combobox
-          items={productTypes}
+          items={names}
           value={value || null}
           onValueChange={(v) => save((v as string | null) ?? "")}
           itemToStringLabel={(name: string) => name}
@@ -299,6 +303,66 @@ function ProductTypeField({
       ) : (
         <Hint>{t("part.noProductTypesHint")}</Hint>
       )}
+    </>
+  )
+}
+
+// Podtyp w obrębie WYBRANEJ serii/typu — o poziom głębiej niż ProductTypeField i na tej
+// samej zasadzie: bez wybranej serii/typu nie renderuje się w ogóle, a lista zawiera
+// wyłącznie podtypy TEJ serii. Seria/typ bez żadnych podtypów też chowa pole — podtyp jest
+// opcjonalnym uszczegółowieniem, nie każda seria go ma.
+function ProductSubtypeField({
+  manufacturerName,
+  productTypeName,
+  value,
+  onSave,
+  disabled,
+  onError,
+}: {
+  manufacturerName: string
+  productTypeName: string
+  value: string
+  onSave: (key: string, value: string) => void | Promise<void>
+  disabled: boolean
+  onError?: (message: string | null) => void
+}) {
+  const { t } = useLanguage()
+  const { subtypes } = useManufacturerProductSubtypes(manufacturerName, productTypeName)
+  const names = subtypes.map((s) => s.name)
+
+  async function save(next: string) {
+    try {
+      onError?.(null)
+      await onSave("productSubtype", next)
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : t("part.saveFieldFailed"))
+    }
+  }
+
+  if (!manufacturerName || !productTypeName || names.length === 0) return null
+
+  return (
+    <>
+      <Label>{t("part.productSubtype")}</Label>
+      <Combobox
+        items={names}
+        value={value || null}
+        onValueChange={(v) => save((v as string | null) ?? "")}
+        itemToStringLabel={(name: string) => name}
+        disabled={disabled}
+      >
+        <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear />
+        <ComboboxContent>
+          <ComboboxEmpty>{t("part.noMatchingProductSubtypes")}</ComboboxEmpty>
+          <ComboboxList>
+            {(name: string) => (
+              <ComboboxItem key={name} value={name}>
+                {name}
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
     </>
   )
 }
@@ -426,4 +490,4 @@ function PropField({
   )
 }
 
-export { ManufacturerField, MaterialField, ProductTypeField, PropField }
+export { ManufacturerField, MaterialField, ProductSubtypeField, ProductTypeField, PropField }

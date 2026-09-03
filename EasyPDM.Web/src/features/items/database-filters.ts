@@ -13,6 +13,7 @@ export interface DatabaseFilters {
   partKind: KindFilter
   manufacturer: string
   productType: string
+  productSubtype: string
   client: string
 }
 
@@ -62,6 +63,7 @@ export function coerceDatabaseFilters(raw: Record<string, unknown>): DatabaseFil
     partKind: PART_KINDS.includes(raw.partKind as KindFilter) ? (raw.partKind as KindFilter) : "all",
     manufacturer: typeof raw.manufacturer === "string" ? raw.manufacturer : "",
     productType: typeof raw.productType === "string" ? raw.productType : "",
+    productSubtype: typeof raw.productSubtype === "string" ? raw.productSubtype : "",
     client: typeof raw.client === "string" ? raw.client : "",
   }
 }

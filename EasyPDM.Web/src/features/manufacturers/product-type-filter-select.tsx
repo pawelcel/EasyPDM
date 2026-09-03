@@ -35,9 +35,9 @@ function ProductTypeFilterSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="all">{t("filter.allProductTypes")}</SelectItem>
-        {productTypes.map((name) => (
-          <SelectItem key={name} value={name}>
-            {name}
+        {productTypes.map((p) => (
+          <SelectItem key={p.id} value={p.name}>
+            {p.name}
           </SelectItem>
         ))}
       </SelectContent>

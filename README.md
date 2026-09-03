@@ -133,17 +133,19 @@ A Part has one of four **kinds**, each with a different set of fields:
 | Kind | Additional fields |
 |---|---|
 | Manufactured | Material, Price |
-| Purchased | Manufacturer, Product type, Order number 1/2, Mass, Price |
+| Purchased | Manufacturer, Series/Type, Subtype, Order number 1/2, Mass, Price |
 | Standard | Material, Norm |
 | Client-supplied | (no additional fields) |
 
-An Assembly has one of three **kinds**: Manufactured, Purchased (Manufacturer and
-Product type) or Client-supplied. Whatever the kind, it can also carry an optional
+An Assembly has one of three **kinds**: Manufactured, Purchased (Manufacturer,
+Series/Type and Subtype) or Client-supplied. Whatever the kind, it can also carry an optional
 Mass and any custom properties.
 
-**Product type** is an entry from the chosen manufacturer's list of types
-(Manufacturers tab) — the field appears only once a manufacturer is selected, and
-offers exactly that manufacturer's types.
+**Series/Type** is an entry from the chosen manufacturer's list (Manufacturers tab), and
+**Subtype** narrows it down within that series (e.g. series "Cylindrical roller bearings"
+→ subtypes NU/NJ/NUP). Each field appears only once the one above it is filled in and
+offers exactly the entries belonging to it; changing the manufacturer or the series clears
+whatever is below.
 
 ### Status and revisions
 
