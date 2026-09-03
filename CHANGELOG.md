@@ -52,6 +52,16 @@ All notable changes to EasyPDM are documented in this file.
   that shared item from the other project's BOM too — it no longer does.
 
 ### Fixed
+- Switching a Part or Assembly's kind (e.g. Purchased → Standard) didn't clear the
+  fields that belonged only to the old kind — a Manufacturer typed in under
+  "Purchased" stayed in the item's data even after switching away, invisible in the
+  UI but still turning up in "Whole database" search. Now cleared as part of the
+  kind change, both when editing an existing item and while still filling in the
+  "New item" dialog.
+- An Assembly's generic Properties editor duplicated its kind, Manufacturer,
+  Series/Type and Subtype as plain, freely-editable rows underneath the dedicated
+  fields for them further up — redundant, and easy to accidentally desync from the
+  real fields.
 - Adding a *new* item under a locked assembly bypassed the owner lock entirely —
   anyone with project access could insert a new BOM row under someone else's locked
   assembly, even though every other change to that assembly was correctly blocked.

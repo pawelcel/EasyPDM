@@ -48,6 +48,40 @@ const ASSEMBLY_KINDS: { value: string; labelKey: TranslationKey }[] = [
   { value: "Klienta", labelKey: "assembly.kindClient" },
 ]
 
+// Klucze properties NALEŻĄCE do danego rodzaju (patrz pola renderowane w każdym bloku
+// PartPropertyForm niżej) — przy zmianie rodzaju te z POPRZEDNIEGO rodzaju są czyszczone
+// (ustawiane na ""), żeby nie zostały jako martwe, ale wciąż przeszukiwalne dane (Cała
+// baza szuka po CAŁEJ treści properties, nie tylko po polach aktualnie pokazywanych w
+// UI — bez tego np. producent z porzuconej Części zakupowej dalej by się wyszukiwał po
+// zmianie rodzaju na Normalię). "notes" celowo pominięte — to pole wspólne dla wszystkich
+// rodzajów, nie "należy" do żadnego konkretnego.
+const PART_KIND_FIELDS: Record<string, string[]> = {
+  Wykonywana: ["material", "price", "currency", "priceType", "priceDate"],
+  Zakupowa: [
+    "manufacturer",
+    "productType",
+    "productSubtype",
+    "orderNumber",
+    "orderNumber2",
+    "mass",
+    "price",
+    "currency",
+    "priceType",
+    "priceDate",
+  ],
+  Normalia: ["material", "norm"],
+  Klienta: [],
+}
+
+// Złożenie ma "Masę" zawsze dostępną przez generyczny PropertyEditor (zob.
+// item-detail-panel.tsx), niezależnie od rodzaju — w odróżnieniu od Części, gdzie Masa
+// jest polem WYŁĄCZNIE Zakupowej — więc tu nie ma jej na liście do czyszczenia.
+const ASSEMBLY_KIND_FIELDS: Record<string, string[]> = {
+  Wykonywane: [],
+  Zakupowe: ["manufacturer", "productType", "productSubtype"],
+  Klienta: [],
+}
+
 // Rodzaj/Nazwa/Materiał — wydzielone z reszty formularza, bo pokazują się od razu w
 // nagłówku panelu (obok podglądu), nie dopiero w sekcji "Właściwości" niżej.
 function PartSummaryFields({
@@ -93,7 +127,12 @@ function PartSummaryFields({
   async function changeRodzaj(next: string) {
     try {
       setError(null)
-      await api.updateProperties(item.id, { rodzaj: next })
+      // Pola POPRZEDNIEGO rodzaju czyszczone razem ze zmianą — inaczej zostają jako martwe,
+      // ale wciąż przeszukiwalne w "Całej bazie" (zob. PART_KIND_FIELDS/ASSEMBLY_KIND_FIELDS
+      // wyżej).
+      const staleFields = (isAssembly ? ASSEMBLY_KIND_FIELDS : PART_KIND_FIELDS)[rodzaj] ?? []
+      const cleared = Object.fromEntries(staleFields.map((key) => [key, ""]))
+      await api.updateProperties(item.id, { ...cleared, rodzaj: next })
       await onChanged()
     } catch (err) {
       setError(err instanceof Error ? err.message : t("part.saveFieldFailed"))
@@ -336,4 +375,4 @@ function PriceRow({
   )
 }
 
-export { PartPropertyForm, PartSummaryFields }
+export { ASSEMBLY_KIND_FIELDS, PART_KIND_FIELDS, PartPropertyForm, PartSummaryFields }

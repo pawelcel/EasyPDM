@@ -55,6 +55,20 @@ function bomPropertyOrDash(properties: Record<string, unknown>, key: string): st
   return typeof value === "string" && value.trim() ? value : "-"
 }
 
+// Klucze, które dla Złożenia ma już swoje DEDYKOWANE pole w PartPropertyForm wyżej
+// (rodzaj — przyciski w PartSummaryFields; producent/seria-typ/podtyp — pola Zakupowego) —
+// generyczny PropertyEditor niżej pokazuje "resztę" (Masę i dowolne własne klucze), więc
+// bez tego filtra te same wartości pokazałyby się DRUGI raz jako zwykłe, wolno edytowalne
+// wiersze, myląc redundancją i pozwalając rozjechać je od specjalizowanego pola.
+const ASSEMBLY_MANAGED_PROPERTY_KEYS = new Set(["rodzaj", "manufacturer", "productType", "productSubtype"])
+
+function propertyEditorEntries(item: Item): Record<string, unknown> {
+  if (item.itemType !== "assembly") return item.properties
+  return Object.fromEntries(
+    Object.entries(item.properties).filter(([key]) => !ASSEMBLY_MANAGED_PROPERTY_KEYS.has(key))
+  )
+}
+
 // Zmiana nazwy Folderu/Pliku — odpowiednik pola nazwy w PartSummaryFields (Część/Złożenie),
 // tylko bez rodzaju/materiału/blokad statusu i właściciela (te dotyczą wyłącznie Części i
 // Złożeń — isLocked/canEditOwnerLocked zawsze zwracają "odblokowane" dla Folderu/Pliku, bo
@@ -433,7 +447,7 @@ function ItemDetailPanel({
           )}
           <PropertyEditor
             itemId={item.id}
-            properties={item.properties}
+            properties={propertyEditorEntries(item)}
             locked={isLocked(item) || !ownerEditable}
             lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
             onChanged={refreshAfterAction}

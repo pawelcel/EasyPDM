@@ -36,6 +36,7 @@ import {
   ProductTypeAndSubtypeFields,
   PropField,
 } from "@/features/items/property-fields"
+import { ASSEMBLY_KIND_FIELDS, PART_KIND_FIELDS } from "@/features/items/part-property-form"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -191,6 +192,21 @@ function AddNodeDialog({
   const [extraProps, setExtraProps] = useState<Record<string, string>>(seedExtraProps)
   function setExtraField(key: string, value: string) {
     setExtraProps((prev) => ({ ...prev, [key]: value }))
+  }
+  // Zmiana rodzaju W TRAKCIE tworzenia (przed pierwszym zapisem) — pola POPRZEDNIEGO
+  // rodzaju czyszczone z lokalnego stanu, inaczej zostałyby zebrane przy submit mimo że
+  // ich pola już się nie pokazują (extraProps przeżywa przełączenie rodzaju, bo to jeden
+  // wspólny Record dla wszystkich rodzajów na raz — zob. PART_KIND_FIELDS/ASSEMBLY_KIND_FIELDS).
+  function changeRodzaj(next: string) {
+    const staleFields = (mode === "assembly" ? ASSEMBLY_KIND_FIELDS : PART_KIND_FIELDS)[rodzaj] ?? []
+    if (staleFields.length > 0) {
+      setExtraProps((prev) => {
+        const copy = { ...prev }
+        for (const key of staleFields) delete copy[key]
+        return copy
+      })
+    }
+    setRodzaj(next)
   }
   // Widoczny tylko, gdy tworzenie ma przypięty bilet z makra (zob. props "ticket" wyżej) —
   // w normalnym, ręcznym dodawaniu przez aplikację webową nie ma żadnego lokalnego pliku
@@ -510,7 +526,7 @@ function AddNodeDialog({
                 type="button"
                 size="sm"
                 variant={rodzaj === "Wykonywana" ? "default" : "outline"}
-                onClick={() => setRodzaj("Wykonywana")}
+                onClick={() => changeRodzaj("Wykonywana")}
               >
                 {t("part.kindManufactured")}
               </Button>
@@ -518,7 +534,7 @@ function AddNodeDialog({
                 type="button"
                 size="sm"
                 variant={rodzaj === "Zakupowa" ? "default" : "outline"}
-                onClick={() => setRodzaj("Zakupowa")}
+                onClick={() => changeRodzaj("Zakupowa")}
               >
                 {t("part.kindPurchased")}
               </Button>
@@ -526,7 +542,7 @@ function AddNodeDialog({
                 type="button"
                 size="sm"
                 variant={rodzaj === "Normalia" ? "default" : "outline"}
-                onClick={() => setRodzaj("Normalia")}
+                onClick={() => changeRodzaj("Normalia")}
               >
                 {t("part.kindStandard")}
               </Button>
@@ -534,7 +550,7 @@ function AddNodeDialog({
                 type="button"
                 size="sm"
                 variant={rodzaj === "Klienta" ? "default" : "outline"}
-                onClick={() => setRodzaj("Klienta")}
+                onClick={() => changeRodzaj("Klienta")}
               >
                 {t("part.kindClient")}
               </Button>
@@ -627,7 +643,7 @@ function AddNodeDialog({
                     type="button"
                     size="sm"
                     variant={rodzaj === "Wykonywane" ? "default" : "outline"}
-                    onClick={() => setRodzaj("Wykonywane")}
+                    onClick={() => changeRodzaj("Wykonywane")}
                   >
                     {t("assembly.kindManufactured")}
                   </Button>
@@ -635,7 +651,7 @@ function AddNodeDialog({
                     type="button"
                     size="sm"
                     variant={rodzaj === "Zakupowe" ? "default" : "outline"}
-                    onClick={() => setRodzaj("Zakupowe")}
+                    onClick={() => changeRodzaj("Zakupowe")}
                   >
                     {t("assembly.kindPurchased")}
                   </Button>
@@ -643,7 +659,7 @@ function AddNodeDialog({
                     type="button"
                     size="sm"
                     variant={rodzaj === "Klienta" ? "default" : "outline"}
-                    onClick={() => setRodzaj("Klienta")}
+                    onClick={() => changeRodzaj("Klienta")}
                   >
                     {t("assembly.kindClient")}
                   </Button>
