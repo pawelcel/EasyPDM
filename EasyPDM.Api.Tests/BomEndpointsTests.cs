@@ -126,7 +126,7 @@ public class BomEndpointsTests
 
         var text = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
         var lines = text.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal("L.p.;Nazwa;Ilość;Materiał;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2", lines[0]);
+        Assert.Equal("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2", lines[0]);
 
         // zlozenie2 to L.p. "1" (pierwsze dziecko zlozenie1), czesc2 pod nim to "1.1".
         Assert.Contains(lines, l => l.StartsWith("1;", StringComparison.Ordinal));
@@ -155,6 +155,7 @@ public class BomEndpointsTests
         // w odróżnieniu od surowej ilości "2" widocznej w "/bom" i "/bom/csv".
         Assert.Equal("6", fields[1]);
         Assert.Equal("Stal nierdzewna", fields[2]);
-        Assert.Equal("ACME", fields[3]);
+        Assert.Equal("", fields[3]);
+        Assert.Equal("ACME", fields[4]);
     }
 }
