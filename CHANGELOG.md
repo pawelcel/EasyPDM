@@ -38,6 +38,11 @@ All notable changes to EasyPDM are documented in this file.
   something to explore instead of a blank slate. A notification points it out and
   reminds you to clear it (Settings → File storage → Danger zone) before real use.
   Only ever created once, on a genuinely empty database.
+- An assembly's BOM table (and both its CSV exports) now shows a "Norm" column,
+  filled in from a Standard part's own Norm field.
+- "Whole database" gained a "Clear filters" button next to the other filters —
+  resets search, tag, and every filter dropdown in one click. Disabled when nothing
+  is currently filtered.
 
 ### Changed
 - Admins can now bypass another user's item lock for three actions: changing its

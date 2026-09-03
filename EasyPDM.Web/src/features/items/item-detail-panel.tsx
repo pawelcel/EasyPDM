@@ -488,6 +488,7 @@ function ItemDetailPanel({
                     <TableHead>{t("item.colRevision")}</TableHead>
                     <TableHead className="text-right">{t("common.quantity")}</TableHead>
                     <TableHead>{t("common.material")}</TableHead>
+                    <TableHead>{t("part.norm")}</TableHead>
                     <TableHead>{t("common.manufacturer")}</TableHead>
                     <TableHead>{t("item.colOrderNumber1")}</TableHead>
                     <TableHead>{t("item.colOrderNumber2")}</TableHead>
@@ -672,6 +673,7 @@ function SortableBomRow({
           />
         </TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "material")}</TableCell>
+        <TableCell>{bomPropertyOrDash(child.properties, "norm")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "manufacturer")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "orderNumber")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "orderNumber2")}</TableCell>
@@ -710,6 +712,7 @@ function SortableBomRow({
           <TableCell>{entry.revisionNumber !== null ? revisionLabel(entry.revisionNumber) : "—"}</TableCell>
           <TableCell className="text-right">{entry.quantity}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "material")}</TableCell>
+          <TableCell>{bomPropertyOrDash(entry.properties, "norm")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "manufacturer")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "orderNumber")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "orderNumber2")}</TableCell>

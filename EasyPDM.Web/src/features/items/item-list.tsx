@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { FilterX } from "lucide-react"
 
 import { api } from "@/api/client"
 import type { Item, Project } from "@/api/types"
@@ -9,6 +10,7 @@ import { Hint } from "@/components/ui/hint"
 import { ResizeHandle } from "@/components/ui/resize-handle"
 import { ClientFilterSelect } from "@/features/items/client-filter-select"
 import {
+  coerceDatabaseFilters,
   matchesKindFilter,
   type DatabaseFilters,
   type KindFilter,
@@ -185,6 +187,20 @@ function ItemList({
     setSelection(null)
   }
 
+  const hasActiveFilters =
+    !!search ||
+    !!tag ||
+    recordType !== "all" ||
+    partKind !== "all" ||
+    !!manufacturer ||
+    !!productType ||
+    !!productSubtype ||
+    !!client
+
+  function clearFilters() {
+    applyFilters(coerceDatabaseFilters({}))
+  }
+
   async function confirmDeleteCompletely() {
     if (!confirmingDeleteId) return
     setDeletingPending(true)
@@ -348,6 +364,16 @@ function ItemList({
           currentFilters={{ search, tag, recordType, partKind, manufacturer, productType, productSubtype, client }}
           onApply={applyFilters}
         />
+        <Button
+          variant="outline"
+          onClick={clearFilters}
+          disabled={!hasActiveFilters}
+          aria-label={t("filter.clearAllAria")}
+          title={t("filter.clearAllAria")}
+        >
+          <FilterX className="size-4" />
+          {t("filter.clearAll")}
+        </Button>
       </div>
 
       {/* Belka zawsze widoczna (nie tylko po zaznaczeniu czegoś) — zmieniają się jedynie

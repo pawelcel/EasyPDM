@@ -248,6 +248,8 @@ const pl = {
   "filter.allManufacturers": "Wszyscy producenci",
   "filter.allProductTypes": "Wszystkie serie/typy",
   "filter.allProductSubtypes": "Wszystkie podtypy",
+  "filter.clearAll": "Wyczyść filtry",
+  "filter.clearAllAria": "Wyczyść wszystkie filtry",
   "filter.allClients": "Wszyscy klienci",
   "filter.other": "Pozostałe",
 
@@ -871,6 +873,8 @@ const en: Record<TranslationKey, string> = {
   "filter.allManufacturers": "All manufacturers",
   "filter.allProductTypes": "All series/types",
   "filter.allProductSubtypes": "All subtypes",
+  "filter.clearAll": "Clear filters",
+  "filter.clearAllAria": "Clear all filters",
   "filter.allClients": "All clients",
   "filter.other": "Other",
 
@@ -910,7 +914,7 @@ const en: Record<TranslationKey, string> = {
   "part.kindPurchased": "Purchased",
   "part.kindStandard": "Standard part",
   "part.kindClient": "Client's",
-  "part.norm": "Standard",
+  "part.norm": "Norm",
   "part.selectKindHint": "Select a kind to see additional properties.",
   "part.material": "Material",
   "part.searchPlaceholder": "Type a name to search…",
@@ -1492,6 +1496,8 @@ const de: Record<TranslationKey, string> = {
   "filter.allManufacturers": "Alle Hersteller",
   "filter.allProductTypes": "Alle Serien/Typen",
   "filter.allProductSubtypes": "Alle Untertypen",
+  "filter.clearAll": "Filter zurücksetzen",
+  "filter.clearAllAria": "Alle Filter zurücksetzen",
   "filter.allClients": "Alle Kunden",
   "filter.other": "Sonstige",
 

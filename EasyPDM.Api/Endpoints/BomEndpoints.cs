@@ -54,7 +54,7 @@ static class BomEndpoints
             var rows = await FetchBomRowsAsync(conn, id);
 
             var csv = new StringBuilder();
-            csv.Append("L.p.;Nazwa;Ilość;Materiał;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2\r\n");
+            csv.Append("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2\r\n");
             foreach (var row in rows)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
@@ -65,6 +65,7 @@ static class BomEndpoints
                     CsvField(name),
                     CsvField(row.Quantity.ToString(CultureInfo.InvariantCulture)),
                     CsvField(PropertyOrEmpty(props, "material")),
+                    CsvField(PropertyOrEmpty(props, "norm")),
                     CsvField(PropertyOrEmpty(props, "manufacturer")),
                     CsvField(PropertyOrEmpty(props, "orderNumber")),
                     CsvField(PropertyOrEmpty(props, "orderNumber2")),
@@ -161,7 +162,7 @@ static class BomEndpoints
                 .OrderBy(a => a.ItemNumber ?? int.MaxValue);
 
             var csv = new StringBuilder();
-            csv.Append("Nazwa;Ilość łącznie;Materiał;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2\r\n");
+            csv.Append("Nazwa;Ilość łącznie;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2\r\n");
             foreach (var row in aggregated)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
@@ -171,6 +172,7 @@ static class BomEndpoints
                     CsvField(name),
                     CsvField(row.TotalQuantity.ToString(CultureInfo.InvariantCulture)),
                     CsvField(PropertyOrEmpty(props, "material")),
+                    CsvField(PropertyOrEmpty(props, "norm")),
                     CsvField(PropertyOrEmpty(props, "manufacturer")),
                     CsvField(PropertyOrEmpty(props, "orderNumber")),
                     CsvField(PropertyOrEmpty(props, "orderNumber2")),

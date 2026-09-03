@@ -172,8 +172,8 @@ ikona kłódki: zielona (zablokowane przez Ciebie), żółta (przez kogoś inneg
 (zwolnione).
 
 BOM złożenia pokazuje: L.p. (edytowalne wpisaniem liczby całkowitej — musi być unikalna
-w tym BOM-ie — albo przeciągnięciem wiersza), Nazwa, Ilość, Materiał, Producent, Numer
-zamówieniowy 1/2 (brakujące pola jako „-”), razem z zagłębionymi elementami (części
+w tym BOM-ie — albo przeciągnięciem wiersza), Nazwa, Ilość, Materiał, Norma, Producent,
+Numer zamówieniowy 1/2 (brakujące pola jako „-”), razem z zagłębionymi elementami (części
 zagnieżdżonych złożeń, L.p. w formie `2.1`). Eksport do CSV w dwóch wariantach: pełny
 (każde wystąpienie osobno) i zsumowany (ten sam komponent użyty kilka razy w różnych
 miejscach — jeden wiersz z łączną, rozwiniętą przez cały łańcuch ilością).

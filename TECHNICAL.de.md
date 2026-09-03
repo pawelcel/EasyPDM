@@ -198,8 +198,8 @@ gelb (von jemand anderem), offen (freigegeben).
 
 Die Stückliste einer Baugruppe zeigt: Position (editierbar durch Eingabe einer
 Ganzzahl — muss innerhalb dieser Stückliste eindeutig sein — oder durch Ziehen der
-Zeile), Name, Menge, Material, Hersteller, Bestellnummer 1/2 (fehlende Felder als „-"),
-zusammen mit verschachtelten Elementen (Teile verschachtelter Baugruppen, Position in
+Zeile), Name, Menge, Material, Norm, Hersteller, Bestellnummer 1/2 (fehlende Felder als
+„-"), zusammen mit verschachtelten Elementen (Teile verschachtelter Baugruppen, Position in
 der Form `2.1`). CSV-Export in zwei Varianten: vollständig (jedes Vorkommen einzeln
 aufgeführt) und zusammengefasst (dieselbe Komponente mehrfach an verschiedenen Stellen
 verwendet — eine Zeile mit der über die gesamte Kette aufgelösten Gesamtmenge).

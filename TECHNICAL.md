@@ -177,7 +177,7 @@ and has no owner — it cannot be locked. In the tree this is shown by a lock ic
 (locked by you), yellow (by someone else), open (released).
 
 An Assembly's BOM shows: position (editable by typing an integer — must be unique within
-that BOM — or by dragging the row), Name, Quantity, Material, Manufacturer, Order
+that BOM — or by dragging the row), Name, Quantity, Material, Norm, Manufacturer, Order
 number 1/2 (missing fields shown as "-"), together with nested items (parts of nested
 assemblies, position in the form `2.1`). CSV export in two variants: full (every
 occurrence listed separately) and aggregated (the same component used several times in
