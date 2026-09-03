@@ -133,11 +133,17 @@ A Part has one of four **kinds**, each with a different set of fields:
 | Kind | Additional fields |
 |---|---|
 | Manufactured | Material, Price |
-| Purchased | Manufacturer, Order number 1/2, Mass, Price |
+| Purchased | Manufacturer, Product type, Order number 1/2, Mass, Price |
 | Standard | Material, Norm |
 | Client-supplied | (no additional fields) |
 
-An Assembly has no kind — only an optional Mass.
+An Assembly has one of three **kinds**: Manufactured, Purchased (Manufacturer and
+Product type) or Client-supplied. Whatever the kind, it can also carry an optional
+Mass and any custom properties.
+
+**Product type** is an entry from the chosen manufacturer's list of types
+(Manufacturers tab) — the field appears only once a manufacturer is selected, and
+offers exactly that manufacturer's types.
 
 ### Status and revisions
 

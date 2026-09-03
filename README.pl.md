@@ -130,11 +130,16 @@ Część ma jeden z czterech **rodzajów**, każdy z innym zestawem pól:
 | Rodzaj | Dodatkowe pola |
 |---|---|
 | Wykonywana | Materiał, Cena |
-| Zakupowa | Producent, Numer zamówieniowy 1/2, Masa, Cena |
+| Zakupowa | Producent, Typ produktu, Numer zamówieniowy 1/2, Masa, Cena |
 | Normalia | Materiał, Norma |
 | Klienta | (bez dodatkowych pól) |
 
-Złożenie nie ma rodzaju — tylko opcjonalną Masę.
+Złożenie ma jeden z trzech **rodzajów**: Wykonywane, Zakupowe (Producent i Typ
+produktu) albo Klienta. Niezależnie od rodzaju można mu wpisać opcjonalną Masę i
+dowolne własne właściwości.
+
+**Typ produktu** to pozycja z listy typów danego producenta (zakładka Producenci) —
+pole pojawia się dopiero po wybraniu producenta i pokazuje wyłącznie jego typy.
 
 ### Status i rewizje
 

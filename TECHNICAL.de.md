@@ -24,7 +24,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
 
 - **`db/schema.sql`** — das vollständige Schema von Grund auf (aktueller Stand nach allen
   Migrationen).
-- **`db/migrations/`** — Migrationen `002`–`039` für eine bereits bestehende Datenbank:
+- **`db/migrations/`** — Migrationen `002`–`040` für eine bereits bestehende Datenbank:
   Projekte, Elementtypen, Sichtbarkeit im Baum, Status/Revisionen, Materialien
   (+ Gruppen/Untergruppen), Anhänge, Stücklisten-Reihenfolge, Revisionskommentare,
   Anmeldung und Rollen, Projekteigenschaften, kaskadierendes Löschen, Reihenfolge der
@@ -36,7 +36,8 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   Elemente (ein Element kann ohne Projekt existieren, nur über "Gesamte Datenbank"
   erreichbar), Kontaktadresse von Hersteller/Kunde, Standardwert/Eindeutigkeit der
   Stücklistenposition, Benachrichtigungen + deren Einstellungen pro Typ, Markierung des
-  Beispielprojekts sowie eine kleine interne Zustandstabelle `system_state`. Seit
+  Beispielprojekts, eine kleine interne Zustandstabelle `system_state` sowie
+  Hersteller-Produkttypen. Seit
   Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
   resources) und werden **automatisch bei jedem Start** angewendet — siehe
   `MigrationRunner.cs` und "Inbetriebnahme" unten — sie müssen nicht mehr manuell per
@@ -141,10 +142,25 @@ direkt unter dem Original.
 
 Ein Teil hat vier **Arten** (`properties.rodzaj`), jede mit einem anderen Satz von
 Feldern und einem anderen Symbol im Baum: **Gefertigt** (Material, Preis, Zusätzliche
-Informationen), **Zugekauft** (Hersteller, Bestellnummer 1/2, Masse, Preis, Zusätzliche
-Informationen), **Norm** (Material, Norm, Zusätzliche Informationen), **Kundenteil**
-(keine zusätzlichen Felder außer Zusätzlichen Informationen). Eine Baugruppe hat
-überhaupt keine Art — nur eine optionale Masse.
+Informationen), **Zugekauft** (Hersteller, Produkttyp, Bestellnummer 1/2, Masse, Preis,
+Zusätzliche Informationen), **Norm** (Material, Norm, Zusätzliche Informationen),
+**Kundenteil** (keine zusätzlichen Felder außer Zusätzlichen Informationen).
+
+Eine Baugruppe hat drei eigene Arten im selben `properties.rodzaj`: **Wykonywane**
+(gefertigt), **Zakupowe** (zugekauft — Hersteller, Produkttyp) und **Klienta** (vom
+Kunden). Die Zeichenketten unterscheiden sich BEWUSST von denen des Teils ("Zakupowe"
+statt "Zakupowa"), denn dieser Wert dient zugleich als Schlüssel für das Nummernpräfix —
+die einzige gemeinsame Zeichenkette ist "Klienta", die sich auch das Präfix teilt. Über
+die Felder ihrer Art hinaus hat eine Baugruppe weiterhin den generischen
+Eigenschaften-Editor (Masse und beliebige eigene Schlüssel). Baugruppen aus früheren
+Versionen haben keine Art und zeigen einen Hinweis, eine auszuwählen.
+
+**Produkttyp** (`properties.productType`) ist ein Name aus der Typenliste des jeweiligen
+Herstellers (`manufacturer_product_types`, Reiter Hersteller) — die Verknüpfung erfolgt
+ausschließlich über den Namen, wie bei Hersteller und Material, sodass das Löschen eines
+Typs aus dem Katalog bereits beschriebene Elemente nie verändert. Das Feld erscheint erst
+nach der Wahl eines Herstellers, und ein Herstellerwechsel löscht einen zuvor gewählten
+Typ.
 
 Ein Teil/eine Baugruppe hat eine Zustandsmaschine: `w_pracy → sprawdzany → (w_pracy |
 wydany) → w_pracy` (in Bearbeitung → in Prüfung → (in Bearbeitung | freigegeben) → in
@@ -249,14 +265,14 @@ sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwend
 | GET | `/api/items/{id}/revisions` | Historie der Revisionskommentare (nur Revisionen mit Kommentar) |
 | GET | `/api/items/{id}/history` | vollständige Historie: Erstellung, Statusänderungen, Revisionen, hinzugefügter/entfernter Anhang, Eigentümersperre/-freigabe (wann/wer/Beschreibung), chronologisch |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | Materialkatalog (Name + Gruppe/Untergruppe) |
-| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]` | Herstellerkatalog + Kontaktpersonen |
+| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}]` | Herstellerkatalog + Kontaktpersonen + Produkttypen |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | Anhänge (Upload/Registrierung einer vorhandenen Datei/Liste/Download/Löschen) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | gespeicherte Filtersätze der Ansicht „Gesamte Datenbank" (privat pro Benutzer) |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | Korrelation CAD-Makro ↔ Browser (siehe `EasyPDM.FreeCad/README.md`) |
 | GET | `/api/config` | Speicherort für Dateien (z. B. zur Verwendung durch das FreeCAD-Makro) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | Speicherort/-statistiken, Verschieben, Sicherung (pg_dump + Dateien in einem ZIP), Wiederherstellung aus einer Sicherung — **nur Administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | Zeitplan für automatische Sicherung (ein-/ausschalten, Häufigkeit, Tag, Uhrzeit, Anzahl aufbewahrter Kopien) — **nur Administrator** |
-| GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | Buchstaben-Präfixe der Elementnummer pro Art — **nur Administrator** |
+| GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | Buchstaben-Präfixe der Elementnummer pro Art (die 4 Teile-Arten plus `Zlozenie` = gefertigte Baugruppe; zugekaufte/Kunden-Baugruppen nutzen das Präfix der Teile-Art) — **nur Administrator** |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | Vorschau/Zurückdrehen der Elementnummern-Sequenz — **nur Administrator** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | Liste der Tage mit gespeichertem Protokoll, die letzten N Zeilen eines bestimmten Tages, Download der vollständigen Datei — **nur Administrator** |
 

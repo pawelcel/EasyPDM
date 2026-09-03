@@ -89,11 +89,11 @@ dwie osobne.
      nawigacji po panelu projektów po lewej: dopiero W TYM POPUPIE wybiera się projekt,
      opcjonalnie element nadrzędny, typ (Część/Złożenie), nazwę (domyślnie podpowiedziana
      z etykiety dokumentu), rodzaj i zależne od niego pola: dla Części rodzaj jest
-     wymagany — **Wykonywana** → Materiał, **Zakupowa** → Producent/Numer zamówieniowy
-     1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** → brak dodatkowych pól. Dla
-     Złożenia rodzaj jest opcjonalny i ograniczony do Wykonywana/Zakupowa/Normalia (bez
-     "Klienta"), a Masa jest zawsze widoczna niezależnie od wybranego rodzaju — Złożenie
-     nigdy nie ma pola Materiał (tylko Część). Popup ma też **checkboksy "Eksportuj STEP"
+     wymagany — **Wykonywana** → Materiał, **Zakupowa** → Producent/Typ produktu/Numer
+     zamówieniowy 1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** → brak dodatkowych
+     pól. Złożenie ma własne, też wymagane rodzaje — **Wykonywane**, **Zakupowe** →
+     Producent/Typ produktu, **Klienta** — a Masa jest zawsze widoczna niezależnie od
+     wybranego rodzaju; Złożenie nigdy nie ma pola Materiał (tylko Część). Popup ma też **checkboksy "Eksportuj STEP"
      i "Eksportuj PDF"** (STEP domyślnie zaznaczony, PDF nie — patrz krok 5 niżej, co
      dokładnie robi każdy z nich przy eksporcie). Bilet jest przypięty JAWNIE do tego
      jednego, konkretnego popupu — żadne

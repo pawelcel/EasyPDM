@@ -95,11 +95,11 @@ separate ones.
      project, optionally a parent item, the type (Part/Assembly), the name (pre-filled by
      default from the document's label), the kind, and the fields that depend on it: for
      a Part the kind is required — **Manufactured** → Material, **Purchased** →
-     Manufacturer/Order number 1 and 2/Mass, **Standard** → Material/Norm,
-     **Client-supplied** → no additional fields. For an Assembly the kind is optional and
-     limited to Manufactured/Purchased/Standard (no "Client-supplied"), and Mass is
-     always visible regardless of the chosen kind — an Assembly never has a Material
-     field (only a Part does). The popup also has **"Export STEP" and "Export PDF"
+     Manufacturer/Product type/Order number 1 and 2/Mass, **Standard** → Material/Norm,
+     **Client-supplied** → no additional fields. An Assembly has its own kinds, also
+     required — **Manufactured**, **Purchased** → Manufacturer/Product type,
+     **Client-supplied** — and Mass is always visible regardless of the chosen kind; an
+     Assembly never has a Material field (only a Part does). The popup also has **"Export STEP" and "Export PDF"
      checkboxes** (STEP checked by default, PDF unchecked — see step 5 below for what
      each actually does on export). The ticket is EXPLICITLY pinned to this one specific
      popup — no OTHER

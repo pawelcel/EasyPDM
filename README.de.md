@@ -141,11 +141,17 @@ Ein Teil hat eine von vier **Arten**, jede mit einem anderen Satz von Feldern:
 | Art | Zusätzliche Felder |
 |---|---|
 | Gefertigt | Material, Preis |
-| Zugekauft | Hersteller, Bestellnummer 1/2, Masse, Preis |
+| Zugekauft | Hersteller, Produkttyp, Bestellnummer 1/2, Masse, Preis |
 | Norm | Material, Norm |
 | Kundenteil | (keine zusätzlichen Felder) |
 
-Eine Baugruppe hat keine Art — nur eine optionale Masse.
+Eine Baugruppe hat eine von drei **Arten**: Gefertigt, Zugekauft (Hersteller und
+Produkttyp) oder Vom Kunden. Unabhängig von der Art kann sie zusätzlich eine
+optionale Masse und beliebige eigene Eigenschaften tragen.
+
+**Produkttyp** ist ein Eintrag aus der Typenliste des gewählten Herstellers (Reiter
+Hersteller) — das Feld erscheint erst nach der Wahl eines Herstellers und zeigt
+ausschließlich dessen Typen.
 
 ### Status und Revisionen
 

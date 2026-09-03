@@ -24,7 +24,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`039` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`040` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -34,8 +34,8 @@ PostgreSQL 18.
   prefix per kind, Clients (catalog + own file tree), project-less items (an item can
   exist with no project, reachable only through "Whole database"), manufacturer/client
   contact address, BOM position default/uniqueness, notifications + per-type
-  preferences, the sample-project marker, and a small internal `system_state` flag
-  table. Since migration 027, files in this folder are embedded in the program
+  preferences, the sample-project marker, a small internal `system_state` flag table,
+  and manufacturer product types. Since migration 027, files in this folder are embedded in the program
   (embedded resources) and applied **automatically on every startup** — see
   `MigrationRunner.cs` and "How to run" below — you no longer need to run them
   manually through psql.
@@ -128,10 +128,23 @@ under the original.
 
 A Part has four **kinds** (`properties.rodzaj`), each with a different set of fields and
 a different icon in the tree: **Manufactured** (Material, Price, Additional notes),
-**Purchased** (Manufacturer, Order number 1/2, Mass, Price, Additional notes),
-**Standard** (Material, Norm, Additional notes), **Client-supplied** (no additional
-fields besides Additional notes). An Assembly has no kind at all — only an optional
-Mass.
+**Purchased** (Manufacturer, Product type, Order number 1/2, Mass, Price, Additional
+notes), **Standard** (Material, Norm, Additional notes), **Client-supplied** (no
+additional fields besides Additional notes).
+
+An Assembly has three kinds of its own in the same `properties.rodzaj`: **Wykonywane**
+(manufactured), **Zakupowe** (purchased — Manufacturer, Product type) and **Klienta**
+(client-supplied). The strings deliberately differ from the Part ones ("Zakupowe" vs
+"Zakupowa"), because that value doubles as the numbering-prefix key — the one shared
+string is "Klienta", which shares its prefix too. Beyond its kind's fields an Assembly
+still has the generic property editor (Mass and any custom keys). Assemblies created
+before this version have no kind and show a hint prompting you to pick one.
+
+**Product type** (`properties.productType`) is a name picked from that manufacturer's
+list of types (`manufacturer_product_types`, Manufacturers tab) — the link is by name
+only, like manufacturer and material, so deleting a type from the catalog never rewrites
+items that already reference it. The field appears only once a manufacturer is selected,
+and changing the manufacturer clears a previously chosen type.
 
 A Part/Assembly has a state machine: `w_pracy → sprawdzany → (w_pracy | wydany) →
 w_pracy` (in progress → under review → (in progress | released) → in progress; going
@@ -231,14 +244,14 @@ application).
 | GET | `/api/items/{id}/revisions` | revision comment history (only revisions with a comment) |
 | GET | `/api/items/{id}/history` | full history: creation, status changes, revisions, attachment added/removed, owner lock/release (when/who/description), chronologically |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | material catalog (name + group/subgroup) |
-| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]` | manufacturer catalog + contact people |
+| GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}]` | manufacturer catalog + contact people + product types |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | attachments (upload/register an existing file/list/download/delete) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | saved filter sets for the "Whole database" view (private per user) |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | CAD macro ↔ browser correlation (see `EasyPDM.FreeCad/README.md`) |
 | GET | `/api/config` | file storage location (used e.g. by the FreeCAD macro) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | storage location/stats, moving it, backup (pg_dump + files in a ZIP), restore from backup — **administrator only** |
 | GET/PATCH | `/api/settings/backup-schedule` | automatic backup schedule (enable/disable, frequency, day, time, number of kept copies) — **administrator only** |
-| GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | item number letter prefixes per kind — **administrator only** |
+| GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | item number letter prefixes per kind (the 4 Part kinds plus `Zlozenie` = manufactured assembly; purchased/client assemblies reuse the Part kind's prefix) — **administrator only** |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | preview/rewind the item number sequence — **administrator only** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | list of days with a saved log, the last N lines of a given day, download of the full file — **administrator only** |
 

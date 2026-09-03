@@ -102,11 +102,11 @@ des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
      Projekt, optional ein übergeordnetes Element, den Typ (Teil/Baugruppe), den Namen
      (standardmäßig aus dem Label des Dokuments vorgeschlagen), die Art und die davon
      abhängigen Felder: bei einem Teil ist die Art erforderlich — **Gefertigt** →
-     Material, **Zugekauft** → Hersteller/Bestellnummer 1 und 2/Masse, **Norm** →
-     Material/Norm, **Kundenteil** → keine zusätzlichen Felder. Bei einer Baugruppe ist
-     die Art optional und auf Gefertigt/Zugekauft/Norm beschränkt (ohne "Kundenteil"), und
-     die Masse ist immer sichtbar, unabhängig von der gewählten Art — eine Baugruppe hat
-     nie ein Materialfeld (nur ein Teil). Das Popup hat außerdem die **Checkboxen
+     Material, **Zugekauft** → Hersteller/Produkttyp/Bestellnummer 1 und 2/Masse, **Norm**
+     → Material/Norm, **Kundenteil** → keine zusätzlichen Felder. Eine Baugruppe hat eigene,
+     ebenfalls erforderliche Arten — **Gefertigt**, **Zugekauft** → Hersteller/Produkttyp,
+     **Vom Kunden** — und die Masse ist immer sichtbar, unabhängig von der gewählten Art;
+     eine Baugruppe hat nie ein Materialfeld (nur ein Teil). Das Popup hat außerdem die **Checkboxen
      „STEP exportieren" und „PDF exportieren"** (STEP standardmäßig angehakt, PDF nicht —
      siehe Schritt 5 unten, was jede davon beim Export genau bewirkt). Das Ticket ist
      EXPLIZIT an genau dieses eine Popup gebunden — kein ANDERES "Hinzufügen" in der Anwendung (im Projektbaum, im
