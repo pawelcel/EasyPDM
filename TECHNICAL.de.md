@@ -161,10 +161,15 @@ Fremdschlüssel auf die Serie) bilden einen zweistufigen Katalog je Hersteller (
 Hersteller). Die Verknüpfung mit einem Element erfolgt ausschließlich über den Namen, wie
 bei Hersteller und Material, sodass das Löschen eines Katalogeintrags bereits beschriebene
 Elemente nie verändert. Die gesamte Kette Hersteller → Serie/Typ → Untertyp kaskadiert in
-beide Richtungen: Jedes Feld (und der zugehörige Filter in "Gesamte Datenbank") erscheint
-erst, wenn das darüber ausgefüllt ist, und zeigt ausschließlich die ihm zugeordneten
-Einträge; eine Änderung auf einer höheren Ebene löscht die darunter. Der Untertyp ist
-optional — eine Serie ohne Untertypen blendet das Feld ganz aus.
+beide Richtungen, jedoch unterschiedlich an den beiden Stellen, an denen sie vorkommt: im
+Eigenschaftenformular des Elements (`ProductTypeAndSubtypeFields`, property-fields.tsx)
+sind beide Felder IMMER sichtbar, nur gesperrt, solange die Ebene darüber leer ist
+(Serie/Typ ohne Hersteller, Untertyp ohne Serie) — bewusst so, damit nichts zu
+verschwinden scheint; in den Filtern von "Gesamte Datenbank"
+(`ProductTypeFilterSelect`/`ProductSubtypeFilterSelect`) erscheint der niedrigere Filter
+erst, wenn der darüber gesetzt ist. An beiden Stellen löscht bzw. verbirgt eine Änderung
+(oder, bei den Filtern, das Zurücksetzen) einer höheren Ebene die darunter. Der Untertyp
+ist optional — eine Serie ohne Untertypen bietet einfach eine leere Liste.
 
 Ein Teil/eine Baugruppe hat eine Zustandsmaschine: `w_pracy → sprawdzany → (w_pracy |
 wydany) → w_pracy` (in Bearbeitung → in Prüfung → (in Bearbeitung | freigegeben) → in

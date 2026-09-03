@@ -139,9 +139,9 @@ i Podtyp) albo Klienta. Niezależnie od rodzaju można mu wpisać opcjonalną Ma
 dowolne własne właściwości.
 
 **Seria/Typ** to pozycja z listy danego producenta (zakładka Producenci), a **Podtyp** to
-uszczegółowienie w obrębie tej serii (np. seria „Łożyska walcowe” → podtypy NU/NJ/NUP).
-Każde pole pojawia się dopiero po wypełnieniu poprzedniego i pokazuje wyłącznie pozycje
-do niego przypisane; zmiana producenta albo serii czyści to, co niżej.
+uszczegółowienie w obrębie tej serii (np. seria „Łożyska walcowe” → podtypy NU/NJ/NUP), oba
+pola widoczne obok siebie. Seria/Typ jest zablokowana, dopóki nie wybierzesz producenta, a
+Podtyp — dopóki nie wybierzesz serii; zmiana producenta albo serii czyści to, co niżej.
 
 ### Status i rewizje
 

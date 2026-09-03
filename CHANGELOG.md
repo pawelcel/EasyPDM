@@ -24,10 +24,11 @@ All notable changes to EasyPDM are documented in this file.
 - Manufacturers can now have a two-level catalog of what they supply: Series/Types,
   and Subtypes within a series, added from one row (a series picker plus a subtype
   field plus Add) and listed in a filterable table below (Manufacturers tab). On a
-  purchased item — Part or Assembly — picking a manufacturer reveals an optional
-  "Series/Type" field, and picking one of those reveals an optional "Subtype", each
-  offering exactly the entries belonging to the level above; changing a higher level
-  clears the lower ones. In "Whole database" the kind filter now covers Parts and
+  purchased item — Part or Assembly — the "Series/Type" and "Subtype" fields sit next
+  to Manufacturer, always visible, side by side; each is simply disabled until the
+  level above it is set (Series/Type needs a manufacturer, Subtype needs a
+  series/type) and offers exactly the entries belonging to it, and changing a higher
+  level clears the lower ones. In "Whole database" the kind filter now covers Parts and
   Assemblies together (choosing "Purchased" lists both), and the same
   Manufacturer → Series/Type → Subtype chain appears as dependent filters next to it.
 - Client detail panel now lists the Projects assigned to that client (with a button

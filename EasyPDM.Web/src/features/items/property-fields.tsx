@@ -246,49 +246,57 @@ function ManufacturerField({
   )
 }
 
-// Seria/typ z katalogu WYBRANEGO producenta (zob. zakładka Producenci) — pole ma sens
-// dopiero, gdy producent jest wybrany, więc bez niego w ogóle się nie renderuje. Zapisuje
-// samą nazwę typu, tak samo jak ManufacturerField zapisuje samą nazwę producenta.
-function ProductTypeField({
+// Seria/Typ i Podtyp, jedna obok drugiej — łańcuch zależny od producenta (zob. zakładka
+// Producenci) pokazany OD RAZU, w odróżnieniu od wcześniejszej wersji, która chowała te
+// pola całkowicie, dopóki poprzedni poziom nie był wybrany (myliło to, sprawiając wrażenie,
+// że coś zniknęło). Zamiast tego pole jest po prostu zablokowane: Seria/Typ dopóki nie ma
+// producenta, Podtyp dopóki nie ma serii/typu — a sama pusta lista po otwarciu tłumaczy się
+// komunikatem ComboboxEmpty. Obie wartości zapisują samą NAZWĘ, tak jak ManufacturerField.
+function ProductTypeAndSubtypeFields({
   manufacturerName,
-  value,
+  productType,
+  productSubtype,
   onSave,
   disabled,
   onError,
 }: {
   manufacturerName: string
-  value: string
+  productType: string
+  productSubtype: string
   onSave: (key: string, value: string) => void | Promise<void>
   disabled: boolean
   onError?: (message: string | null) => void
 }) {
   const { t } = useLanguage()
   const { productTypes } = useManufacturerProductTypes(manufacturerName)
-  const names = productTypes.map((p) => p.name)
+  const typeNames = productTypes.map((p) => p.name)
+  const { subtypes } = useManufacturerProductSubtypes(manufacturerName, productType)
+  const subtypeNames = subtypes.map((s) => s.name)
 
-  async function save(next: string) {
+  const typeDisabled = disabled || !manufacturerName
+  const subtypeDisabled = disabled || !productType
+
+  async function save(key: "productType" | "productSubtype", next: string) {
     try {
       onError?.(null)
-      await onSave("productType", next)
+      await onSave(key, next)
     } catch (err) {
       onError?.(err instanceof Error ? err.message : t("part.saveFieldFailed"))
     }
   }
 
-  if (!manufacturerName) return null
-
   return (
-    <>
-      <Label>{t("part.productType")}</Label>
-      {names.length > 0 ? (
+    <div className="flex gap-1.5">
+      <div className="min-w-0 flex-1">
+        <Label>{t("part.productType")}</Label>
         <Combobox
-          items={names}
-          value={value || null}
-          onValueChange={(v) => save((v as string | null) ?? "")}
+          items={typeNames}
+          value={productType || null}
+          onValueChange={(v) => save("productType", (v as string | null) ?? "")}
           itemToStringLabel={(name: string) => name}
-          disabled={disabled}
+          disabled={typeDisabled}
         >
-          <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear />
+          <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear disabled={typeDisabled} />
           <ComboboxContent>
             <ComboboxEmpty>{t("part.noMatchingProductTypes")}</ComboboxEmpty>
             <ComboboxList>
@@ -300,70 +308,31 @@ function ProductTypeField({
             </ComboboxList>
           </ComboboxContent>
         </Combobox>
-      ) : (
-        <Hint>{t("part.noProductTypesHint")}</Hint>
-      )}
-    </>
-  )
-}
+      </div>
 
-// Podtyp w obrębie WYBRANEJ serii/typu — o poziom głębiej niż ProductTypeField i na tej
-// samej zasadzie: bez wybranej serii/typu nie renderuje się w ogóle, a lista zawiera
-// wyłącznie podtypy TEJ serii. Seria/typ bez żadnych podtypów też chowa pole — podtyp jest
-// opcjonalnym uszczegółowieniem, nie każda seria go ma.
-function ProductSubtypeField({
-  manufacturerName,
-  productTypeName,
-  value,
-  onSave,
-  disabled,
-  onError,
-}: {
-  manufacturerName: string
-  productTypeName: string
-  value: string
-  onSave: (key: string, value: string) => void | Promise<void>
-  disabled: boolean
-  onError?: (message: string | null) => void
-}) {
-  const { t } = useLanguage()
-  const { subtypes } = useManufacturerProductSubtypes(manufacturerName, productTypeName)
-  const names = subtypes.map((s) => s.name)
-
-  async function save(next: string) {
-    try {
-      onError?.(null)
-      await onSave("productSubtype", next)
-    } catch (err) {
-      onError?.(err instanceof Error ? err.message : t("part.saveFieldFailed"))
-    }
-  }
-
-  if (!manufacturerName || !productTypeName || names.length === 0) return null
-
-  return (
-    <>
-      <Label>{t("part.productSubtype")}</Label>
-      <Combobox
-        items={names}
-        value={value || null}
-        onValueChange={(v) => save((v as string | null) ?? "")}
-        itemToStringLabel={(name: string) => name}
-        disabled={disabled}
-      >
-        <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear />
-        <ComboboxContent>
-          <ComboboxEmpty>{t("part.noMatchingProductSubtypes")}</ComboboxEmpty>
-          <ComboboxList>
-            {(name: string) => (
-              <ComboboxItem key={name} value={name}>
-                {name}
-              </ComboboxItem>
-            )}
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
-    </>
+      <div className="min-w-0 flex-1">
+        <Label>{t("part.productSubtype")}</Label>
+        <Combobox
+          items={subtypeNames}
+          value={productSubtype || null}
+          onValueChange={(v) => save("productSubtype", (v as string | null) ?? "")}
+          itemToStringLabel={(name: string) => name}
+          disabled={subtypeDisabled}
+        >
+          <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear disabled={subtypeDisabled} />
+          <ComboboxContent>
+            <ComboboxEmpty>{t("part.noMatchingProductSubtypes")}</ComboboxEmpty>
+            <ComboboxList>
+              {(name: string) => (
+                <ComboboxItem key={name} value={name}>
+                  {name}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+      </div>
+    </div>
   )
 }
 
@@ -490,4 +459,4 @@ function PropField({
   )
 }
 
-export { ManufacturerField, MaterialField, ProductSubtypeField, ProductTypeField, PropField }
+export { ManufacturerField, MaterialField, ProductTypeAndSubtypeFields, PropField }

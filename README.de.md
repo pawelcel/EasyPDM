@@ -151,9 +151,9 @@ optionale Masse und beliebige eigene Eigenschaften tragen.
 
 **Serie/Typ** ist ein Eintrag aus der Liste des gewählten Herstellers (Reiter Hersteller),
 und **Untertyp** verfeinert sie innerhalb dieser Serie (z. B. Serie „Zylinderrollenlager“
-→ Untertypen NU/NJ/NUP). Jedes Feld erscheint erst, wenn das darüber ausgefüllt ist, und
-zeigt ausschließlich die ihm zugeordneten Einträge; ein Wechsel des Herstellers oder der
-Serie löscht alles darunter.
+→ Untertypen NU/NJ/NUP), beide nebeneinander angezeigt. Serie/Typ ist gesperrt, bis ein
+Hersteller gewählt ist, Untertyp, bis eine Serie gewählt ist; ein Wechsel des Herstellers
+oder der Serie löscht alles darunter.
 
 ### Status und Revisionen
 

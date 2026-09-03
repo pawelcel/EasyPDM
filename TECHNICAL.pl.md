@@ -139,10 +139,15 @@ sprzed tej wersji nie mają rodzaju i pokazują podpowiedź, żeby go wybrać.
 obcym do serii) tworzą dwupoziomowy katalog per producent (zakładka Producenci).
 Powiązanie z elementem jest wyłącznie po nazwie, jak przy producencie i materiale, więc
 usunięcie pozycji z katalogu nie zmienia niczego w opisanych już elementach. Cały łańcuch
-Producent → Seria/Typ → Podtyp jest kaskadowy w obie strony: każde pole (i odpowiadający
-mu filtr w "Całej bazie") pojawia się dopiero po wypełnieniu poprzedniego i pokazuje
-wyłącznie pozycje do niego przypisane, a zmiana na wyższym poziomie czyści niższe.
-Podtyp jest opcjonalny — seria bez podtypów w ogóle nie pokazuje tego pola.
+Producent → Seria/Typ → Podtyp jest kaskadowy w obie strony, ale inaczej w dwóch miejscach,
+gdzie się pojawia: we właściwościach elementu (`ProductTypeAndSubtypeFields`,
+property-fields.tsx) oba pola są widoczne ZAWSZE, tylko zablokowane, dopóki poziom wyżej
+jest pusty (Seria/Typ bez producenta, Podtyp bez serii) — celowo, żeby nie wyglądało, jakby
+pole "znikało"; w filtrach "Całej bazie" (`ProductTypeFilterSelect`/
+`ProductSubtypeFilterSelect`) filtr niższego poziomu pojawia się dopiero, gdy wyższy jest
+ustawiony. W obu miejscach zmiana wyższego poziomu (albo, w filtrach, cofnięcie go)
+czyści/chowa niższe. Podtyp jest opcjonalny — seria bez podtypów zwyczajnie ma pustą listę
+do wyboru.
 
 Część/Złożenie mają maszynę stanów: `w_pracy → sprawdzany → (w_pracy | wydany) → w_pracy`
 (powrót z `wydany` podnosi numer rewizji, z opcjonalnym komentarzem do rewizji). Poza

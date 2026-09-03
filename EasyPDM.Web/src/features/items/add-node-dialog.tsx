@@ -33,8 +33,7 @@ import {
 import {
   ManufacturerField,
   MaterialField,
-  ProductSubtypeField,
-  ProductTypeField,
+  ProductTypeAndSubtypeFields,
   PropField,
 } from "@/features/items/property-fields"
 import type { TranslationKey } from "@/i18n/translations"
@@ -549,16 +548,10 @@ function AddNodeDialog({
             {rodzaj === "Zakupowa" && (
               <>
                 <ManufacturerField value={extraProps.manufacturer ?? ""} onSave={setExtraField} disabled={false} />
-                <ProductTypeField
+                <ProductTypeAndSubtypeFields
                   manufacturerName={extraProps.manufacturer ?? ""}
-                  value={extraProps.productType ?? ""}
-                  onSave={setExtraField}
-                  disabled={false}
-                />
-                <ProductSubtypeField
-                  manufacturerName={extraProps.manufacturer ?? ""}
-                  productTypeName={extraProps.productType ?? ""}
-                  value={extraProps.productSubtype ?? ""}
+                  productType={extraProps.productType ?? ""}
+                  productSubtype={extraProps.productSubtype ?? ""}
                   onSave={setExtraField}
                   disabled={false}
                 />
@@ -668,16 +661,10 @@ function AddNodeDialog({
                   onSave={setExtraField}
                   disabled={false}
                 />
-                <ProductTypeField
+                <ProductTypeAndSubtypeFields
                   manufacturerName={extraProps.manufacturer ?? ""}
-                  value={extraProps.productType ?? ""}
-                  onSave={setExtraField}
-                  disabled={false}
-                />
-                <ProductSubtypeField
-                  manufacturerName={extraProps.manufacturer ?? ""}
-                  productTypeName={extraProps.productType ?? ""}
-                  value={extraProps.productSubtype ?? ""}
+                  productType={extraProps.productType ?? ""}
+                  productSubtype={extraProps.productSubtype ?? ""}
                   onSave={setExtraField}
                   disabled={false}
                 />

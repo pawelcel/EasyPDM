@@ -145,10 +145,14 @@ before this version have no kind and show a hint prompting you to pick one.
 the series) form a two-level catalog per manufacturer (Manufacturers tab). The link to an
 item is by name only, like manufacturer and material, so deleting a catalog entry never
 rewrites items that already reference it. The whole Manufacturer → Series/Type → Subtype
-chain cascades both ways: each field (and its matching filter in "Whole database") appears
-only once the one above it is filled in and offers exactly the entries belonging to it,
-and changing a higher level clears the lower ones. The subtype is optional — a series with
-no subtypes doesn't show the field at all.
+chain cascades both ways, but differently in the two places it shows up: on the item
+properties form (`ProductTypeAndSubtypeFields`, property-fields.tsx) both fields are
+ALWAYS visible, only disabled while the level above is empty (Series/Type with no
+manufacturer, Subtype with no series) — deliberately, so nothing appears to vanish; in the
+"Whole database" filters (`ProductTypeFilterSelect`/`ProductSubtypeFilterSelect`) the lower
+filter appears only once the one above it is set. In both places, changing (or, in the
+filters, clearing) a higher level clears/hides the lower ones. The subtype is optional — a
+series with none simply offers an empty list.
 
 A Part/Assembly has a state machine: `w_pracy → sprawdzany → (w_pracy | wydany) →
 w_pracy` (in progress → under review → (in progress | released) → in progress; going

@@ -18,8 +18,7 @@ import {
 import {
   ManufacturerField,
   MaterialField,
-  ProductSubtypeField,
-  ProductTypeField,
+  ProductTypeAndSubtypeFields,
   PropField,
 } from "@/features/items/property-fields"
 import type { TranslationKey } from "@/i18n/translations"
@@ -199,17 +198,10 @@ function PartPropertyForm({
       {rodzaj === "Zakupowa" && (
         <>
           <ManufacturerField value={propValue("manufacturer")} onSave={saveField} disabled={locked} onError={setError} />
-          <ProductTypeField
+          <ProductTypeAndSubtypeFields
             manufacturerName={propValue("manufacturer")}
-            value={propValue("productType")}
-            onSave={saveField}
-            disabled={locked}
-            onError={setError}
-          />
-          <ProductSubtypeField
-            manufacturerName={propValue("manufacturer")}
-            productTypeName={propValue("productType")}
-            value={propValue("productSubtype")}
+            productType={propValue("productType")}
+            productSubtype={propValue("productSubtype")}
             onSave={saveField}
             disabled={locked}
             onError={setError}
@@ -239,17 +231,10 @@ function PartPropertyForm({
       {rodzaj === "Zakupowe" && (
         <>
           <ManufacturerField value={propValue("manufacturer")} onSave={saveField} disabled={locked} onError={setError} />
-          <ProductTypeField
+          <ProductTypeAndSubtypeFields
             manufacturerName={propValue("manufacturer")}
-            value={propValue("productType")}
-            onSave={saveField}
-            disabled={locked}
-            onError={setError}
-          />
-          <ProductSubtypeField
-            manufacturerName={propValue("manufacturer")}
-            productTypeName={propValue("productType")}
-            value={propValue("productSubtype")}
+            productType={propValue("productType")}
+            productSubtype={propValue("productSubtype")}
             onSave={saveField}
             disabled={locked}
             onError={setError}

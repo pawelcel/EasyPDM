@@ -143,9 +143,9 @@ Mass and any custom properties.
 
 **Series/Type** is an entry from the chosen manufacturer's list (Manufacturers tab), and
 **Subtype** narrows it down within that series (e.g. series "Cylindrical roller bearings"
-→ subtypes NU/NJ/NUP). Each field appears only once the one above it is filled in and
-offers exactly the entries belonging to it; changing the manufacturer or the series clears
-whatever is below.
+→ subtypes NU/NJ/NUP), both shown side by side. Series/Type is locked until you pick a
+manufacturer, and Subtype until you pick a series; changing the manufacturer or the series
+clears whatever is below.
 
 ### Status and revisions
 
