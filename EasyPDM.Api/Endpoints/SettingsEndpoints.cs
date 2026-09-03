@@ -555,13 +555,13 @@ static class SettingsEndpoints
         });
     }
 
-    // Pierwsze 4 to te same wartości co PART_KINDS/ASSEMBLY_KINDS w EasyPDMUpload.FCMacro i
-    // PartPropertyForm/add-node-dialog w aplikacji webowej — jedyne dozwolone wartości
-    // properties.rodzaj w całym systemie. "Zlozenie" to sztuczny, dodatkowy klucz (NIE
-    // prawdziwa wartość properties.rodzaj) — złożenia nie mają swojego "rodzaju" jako
-    // takiego, ale i tak potrzebują JEDNEGO wspólnego prefiksu dla wszystkich złożeń, więc
-    // dostają ten jeden sztywny wpis zamiast czterech jak części. Zob. ItemEndpoints.cs,
-    // gdzie prefiks złożenia jest dobierany po tym stałym kluczu, a nie po properties.rodzaj.
+    // Pierwsze 4 to rodzaje Części (properties.rodzaj) — te same wartości co w
+    // EasyPDMUpload.FCMacro i PartPropertyForm/add-node-dialog w aplikacji webowej.
+    // "Zlozenie" to sztuczny, dodatkowy klucz (NIE wartość properties.rodzaj): prefiks
+    // złożenia WYKONYWANEGO, historycznie wspólny dla wszystkich złożeń. Złożenie ma dziś
+    // własne trzy rodzaje (Wykonywane/Zakupowe/Klienta), ale tylko wykonywane numeruje się
+    // osobno — zakupowe i klienta dzielą prefiks z odpowiednim rodzajem Części, więc nie
+    // potrzebują tu własnych wpisów. Mapowanie: ItemEndpoints.AssemblyPrefixKind.
     private static readonly string[] ItemNumberPrefixKinds =
         ["Wykonywana", "Zakupowa", "Normalia", "Klienta", "Zlozenie"];
 

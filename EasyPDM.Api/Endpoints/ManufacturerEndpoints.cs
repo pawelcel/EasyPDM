@@ -1,8 +1,9 @@
 using Npgsql;
 
-// Katalog producentów i ich osób kontaktowych — na razie niezależny od Części (wolny
-// tekst we właściwościach "manufacturer" Części nie jest z tym powiązany), zarządzany
-// z osobnej pozycji w panelu bocznym.
+// Katalog producentów: osoby kontaktowe i typy produktów, zarządzane z osobnej pozycji
+// w panelu bocznym. Powiązanie z elementami jest wyłącznie "po nazwie" — element trzyma
+// w properties.manufacturer/properties.productType goły tekst, bez klucza obcego, więc
+// usunięcie producenta albo typu nie zmienia niczego w już opisanych elementach.
 static class ManufacturerEndpoints
 {
     public static void MapManufacturerEndpoints(this WebApplication app, string connectionString)
@@ -71,7 +72,21 @@ static class ManufacturerEndpoints
                     contacts.Add(ReadContact(reader));
             }
 
-            return Results.Ok(new { id, name, contacts });
+            const string productTypesSql = """
+                SELECT id, name FROM manufacturer_product_types
+                WHERE manufacturer_id = @id
+                ORDER BY name;
+                """;
+            var productTypes = new List<object>();
+            await using (var typesCmd = new NpgsqlCommand(productTypesSql, conn))
+            {
+                typesCmd.Parameters.AddWithValue("id", id);
+                await using var reader = await typesCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    productTypes.Add(new { id = reader.GetInt32(0), name = reader.GetString(1) });
+            }
+
+            return Results.Ok(new { id, name, contacts, productTypes });
         });
 
         // POST /api/manufacturers   body: { "name": "..." }
@@ -195,6 +210,83 @@ static class ManufacturerEndpoints
 
             return Results.Ok();
         });
+
+        // POST /api/manufacturers/{id}/product-types   body: { "name": "..." }
+        app.MapPost("/api/manufacturers/{id:int}/product-types", async (int id, ProductTypeRequest body) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Name))
+                return Results.BadRequest("Nazwa typu produktu nie może być pusta.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using (var checkCmd = new NpgsqlCommand("SELECT 1 FROM manufacturers WHERE id = @id;", conn))
+            {
+                checkCmd.Parameters.AddWithValue("id", id);
+                if (await checkCmd.ExecuteScalarAsync() is null)
+                    return Results.NotFound("Producent nie istnieje.");
+            }
+
+            await using var cmd = new NpgsqlCommand(
+                "INSERT INTO manufacturer_product_types (manufacturer_id, name) VALUES (@manufacturerId, @name) RETURNING id;",
+                conn);
+            cmd.Parameters.AddWithValue("manufacturerId", id);
+            cmd.Parameters.AddWithValue("name", body.Name.Trim());
+
+            try
+            {
+                var typeId = (int)(await cmd.ExecuteScalarAsync())!;
+                return Results.Created($"/api/manufacturers/{id}/product-types/{typeId}", new { id = typeId });
+            }
+            catch (PostgresException ex) when (ex.SqlState == "23505")
+            {
+                return Results.Conflict("Ten producent ma już typ produktu o tej nazwie.");
+            }
+        });
+
+        // PATCH /api/manufacturers/{id}/product-types/{typeId}   body: { "name": "..." }
+        app.MapPatch("/api/manufacturers/{id:int}/product-types/{typeId:int}", async (int id, int typeId, ProductTypeRequest body) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Name))
+                return Results.BadRequest("Nazwa typu produktu nie może być pusta.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand(
+                "UPDATE manufacturer_product_types SET name = @name WHERE id = @typeId AND manufacturer_id = @manufacturerId;",
+                conn);
+            cmd.Parameters.AddWithValue("typeId", typeId);
+            cmd.Parameters.AddWithValue("manufacturerId", id);
+            cmd.Parameters.AddWithValue("name", body.Name.Trim());
+
+            try
+            {
+                var affected = await cmd.ExecuteNonQueryAsync();
+                return affected == 0 ? Results.NotFound() : Results.Ok();
+            }
+            catch (PostgresException ex) when (ex.SqlState == "23505")
+            {
+                return Results.Conflict("Ten producent ma już typ produktu o tej nazwie.");
+            }
+        });
+
+        // DELETE /api/manufacturers/{id}/product-types/{typeId} — elementy, które mają tę
+        // nazwę zapisaną w properties.productType, zostają nietknięte (to wolny tekst,
+        // nie klucz obcy) — dokładnie tak samo jak przy usunięciu samego producenta.
+        app.MapDelete("/api/manufacturers/{id:int}/product-types/{typeId:int}", async (int id, int typeId) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand(
+                "DELETE FROM manufacturer_product_types WHERE id = @typeId AND manufacturer_id = @manufacturerId;", conn);
+            cmd.Parameters.AddWithValue("typeId", typeId);
+            cmd.Parameters.AddWithValue("manufacturerId", id);
+            await cmd.ExecuteNonQueryAsync();
+
+            return Results.Ok();
+        });
     }
 
     private static void AddContactParameters(NpgsqlCommand cmd, int manufacturerId, ContactRequest body)
@@ -223,4 +315,5 @@ static class ManufacturerEndpoints
 }
 
 record ManufacturerRequest(string Name);
+record ProductTypeRequest(string Name);
 record ContactRequest(string? FirstName, string? LastName, string? Phone, string? Position, string? Email, string? Address);

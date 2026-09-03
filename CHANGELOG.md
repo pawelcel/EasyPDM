@@ -16,6 +16,17 @@ All notable changes to EasyPDM are documented in this file.
   assembly that contains the item, directly or through a sub-assembly, across
   projects — with a button to jump straight to it. Scrollable, capped at 5
   visible rows like History.
+- Assemblies now have a kind of their own — Manufactured, Purchased or Client's —
+  picked when creating one and changeable later, just like a Part's kind. Purchased
+  and client assemblies are numbered with the prefix of the matching Part kind; only
+  manufactured assemblies keep their own prefix (the existing "Assembly" one, now
+  labelled accordingly in Settings → Numbering).
+- Manufacturers can now have a list of product types (Manufacturers tab). On a
+  purchased item — Part or Assembly — picking a manufacturer reveals an optional
+  "Product type" field offering exactly that manufacturer's types. In "Whole
+  database" the kind filter now covers Parts and Assemblies together (choosing
+  "Purchased" lists both), and once a manufacturer is selected a dependent product
+  type filter appears next to it.
 - Client detail panel now lists the Projects assigned to that client (with a button
   to jump straight to each one), scoped to what the current user can actually see.
 - A brand new, empty database now gets one sample project on first startup (an

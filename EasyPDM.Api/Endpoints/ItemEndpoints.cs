@@ -245,17 +245,15 @@ static class ItemEndpoints
             var propertiesJson = body.Properties.HasValue ? body.Properties.Value.GetRawText() : "{}";
             // "rodzaj" decyduje o prefiksie numeru — zob. item_number_prefixes (Ustawienia ->
             // Nazewnictwo). Zamrożony TERAZ, w momencie tworzenia; późniejsza zmiana rodzaju
-            // elementu albo mapowania w Ustawieniach nic tu już nie zmienia. Złożenia nie mają
-            // prawdziwego "rodzaju" — zawsze dostają jeden wspólny prefiks pod sztywnym kluczem
-            // "Zlozenie" (zob. SettingsEndpoints.ItemNumberPrefixKinds), niezależnie od tego, co
-            // ewentualnie ma w properties.rodzaj.
+            // elementu albo mapowania w Ustawieniach nic tu już nie zmienia.
+            string? propertyRodzaj = body.Properties.HasValue
+                && body.Properties.Value.TryGetProperty("rodzaj", out var rodzajEl)
+                && rodzajEl.ValueKind == JsonValueKind.String
+                ? rodzajEl.GetString()
+                : null;
             string? rodzaj = body.ItemType == "assembly"
-                ? "Zlozenie"
-                : body.Properties.HasValue
-                    && body.Properties.Value.TryGetProperty("rodzaj", out var rodzajEl)
-                    && rodzajEl.ValueKind == JsonValueKind.String
-                    ? rodzajEl.GetString()
-                    : null;
+                ? AssemblyPrefixKind(propertyRodzaj)
+                : propertyRodzaj;
 
             // show_in_tree=false gdy element od razu powstaje jako podelement (parentId podany) —
             // inaczej pokazywałby się PODWÓJNIE: jako korzeń projektu ORAZ zagnieżdżony pod
@@ -1161,6 +1159,19 @@ static class ItemEndpoints
     internal static string ItemLabel(string fileName, int? itemNumber, string? itemNumberPrefix) =>
         itemNumber is not null ? $"{itemNumberPrefix}{itemNumber} ({fileName})" : fileName;
 
+    // Rodzaj Złożenia -> klucz w item_number_prefixes. Złożenie zakupowe/klienta dzieli
+    // prefiks z odpowiednim rodzajem Części (to ten sam towar, tylko złożony), a złożenie
+    // wykonywane ma własny, historyczny klucz "Zlozenie". Brak rodzaju (np. złożenie
+    // wgrane makrem CAD, które o rodzaj nie pyta) też trafia na "Zlozenie" -- dokładnie
+    // to, co ten kod robił dla KAŻDEGO złożenia, zanim złożenia dostały rodzaj.
+    // Odpowiednik tego mapowania w SQL jest w InsertDuplicateRowAsync niżej.
+    internal static string AssemblyPrefixKind(string? rodzaj) => rodzaj switch
+    {
+        "Zakupowe" => "Zakupowa",
+        "Klienta" => "Klienta",
+        _ => "Zlozenie",
+    };
+
     // Wspólne dla wszystkich endpointów operujących na elemencie/projekcie po ID — zwykły
     // użytkownik musi być przypisany do projektu (project_users), administrator zawsze ma
     // dostęp. Używane zarówno dla odczytu, jak i mutacji — nieprzypisany użytkownik nie
@@ -1236,7 +1247,12 @@ static class ItemEndpoints
                    @ownerId, true, @ownerId, @showInTree
             FROM items src
             LEFT JOIN item_number_prefixes p
-                ON p.rodzaj = (CASE WHEN src.item_type = 'assembly' THEN 'Zlozenie' ELSE src.properties->>'rodzaj' END)
+                ON p.rodzaj = (CASE
+                    WHEN src.item_type = 'assembly' THEN (CASE src.properties->>'rodzaj'
+                        WHEN 'Zakupowe' THEN 'Zakupowa'
+                        WHEN 'Klienta' THEN 'Klienta'
+                        ELSE 'Zlozenie' END)
+                    ELSE src.properties->>'rodzaj' END)
             WHERE src.id = @sourceId
             RETURNING item_number, item_number_prefix;
             """;

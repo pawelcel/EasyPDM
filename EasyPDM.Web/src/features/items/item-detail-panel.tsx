@@ -420,16 +420,25 @@ function ItemDetailPanel({
       <AddTagRow onAdd={handleAddTag} className="mt-2" />
 
       <SectionLabel>{t("item.properties")}</SectionLabel>
+      {/* Część ma komplet pól zależnych od rodzaju i nie potrzebuje edytora surowych
+          właściwości. Złożenie dostaje z PartPropertyForm tylko pola swojego rodzaju
+          (dziś: producent i typ produktu dla zakupowego), a całą resztę — masę i dowolne
+          własne klucze — dalej obsługuje generyczny PropertyEditor pod spodem. */}
       {item.itemType === "part" ? (
         <PartPropertyForm item={item} onChanged={refreshAfterAction} />
       ) : (
-        <PropertyEditor
-          itemId={item.id}
-          properties={item.properties}
-          locked={isLocked(item) || !ownerEditable}
-          lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
-          onChanged={refreshAfterAction}
-        />
+        <>
+          {item.itemType === "assembly" && (
+            <PartPropertyForm item={item} onChanged={refreshAfterAction} />
+          )}
+          <PropertyEditor
+            itemId={item.id}
+            properties={item.properties}
+            locked={isLocked(item) || !ownerEditable}
+            lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
+            onChanged={refreshAfterAction}
+          />
+        </>
       )}
 
       {item.itemType === "assembly" && (

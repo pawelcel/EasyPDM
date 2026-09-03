@@ -30,7 +30,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ManufacturerField, MaterialField, PropField } from "@/features/items/property-fields"
+import {
+  ManufacturerField,
+  MaterialField,
+  ProductTypeField,
+  PropField,
+} from "@/features/items/property-fields"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -118,7 +123,7 @@ function AddNodeDialog({
   }
   function seedExtraProps(): Record<string, string> {
     const result: Record<string, string> = {}
-    for (const key of ["material", "manufacturer", "orderNumber", "orderNumber2", "norm"]) {
+    for (const key of ["material", "manufacturer", "productType", "orderNumber", "orderNumber2", "norm"]) {
       const v = initialProperties?.[key]
       if (typeof v === "string") result[key] = v
     }
@@ -259,6 +264,16 @@ function AddNodeDialog({
       )
       return
     }
+    if (itemType === "assembly" && !rodzaj) {
+      setError(
+        t("addNode.selectAssemblyKindError", {
+          manufactured: t("assembly.kindManufactured"),
+          purchased: t("assembly.kindPurchased"),
+          client: t("assembly.kindClient"),
+        })
+      )
+      return
+    }
 
     const trimmed = name.trim()
     if (!trimmed) {
@@ -275,7 +290,13 @@ function AddNodeDialog({
       }
     }
     if (itemType === "assembly") {
+      properties.rodzaj = rodzaj
       if (mass.trim()) properties.mass = mass.trim()
+      if (rodzaj === "Zakupowe") {
+        for (const key of ["manufacturer", "productType"]) {
+          if (extraProps[key]?.trim()) properties[key] = extraProps[key].trim()
+        }
+      }
     }
 
     setSubmitting(true)
@@ -527,6 +548,12 @@ function AddNodeDialog({
             {rodzaj === "Zakupowa" && (
               <>
                 <ManufacturerField value={extraProps.manufacturer ?? ""} onSave={setExtraField} disabled={false} />
+                <ProductTypeField
+                  manufacturerName={extraProps.manufacturer ?? ""}
+                  value={extraProps.productType ?? ""}
+                  onSave={setExtraField}
+                  disabled={false}
+                />
                 <PropField
                   label={t("part.orderNumber")}
                   propKey="orderNumber"
@@ -591,8 +618,56 @@ function AddNodeDialog({
 
         {(!needsProjectPicker || projectId) && (mode === "folder" || mode === "assembly") && (
           <div className="flex flex-col gap-2">
+            {mode === "assembly" && (
+              <>
+                <Label>{t("part.kind")}</Label>
+                <div className="flex gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={rodzaj === "Wykonywane" ? "default" : "outline"}
+                    onClick={() => setRodzaj("Wykonywane")}
+                  >
+                    {t("assembly.kindManufactured")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={rodzaj === "Zakupowe" ? "default" : "outline"}
+                    onClick={() => setRodzaj("Zakupowe")}
+                  >
+                    {t("assembly.kindPurchased")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={rodzaj === "Klienta" ? "default" : "outline"}
+                    onClick={() => setRodzaj("Klienta")}
+                  >
+                    {t("assembly.kindClient")}
+                  </Button>
+                </div>
+              </>
+            )}
+
             <Label htmlFor="node-name">{t("common.name")}</Label>
             <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} />
+
+            {mode === "assembly" && rodzaj === "Zakupowe" && (
+              <>
+                <ManufacturerField
+                  value={extraProps.manufacturer ?? ""}
+                  onSave={setExtraField}
+                  disabled={false}
+                />
+                <ProductTypeField
+                  manufacturerName={extraProps.manufacturer ?? ""}
+                  value={extraProps.productType ?? ""}
+                  onSave={setExtraField}
+                  disabled={false}
+                />
+              </>
+            )}
 
             {mode === "assembly" && (
               <>

@@ -20,9 +20,14 @@ const PART_KINDS: { rodzaj: string; labelKey: TranslationKey }[] = [
   { rodzaj: "Klienta", labelKey: "part.kindClient" },
 ]
 
-// Złożenia nie mają "rodzaju" — dostają JEDEN wspólny prefiks pod sztywnym kluczem
-// "Zlozenie" (nie prawdziwa wartość properties.rodzaj), zob. ItemEndpoints.cs.
-const ASSEMBLY_KIND = { rodzaj: "Zlozenie", labelKey: "itemType.assembly" as TranslationKey }
+// Złożenia mają własne rodzaje (Wykonywane/Zakupowe/Klienta), ale osobny prefiks dostaje
+// tylko WYKONYWANE — pod sztywnym kluczem "Zlozenie" (nie jest to wartość properties.rodzaj).
+// Zakupowe i klienta numerują się prefiksem odpowiedniego rodzaju Części wyżej, zob.
+// ItemEndpoints.AssemblyPrefixKind.
+const ASSEMBLY_KIND = {
+  rodzaj: "Zlozenie",
+  labelKey: "naming.assemblyManufacturedLabel" as TranslationKey,
+}
 
 function NamingSettingsView() {
   const { t } = useLanguage()
@@ -91,6 +96,7 @@ function NamingSettingsView() {
         </div>
 
         <SectionLabel>{t("itemType.assembly")}</SectionLabel>
+        <Hint>{t("naming.assemblyPrefixHint")}</Hint>
         <div className="flex flex-col gap-3">
           <PrefixRow
             rodzaj={ASSEMBLY_KIND.rodzaj}

@@ -15,13 +15,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ManufacturerField, MaterialField, PropField } from "@/features/items/property-fields"
+import {
+  ManufacturerField,
+  MaterialField,
+  ProductTypeField,
+  PropField,
+} from "@/features/items/property-fields"
+import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
 const CURRENCIES = [
   { value: "PLN", symbol: "zł" },
   { value: "EUR", symbol: "€" },
   { value: "USD", symbol: "$" },
+]
+
+// Dozwolone wartości properties.rodzaj — osobne listy dla Części i Złożenia. Wartości
+// Złożenia są w rodzaju nijakim i CELOWO różnią się napisem od odpowiedników Części
+// ("Zakupowe" vs "Zakupowa"), bo napis rodzaju jest jednocześnie kluczem numeracji
+// (item_number_prefixes); wyjątkiem jest "Klienta", identyczne dla obu, bo taki prefiks
+// jest wspólny. Zob. ItemEndpoints.AssemblyPrefixKind po stronie API.
+const PART_KINDS: { value: string; labelKey: TranslationKey }[] = [
+  { value: "Wykonywana", labelKey: "part.kindManufactured" },
+  { value: "Zakupowa", labelKey: "part.kindPurchased" },
+  { value: "Normalia", labelKey: "part.kindStandard" },
+  { value: "Klienta", labelKey: "part.kindClient" },
+]
+
+const ASSEMBLY_KINDS: { value: string; labelKey: TranslationKey }[] = [
+  { value: "Wykonywane", labelKey: "assembly.kindManufactured" },
+  { value: "Zakupowe", labelKey: "assembly.kindPurchased" },
+  { value: "Klienta", labelKey: "assembly.kindClient" },
 ]
 
 // Rodzaj/Nazwa/Materiał — wydzielone z reszty formularza, bo pokazują się od razu w
@@ -36,10 +60,11 @@ function PartSummaryFields({
   const { t } = useLanguage()
   const { user } = useAuth()
   const rodzaj = typeof item.properties.rodzaj === "string" ? item.properties.rodzaj : ""
-  // "Rodzaj" (i pola od niego zależne, w tym Materiał) to koncepcja WYŁĄCZNIE Części —
-  // Złożenia go nie mają w ogóle, dostają tu tylko pole nazwy (i ewentualnie Masę, patrz
-  // add-node-dialog.tsx przy tworzeniu — do edycji Masy istniejącego Złożenia służy
-  // generyczny PropertyEditor w sekcji "Właściwości").
+  // Rodzaj mają OBA typy, tylko z innych list (zob. PART_KINDS/ASSEMBLY_KINDS niżej) —
+  // Złożenie nie ma odpowiednika "Normalii", a jego wartości są w rodzaju nijakim
+  // ("Wykonywane" zamiast "Wykonywana"), żeby dało się je odróżnić w item_number_prefixes.
+  // Pola zależne od rodzaju różnią się dalej: Materiał to koncepcja wyłącznie Części, a
+  // Masę istniejącego Złożenia edytuje się generycznym PropertyEditorem w "Właściwościach".
   const isAssembly = item.itemType === "assembly"
   const statusLocked = isLocked(item)
   const ownerBlocked = user ? !canEditOwnerLocked(item, user.id) : false
@@ -85,45 +110,20 @@ function PartSummaryFields({
       {statusLocked && <Hint>{t("part.lockedHint")}</Hint>}
       {ownerBlocked && !statusLocked && <Hint>{t("item.ownerLockedHint")}</Hint>}
 
-      {!isAssembly && (
-        <>
-          <Label>{t("part.kind")}</Label>
-          <div className="flex flex-wrap gap-1.5">
-            <Button
-              size="sm"
-              variant={rodzaj === "Wykonywana" ? "default" : "outline"}
-              disabled={locked}
-              onClick={() => changeRodzaj("Wykonywana")}
-            >
-              {t("part.kindManufactured")}
-            </Button>
-            <Button
-              size="sm"
-              variant={rodzaj === "Zakupowa" ? "default" : "outline"}
-              disabled={locked}
-              onClick={() => changeRodzaj("Zakupowa")}
-            >
-              {t("part.kindPurchased")}
-            </Button>
-            <Button
-              size="sm"
-              variant={rodzaj === "Normalia" ? "default" : "outline"}
-              disabled={locked}
-              onClick={() => changeRodzaj("Normalia")}
-            >
-              {t("part.kindStandard")}
-            </Button>
-            <Button
-              size="sm"
-              variant={rodzaj === "Klienta" ? "default" : "outline"}
-              disabled={locked}
-              onClick={() => changeRodzaj("Klienta")}
-            >
-              {t("part.kindClient")}
-            </Button>
-          </div>
-        </>
-      )}
+      <Label>{t("part.kind")}</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {(isAssembly ? ASSEMBLY_KINDS : PART_KINDS).map((kind) => (
+          <Button
+            key={kind.value}
+            size="sm"
+            variant={rodzaj === kind.value ? "default" : "outline"}
+            disabled={locked}
+            onClick={() => changeRodzaj(kind.value)}
+          >
+            {t(kind.labelKey)}
+          </Button>
+        ))}
+      </div>
 
       <Label htmlFor="part-name">{t("common.name")}</Label>
       <Input
@@ -146,7 +146,7 @@ function PartSummaryFields({
         />
       )}
 
-      {!isAssembly && !rodzaj && <Hint>{t("part.selectKindHint")}</Hint>}
+      {!rodzaj && <Hint>{t("part.selectKindHint")}</Hint>}
       <FormError>{error}</FormError>
     </div>
   )
@@ -168,7 +168,13 @@ function PartPropertyForm({
   const [error, setError] = useState<string | null>(null)
 
   async function saveField(key: string, value: string) {
-    await api.updateProperties(item.id, { [key]: value })
+    // Typ produktu należy do KONKRETNEGO producenta — po zmianie producenta poprzedni typ
+    // byłby już spoza jego katalogu, więc znika razem z nim.
+    const fields: Record<string, string> =
+      key === "manufacturer" && value !== propValue("manufacturer")
+        ? { manufacturer: value, productType: "" }
+        : { [key]: value }
+    await api.updateProperties(item.id, fields)
     await onChanged()
   }
 
@@ -189,6 +195,13 @@ function PartPropertyForm({
       {rodzaj === "Zakupowa" && (
         <>
           <ManufacturerField value={propValue("manufacturer")} onSave={saveField} disabled={locked} onError={setError} />
+          <ProductTypeField
+            manufacturerName={propValue("manufacturer")}
+            value={propValue("productType")}
+            onSave={saveField}
+            disabled={locked}
+            onError={setError}
+          />
           <PropField label={t("part.orderNumber")} propKey="orderNumber" value={propValue("orderNumber")} onSave={saveField} disabled={locked} onError={setError} />
           <PropField label={t("part.orderNumber2")} propKey="orderNumber2" value={propValue("orderNumber2")} onSave={saveField} disabled={locked} onError={setError} />
           <PropField label={t("part.mass")} propKey="mass" value={propValue("mass")} onSave={saveField} type="number" disabled={locked} onError={setError} />
@@ -206,6 +219,22 @@ function PartPropertyForm({
 
       {rodzaj === "Klienta" && (
         <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
+      )}
+
+      {/* Złożenie zakupowe — kupiony podzespół ma producenta i typ produktu dokładnie tak
+          samo jak część zakupowa. Reszta jego właściwości (masa, cena, cokolwiek własnego)
+          zostaje w generycznym PropertyEditorze pod spodem, zob. item-detail-panel.tsx. */}
+      {rodzaj === "Zakupowe" && (
+        <>
+          <ManufacturerField value={propValue("manufacturer")} onSave={saveField} disabled={locked} onError={setError} />
+          <ProductTypeField
+            manufacturerName={propValue("manufacturer")}
+            value={propValue("productType")}
+            onSave={saveField}
+            disabled={locked}
+            onError={setError}
+          />
+        </>
       )}
 
       <FormError>{error}</FormError>

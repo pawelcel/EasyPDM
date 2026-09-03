@@ -19,6 +19,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TagPill } from "@/components/ui/tag-pill"
+import { AddTagRow } from "@/features/tags/add-tag-row"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useManufacturers } from "@/features/manufacturers/use-manufacturers"
 import { useLanguage } from "@/i18n/use-language"
@@ -174,6 +176,9 @@ function ManufacturerDetailPanel({
   const [confirmingDeleteContactId, setConfirmingDeleteContactId] = useState<number | null>(null)
   const [contactDeletePending, setContactDeletePending] = useState(false)
   const [contactDeleteError, setContactDeleteError] = useState<string | null>(null)
+  const [confirmingDeleteTypeId, setConfirmingDeleteTypeId] = useState<number | null>(null)
+  const [typeDeletePending, setTypeDeletePending] = useState(false)
+  const [typeDeleteError, setTypeDeleteError] = useState<string | null>(null)
 
   async function refetch() {
     const data = await api.getManufacturer(id)
@@ -238,9 +243,39 @@ function ManufacturerDetailPanel({
     }
   }
 
+  // Błąd propagowany do AddTagRow, który sam pokazuje komunikat i NIE czyści wtedy pola.
+  async function addProductType(name: string) {
+    try {
+      await api.addManufacturerProductType(id, name)
+    } catch (err) {
+      throw new Error(
+        err instanceof ApiError && err.status === 409
+          ? t("manufacturer.productTypeConflict")
+          : t("manufacturer.addProductTypeFailed")
+      )
+    }
+    await refetch()
+  }
+
+  async function confirmRemoveProductType() {
+    if (confirmingDeleteTypeId === null) return
+    setTypeDeletePending(true)
+    setTypeDeleteError(null)
+    try {
+      await api.removeManufacturerProductType(id, confirmingDeleteTypeId)
+      setConfirmingDeleteTypeId(null)
+      await refetch()
+    } catch (err) {
+      setTypeDeleteError(err instanceof ApiError ? err.message : t("manufacturer.deleteProductTypeFailed"))
+    } finally {
+      setTypeDeletePending(false)
+    }
+  }
+
   if (!manufacturer) return null
 
   const confirmingDeleteContact = manufacturer.contacts.find((c) => c.id === confirmingDeleteContactId) ?? null
+  const confirmingDeleteType = manufacturer.productTypes.find((p) => p.id === confirmingDeleteTypeId) ?? null
 
   return (
     <div>
@@ -338,6 +373,28 @@ function ManufacturerDetailPanel({
         <Hint>{t("common.noContacts")}</Hint>
       )}
 
+      {/* Typy produktów — podpowiedzi do pola "Typ produktu" przy elemencie zakupowym
+          (zob. ProductTypeField) i do filtra w widoku "Cała baza". Element trzyma samą
+          nazwę typu, więc usunięcie typu tutaj nie zmienia niczego w opisanych już
+          elementach — znika tylko z listy do wyboru. */}
+      <div className="mt-4">
+        <SectionLabel>{t("manufacturer.productTypesLabel")}</SectionLabel>
+        {manufacturer.productTypes.length > 0 ? (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {manufacturer.productTypes.map((p) => (
+              <TagPill key={p.id} name={p.name} onRemove={() => setConfirmingDeleteTypeId(p.id)} />
+            ))}
+          </div>
+        ) : (
+          <Hint>{t("manufacturer.noProductTypes")}</Hint>
+        )}
+        <AddTagRow
+          onAdd={addProductType}
+          className="mt-2"
+          placeholder={t("manufacturer.productTypePlaceholder")}
+        />
+      </div>
+
       {confirmingDelete && (
         <ConfirmDialog
           open
@@ -368,6 +425,22 @@ function ManufacturerDetailPanel({
           onCancel={() => setConfirmingDeleteContactId(null)}
           pending={contactDeletePending}
           error={contactDeleteError}
+        />
+      )}
+
+      {confirmingDeleteType && (
+        <ConfirmDialog
+          open
+          title={t("manufacturer.deleteProductTypeTitle")}
+          description={t("manufacturer.deleteProductTypeConfirmDescription", {
+            name: confirmingDeleteType.name,
+          })}
+          confirmLabel={t("common.delete")}
+          variant="destructive"
+          onConfirm={confirmRemoveProductType}
+          onCancel={() => setConfirmingDeleteTypeId(null)}
+          pending={typeDeletePending}
+          error={typeDeleteError}
         />
       )}
     </div>

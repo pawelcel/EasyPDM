@@ -271,10 +271,18 @@ export interface ManufacturerContact {
   address: string | null
 }
 
+// Typ produktu w katalogu producenta (np. "Łożyska") — podpowiedź do wyboru przy elemencie
+// zakupowym. Element zapisuje samą NAZWĘ w properties.productType, nie to id.
+export interface ManufacturerProductType {
+  id: number
+  name: string
+}
+
 export interface ManufacturerDetail {
   id: number
   name: string
   contacts: ManufacturerContact[]
+  productTypes: ManufacturerProductType[]
 }
 
 // Lekki wpis do listy/wyszukiwarki klientów (zakładka "Klienci") — bez osób kontaktowych

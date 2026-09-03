@@ -395,6 +395,23 @@ export const api = {
       method: "DELETE",
     }).then((r) => handleResponse<void>(r)),
 
+  addManufacturerProductType: (manufacturerId: number, name: string) =>
+    fetch(`${BASE}/manufacturers/${manufacturerId}/product-types`, json({ name })).then((r) =>
+      handleResponse<{ id: number }>(r)
+    ),
+
+  updateManufacturerProductType: (manufacturerId: number, typeId: number, name: string) =>
+    fetch(`${BASE}/manufacturers/${manufacturerId}/product-types/${typeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeManufacturerProductType: (manufacturerId: number, typeId: number) =>
+    fetch(`${BASE}/manufacturers/${manufacturerId}/product-types/${typeId}`, {
+      method: "DELETE",
+    }).then((r) => handleResponse<void>(r)),
+
   getClients: (search?: string) =>
     fetch(`${BASE}/clients${search ? `?search=${encodeURIComponent(search)}` : ""}`).then((r) =>
       handleResponse<Client[]>(r)

@@ -8,14 +8,19 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { ResizeHandle } from "@/components/ui/resize-handle"
 import { ClientFilterSelect } from "@/features/items/client-filter-select"
-import type { DatabaseFilters } from "@/features/items/database-filters"
+import {
+  matchesKindFilter,
+  type DatabaseFilters,
+  type KindFilter,
+} from "@/features/items/database-filters"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
 import { ItemRow } from "@/features/items/item-row"
-import { PartKindSelect, type PartKindFilter } from "@/features/items/part-kind-select"
+import { PartKindSelect } from "@/features/items/part-kind-select"
 import { RecordTypeSelect, type RecordType } from "@/features/items/record-type-select"
 import { SavedFiltersBar } from "@/features/items/saved-filters-bar"
 import { ManufacturerFilterSelect } from "@/features/manufacturers/manufacturer-filter-select"
+import { ProductTypeFilterSelect } from "@/features/manufacturers/product-type-filter-select"
 import { ProjectDetailPanel } from "@/features/projects/project-detail-panel"
 import { ProjectRow } from "@/features/projects/project-row"
 import { useResizableWidth } from "@/hooks/use-resizable-width"
@@ -61,8 +66,9 @@ function ItemList({
 }) {
   const { t } = useLanguage()
   const [recordType, setRecordType] = useState<RecordType>("all")
-  const [partKind, setPartKind] = useState<PartKindFilter>("all")
+  const [partKind, setPartKind] = useState<KindFilter>("all")
   const [manufacturer, setManufacturer] = useState("")
+  const [productType, setProductType] = useState("")
   // clientId (jako string, jak wymagają wartości <Select>) klienta przypisanego do
   // PROJEKTU elementu/projektu — w odróżnieniu od "rodzaju"/"producenta" to nie jest
   // filtr specyficzny dla Części, więc działa niezależnie od recordType (na projektach
@@ -131,19 +137,27 @@ function ItemList({
     }
   }
 
-  // Filtr "rodzaj części" ma sens tylko dla Części, a "producent" tylko dla Części
-  // zakupowych — zmiana filtra wyżej w hierarchii kasuje te niżej, żeby nie został
-  // "ukryty" filtr, który dalej coś zawęża, choć jego kontrolka jest już wyszarzona.
+  // Filtr "rodzaj" ma sens tylko dla Części/Złożeń, "producent" tylko dla zakupowych, a
+  // "typ produktu" tylko w obrębie konkretnego producenta — zmiana filtra wyżej w
+  // hierarchii kasuje te niżej, żeby nie został "ukryty" filtr, który dalej coś zawęża,
+  // choć jego kontrolka jest już wyszarzona albo w ogóle zniknęła.
   function changeRecordType(next: RecordType) {
     setRecordType(next)
     setPartKind("all")
     setManufacturer("")
+    setProductType("")
     setSelection(null)
   }
 
-  function changePartKind(next: PartKindFilter) {
+  function changePartKind(next: KindFilter) {
     setPartKind(next)
     setManufacturer("")
+    setProductType("")
+  }
+
+  function changeManufacturer(next: string) {
+    setManufacturer(next)
+    setProductType("")
   }
 
   // Wczytanie zapisanego zestawu filtrów ustawia WSZYSTKIE wartości naraz, więc celowo
@@ -155,6 +169,7 @@ function ItemList({
     setRecordType(f.recordType)
     setPartKind(f.partKind)
     setManufacturer(f.manufacturer)
+    setProductType(f.productType)
     setClient(f.client)
     setSelection(null)
   }
@@ -228,12 +243,9 @@ function ItemList({
           if (recordType === "other" && (item.itemType === "part" || item.itemType === "assembly")) {
             return false
           }
-          if (partKind !== "all" && (item.itemType !== "part" || item.properties.rodzaj !== partKind)) {
-            return false
-          }
-          if (manufacturer && (item.itemType !== "part" || item.properties.manufacturer !== manufacturer)) {
-            return false
-          }
+          if (!matchesKindFilter(item, partKind)) return false
+          if (manufacturer && item.properties.manufacturer !== manufacturer) return false
+          if (productType && item.properties.productType !== productType) return false
           if (client && String(projectsById.get(item.projectId ?? "")?.clientId) !== client) {
             return false
           }
@@ -294,15 +306,26 @@ function ItemList({
     <div className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         <RecordTypeSelect value={recordType} onChange={changeRecordType} />
-        <PartKindSelect value={partKind} onChange={changePartKind} disabled={recordType !== "part"} />
+        <PartKindSelect
+          value={partKind}
+          onChange={changePartKind}
+          disabled={recordType === "project" || recordType === "other"}
+        />
         <ManufacturerFilterSelect
           value={manufacturer}
-          onChange={setManufacturer}
-          disabled={partKind !== "Zakupowa"}
+          onChange={changeManufacturer}
+          disabled={partKind !== "purchased"}
         />
+        {manufacturer && (
+          <ProductTypeFilterSelect
+            manufacturerName={manufacturer}
+            value={productType}
+            onChange={setProductType}
+          />
+        )}
         <ClientFilterSelect projects={projects} value={client} onChange={setClient} />
         <SavedFiltersBar
-          currentFilters={{ search, tag, recordType, partKind, manufacturer, client }}
+          currentFilters={{ search, tag, recordType, partKind, manufacturer, productType, client }}
           onApply={applyFilters}
         />
       </div>

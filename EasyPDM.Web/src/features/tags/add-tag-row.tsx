@@ -6,12 +6,17 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/i18n/use-language"
 
+// Używane też poza tagami (typy produktów producenta) — stąd podmienialny placeholder;
+// reszta zachowania (czyszczenie pola dopiero po udanym zapisie, komunikat błędu z
+// wyjątku rzuconego przez onAdd) jest identyczna niezależnie od tego, co się dodaje.
 function AddTagRow({
   onAdd,
   className,
+  placeholder,
 }: {
   onAdd: (name: string) => void | Promise<void>
   className?: string
+  placeholder?: string
 }) {
   const { t } = useLanguage()
   const [value, setValue] = useState("")
@@ -45,7 +50,7 @@ function AddTagRow({
           onKeyDown={(e) => {
             if (e.key === "Enter") submit()
           }}
-          placeholder={t("item.newTagPlaceholder")}
+          placeholder={placeholder ?? t("item.newTagPlaceholder")}
           className="h-7 text-[13px]"
           disabled={submitting}
         />

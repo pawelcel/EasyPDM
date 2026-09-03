@@ -136,6 +136,23 @@ CREATE TABLE manufacturer_contacts (
 
 CREATE INDEX idx_manufacturer_contacts_manufacturer ON manufacturer_contacts (manufacturer_id);
 
+-- Typy produktów producenta (np. "Łożyska", "Silniki krokowe") -- do wyboru przy elemencie
+-- ZAKUPOWYM obok samego producenta i do filtrowania w widoku "Cała baza". Element trzyma
+-- tylko NAZWĘ wybranego typu w properties.productType (tak samo jak nazwę producenta),
+-- bez klucza obcego -- ta tabela jest katalogiem podpowiedzi, nie właścicielem tej relacji.
+CREATE TABLE manufacturer_product_types (
+    id              SERIAL PRIMARY KEY,
+    manufacturer_id INTEGER NOT NULL REFERENCES manufacturers(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    UNIQUE (manufacturer_id, name)
+);
+
+CREATE INDEX idx_manufacturer_product_types_manufacturer
+    ON manufacturer_product_types (manufacturer_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON manufacturer_product_types TO pdm_user;
+GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_types_id_seq TO pdm_user;
+
 -- ============================================================
 -- Klienci (katalog z osobami kontaktowymi i własną strukturą plików, zarządzany z panelu
 -- bocznego) -- celowo izolowane od items/item_relations, patrz komentarz przy client_nodes.
@@ -404,4 +421,5 @@ INSERT INTO schema_migrations (filename) VALUES
     ('031_clients.sql'), ('032_nullable_item_project.sql'),
     ('033_manufacturer_contact_address.sql'), ('034_client_contact_address.sql'),
     ('035_item_relations_position_default.sql'), ('036_item_relations_position_unique.sql'),
-    ('037_notifications.sql'), ('038_project_is_sample.sql'), ('039_system_state.sql');
+    ('037_notifications.sql'), ('038_project_is_sample.sql'), ('039_system_state.sql'),
+    ('040_manufacturer_product_types.sql');
