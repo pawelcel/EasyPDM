@@ -130,8 +130,8 @@ inaczej:
      wyboru TAM: **Nowy element** (projekt, opcjonalnie rodzic, typ, nazwa — dla Części
      dodatkowo rodzaj i zależne od niego pola: Wykonywana → Materiał; Zakupowa →
      Producent/Seria-Typ/Podtyp/Numery zamówieniowe/Masa; Normalia → Materiał/Norma; Klienta →
-     brak dodatkowych pól; **Złożenie ma własne rodzaje** (Wykonywane; Zakupowe →
-     Producent/Seria-Typ/Podtyp; Klienta) plus zawsze opcjonalną Masę — plus
+     Klient; **Złożenie ma własne rodzaje** (Wykonywane; Zakupowe →
+     Producent/Seria-Typ/Podtyp; Klienta → Klient) plus zawsze opcjonalną Masę — plus
      checkboxy eksportu STEP i PDF), **Duplikuj** (wskazuje istniejący element, kopiuje
      jego właściwości do nowego, bez plików) albo **Dograj do istniejącego**
      (wyszukiwarka po całej bazie + te same checkboxy STEP/PDF). Makro czeka (odpytuje

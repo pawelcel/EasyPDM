@@ -129,16 +129,20 @@ under the original.
 A Part has four **kinds** (`properties.rodzaj`), each with a different set of fields and
 a different icon in the tree: **Manufactured** (Material, Price, Additional notes),
 **Purchased** (Manufacturer, Series/Type, Subtype, Order number 1/2, Mass, Price, Additional
-notes), **Standard** (Material, Norm, Additional notes), **Client-supplied** (no
-additional fields besides Additional notes).
+notes), **Standard** (Material, Norm, Additional notes), **Client-supplied** (Client,
+Additional notes).
 
 An Assembly has three kinds of its own in the same `properties.rodzaj`: **Wykonywane**
 (manufactured), **Zakupowe** (purchased — Manufacturer, Series/Type, Subtype) and **Klienta**
-(client-supplied). The strings deliberately differ from the Part ones ("Zakupowe" vs
+(client-supplied — Client). The strings deliberately differ from the Part ones ("Zakupowe" vs
 "Zakupowa"), because that value doubles as the numbering-prefix key — the one shared
 string is "Klienta", which shares its prefix too. Beyond its kind's fields an Assembly
 still has the generic property editor (Mass and any custom keys). Assemblies created
 before this version have no kind and show a hint prompting you to pick one.
+
+**Client** (`properties.client`, table `clients`) — for the Client-supplied kind, on a
+Part or Assembly, picked from the Clients catalog (Clients tab) the same way as
+Manufacturer/Material: linked by name, not a foreign key.
 
 **Series/Type** (`properties.productType`, table `manufacturer_product_types`) and
 **Subtype** (`properties.productSubtype`, table `manufacturer_product_subtypes`, keyed to

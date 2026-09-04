@@ -135,11 +135,13 @@ A Part has one of four **kinds**, each with a different set of fields:
 | Manufactured | Material, Price |
 | Purchased | Manufacturer, Series/Type, Subtype, Order number 1/2, Mass, Price |
 | Standard | Material, Norm |
-| Client-supplied | (no additional fields) |
+| Client-supplied | Client |
 
 An Assembly has one of three **kinds**: Manufactured, Purchased (Manufacturer,
-Series/Type and Subtype) or Client-supplied. Whatever the kind, it can also carry an optional
-Mass and any custom properties.
+Series/Type and Subtype) or Client-supplied (Client). Whatever the kind, it can also carry
+an optional Mass and any custom properties.
+
+**Client** — for the Client-supplied kind, picked from the same catalog as the Clients tab.
 
 **Series/Type** is an entry from the chosen manufacturer's list (Manufacturers tab), and
 **Subtype** narrows it down within that series (e.g. series "Cylindrical roller bearings"

@@ -132,11 +132,13 @@ Część ma jeden z czterech **rodzajów**, każdy z innym zestawem pól:
 | Wykonywana | Materiał, Cena |
 | Zakupowa | Producent, Seria/Typ, Podtyp, Numer zamówieniowy 1/2, Masa, Cena |
 | Normalia | Materiał, Norma |
-| Klienta | (bez dodatkowych pól) |
+| Klienta | Klient |
 
 Złożenie ma jeden z trzech **rodzajów**: Wykonywane, Zakupowe (Producent, Seria/Typ
-i Podtyp) albo Klienta. Niezależnie od rodzaju można mu wpisać opcjonalną Masę i
-dowolne własne właściwości.
+i Podtyp) albo Klienta (Klient). Niezależnie od rodzaju można mu wpisać opcjonalną Masę
+i dowolne własne właściwości.
+
+**Klient** — dla rodzaju Klienta, wybierany z tego samego katalogu co zakładka Klienci.
 
 **Seria/Typ** to pozycja z listy danego producenta (zakładka Producenci), a **Podtyp** to
 uszczegółowienie w obrębie tej serii (np. seria „Łożyska walcowe” → podtypy NU/NJ/NUP), oba

@@ -145,8 +145,8 @@ anders gelöst:
      drei DORT zu wählenden Optionen: **Neues Element** (Projekt, optional ein
      Elternelement, Typ, Name — bei Teilen zusätzlich die Art und deren abhängige Felder:
      Gefertigt → Material; Zugekauft → Hersteller/Serie-Typ/Untertyp/Bestellnummern/Masse;
-     Normteil → Material/Norm; Kundenteil → keine zusätzlichen Felder; **eine Baugruppe hat
-     eigene Arten** (Gefertigt; Zugekauft → Hersteller/Serie-Typ/Untertyp; Vom Kunden) plus eine
+     Normteil → Material/Norm; Kundenteil → Kunde; **eine Baugruppe hat
+     eigene Arten** (Gefertigt; Zugekauft → Hersteller/Serie-Typ/Untertyp; Vom Kunden → Kunde) plus eine
      stets optionale Masse — plus STEP- und
      PDF-Export-Checkboxen), **Duplizieren** (verweist auf ein vorhandenes Element,
      kopiert dessen Eigenschaften in ein neues, ohne Dateien) oder **An vorhandenes

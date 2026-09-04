@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  ClientField,
   ManufacturerField,
   MaterialField,
   ProductTypeAndSubtypeFields,
@@ -261,7 +262,10 @@ function PartPropertyForm({
       )}
 
       {rodzaj === "Klienta" && (
-        <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
+        <>
+          <ClientField value={propValue("client")} onSave={saveField} disabled={locked} onError={setError} />
+          <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
+        </>
       )}
 
       {/* Złożenie zakupowe — kupiony podzespół ma producenta i typ produktu dokładnie tak

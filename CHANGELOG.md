@@ -50,6 +50,9 @@ All notable changes to EasyPDM are documented in this file.
   the attempt names the cancelled item(s) right in the status confirmation dialog.
   Cancelled items are always ownerless, same as released ones, and their icon in the
   tree/list turns red.
+- The Client-supplied kind (Part or Assembly) now has a "Client" field, picked from
+  the Clients catalog — previously there was no way to record which client a
+  client-supplied item actually belongs to.
 
 ### Changed
 - Admins can now bypass another user's item lock for three actions: changing its

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Info } from "lucide-react"
 
 import { api } from "@/api/client"
-import type { ManufacturerDetail } from "@/api/types"
+import type { ClientDetail, ManufacturerDetail } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useClients } from "@/features/clients/use-clients"
 import { useMaterials } from "@/features/materials/use-materials"
 import {
   useManufacturerProductSubtypes,
@@ -246,6 +247,68 @@ function ManufacturerField({
   )
 }
 
+// Klient z katalogu (zakładka Klienci) — pole dla Części/Złożenia rodzaju "Klienta", tym
+// samym wzorcem co ManufacturerField: wolny tekst dopasowany po nazwie, nie klucz obcy.
+function ClientField({
+  value,
+  onSave,
+  disabled,
+  onError,
+}: {
+  value: string
+  onSave: (key: string, value: string) => void | Promise<void>
+  disabled: boolean
+  onError?: (message: string | null) => void
+}) {
+  const { t } = useLanguage()
+  const { clients } = useClients("")
+  const clientNames = clients.map((c) => c.name)
+  const matched = clients.find((c) => c.name === value)
+
+  async function save(next: string) {
+    try {
+      onError?.(null)
+      await onSave("client", next)
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : t("part.saveFieldFailed"))
+    }
+  }
+
+  return (
+    <>
+      <Label>{t("part.client")}</Label>
+      {clients.length > 0 ? (
+        <div className="flex gap-1.5">
+          <div className="flex-1">
+            <Combobox
+              items={clientNames}
+              value={value || null}
+              onValueChange={(v) => save((v as string | null) ?? "")}
+              itemToStringLabel={(name: string) => name}
+              disabled={disabled}
+            >
+              <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear />
+              <ComboboxContent>
+                <ComboboxEmpty>{t("part.noMatchingClients")}</ComboboxEmpty>
+                <ComboboxList>
+                  {(name: string) => (
+                    <ComboboxItem key={name} value={name}>
+                      {name}
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          </div>
+          <ClientInfoButton clientId={matched?.id ?? null} />
+        </div>
+      ) : (
+        <Hint>{t("part.noClientsHint")}</Hint>
+      )}
+    </>
+  )
+}
+
 // Seria/Typ i Podtyp, jedna obok drugiej — łańcuch zależny od producenta (zob. zakładka
 // Producenci) pokazany OD RAZU, w odróżnieniu od wcześniejszej wersji, która chowała te
 // pola całkowicie, dopóki poprzedni poziom nie był wybrany (myliło to, sprawiając wrażenie,
@@ -403,6 +466,73 @@ function ManufacturerInfoButton({ manufacturerId }: { manufacturerId: number | n
   )
 }
 
+function ClientInfoButton({ clientId }: { clientId: number | null }) {
+  const { t } = useLanguage()
+  const [open, setOpen] = useState(false)
+  const [detail, setDetail] = useState<ClientDetail | null>(null)
+
+  useEffect(() => {
+    if (!open || clientId === null) return
+    api.getClient(clientId).then(setDetail)
+  }, [open, clientId])
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) setDetail(null)
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button
+            size="icon"
+            variant="outline"
+            disabled={clientId === null}
+            aria-label={t("part.viewClientAria")}
+          >
+            <Info className="size-4" />
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{detail?.name ?? t("part.client")}</DialogTitle>
+        </DialogHeader>
+        {detail ? (
+          detail.contacts.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("common.fullName")}</TableHead>
+                  <TableHead>{t("common.position")}</TableHead>
+                  <TableHead>{t("common.phone")}</TableHead>
+                  <TableHead>{t("common.email")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detail.contacts.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell>{[c.firstName, c.lastName].filter(Boolean).join(" ") || "-"}</TableCell>
+                    <TableCell>{c.position || "-"}</TableCell>
+                    <TableCell>{c.phone || "-"}</TableCell>
+                    <TableCell>{c.email || "-"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <Hint>{t("common.noContacts")}</Hint>
+          )
+        ) : (
+          <Hint>{t("common.loading")}</Hint>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function PropField({
   label,
   propKey,
@@ -459,4 +589,4 @@ function PropField({
   )
 }
 
-export { ManufacturerField, MaterialField, ProductTypeAndSubtypeFields, PropField }
+export { ClientField, ManufacturerField, MaterialField, ProductTypeAndSubtypeFields, PropField }

@@ -144,16 +144,20 @@ Ein Teil hat vier **Arten** (`properties.rodzaj`), jede mit einem anderen Satz v
 Feldern und einem anderen Symbol im Baum: **Gefertigt** (Material, Preis, Zusätzliche
 Informationen), **Zugekauft** (Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Masse, Preis,
 Zusätzliche Informationen), **Norm** (Material, Norm, Zusätzliche Informationen),
-**Kundenteil** (keine zusätzlichen Felder außer Zusätzlichen Informationen).
+**Kundenteil** (Kunde, Zusätzliche Informationen).
 
 Eine Baugruppe hat drei eigene Arten im selben `properties.rodzaj`: **Wykonywane**
 (gefertigt), **Zakupowe** (zugekauft — Hersteller, Serie/Typ, Untertyp) und **Klienta** (vom
-Kunden). Die Zeichenketten unterscheiden sich BEWUSST von denen des Teils ("Zakupowe"
+Kunden — Kunde). Die Zeichenketten unterscheiden sich BEWUSST von denen des Teils ("Zakupowe"
 statt "Zakupowa"), denn dieser Wert dient zugleich als Schlüssel für das Nummernpräfix —
 die einzige gemeinsame Zeichenkette ist "Klienta", die sich auch das Präfix teilt. Über
 die Felder ihrer Art hinaus hat eine Baugruppe weiterhin den generischen
 Eigenschaften-Editor (Masse und beliebige eigene Schlüssel). Baugruppen aus früheren
 Versionen haben keine Art und zeigen einen Hinweis, eine auszuwählen.
+
+**Kunde** (`properties.client`, Tabelle `clients`) — für die Art Kundenteil, bei Teil
+oder Baugruppe, ausgewählt aus dem Kundenkatalog (Reiter Kunden) nach demselben Muster
+wie Hersteller/Material: Verknüpfung über den Namen, kein Fremdschlüssel.
 
 **Serie/Typ** (`properties.productType`, Tabelle `manufacturer_product_types`) und
 **Untertyp** (`properties.productSubtype`, Tabelle `manufacturer_product_subtypes` mit

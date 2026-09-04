@@ -143,11 +143,13 @@ Ein Teil hat eine von vier **Arten**, jede mit einem anderen Satz von Feldern:
 | Gefertigt | Material, Preis |
 | Zugekauft | Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Masse, Preis |
 | Norm | Material, Norm |
-| Kundenteil | (keine zusätzlichen Felder) |
+| Kundenteil | Kunde |
 
 Eine Baugruppe hat eine von drei **Arten**: Gefertigt, Zugekauft (Hersteller, Serie/Typ
-und Untertyp) oder Vom Kunden. Unabhängig von der Art kann sie zusätzlich eine
+und Untertyp) oder Vom Kunden (Kunde). Unabhängig von der Art kann sie zusätzlich eine
 optionale Masse und beliebige eigene Eigenschaften tragen.
+
+**Kunde** — für die Art „Vom Kunden“, ausgewählt aus demselben Katalog wie der Reiter Kunden.
 
 **Serie/Typ** ist ein Eintrag aus der Liste des gewählten Herstellers (Reiter Hersteller),
 und **Untertyp** verfeinert sie innerhalb dieser Serie (z. B. Serie „Zylinderrollenlager“

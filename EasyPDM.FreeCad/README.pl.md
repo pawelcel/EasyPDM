@@ -90,9 +90,9 @@ dwie osobne.
      opcjonalnie element nadrzędny, typ (Część/Złożenie), nazwę (domyślnie podpowiedziana
      z etykiety dokumentu), rodzaj i zależne od niego pola: dla Części rodzaj jest
      wymagany — **Wykonywana** → Materiał, **Zakupowa** → Producent/Seria-Typ/Podtyp/Numer
-     zamówieniowy 1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** → brak dodatkowych
-     pól. Złożenie ma własne, też wymagane rodzaje — **Wykonywane**, **Zakupowe** →
-     Producent/Seria-Typ/Podtyp, **Klienta** — a Masa jest zawsze widoczna niezależnie od
+     zamówieniowy 1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** → Klient. Złożenie
+     ma własne, też wymagane rodzaje — **Wykonywane**, **Zakupowe** →
+     Producent/Seria-Typ/Podtyp, **Klienta** → Klient — a Masa jest zawsze widoczna niezależnie od
      wybranego rodzaju; Złożenie nigdy nie ma pola Materiał (tylko Część). Popup ma też **checkboksy "Eksportuj STEP"
      i "Eksportuj PDF"** (STEP domyślnie zaznaczony, PDF nie — patrz krok 5 niżej, co
      dokładnie robi każdy z nich przy eksporcie). Bilet jest przypięty JAWNIE do tego

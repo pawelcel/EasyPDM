@@ -34,8 +34,9 @@ Co robi (w tej kolejności):
          (dla Części: Wykonywana/Zakupowa/Normalia/Klienta; dla Złożenia: Wykonywane/
          Zakupowe/Klienta — w obu przypadkach wymagany) i zależne od niego pola (Część
          Wykonywana: Materiał; Zakupowa: Producent/Seria-Typ/Podtyp/Numer zamówieniowy
-         1 i 2/Masa; Normalia: Materiał/Norma; Klienta: brak dodatkowych pól. Złożenie
-         Zakupowe: Producent/Seria-Typ/Podtyp; każde Złożenie dodatkowo: Masa),
+         1 i 2/Masa; Normalia: Materiał/Norma; Klienta: Klient. Złożenie
+         Zakupowe: Producent/Seria-Typ/Podtyp; Złożenie Klienta: Klient; każde Złożenie
+         dodatkowo: Masa),
          a także czy eksportować i wysłać model STEP (checkbox w tym samym popupie). Bilet
          jest przypięty JAWNIE do tego jednego, konkretnego popupu — żadne INNE "Dodaj" w
          aplikacji (w drzewie projektu, panelu szczegółów) nigdy przypadkiem go nie

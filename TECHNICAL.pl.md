@@ -124,15 +124,18 @@ właściciela) — z poziomu drzewka kopia ląduje zaraz pod oryginałem.
 Część ma cztery **rodzaje** (`properties.rodzaj`), każdy z innym zestawem pól i inną ikoną
 w drzewku: **Wykonywana** (Materiał, Cena, Dodatkowe informacje), **Zakupowa** (Producent,
 Seria/Typ, Podtyp, Numer zamówieniowy 1/2, Masa, Cena, Dodatkowe informacje), **Normalia**
-(Materiał, Norma, Dodatkowe informacje), **Klienta** (bez dodatkowych pól poza Dodatkowymi
-informacjami).
+(Materiał, Norma, Dodatkowe informacje), **Klienta** (Klient, Dodatkowe informacje).
 
 Złożenie ma trzy własne rodzaje w tym samym `properties.rodzaj`: **Wykonywane**,
-**Zakupowe** (Producent, Seria/Typ, Podtyp) i **Klienta**. Napisy są CELOWO inne niż dla Części
+**Zakupowe** (Producent, Seria/Typ, Podtyp) i **Klienta** (Klient). Napisy są CELOWO inne niż dla Części
 ("Zakupowe" vs "Zakupowa"), bo ta sama wartość jest kluczem prefiksu numeracji — jedynym
 wspólnym napisem jest "Klienta", które i prefiks ma wspólny. Poza polami swojego rodzaju
 Złożenie ma dalej generyczny edytor właściwości (Masa i dowolne własne klucze). Złożenia
 sprzed tej wersji nie mają rodzaju i pokazują podpowiedź, żeby go wybrać.
+
+**Klient** (`properties.client`, tabela `clients`) — dla rodzaju Klienta, Część lub
+Złożenie, wybierany z katalogu Klientów (zakładka Klienci) tym samym wzorcem co
+Producent/Materiał: powiązanie po nazwie, nie klucz obcy.
 
 **Seria/Typ** (`properties.productType`, tabela `manufacturer_product_types`) i
 **Podtyp** (`properties.productSubtype`, tabela `manufacturer_product_subtypes` z kluczem

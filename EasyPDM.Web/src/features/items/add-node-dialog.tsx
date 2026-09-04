@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  ClientField,
   ManufacturerField,
   MaterialField,
   ProductTypeAndSubtypeFields,
@@ -124,7 +125,7 @@ function AddNodeDialog({
   }
   function seedExtraProps(): Record<string, string> {
     const result: Record<string, string> = {}
-    for (const key of ["material", "manufacturer", "productType", "productSubtype", "orderNumber", "orderNumber2", "norm"]) {
+    for (const key of ["material", "manufacturer", "productType", "productSubtype", "orderNumber", "orderNumber2", "norm", "client"]) {
       const v = initialProperties?.[key]
       if (typeof v === "string") result[key] = v
     }
@@ -313,6 +314,7 @@ function AddNodeDialog({
           if (extraProps[key]?.trim()) properties[key] = extraProps[key].trim()
         }
       }
+      if (rodzaj === "Klienta" && extraProps.client?.trim()) properties.client = extraProps.client.trim()
     }
 
     setSubmitting(true)
@@ -605,6 +607,9 @@ function AddNodeDialog({
                 disabled={false}
               />
             )}
+            {rodzaj === "Klienta" && (
+              <ClientField value={extraProps.client ?? ""} onSave={setExtraField} disabled={false} />
+            )}
 
             {ticket && (
               <>
@@ -685,6 +690,9 @@ function AddNodeDialog({
                   disabled={false}
                 />
               </>
+            )}
+            {mode === "assembly" && rodzaj === "Klienta" && (
+              <ClientField value={extraProps.client ?? ""} onSave={setExtraField} disabled={false} />
             )}
 
             {mode === "assembly" && (
