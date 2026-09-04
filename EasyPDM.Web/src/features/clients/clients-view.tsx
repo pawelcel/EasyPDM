@@ -25,7 +25,7 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { ClientDetailPanel } from "@/features/clients/client-detail-panel"
 import { useClients } from "@/features/clients/use-clients"
@@ -111,13 +111,6 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
 
         {rows.length > 0 ? (
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("common.name")}</TableHead>
-                <TableHead>{t("client.name2Label")}</TableHead>
-                <TableHead className="w-8" />
-              </TableRow>
-            </TableHeader>
             <TableBody>
               {rows.map((row) => (
                 <TableRow
@@ -126,10 +119,16 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
                   data-state={selectedId === row.clientId ? "selected" : undefined}
                   className="cursor-pointer"
                 >
-                  <TableCell className={row.clientName ? "" : "text-muted-foreground/40"}>
-                    {row.clientName ?? "↳"}
+                  <TableCell>
+                    {row.clientName ? (
+                      <>
+                        {row.clientName}
+                        {row.name2 && <span className="text-muted-foreground"> — {row.name2}</span>}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">↳ {row.name2}</span>
+                    )}
                   </TableCell>
-                  <TableCell>{row.name2 ?? "-"}</TableCell>
                   <TableCell>
                     {row.name2Id !== null && row.name2 !== null && (
                       <Button
