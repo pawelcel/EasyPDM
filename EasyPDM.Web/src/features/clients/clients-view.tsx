@@ -119,16 +119,11 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
                   data-state={selectedId === row.clientId ? "selected" : undefined}
                   className="cursor-pointer"
                 >
-                  <TableCell>
-                    {row.clientName ? (
-                      <>
-                        {row.clientName}
-                        {row.name2 && <span className="text-muted-foreground"> — {row.name2}</span>}
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">↳ {row.name2}</span>
-                    )}
-                  </TableCell>
+                  {/* Nazwa 2 (jeśli jest) jest już samodzielną, pełną nazwą (np. "Bosch
+                      Rexroth"), więc pokazuje się sama, jako pełnoprawna, równorzędna
+                      pozycja listy -- bez dopisywania "Bosch — " z przodu ani wcięcia "↳"
+                      sugerującego, że to coś podrzędnego wobec pierwszego wiersza klienta. */}
+                  <TableCell>{row.name2 ?? row.clientName}</TableCell>
                   <TableCell>
                     {row.name2Id !== null && row.name2 !== null && (
                       <Button
