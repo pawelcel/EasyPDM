@@ -148,10 +148,14 @@ Producent/Materiał: powiązanie po nazwie, nie klucz obcy. Obok niego **Nazwa 2
 katalogu (tabela `client_name2`, relacja 1:N do klienta — jeden klient może mieć ich kilka,
 np. różne spółki-córki handlujące pod tą samą nazwą główną, nie kolumna 1:1) —
 zablokowana, dopóki nie wybrano klienta; lista opcji zawiera wszystkie Nazwy 2 tego
-klienta, pustą gdy nie ma żadnej. Zmiana klienta czyści wcześniej wybraną Nazwę 2. Samo
-okno "Dodaj klienta" jest "dynamiczne": wpisanie/wybranie nazwy, która już istnieje w
-katalogu, przełącza je z zakładania duplikatu klienta na dodanie temu istniejącemu
-klientowi nowej Nazwy 2 — to właśnie chroni przed rozdrobnieniem jednego klienta (np.
+klienta, pustą gdy nie ma żadnej. Zmiana klienta czyści wcześniej wybraną Nazwę 2. Sama
+lista po lewej w zakładce Klienci to odzwierciedla wprost — płaska tabela Nazwa/Nazwa 2,
+jeden wiersz na każdą Nazwę 2 (klient bez żadnej dostaje jeden wiersz z kreską), więc
+każdy wariant widać bez wchodzenia w danego klienta, z przyciskiem usuwania od razu przy
+wierszu. Pole nazwy w oknie "Dodaj klienta" jest samo pickerem po tym samym katalogu i
+jest "dynamiczne": wpisanie/wybranie nazwy, która już istnieje, przełącza je z zakładania
+duplikatu klienta na dodanie temu istniejącemu klientowi nowej Nazwy 2 (potwierdzane
+jednym "OK" zamiast "Dodaj") — to właśnie chroni przed rozdrobnieniem jednego klienta (np.
 "Bosch") na kilka niemal identycznych wpisów w katalogu, zakładanych tylko po to, żeby
 zapisać różne warianty Nazwy 2.
 

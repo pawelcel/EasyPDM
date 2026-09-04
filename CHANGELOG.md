@@ -55,11 +55,15 @@ All notable changes to EasyPDM are documented in this file.
   client-supplied item actually belongs to. Next to it, on the same line, "Name 2" —
   one of that client's second names/trade variants, offered only once a client is
   picked and cleared again if you change it. A client can now have any number of
-  Name 2 entries (managed as a list on the client's detail panel) instead of just
-  one, and the "Add client" dialog is dynamic: typing an existing client's name
-  switches it to adding that client a new Name 2 instead of creating a duplicate
-  entry — so ten trade names for the same client no longer means ten disconnected
-  "Client" catalog entries to pick from.
+  Name 2 entries instead of just one — so ten trade names for the same client no
+  longer means ten disconnected "Client" catalog entries to pick from. The Clients
+  tab's left-hand list now shows every client alongside each of its Name 2 entries
+  as its own row (Name / Name 2, not buried in a table inside one client), and the
+  "Add client" dialog is dynamic: its name field is a picker over existing clients,
+  and typing/selecting one that already exists switches the dialog to adding that
+  client a new Name 2 (confirmed with a single "OK") instead of creating a
+  duplicate entry. Deleting a Name 2 is a one-click action right on its row in
+  that list.
 
 ### Changed
 - Admins can now bypass another user's item lock for three actions: changing its

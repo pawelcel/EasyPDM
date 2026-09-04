@@ -12,11 +12,11 @@ static class ClientEndpoints
 {
     public static void MapClientEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
     {
-        // GET /api/clients?search=... — lekka lista (bez osób kontaktowych/nazw2, tylko
-        // liczba kontaktów) do wyszukiwarki po lewej stronie oraz do pickera w Projekcie.
-        // Wyszukiwanie po nazwie 2 dalej działa (EXISTS na client_name2), mimo że lista nie
-        // zwraca już samych wartości -- tak samo jak wyszukiwanie producenta po nazwie
-        // typu/podtypu nie zwraca ich w GET /api/manufacturers.
+        // GET /api/clients?search=... — lista do wyszukiwarki po lewej stronie (pokazuje
+        // Nazwę razem z KAŻDĄ Nazwą 2 jako osobny wiersz, więc musi nieść same nazwy 2, nie
+        // tylko ich liczbę jak kontakty) oraz do pickera w Projekcie. Wyszukiwanie po nazwie
+        // 2 dopasowuje klienta całościowo (EXISTS) -- trafienie tylko przez jedną z kilku
+        // nazw 2 nadal pokazuje wszystkie pozostałe, nie tylko pasującą.
         app.MapGet("/api/clients", async (string? search) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
@@ -36,21 +36,53 @@ static class ClientEndpoints
                 GROUP BY c.id
                 ORDER BY c.name;
                 """;
-            await using var cmd = new NpgsqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("search", (object?)search ?? DBNull.Value);
-
-            var result = new List<object>();
-            await using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            var clients = new List<(int Id, string Name, string? Location, long ContactCount)>();
+            await using (var cmd = new NpgsqlCommand(sql, conn))
             {
-                result.Add(new
+                cmd.Parameters.AddWithValue("search", (object?)search ?? DBNull.Value);
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
                 {
-                    id = reader.GetInt32(0),
-                    name = reader.GetString(1),
-                    location = reader.IsDBNull(2) ? null : reader.GetString(2),
-                    contactCount = reader.GetInt64(3)
-                });
+                    clients.Add((
+                        reader.GetInt32(0),
+                        reader.GetString(1),
+                        reader.IsDBNull(2) ? null : reader.GetString(2),
+                        reader.GetInt64(3)
+                    ));
+                }
             }
+
+            // Nazwy 2 dociągane jednym zapytaniem dla WSZYSTKICH przefiltrowanych klientów i
+            // grupowane w pamięci -- inaczej byłoby to N+1 zapytań (jedno na klienta), ten sam
+            // wzorzec co subtypesByType w GET /api/manufacturers/{id}.
+            var name2sByClient = new Dictionary<int, List<object>>();
+            if (clients.Count > 0)
+            {
+                const string name2Sql = """
+                    SELECT client_id, id, name2 FROM client_name2
+                    WHERE client_id = ANY(@clientIds)
+                    ORDER BY name2;
+                    """;
+                await using var name2Cmd = new NpgsqlCommand(name2Sql, conn);
+                name2Cmd.Parameters.AddWithValue("clientIds", clients.Select(c => c.Id).ToArray());
+                await using var reader = await name2Cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var clientId = reader.GetInt32(0);
+                    if (!name2sByClient.TryGetValue(clientId, out var list))
+                        name2sByClient[clientId] = list = [];
+                    list.Add(new { id = reader.GetInt32(1), name2 = reader.GetString(2) });
+                }
+            }
+
+            var result = clients.Select(c => new
+            {
+                id = c.Id,
+                name = c.Name,
+                location = c.Location,
+                contactCount = c.ContactCount,
+                name2s = name2sByClient.TryGetValue(c.Id, out var list) ? list : [],
+            });
 
             return Results.Ok(result);
         });

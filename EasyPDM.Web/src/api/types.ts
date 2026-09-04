@@ -293,17 +293,17 @@ export interface ManufacturerDetail {
   productTypes: ManufacturerProductType[]
 }
 
-// Lekki wpis do listy/wyszukiwarki klientów (zakładka "Klienci") — bez osób kontaktowych
-// (te dociągane są osobno, dopiero po zaznaczeniu konkretnego klienta) ani nazw 2 (może
-// być ich kilka na klienta, zob. ClientName2 niżej — dociągane tak samo jak
-// ManufacturerProductType, dopiero w ClientDetail). Osobny typ od Manufacturer mimo
-// podobieństwa — Klient ma dodatkowo location i własne drzewko plików (ClientNode), więc
-// moduły są celowo niezależne.
+// Wpis do listy/wyszukiwarki klientów (zakładka "Klienci") — bez osób kontaktowych (te
+// dociągane są osobno, dopiero po zaznaczeniu konkretnego klienta), ale Z nazwami 2 (zob.
+// ClientName2 niżej), bo lewa lista pokazuje osobny wiersz na każdą z nich (Nazwa / Nazwa 2),
+// nie tylko listę samych klientów. Osobny typ od Manufacturer mimo podobieństwa — Klient ma
+// dodatkowo location i własne drzewko plików (ClientNode), więc moduły są celowo niezależne.
 export interface Client {
   id: number
   name: string
   location: string | null
   contactCount: number
+  name2s: ClientName2[]
 }
 
 export interface ClientContact {

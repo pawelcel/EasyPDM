@@ -172,11 +172,16 @@ dem Katalog (Tabelle `client_name2`, eine 1:N-Beziehung zum Kunden — ein Kunde
 mehrere haben, z. B. verschiedene Tochtergesellschaften unter demselben Hauptnamen, keine
 1:1-Spalte) — gesperrt, bis ein Kunde gewählt ist; die Optionsliste enthält alle Namen 2
 dieses Kunden, leer, falls keiner vorhanden ist. Ein Kundenwechsel löscht einen zuvor
-gewählten Name 2. Der Dialog „Kunde hinzufügen" selbst ist „dynamisch": Wird ein bereits
-im Katalog vorhandener Name eingegeben/ausgewählt, wechselt er vom Anlegen eines
-doppelten Kunden zum Hinzufügen eines neuen Namens 2 zu diesem bestehenden Kunden — genau
-das verhindert, dass ein Kunde (z. B. „Bosch") in mehrere fast identische Katalogeinträge
-zerfällt, nur um verschiedene Name-2-Varianten festzuhalten.
+gewählten Name 2. Die linke Liste im Reiter Kunden spiegelt das direkt wider — eine
+flache Name/Name-2-Tabelle, eine Zeile je Name 2 (ein Kunde ohne einen erhält eine Zeile
+mit einem Strich), sodass jede Variante sichtbar ist, ohne den Kunden zu öffnen, mit einer
+Löschen-Schaltfläche direkt an der Zeile. Das Namensfeld im Dialog „Kunde hinzufügen" ist
+selbst ein Picker über denselben Katalog und ist „dynamisch": Wird ein bereits im Katalog
+vorhandener Name eingegeben/ausgewählt, wechselt er vom Anlegen eines doppelten Kunden zum
+Hinzufügen eines neuen Namens 2 zu diesem bestehenden Kunden (bestätigt mit einem
+einzelnen „OK" statt „Hinzufügen") — genau das verhindert, dass ein Kunde (z. B. „Bosch")
+in mehrere fast identische Katalogeinträge zerfällt, nur um verschiedene Name-2-Varianten
+festzuhalten.
 
 Unabhängig von `properties.client` oben ist der **Kundenkatalog** (Tabelle `clients`,
 Reiter Kunden) eine eigenständige Entität erster Klasse: Name/Standort, seine Liste von

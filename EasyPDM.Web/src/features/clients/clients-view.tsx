@@ -1,9 +1,18 @@
 import { useState } from "react"
-import { Plus } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
 import type { Client } from "@/api/types"
 import { Button } from "@/components/ui/button"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
   Dialog,
   DialogContent,
@@ -16,10 +25,41 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { ClientDetailPanel } from "@/features/clients/client-detail-panel"
 import { useClients } from "@/features/clients/use-clients"
 import { useLanguage } from "@/i18n/use-language"
+
+// Płaska tabela: klient bez nazw 2 daje jeden wiersz (Nazwa 2 puste), klient z nazwami 2 —
+// po wierszu na każdą, tak żeby wszystkie warianty ("Bosch" / "Bosch Polska" / "Bosch
+// Rexroth" / ...) były widoczne od razu w liście po lewej, bez wchodzenia w szczegóły
+// klienta -- ten sam wzorzec co płaska tabela Seria/Typ + Podtyp w zakładce Producenci.
+function buildRows(clients: Client[]) {
+  const rows: {
+    clientId: number
+    clientName: string | null
+    contactCount: number | null
+    name2Id: number | null
+    name2: string | null
+  }[] = []
+  for (const c of clients) {
+    if (c.name2s.length === 0) {
+      rows.push({ clientId: c.id, clientName: c.name, contactCount: c.contactCount, name2Id: null, name2: null })
+      continue
+    }
+    c.name2s.forEach((n, index) => {
+      rows.push({
+        clientId: c.id,
+        clientName: index === 0 ? c.name : null,
+        contactCount: index === 0 ? c.contactCount : null,
+        name2Id: n.id,
+        name2: n.name2,
+      })
+    })
+  }
+  return rows
+}
 
 function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: string) => void }) {
   const { t } = useLanguage()
@@ -27,6 +67,28 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
   const debouncedSearch = useDebouncedValue(search, 300)
   const { clients, refetch } = useClients(debouncedSearch)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const rows = buildRows(clients)
+
+  const [confirmingDeleteName2, setConfirmingDeleteName2] = useState<
+    { clientId: number; name2Id: number; name2: string } | null
+  >(null)
+  const [name2DeletePending, setName2DeletePending] = useState(false)
+  const [name2DeleteError, setName2DeleteError] = useState<string | null>(null)
+
+  async function confirmRemoveName2() {
+    if (!confirmingDeleteName2) return
+    setName2DeletePending(true)
+    setName2DeleteError(null)
+    try {
+      await api.removeClientName2(confirmingDeleteName2.clientId, confirmingDeleteName2.name2Id)
+      setConfirmingDeleteName2(null)
+      await refetch()
+    } catch (err) {
+      setName2DeleteError(err instanceof ApiError ? err.message : t("client.deleteName2Failed"))
+    } finally {
+      setName2DeletePending(false)
+    }
+  }
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -47,29 +109,64 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
           />
         </div>
 
-        {clients.length > 0 ? (
-          <ul className="flex flex-col gap-0.5">
-            {clients.map((c) => (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(c.id)}
-                  className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent ${
-                    selectedId === c.id ? "bg-accent" : ""
-                  }`}
+        {rows.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("common.name")}</TableHead>
+                <TableHead>{t("client.name2Label")}</TableHead>
+                <TableHead className="w-8" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow
+                  key={`${row.clientId}-${row.name2Id ?? "none"}`}
+                  onClick={() => setSelectedId(row.clientId)}
+                  data-state={selectedId === row.clientId ? "selected" : undefined}
+                  className="cursor-pointer"
                 >
-                  <span className="flex-1 truncate">{c.name}</span>
-                  <span className="shrink-0 text-[12px] text-muted-foreground">
-                    {c.contactCount} {t(c.contactCount === 1 ? "client.contactSingular" : "client.contactPlural")}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <TableCell className={row.clientName ? "" : "text-muted-foreground/40"}>
+                    {row.clientName ?? "↳"}
+                  </TableCell>
+                  <TableCell>{row.name2 ?? "-"}</TableCell>
+                  <TableCell>
+                    {row.name2Id !== null && row.name2 !== null && (
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label={t("client.deleteName2Aria")}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConfirmingDeleteName2({ clientId: row.clientId, name2Id: row.name2Id!, name2: row.name2! })
+                        }}
+                      >
+                        <Trash2 className="size-3.5 text-muted-foreground" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         ) : (
           <Hint>{search ? t("client.noMatches") : t("client.emptyAll")}</Hint>
         )}
       </div>
+
+      {confirmingDeleteName2 && (
+        <ConfirmDialog
+          open
+          title={t("client.deleteName2Aria")}
+          description={t("client.deleteName2ConfirmDescription", { name: confirmingDeleteName2.name2 })}
+          confirmLabel={t("common.delete")}
+          variant="destructive"
+          onConfirm={confirmRemoveName2}
+          onCancel={() => setConfirmingDeleteName2(null)}
+          pending={name2DeletePending}
+          error={name2DeleteError}
+        />
+      )}
 
       <div className="col-span-2 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         {selectedId ? (
@@ -88,10 +185,11 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
   )
 }
 
-// Okno "dynamiczne": wpisana/wybrana nazwa jest na bieżąco porównywana z katalogiem. Jeśli
-// pasuje do JUŻ ISTNIEJĄCEGO klienta, okno przełącza się w tryb "dodaj temu klientowi nazwę
-// 2" zamiast próbować założyć drugiego klienta o tej samej nazwie (co i tak odbiłoby się od
-// UNIQUE na clients.name) — dokładnie to, co pozwala jednemu "Bosch" mieć wiele nazw 2
+// Okno "dynamiczne": pole nazwy to Combobox — można wybrać istniejącego klienta z listy albo
+// wpisać zupełnie nową nazwę. Wybrana/wpisana nazwa jest na bieżąco porównywana z katalogiem;
+// jeśli pasuje do JUŻ ISTNIEJĄCEGO klienta, okno przełącza się w tryb "dodaj temu klientowi
+// nazwę 2" zamiast próbować założyć drugiego klienta o tej samej nazwie (co i tak odbiłoby
+// się od UNIQUE na clients.name) — dokładnie to, co pozwala jednemu "Bosch" mieć wiele nazw 2
 // zamiast wielu osobnych, niepowiązanych ze sobą wpisów "Bosch" w katalogu.
 function NewClientDialog({
   clients,
@@ -106,6 +204,7 @@ function NewClientDialog({
   const [name2, setName2] = useState("")
   const [error, setError] = useState("")
   const [pending, setPending] = useState(false)
+  const clientNames = clients.map((c) => c.name)
 
   const trimmedName = name.trim()
   const matchedClient = trimmedName
@@ -168,12 +267,25 @@ function NewClientDialog({
         </DialogHeader>
         <div className="flex flex-col gap-2">
           <Label htmlFor="client-name">{t("common.name")}</Label>
-          <Input
-            id="client-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("client.namePlaceholder")}
-          />
+          <Combobox
+            items={clientNames}
+            value={name || null}
+            inputValue={name}
+            onInputValueChange={(v) => setName(v)}
+            onValueChange={(v) => setName((v as string | null) ?? "")}
+          >
+            <ComboboxInput id="client-name" placeholder={t("client.namePlaceholder")} showClear />
+            <ComboboxContent>
+              <ComboboxEmpty>{t("client.newClientHint")}</ComboboxEmpty>
+              <ComboboxList>
+                {(clientName: string) => (
+                  <ComboboxItem key={clientName} value={clientName}>
+                    {clientName}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
           {matchedClient && (
             <>
               <Hint>{t("client.existingClientHint")}</Hint>
@@ -193,7 +305,7 @@ function NewClientDialog({
             {t("common.cancel")}
           </Button>
           <Button onClick={submit} disabled={pending}>
-            {matchedClient ? t("client.addName2Button") : t("common.add")}
+            {matchedClient ? t("common.ok") : t("common.add")}
           </Button>
         </DialogFooter>
       </DialogContent>

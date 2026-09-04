@@ -155,11 +155,15 @@ Manufacturer/Material: linked by name, not a foreign key. Next to it, **Name 2**
 catalog (table `client_name2`, a 1:N relation to the client — one client can have several,
 e.g. different subsidiaries trading under the same parent name — not a 1:1 column) —
 locked until a client is picked; the option list offers every Name 2 that client has,
-empty if it has none. Changing the client clears a previously chosen Name 2. The New
-Client dialog itself is "dynamic": typing/picking a name that already exists in the
-catalog switches it from creating a duplicate client to adding a new Name 2 to that
-existing one instead — this is what keeps one client (e.g. "Bosch") from fragmenting into
-several near-duplicate catalog entries just to record different Name 2 variants.
+empty if it has none. Changing the client clears a previously chosen Name 2. The Clients
+tab's own left-hand list reflects this directly — a flat Name/Name 2 table, one row per
+Name 2 (a client with none gets a single row with a dash), so every variant is visible
+without opening a client — with a delete button right on each row. The "Add client"
+dialog's name field is itself a picker over the same catalog and is "dynamic": typing/
+picking a name that already exists switches it from creating a duplicate client to adding
+a new Name 2 to that existing one instead (confirmed with a single "OK" instead of
+"Add") — this is what keeps one client (e.g. "Bosch") from fragmenting into several
+near-duplicate catalog entries just to record different Name 2 variants.
 
 Separately from `properties.client` above, the **Clients catalog** (`clients` table,
 Clients tab) is its own first-class entity: name/location, its list of Name 2 entries
