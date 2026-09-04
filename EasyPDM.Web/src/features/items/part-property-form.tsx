@@ -71,7 +71,7 @@ const PART_KIND_FIELDS: Record<string, string[]> = {
     "priceDate",
   ],
   Normalia: ["material", "norm"],
-  Klienta: [],
+  Klienta: ["client"],
 }
 
 // Złożenie ma "Masę" zawsze dostępną przez generyczny PropertyEditor (zob.
@@ -80,7 +80,7 @@ const PART_KIND_FIELDS: Record<string, string[]> = {
 const ASSEMBLY_KIND_FIELDS: Record<string, string[]> = {
   Wykonywane: [],
   Zakupowe: ["manufacturer", "productType", "productSubtype"],
-  Klienta: [],
+  Klienta: ["client"],
 }
 
 // Rodzaj/Nazwa/Materiał — wydzielone z reszty formularza, bo pokazują się od razu w

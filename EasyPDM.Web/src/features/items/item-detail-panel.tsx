@@ -56,11 +56,18 @@ function bomPropertyOrDash(properties: Record<string, unknown>, key: string): st
 }
 
 // Klucze, które dla Złożenia ma już swoje DEDYKOWANE pole w PartPropertyForm wyżej
-// (rodzaj — przyciski w PartSummaryFields; producent/seria-typ/podtyp — pola Zakupowego) —
-// generyczny PropertyEditor niżej pokazuje "resztę" (Masę i dowolne własne klucze), więc
+// (rodzaj — przyciski w PartSummaryFields; producent/seria-typ/podtyp — pola Zakupowego;
+// client — pole Klienta rodzaju Klienta) — generyczny PropertyEditor niżej pokazuje
+// "resztę" (Masę i dowolne własne klucze), więc
 // bez tego filtra te same wartości pokazałyby się DRUGI raz jako zwykłe, wolno edytowalne
 // wiersze, myląc redundancją i pozwalając rozjechać je od specjalizowanego pola.
-const ASSEMBLY_MANAGED_PROPERTY_KEYS = new Set(["rodzaj", "manufacturer", "productType", "productSubtype"])
+const ASSEMBLY_MANAGED_PROPERTY_KEYS = new Set([
+  "rodzaj",
+  "manufacturer",
+  "productType",
+  "productSubtype",
+  "client",
+])
 
 function propertyEditorEntries(item: Item): Record<string, unknown> {
   if (item.itemType !== "assembly") return item.properties
