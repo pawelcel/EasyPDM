@@ -31,32 +31,21 @@ import { ClientDetailPanel } from "@/features/clients/client-detail-panel"
 import { useClients } from "@/features/clients/use-clients"
 import { useLanguage } from "@/i18n/use-language"
 
-// Płaska tabela: klient bez nazw 2 daje jeden wiersz (Nazwa 2 puste), klient z nazwami 2 —
-// po wierszu na każdą, tak żeby wszystkie warianty ("Bosch" / "Bosch Polska" / "Bosch
-// Rexroth" / ...) były widoczne od razu w liście po lewej, bez wchodzenia w szczegóły
-// klienta -- ten sam wzorzec co płaska tabela Seria/Typ + Podtyp w zakładce Producenci.
+// Płaska tabela: klient bez nazw 2 daje jeden wiersz (sama nazwa), klient z nazwami 2 —
+// po wierszu na każdą, KAŻDY niosący pełną parę Nazwa+Nazwa 2 (nie tylko pierwszy z nich) —
+// tak żeby każdy wiersz był samodzielną, kompletną pozycją, a nie wyglądał na coś
+// podrzędnego wobec poprzedniego. Wszystkie warianty ("Bosch — Bosch Polska" / "Bosch —
+// Bosch Rexroth" / ...) widoczne od razu w liście po lewej, bez wchodzenia w szczegóły klienta.
 function buildRows(clients: Client[]) {
-  const rows: {
-    clientId: number
-    clientName: string | null
-    contactCount: number | null
-    name2Id: number | null
-    name2: string | null
-  }[] = []
+  const rows: { clientId: number; clientName: string; name2Id: number | null; name2: string | null }[] = []
   for (const c of clients) {
     if (c.name2s.length === 0) {
-      rows.push({ clientId: c.id, clientName: c.name, contactCount: c.contactCount, name2Id: null, name2: null })
+      rows.push({ clientId: c.id, clientName: c.name, name2Id: null, name2: null })
       continue
     }
-    c.name2s.forEach((n, index) => {
-      rows.push({
-        clientId: c.id,
-        clientName: index === 0 ? c.name : null,
-        contactCount: index === 0 ? c.contactCount : null,
-        name2Id: n.id,
-        name2: n.name2,
-      })
-    })
+    for (const n of c.name2s) {
+      rows.push({ clientId: c.id, clientName: c.name, name2Id: n.id, name2: n.name2 })
+    }
   }
   return rows
 }
@@ -119,11 +108,13 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
                   data-state={selectedId === row.clientId ? "selected" : undefined}
                   className="cursor-pointer"
                 >
-                  {/* Nazwa 2 (jeśli jest) jest już samodzielną, pełną nazwą (np. "Bosch
-                      Rexroth"), więc pokazuje się sama, jako pełnoprawna, równorzędna
-                      pozycja listy -- bez dopisywania "Bosch — " z przodu ani wcięcia "↳"
-                      sugerującego, że to coś podrzędnego wobec pierwszego wiersza klienta. */}
-                  <TableCell>{row.name2 ?? row.clientName}</TableCell>
+                  {/* Nazwa PEŁNA na każdym wierszu (nie tylko pierwszym) -- każdy wiersz ma
+                      być samodzielną, kompletną pozycją, nie czymś podrzędnym wobec
+                      poprzedniego (stąd też brak wcięcia "↳"). */}
+                  <TableCell>
+                    {row.clientName}
+                    {row.name2 && <span className="text-muted-foreground"> — {row.name2}</span>}
+                  </TableCell>
                   <TableCell>
                     {row.name2Id !== null && row.name2 !== null && (
                       <Button
@@ -260,43 +251,38 @@ function NewClientDialog({
           <DialogTitle>{matchedClient ? t("client.addName2Title") : t("client.addTitle")}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-2">
-          {/* Nazwa i Nazwa 2 obok siebie, ZAWSZE oba widoczne -- Nazwa 2 jest opcjonalna
-              niezależnie od tego, czy nazwa jest nowa (nowy klient dostaje od razu swoją
-              pierwszą Nazwę 2, jeśli ją wpisano) czy pasuje do istniejącego klienta (dopisanie
-              mu kolejnej Nazwy 2, albo samo zaznaczenie go, jeśli pole zostawiono puste). */}
-          <div className="flex items-end gap-1.5">
-            <div className="min-w-0 flex-1">
-              <Label htmlFor="client-name">{t("common.name")}</Label>
-              <Combobox
-                items={clientNames}
-                value={name || null}
-                inputValue={name}
-                onInputValueChange={(v) => setName(v)}
-                onValueChange={(v) => setName((v as string | null) ?? "")}
-              >
-                <ComboboxInput id="client-name" placeholder={t("client.namePlaceholder")} showClear />
-                <ComboboxContent>
-                  <ComboboxEmpty>{t("client.newClientHint")}</ComboboxEmpty>
-                  <ComboboxList>
-                    {(clientName: string) => (
-                      <ComboboxItem key={clientName} value={clientName}>
-                        {clientName}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-            </div>
-            <div className="min-w-0 flex-1">
-              <Label htmlFor="client-new-name2">{t("client.name2Label")}</Label>
-              <Input
-                id="client-new-name2"
-                value={name2}
-                onChange={(e) => setName2(e.target.value)}
-                placeholder={t("client.name2Placeholder")}
-              />
-            </div>
-          </div>
+          {/* Nazwa nad Nazwą 2 (nie obok siebie), ZAWSZE oba widoczne -- Nazwa 2 jest
+              opcjonalna niezależnie od tego, czy nazwa jest nowa (nowy klient dostaje od
+              razu swoją pierwszą Nazwę 2, jeśli ją wpisano) czy pasuje do istniejącego
+              klienta (dopisanie mu kolejnej Nazwy 2, albo samo zaznaczenie go, jeśli pole
+              zostawiono puste). */}
+          <Label htmlFor="client-name">{t("common.name")}</Label>
+          <Combobox
+            items={clientNames}
+            value={name || null}
+            inputValue={name}
+            onInputValueChange={(v) => setName(v)}
+            onValueChange={(v) => setName((v as string | null) ?? "")}
+          >
+            <ComboboxInput id="client-name" placeholder={t("client.namePlaceholder")} showClear />
+            <ComboboxContent>
+              <ComboboxEmpty>{t("client.newClientHint")}</ComboboxEmpty>
+              <ComboboxList>
+                {(clientName: string) => (
+                  <ComboboxItem key={clientName} value={clientName}>
+                    {clientName}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+          <Label htmlFor="client-new-name2">{t("client.name2Label")}</Label>
+          <Input
+            id="client-new-name2"
+            value={name2}
+            onChange={(e) => setName2(e.target.value)}
+            placeholder={t("client.name2Placeholder")}
+          />
           {matchedClient && <Hint>{t("client.existingClientHint")}</Hint>}
           <FormError>{error}</FormError>
         </div>
