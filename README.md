@@ -149,13 +149,17 @@ clears whatever is below.
 
 ### Status and revisions
 
-Parts/Assemblies move through three statuses: **in progress → under review → released**.
-In status "in progress" everything can be edited; outside of it, the name and
-properties are locked (price is always editable). Going back from "released" to "in
-progress" bumps the revision by one letter (A → B → C...) and lets you add a comment on
-what changed. At the bottom of an item's panel you can see the full **history**: who
-created it, every status change, every revision with its comment, every
-added/removed attachment, every lock/release.
+Parts/Assemblies move through four statuses: **in progress → under review → released**,
+plus **→ cancelled** from released (for an item that turns out not to be needed). In
+status "in progress" everything can be edited; outside of it, the name and properties are
+locked (price is always editable) and the item is always released (no owner). Going back
+from "released" OR "cancelled" to "in progress" bumps the revision by one letter
+(A → B → C...) and lets you add a comment on what changed. An assembly with a cancelled
+item anywhere in its BOM (even deeply nested) can't itself become "released" — the attempt
+shows which item is cancelled. In the tree/list, a cancelled item's icon turns red. At the
+bottom of an item's panel you can see the full **history**: who created it, every status
+change, every revision with its comment, every added/removed attachment, every
+lock/release.
 
 ### Who's editing — item locking
 

@@ -145,12 +145,17 @@ Podtyp — dopóki nie wybierzesz serii; zmiana producenta albo serii czyści to
 
 ### Status i rewizje
 
-Część/Złożenie przechodzą przez trzy statusy: **w pracy → sprawdzany → wydany**. W statusie
+Część/Złożenie przechodzą przez cztery statusy: **w pracy → sprawdzany → wydany**, a z
+wydanego dodatkowo **→ anulowana** (dla elementu, który się jednak nie przyda). W statusie
 "w pracy" można edytować wszystko; poza nim nazwa i właściwości są zablokowane (cena zawsze
-zostaje edytowalna). Powrót ze statusu "wydany" do "w pracy" podnosi rewizję o jedną literę
-(A → B → C...) i pozwala dodać komentarz, co się zmieniło. Na dole panelu elementu widać
-pełną **historię**: kto utworzył, każda zmiana statusu, każda rewizja z komentarzem, każdy
-dodany/usunięty załącznik, każda blokada/zwolnienie.
+zostaje edytowalna) i element jest zawsze zwolniony (bez właściciela). Powrót ze statusu
+"wydany" LUB "anulowana" do "w pracy" podnosi rewizję o jedną literę (A → B → C...) i
+pozwala dodać komentarz, co się zmieniło. Złożenie z anulowanym elementem gdziekolwiek w
+swoim zestawieniu (nawet głęboko zagnieżdżonym) nie może samo przejść na "wydany" — próba
+pokazuje, który element jest anulowany. W drzewku/liście anulowany element ma czerwoną
+ikonkę. Na dole panelu elementu widać pełną **historię**: kto utworzył, każda zmiana
+statusu, każda rewizja z komentarzem, każdy dodany/usunięty załącznik, każda blokada/
+zwolnienie.
 
 ### Kto edytuje — blokada elementu
 

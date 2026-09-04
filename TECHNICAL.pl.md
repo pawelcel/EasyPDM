@@ -22,7 +22,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`041` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`042` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
@@ -33,7 +33,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   (element może istnieć bez żadnego projektu, dostępny wyłącznie przez "Cała baza"), adres
   kontaktu producenta/klienta, domyślna wartość/unikalność pozycji BOM, powiadomienia + ich
   preferencje per typ, znacznik przykładowego projektu, mała wewnętrzna tabela flag
-  `system_state` oraz serie/typy producenta wraz z ich podtypami. Od migracji 027 pliki z tego folderu są wbudowane
+  `system_state`, serie/typy producenta wraz z ich podtypami oraz status "Anulowana". Od migracji 027 pliki z tego folderu są wbudowane
   w program (embedded resources) i stosowane **automatycznie przy każdym starcie** — zob.
   `MigrationRunner.cs` i "Jak uruchomić" niżej — nie trzeba ich już odpalać ręcznie przez psql.
 - **`EasyPDM.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
@@ -149,10 +149,20 @@ ustawiony. W obu miejscach zmiana wyższego poziomu (albo, w filtrach, cofnięci
 czyści/chowa niższe. Podtyp jest opcjonalny — seria bez podtypów zwyczajnie ma pustą listę
 do wyboru.
 
-Część/Złożenie mają maszynę stanów: `w_pracy → sprawdzany → (w_pracy | wydany) → w_pracy`
-(powrót z `wydany` podnosi numer rewizji, z opcjonalnym komentarzem do rewizji). Poza
-statusem `w_pracy` edycja nazwy/właściwości jest zablokowana — wyjątek: cena/waluta/typ
-ceny zawsze edytowalne. Na dole panelu właściwości Części/Złożenia pokazuje się
+Część/Złożenie mają maszynę stanów: `w_pracy → sprawdzany → (w_pracy | wydany) → w_pracy`,
+a z `wydany` dodatkowo `→ anulowana → w_pracy` (powrót z `wydany` LUB `anulowana` podnosi
+numer rewizji, z opcjonalnym komentarzem do rewizji). `anulowana` wybieralna WYŁĄCZNIE z
+`wydany` — element musiał zostać wydany, zanim okazał się zbędny. Złożenie z anulowanym
+elementem gdziekolwiek w BOM-ie (rekurencyjnie, na dowolnej głębokości —
+`FindCancelledDescendantLabelsAsync` w `ItemEndpoints.cs`, ten sam wzorzec CTE co
+`BomEndpoints.FetchBomRowsAsync`) nie może samo przejść na `wydany`; `PATCH /status`
+odrzuca to z 400 wymieniającym anulowane elementy, co ląduje wprost w oknie potwierdzenia
+zmiany statusu na froncie (`StatusControl`) bez osobnego dialogu. `anulowana`, tak samo
+jak `wydany`, zawsze jest bez właściciela — `/lock`/`/release` odrzucają obie te wartości
+statusu identycznie. Poza statusem `w_pracy` edycja nazwy/właściwości jest zablokowana —
+wyjątek: cena/waluta/typ ceny zawsze edytowalne. Ikonka elementu w drzewku/liście jest
+czerwona dla statusu `anulowana` (`STATUS_ICON_COLOR` w `item-visuals.ts`). Na dole panelu
+właściwości Części/Złożenia pokazuje się
 **Historia**: kiedy i kto utworzył element, każda zmiana statusu (kiedy/kto/z-na), każda
 rewizja z komentarzem (kiedy/kto/opis), każde dodanie/usunięcie załącznika
 (kiedy/kto/nazwa pliku) i każde zablokowanie/zwolnienie właściciela (kiedy/kto), połączone

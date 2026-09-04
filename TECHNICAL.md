@@ -24,7 +24,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`041` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`042` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -35,7 +35,7 @@ PostgreSQL 18.
   exist with no project, reachable only through "Whole database"), manufacturer/client
   contact address, BOM position default/uniqueness, notifications + per-type
   preferences, the sample-project marker, a small internal `system_state` flag table,
-  and manufacturer series/types with their subtypes. Since migration 027, files in this folder are embedded in the program
+  manufacturer series/types with their subtypes, and the "Cancelled" status. Since migration 027, files in this folder are embedded in the program
   (embedded resources) and applied **automatically on every startup** — see
   `MigrationRunner.cs` and "How to run" below — you no longer need to run them
   manually through psql.
@@ -155,10 +155,20 @@ filters, clearing) a higher level clears/hides the lower ones. The subtype is op
 series with none simply offers an empty list.
 
 A Part/Assembly has a state machine: `w_pracy → sprawdzany → (w_pracy | wydany) →
-w_pracy` (in progress → under review → (in progress | released) → in progress; going
-back from `wydany`/released bumps the revision number, with an optional comment on the
-revision). Outside of the `w_pracy`/in-progress status, editing the name/properties is
-locked — exception: price/currency/price type are always editable. At the bottom of a
+w_pracy` (in progress → under review → (in progress | released) → in progress), plus
+`wydany → anulowana → w_pracy` (released → cancelled → in progress; going back from
+`wydany`/released OR `anulowana`/cancelled bumps the revision number, with an optional
+comment on the revision). `anulowana` is only ever reachable FROM `wydany` — an item must
+have been released before it can turn out to be unneeded. An assembly with a cancelled
+item anywhere in its BOM (recursively, at any nesting depth —
+`FindCancelledDescendantLabelsAsync` in `ItemEndpoints.cs`, the same CTE pattern as
+`BomEndpoints.FetchBomRowsAsync`) can't itself become `wydany`; `PATCH /status` rejects
+that with a 400 naming the cancelled items, which lands directly in the frontend's status
+confirmation dialog (`StatusControl`) with no separate dialog needed. `anulowana`, like
+`wydany`, is always ownerless — `/lock`/`/release` reject both status values identically.
+Outside of the `w_pracy`/in-progress status, editing the name/properties is locked —
+exception: price/currency/price type are always editable. An item's icon in the tree/list
+turns red for the `anulowana` status (`STATUS_ICON_COLOR` in `item-visuals.ts`). At the bottom of a
 Part's/Assembly's properties panel you can see the **History**: when and who created
 the item, every status change (when/who/from-to), every revision with its comment
 (when/who/description), every attachment added/removed (when/who/file name), and every

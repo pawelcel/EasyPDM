@@ -157,14 +157,18 @@ oder der Serie löscht alles darunter.
 
 ### Status und Revisionen
 
-Teile/Baugruppen durchlaufen drei Status: **in Bearbeitung → in Prüfung →
-freigegeben**. Im Status "in Bearbeitung" kann alles bearbeitet werden; außerhalb davon
-sind Name und Eigenschaften gesperrt (Preis bleibt immer bearbeitbar). Die Rückkehr vom
-Status "freigegeben" zu "in Bearbeitung" erhöht die Revision um einen Buchstaben
-(A → B → C...) und erlaubt einen Kommentar dazu, was sich geändert hat. Am unteren Rand
-des Elementbereichs sieht man die vollständige **Historie**: wer es erstellt hat, jede
-Statusänderung, jede Revision mit Kommentar, jeden hinzugefügten/entfernten Anhang, jede
-Sperrung/Freigabe.
+Teile/Baugruppen durchlaufen vier Status: **in Bearbeitung → in Prüfung → freigegeben**,
+plus **→ storniert** ab freigegeben (für ein Element, das sich als überflüssig erweist).
+Im Status "in Bearbeitung" kann alles bearbeitet werden; außerhalb davon sind Name und
+Eigenschaften gesperrt (Preis bleibt immer bearbeitbar) und das Element ist immer
+freigegeben (kein Eigentümer). Die Rückkehr von "freigegeben" ODER "storniert" zu "in
+Bearbeitung" erhöht die Revision um einen Buchstaben (A → B → C...) und erlaubt einen
+Kommentar dazu, was sich geändert hat. Eine Baugruppe mit einem stornierten Element
+irgendwo in ihrer Stückliste (auch tief verschachtelt) kann selbst nicht "freigegeben"
+werden — der Versuch zeigt, welches Element storniert ist. Im Baum/in der Liste wird das
+Symbol eines stornierten Elements rot. Am unteren Rand des Elementbereichs sieht man die
+vollständige **Historie**: wer es erstellt hat, jede Statusänderung, jede Revision mit
+Kommentar, jeden hinzugefügten/entfernten Anhang, jede Sperrung/Freigabe.
 
 ### Wer bearbeitet — Elementsperre
 

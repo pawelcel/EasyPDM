@@ -645,15 +645,21 @@ static class ItemEndpoints
         // Maszyna stanów dla Części/Złożeń:
         //   w_pracy    -> sprawdzany
         //   sprawdzany -> w_pracy | wydany
-        //   wydany     -> w_pracy  (podnosi revision_number o 1 — frontend prosi o potwierdzenie)
-        // "comment" ma sens tylko przy podnoszeniu rewizji (wydany -> w_pracy) — opisuje, co
-        // się zmieniło w nowej rewizji; tworzony zarówno z aplikacji webowej, jak i z makra
-        // FreeCAD. Jest opcjonalny — puste/brak pola nic nie zapisuje.
+        //   wydany     -> w_pracy | anulowana
+        //   anulowana  -> w_pracy
+        // Wejście "w_pracy" Z "wydany" ALBO "anulowana" podnosi revision_number o 1 —
+        // frontend prosi o potwierdzenie (i komentarz, patrz niżej). "Anulowana" wybieralna
+        // WYŁĄCZNIE z "wydany" (element musiał zostać wydany, zanim okazał się zbędny);
+        // złożenie z anulowanym elementem gdziekolwiek w BOM-ie (na dowolnej głębokości) nie
+        // może samo przejść na "wydany" — patrz FindCancelledDescendantLabelsAsync niżej.
+        // "comment" ma sens tylko przy podnoszeniu rewizji — opisuje, co się zmieniło w
+        // nowej rewizji; tworzony zarówno z aplikacji webowej, jak i z makra FreeCAD. Jest
+        // opcjonalny — puste/brak pola nic nie zapisuje.
         // ============================================================
         app.MapPatch("/api/items/{id:guid}/status", async (Guid id, StatusRequest body, HttpContext ctx) =>
         {
-            if (body.Status != "w_pracy" && body.Status != "sprawdzany" && body.Status != "wydany")
-                return Results.BadRequest("Nieprawidłowy status — dozwolone: 'w_pracy', 'sprawdzany', 'wydany'.");
+            if (body.Status != "w_pracy" && body.Status != "sprawdzany" && body.Status != "wydany" && body.Status != "anulowana")
+                return Results.BadRequest("Nieprawidłowy status — dozwolone: 'w_pracy', 'sprawdzany', 'wydany', 'anulowana'.");
 
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
@@ -687,13 +693,27 @@ static class ItemEndpoints
                 ("sprawdzany", "w_pracy") => true,
                 ("sprawdzany", "wydany") => true,
                 ("wydany", "w_pracy") => true,
+                ("wydany", "anulowana") => true,
+                ("anulowana", "w_pracy") => true,
                 (null, "w_pracy") => true,
                 _ => false
             };
             if (!isValidTransition)
                 return Results.BadRequest($"Nie można zmienić statusu z '{currentStatus}' na '{body.Status}'.");
 
-            bool bumpRevision = currentStatus == "wydany" && body.Status == "w_pracy";
+            // Złożenie z anulowanym elementem w BOM-ie (na dowolnej głębokości, nie tylko
+            // bezpośrednie dzieci) nie może zostać wydane — komunikat wskazuje który
+            // element trafia bezpośrednio do okna potwierdzenia zmiany statusu na froncie
+            // (StatusControl), bez potrzeby osobnego dialogu.
+            if (itemType == "assembly" && body.Status == "wydany")
+            {
+                var cancelledDescendants = await FindCancelledDescendantLabelsAsync(conn, id);
+                if (cancelledDescendants.Count > 0)
+                    return Results.BadRequest(
+                        $"Nie można ustawić statusu \"Wydany\" — złożenie zawiera anulowane elementy: {string.Join(", ", cancelledDescendants)}.");
+            }
+
+            bool bumpRevision = (currentStatus == "wydany" || currentStatus == "anulowana") && body.Status == "w_pracy";
 
             // Wydany element nie może mieć właściciela ani być zablokowany — zawsze jest zwolniony
             // (patrz też /lock i /release, które odrzucają próby zmiany blokady w tym statusie).
@@ -794,7 +814,7 @@ static class ItemEndpoints
                     await Notifications.NotifyAsync(conn, app.Logger, recipientId.Value, "status_review", notifyData, itemId: id);
                 else if (body.Status != currentStatus && body.Status == "wydany")
                     await Notifications.NotifyAsync(conn, app.Logger, recipientId.Value, "status_released", notifyData, itemId: id);
-                else if (body.Status == "w_pracy" && (currentStatus == "sprawdzany" || currentStatus == "wydany"))
+                else if (body.Status == "w_pracy" && (currentStatus == "sprawdzany" || currentStatus == "wydany" || currentStatus == "anulowana"))
                     await Notifications.NotifyAsync(conn, app.Logger, recipientId.Value, "status_regressed", notifyData, itemId: id);
 
                 if (bumpRevision && revisionNumber is not null)
@@ -827,8 +847,8 @@ static class ItemEndpoints
 
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
                 return Results.BadRequest("Właściciela/blokadę mają tylko Części i Złożenia.");
-            if (info.Value.Status == "wydany")
-                return Results.BadRequest("Wydanych elementów nie można blokować — są zawsze zwolnione.");
+            if (info.Value.Status == "wydany" || info.Value.Status == "anulowana")
+                return Results.BadRequest("Wydanych ani anulowanych elementów nie można blokować — są zawsze zwolnione.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             var isAdmin = user.Role == "admin";
@@ -878,8 +898,8 @@ static class ItemEndpoints
 
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
                 return Results.BadRequest("Właściciela/blokadę mają tylko Części i Złożenia.");
-            if (info.Value.Status == "wydany")
-                return Results.BadRequest("Wydane elementy są zawsze zwolnione.");
+            if (info.Value.Status == "wydany" || info.Value.Status == "anulowana")
+                return Results.BadRequest("Wydane i anulowane elementy są zawsze zwolnione.");
             if (!IsOwnerLocked(info.Value.OwnerId, info.Value.OwnerLocked))
                 return Results.BadRequest("Element nie jest zablokowany.");
 
@@ -1158,6 +1178,44 @@ static class ItemEndpoints
     // późniejszą zmianę nazwy/numeru elementu).
     internal static string ItemLabel(string fileName, int? itemNumber, string? itemNumberPrefix) =>
         itemNumber is not null ? $"{itemNumberPrefix}{itemNumber} ({fileName})" : fileName;
+
+    // Etykiety WSZYSTKICH elementów o statusie "anulowana" w całym poddrzewie BOM-u
+    // złożenia @id (na dowolnej głębokości, nie tylko bezpośrednie dzieci) -- ten sam
+    // rekurencyjny wzorzec co BomEndpoints.FetchBomRowsAsync (tablica "visited" jako
+    // zabezpieczenie przed cyklem), tylko bez ilości/ścieżki, bo tu liczy się wyłącznie
+    // istnienie. Wołane z PATCH /status przed dopuszczeniem przejścia na "wydany".
+    private static async Task<List<string>> FindCancelledDescendantLabelsAsync(NpgsqlConnection conn, Guid id)
+    {
+        const string sql = """
+            WITH RECURSIVE bom AS (
+                SELECT ir.child_id, ARRAY[ir.parent_id] AS visited
+                FROM item_relations ir
+                WHERE ir.parent_id = @id
+                UNION ALL
+                SELECT ir.child_id, b.visited || ir.parent_id
+                FROM item_relations ir
+                JOIN bom b ON ir.parent_id = b.child_id
+                WHERE NOT (ir.parent_id = ANY(b.visited))
+            )
+            SELECT i.file_name, i.item_number, i.item_number_prefix
+            FROM bom b
+            JOIN items i ON i.id = b.child_id
+            WHERE i.status = 'anulowana';
+            """;
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("id", id);
+
+        var labels = new List<string>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            labels.Add(ItemLabel(
+                reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetInt32(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2)));
+        }
+        return labels;
+    }
 
     // Rodzaj Złożenia -> klucz w item_number_prefixes. Złożenie zakupowe/klienta dzieli
     // prefiks z odpowiednim rodzajem Części (to ten sam towar, tylko złożony), a złożenie

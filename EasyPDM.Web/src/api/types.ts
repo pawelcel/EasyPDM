@@ -49,12 +49,13 @@ export interface Project {
 
 export type ItemType = "folder" | "part" | "file" | "assembly"
 
-export type ItemStatus = "w_pracy" | "sprawdzany" | "wydany"
+export type ItemStatus = "w_pracy" | "sprawdzany" | "wydany" | "anulowana"
 
 export const STATUS_LABEL_KEYS: Record<ItemStatus, TranslationKey> = {
   w_pracy: "status.w_pracy",
   sprawdzany: "status.sprawdzany",
   wydany: "status.wydany",
+  anulowana: "status.anulowana",
 }
 
 export function isLocked(item: Pick<Item, "itemType" | "status">): boolean {

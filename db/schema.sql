@@ -71,7 +71,7 @@ CREATE TABLE items (
     last_scanned_at     TIMESTAMPTZ,            -- zostaje na przyszłość: wypełni to skaner/wtyczka CAD, nie wypełniane przy ręcznym dodaniu
     properties          JSONB DEFAULT '{}',
     show_in_tree        BOOLEAN NOT NULL DEFAULT true,  -- dla elementów bez rodzica: czy pokazywać jako korzeń w drzewku
-    status              TEXT CHECK (status IN ('w_pracy', 'sprawdzany', 'wydany')),  -- tylko dla part/assembly
+    status              TEXT CHECK (status IN ('w_pracy', 'sprawdzany', 'wydany', 'anulowana')),  -- tylko dla part/assembly
     revision_number     INTEGER,                    -- tylko dla part/assembly, rośnie przy przejściu wydany -> w_pracy
     root_position       INTEGER NOT NULL DEFAULT 1,  -- kolejność wśród korzeni tego samego projektu (przeciąganie w drzewku)
     owner_id            UUID REFERENCES users(id) ON DELETE SET NULL,  -- właściciel part/assembly — patrz owner_locked
@@ -438,4 +438,5 @@ INSERT INTO schema_migrations (filename) VALUES
     ('033_manufacturer_contact_address.sql'), ('034_client_contact_address.sql'),
     ('035_item_relations_position_default.sql'), ('036_item_relations_position_unique.sql'),
     ('037_notifications.sql'), ('038_project_is_sample.sql'), ('039_system_state.sql'),
-    ('040_manufacturer_product_types.sql'), ('041_manufacturer_product_subtypes.sql');
+    ('040_manufacturer_product_types.sql'), ('041_manufacturer_product_subtypes.sql'),
+    ('042_status_anulowana.sql');

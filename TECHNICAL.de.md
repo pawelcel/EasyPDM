@@ -24,7 +24,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
 
 - **`db/schema.sql`** — das vollständige Schema von Grund auf (aktueller Stand nach allen
   Migrationen).
-- **`db/migrations/`** — Migrationen `002`–`041` für eine bereits bestehende Datenbank:
+- **`db/migrations/`** — Migrationen `002`–`042` für eine bereits bestehende Datenbank:
   Projekte, Elementtypen, Sichtbarkeit im Baum, Status/Revisionen, Materialien
   (+ Gruppen/Untergruppen), Anhänge, Stücklisten-Reihenfolge, Revisionskommentare,
   Anmeldung und Rollen, Projekteigenschaften, kaskadierendes Löschen, Reihenfolge der
@@ -36,8 +36,8 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   Elemente (ein Element kann ohne Projekt existieren, nur über "Gesamte Datenbank"
   erreichbar), Kontaktadresse von Hersteller/Kunde, Standardwert/Eindeutigkeit der
   Stücklistenposition, Benachrichtigungen + deren Einstellungen pro Typ, Markierung des
-  Beispielprojekts, eine kleine interne Zustandstabelle `system_state` sowie
-  Hersteller-Serien/Typen samt ihren Untertypen. Seit
+  Beispielprojekts, eine kleine interne Zustandstabelle `system_state`,
+  Hersteller-Serien/Typen samt ihren Untertypen sowie den Status „Storniert". Seit
   Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
   resources) und werden **automatisch bei jedem Start** angewendet — siehe
   `MigrationRunner.cs` und "Inbetriebnahme" unten — sie müssen nicht mehr manuell per
@@ -173,10 +173,21 @@ ist optional — eine Serie ohne Untertypen bietet einfach eine leere Liste.
 
 Ein Teil/eine Baugruppe hat eine Zustandsmaschine: `w_pracy → sprawdzany → (w_pracy |
 wydany) → w_pracy` (in Bearbeitung → in Prüfung → (in Bearbeitung | freigegeben) → in
-Bearbeitung; die Rückkehr von `wydany`/freigegeben erhöht die Revisionsnummer, mit einem
-optionalen Kommentar zur Revision). Außerhalb des Status `w_pracy`/in Bearbeitung ist das
+Bearbeitung), plus `wydany → anulowana → w_pracy` (freigegeben → storniert → in
+Bearbeitung; die Rückkehr von `wydany`/freigegeben ODER `anulowana`/storniert erhöht die
+Revisionsnummer, mit einem optionalen Kommentar zur Revision). `anulowana` ist
+ausschließlich AUS `wydany` erreichbar — ein Element muss freigegeben gewesen sein, bevor
+es sich als überflüssig erweisen kann. Eine Baugruppe mit einem stornierten Element
+irgendwo in ihrer Stückliste (rekursiv, in beliebiger Verschachtelungstiefe —
+`FindCancelledDescendantLabelsAsync` in `ItemEndpoints.cs`, dasselbe CTE-Muster wie
+`BomEndpoints.FetchBomRowsAsync`) kann selbst nicht `wydany` werden; `PATCH /status`
+lehnt das mit einem 400 ab, der die stornierten Elemente benennt und direkt im
+Statusbestätigungsdialog des Frontends (`StatusControl`) landet, ohne separaten Dialog.
+`anulowana` ist, wie `wydany`, immer eigentümerlos — `/lock`/`/release` lehnen beide
+Statuswerte identisch ab. Außerhalb des Status `w_pracy`/in Bearbeitung ist das
 Bearbeiten von Name/Eigenschaften gesperrt — Ausnahme: Preis/Währung/Preisart sind immer
-bearbeitbar. Am unteren Rand des Eigenschaftenbereichs eines Teils/einer Baugruppe wird
+bearbeitbar. Das Symbol eines Elements im Baum/in der Liste wird für den Status
+`anulowana` rot (`STATUS_ICON_COLOR` in `item-visuals.ts`). Am unteren Rand des Eigenschaftenbereichs eines Teils/einer Baugruppe wird
 die **Historie** angezeigt: wann und wer das Element erstellt hat, jede Statusänderung
 (wann/wer/von-nach), jede Revision mit Kommentar (wann/wer/Beschreibung), jeder
 hinzugefügte/entfernte Anhang (wann/wer/Dateiname) und jede Eigentümersperre/-freigabe

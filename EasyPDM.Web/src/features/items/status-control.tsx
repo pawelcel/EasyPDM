@@ -13,14 +13,16 @@ import { cn } from "@/lib/utils"
 const NEXT_STATUSES: Record<ItemStatus, ItemStatus[]> = {
   w_pracy: ["sprawdzany"],
   sprawdzany: ["w_pracy", "wydany"],
-  wydany: ["w_pracy"],
+  wydany: ["w_pracy", "anulowana"],
+  anulowana: ["w_pracy"],
 }
 
 // Stała kolejność wszystkich statusów -- przyciski renderowane są zawsze w tym samym
 // układzie (bieżący jako odznaka, reszta jako przyciski), żeby nic nie zmieniało pozycji
 // przy zmianie statusu. Nieosiągalne stąd bezpośrednio przejścia (np. w_pracy -> wydany)
-// są nadal widoczne, tylko wyszarzone/nieaktywne.
-const ALL_STATUSES: ItemStatus[] = ["w_pracy", "sprawdzany", "wydany"]
+// są nadal widoczne, tylko wyszarzone/nieaktywne. "Anulowana" wybieralna wyłącznie z
+// "wydany" — z każdego innego statusu ten przycisk jest więc zawsze wyszarzony.
+const ALL_STATUSES: ItemStatus[] = ["w_pracy", "sprawdzany", "wydany", "anulowana"]
 
 function StatusControl({
   item,
@@ -60,7 +62,7 @@ function StatusControl({
     }
   }
 
-  const isRevisionBump = status === "wydany" && pending === "w_pracy"
+  const isRevisionBump = (status === "wydany" || status === "anulowana") && pending === "w_pracy"
   const current = item.revisionNumber ?? 1
 
   return (
@@ -108,7 +110,7 @@ function StatusControl({
               <div className="flex flex-col gap-2">
                 <p>
                   {t("item.revisionBumpNotice", {
-                    statusFrom: t("status.wydany"),
+                    statusFrom: t(STATUS_LABEL_KEYS[status]),
                     statusTo: t("status.w_pracy"),
                     from: revisionLabel(current),
                     to: revisionLabel(current + 1),

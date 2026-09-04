@@ -14,15 +14,16 @@ import { cn } from "@/lib/utils"
 // jego nowym właścicielem; ZABLOKOWANY element może z powrotem zwolnić tylko aktualny
 // właściciel LUB administrator (np. nieobecny pracownik) — jedyny wyjątek od reguły
 // wyżej, razem z przejęciem cudzej blokady przez /lock.
-// Wydana Część/Złożenie (status "wydany") nie może mieć właściciela ani być blokowana —
+// Wydana ALBO anulowana Część/Złożenie nie może mieć właściciela ani być blokowana —
 // zawsze pokazuje się jako zwolniona, niezależnie od tego, co faktycznie zapisano w bazie
-// (backend też to wymusza przy zmianie statusu na "wydany" i odrzuca /lock, /release wtedy).
+// (backend też to wymusza przy zmianie statusu na "wydany" i odrzuca /lock, /release wtedy;
+// "anulowana" wybieralna wyłącznie z "wydany", więc dziedziczy to samo ograniczenie).
 function OwnerControl({ item, onChanged }: { item: Item; onChanged: () => void | Promise<void> }) {
   const { t } = useLanguage()
   const { user } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
-  const isIssued = item.status === "wydany"
+  const isIssued = item.status === "wydany" || item.status === "anulowana"
   const locked = !isIssued && isOwnerLocked(item)
   const ownerName = isIssued ? null : item.ownerDisplayName
   const isOwner = !isIssued && item.ownerId !== null && item.ownerId === user?.id

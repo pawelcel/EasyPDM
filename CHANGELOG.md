@@ -43,6 +43,13 @@ All notable changes to EasyPDM are documented in this file.
 - "Whole database" gained a "Clear filters" button next to the other filters —
   resets search, tag, and every filter dropdown in one click. Disabled when nothing
   is currently filtered.
+- New item status, "Cancelled" — for a released Part/Assembly that turns out not to be
+  needed. Selectable only from "Released", and reversible back to "In progress" (same
+  revision bump + comment as coming back from "Released"). An assembly can't itself
+  become "Released" while anything in its BOM — at any nesting depth — is cancelled;
+  the attempt names the cancelled item(s) right in the status confirmation dialog.
+  Cancelled items are always ownerless, same as released ones, and their icon in the
+  tree/list turns red.
 
 ### Changed
 - Admins can now bypass another user's item lock for three actions: changing its

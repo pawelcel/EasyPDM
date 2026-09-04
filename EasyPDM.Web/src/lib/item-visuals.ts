@@ -1,6 +1,6 @@
 import { Bolt, Box, Boxes, Circle, File, Folder, Lock, LockOpen, ShoppingCart, type LucideIcon } from "lucide-react"
 
-import { isOwnerLocked, type Item } from "@/api/types"
+import { isOwnerLocked, type Item, type ItemStatus } from "@/api/types"
 
 const TYPE_ICON: Record<Item["itemType"], LucideIcon> = {
   folder: Folder,
@@ -9,10 +9,11 @@ const TYPE_ICON: Record<Item["itemType"], LucideIcon> = {
   file: File,
 }
 
-const STATUS_ICON_COLOR: Record<string, string> = {
+const STATUS_ICON_COLOR: Record<ItemStatus, string> = {
   w_pracy: "text-muted-foreground",
   sprawdzany: "text-yellow-400",
   wydany: "text-green-400",
+  anulowana: "text-red-400",
 }
 
 // "Rodzaj" Części dostaje inną ikonkę niż zwykłe pudełko — koszyk dla zakupowej, śrubka dla
