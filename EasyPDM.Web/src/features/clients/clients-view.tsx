@@ -219,22 +219,22 @@ function NewClientDialog({
     setError("")
     setPending(true)
     try {
+      const trimmedName2 = name2.trim()
+      // Nazwa 2 jest opcjonalna w obu gałęziach -- zarówno przy zakładaniu zupełnie nowego
+      // klienta (może dostać swoją pierwszą Nazwę 2 od razu, ale nie musi), jak i przy
+      // wskazaniu już istniejącego (puste pole = po prostu zaznacz go, bez dopisywania
+      // niczego -- skrót zamiast osobnego wyszukiwania go na liście po lewej).
+      let clientId: number
       if (matchedClient) {
-        const trimmedName2 = name2.trim()
-        if (!trimmedName2) {
-          setError(t("client.name2Required"))
-          return
-        }
-        await api.addClientName2(matchedClient.id, trimmedName2)
-        setOpen(false)
-        reset()
-        await onCreated(matchedClient.id)
+        clientId = matchedClient.id
+        if (trimmedName2) await api.addClientName2(clientId, trimmedName2)
       } else {
-        const { id } = await api.createClient({ name: trimmedName, location: null })
-        setOpen(false)
-        reset()
-        await onCreated(id)
+        clientId = (await api.createClient({ name: trimmedName, location: null })).id
+        if (trimmedName2) await api.addClientName2(clientId, trimmedName2)
       }
+      setOpen(false)
+      reset()
+      await onCreated(clientId)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError(matchedClient ? t("client.name2Conflict") : t("client.nameConflict"))
@@ -260,29 +260,34 @@ function NewClientDialog({
           <DialogTitle>{matchedClient ? t("client.addName2Title") : t("client.addTitle")}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="client-name">{t("common.name")}</Label>
-          <Combobox
-            items={clientNames}
-            value={name || null}
-            inputValue={name}
-            onInputValueChange={(v) => setName(v)}
-            onValueChange={(v) => setName((v as string | null) ?? "")}
-          >
-            <ComboboxInput id="client-name" placeholder={t("client.namePlaceholder")} showClear />
-            <ComboboxContent>
-              <ComboboxEmpty>{t("client.newClientHint")}</ComboboxEmpty>
-              <ComboboxList>
-                {(clientName: string) => (
-                  <ComboboxItem key={clientName} value={clientName}>
-                    {clientName}
-                  </ComboboxItem>
-                )}
-              </ComboboxList>
-            </ComboboxContent>
-          </Combobox>
-          {matchedClient && (
-            <>
-              <Hint>{t("client.existingClientHint")}</Hint>
+          {/* Nazwa i Nazwa 2 obok siebie, ZAWSZE oba widoczne -- Nazwa 2 jest opcjonalna
+              niezależnie od tego, czy nazwa jest nowa (nowy klient dostaje od razu swoją
+              pierwszą Nazwę 2, jeśli ją wpisano) czy pasuje do istniejącego klienta (dopisanie
+              mu kolejnej Nazwy 2, albo samo zaznaczenie go, jeśli pole zostawiono puste). */}
+          <div className="flex items-end gap-1.5">
+            <div className="min-w-0 flex-1">
+              <Label htmlFor="client-name">{t("common.name")}</Label>
+              <Combobox
+                items={clientNames}
+                value={name || null}
+                inputValue={name}
+                onInputValueChange={(v) => setName(v)}
+                onValueChange={(v) => setName((v as string | null) ?? "")}
+              >
+                <ComboboxInput id="client-name" placeholder={t("client.namePlaceholder")} showClear />
+                <ComboboxContent>
+                  <ComboboxEmpty>{t("client.newClientHint")}</ComboboxEmpty>
+                  <ComboboxList>
+                    {(clientName: string) => (
+                      <ComboboxItem key={clientName} value={clientName}>
+                        {clientName}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
+            <div className="min-w-0 flex-1">
               <Label htmlFor="client-new-name2">{t("client.name2Label")}</Label>
               <Input
                 id="client-new-name2"
@@ -290,8 +295,9 @@ function NewClientDialog({
                 onChange={(e) => setName2(e.target.value)}
                 placeholder={t("client.name2Placeholder")}
               />
-            </>
-          )}
+            </div>
+          </div>
+          {matchedClient && <Hint>{t("client.existingClientHint")}</Hint>}
           <FormError>{error}</FormError>
         </div>
         <DialogFooter>
