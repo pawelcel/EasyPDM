@@ -96,9 +96,10 @@ separate ones.
      default from the document's label), the kind, and the fields that depend on it: for
      a Part the kind is required — **Manufactured** → Material, **Purchased** →
      Manufacturer/Series-Type/Subtype/Order number 1 and 2/Mass, **Standard** → Material/Norm,
-     **Client-supplied** → Client. An Assembly has its own kinds, also
+     **Client-supplied** → Client + Name 2 (only once a Client is picked). An Assembly has
+     its own kinds, also
      required — **Manufactured**, **Purchased** → Manufacturer/Series-Type/Subtype,
-     **Client-supplied** → Client — and Mass is always visible regardless of the chosen kind; an
+     **Client-supplied** → Client + Name 2 — and Mass is always visible regardless of the chosen kind; an
      Assembly never has a Material field (only a Part does). The popup also has **"Export STEP" and "Export PDF"
      checkboxes** (STEP checked by default, PDF unchecked — see step 5 below for what
      each actually does on export). The ticket is EXPLICITLY pinned to this one specific
@@ -108,8 +109,8 @@ separate ones.
      item"/"Duplicate"/"Attach to existing" choice without creating anything.
    - **"Duplicate"** — first a search box lets you point to the **source** item
      (Part/Assembly) from the whole database, then it opens the SAME popup as "New item",
-     just pre-filled with its properties (kind/material/manufacturer/order numbers/norm/
-     mass) — **without copying any file**. All fields can still be edited before saving —
+     just pre-filled with its properties (kind/material/manufacturer/series-type/subtype/
+     order numbers/norm/mass/client/name 2) — **without copying any file**. All fields can still be edited before saving —
      it's an ordinary creation of a new item, just pre-filled with data from the source.
    - **"Attach to existing"** — opens a search box for a Part/Assembly from the **whole
      database** (not just the current project, since a component can be shared), with

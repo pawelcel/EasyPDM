@@ -90,9 +90,10 @@ dwie osobne.
      opcjonalnie element nadrzędny, typ (Część/Złożenie), nazwę (domyślnie podpowiedziana
      z etykiety dokumentu), rodzaj i zależne od niego pola: dla Części rodzaj jest
      wymagany — **Wykonywana** → Materiał, **Zakupowa** → Producent/Seria-Typ/Podtyp/Numer
-     zamówieniowy 1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** → Klient. Złożenie
+     zamówieniowy 1 i 2/Masa, **Normalia** → Materiał/Norma, **Klienta** → Klient + Nazwa 2
+     (dopiero po wybraniu Klienta). Złożenie
      ma własne, też wymagane rodzaje — **Wykonywane**, **Zakupowe** →
-     Producent/Seria-Typ/Podtyp, **Klienta** → Klient — a Masa jest zawsze widoczna niezależnie od
+     Producent/Seria-Typ/Podtyp, **Klienta** → Klient + Nazwa 2 — a Masa jest zawsze widoczna niezależnie od
      wybranego rodzaju; Złożenie nigdy nie ma pola Materiał (tylko Część). Popup ma też **checkboksy "Eksportuj STEP"
      i "Eksportuj PDF"** (STEP domyślnie zaznaczony, PDF nie — patrz krok 5 niżej, co
      dokładnie robi każdy z nich przy eksporcie). Bilet jest przypięty JAWNIE do tego
@@ -102,7 +103,8 @@ dwie osobne.
      do istniejącego" bez tworzenia niczego.
    - **"Duplikuj"** — najpierw wyszukiwarka wskazuje **źródłowy** element (Część/Złożenie)
      z całej bazy, potem otwiera TEN SAM popup co "Nowy element", tylko wstępnie wypełniony
-     jego właściwościami (rodzaj/materiał/producent/numery zamówieniowe/norma/masa) — **bez
+     jego właściwościami (rodzaj/materiał/producent/seria-typ/podtyp/numery
+     zamówieniowe/norma/masa/klient/nazwa2) — **bez
      kopiowania żadnego pliku**. Wszystkie pola dalej można edytować przed zapisem — to
      zwykłe tworzenie nowego elementu, tylko podpowiedziane danymi ze źródła.
    - **"Dograj do istniejącego"** — rozwija wyszukiwarkę Części/Złożenia z

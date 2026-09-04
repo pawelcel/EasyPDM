@@ -127,8 +127,8 @@ solved differently:
      choose THERE: **New item** (project, optionally a parent, type, name — for Parts
      additionally the kind and its dependent fields: Manufactured → Material; Purchased →
      Manufacturer/Series-Type/Subtype/Order numbers/Mass; Standard part → Material/Norm; Client's →
-     Client; **an Assembly has kinds of its own** (Manufactured; Purchased →
-     Manufacturer/Series-Type/Subtype; Client's → Client) plus an always-optional Mass — plus
+     Client + Name 2 (only once a Client is picked); **an Assembly has kinds of its own** (Manufactured; Purchased →
+     Manufacturer/Series-Type/Subtype; Client's → Client + Name 2) plus an always-optional Mass — plus
      STEP and PDF export checkboxes), **Duplicate** (points to an existing item, copies
      its properties to a new one, no files) or **Attach to existing** (search across the
      whole database + the same STEP/PDF checkboxes). The macro waits (polls every ~2s,

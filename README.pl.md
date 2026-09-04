@@ -32,6 +32,10 @@ powstał i działa — czemu nie udostępnić go innym.
 - **Blokada elementu** — dopóki nad czymś pracujesz, nikt inny nie nadpisze Twoich zmian
   bez Twojej zgody (administrator może w razie potrzeby przejąć albo zwolnić cudzą
   blokadę — np. gdy właściciel jest nieobecny).
+- **Powiadomienia** — ikonka dzwonka pokazuje, co wymaga Twojej uwagi: Twój element
+  czeka na sprawdzenie, został wydany albo cofnięty do "W pracy", ma nową rewizję,
+  został dodany do projektu lub z niego usunięty, a dla administratorów — mało miejsca
+  na dysku. Każdy typ można osobno wyłączyć w Ustawieniach.
 
 ## Pierwsze uruchomienie
 
@@ -82,6 +86,11 @@ Przy pierwszym logowaniu do całkiem świeżo zainstalowanego EasyPDM: login `ad
 `admin` — zmień to hasło od razu po zalogowaniu (Ustawienia → Użytkownicy → znajdź konto
 `admin` na liście → zmień hasło).
 
+Zupełnie świeża, pusta baza dostaje też przy pierwszym uruchomieniu jeden przykładowy
+projekt — złożenie z dwoma częściami, coś do rozejrzenia się zamiast pustki. Powiadomienie
+przypomina o jego usunięciu (Ustawienia → Pliki → Strefa zagrożenia) przed rozpoczęciem
+prawdziwej pracy.
+
 Po zalogowaniu: wybierz projekt (albo utwórz nowy, jeśli masz uprawnienia) — to kontener
 na Twoje pliki i strukturę złożenia — i doinstaluj makro do swojego programu CAD, patrz
 niżej.
@@ -123,16 +132,20 @@ bezpieczne dla współdzielonych komponentów: element z rodzicem gdzie indziej 
 razem z usuwanym poddrzewem. Część/Złożenie da się też **zduplikować** — kopia dostaje
 własny numer i od razu ląduje obok oryginału, z jego skopiowanymi właściwościami.
 
+Sam projekt też da się usunąć (tylko administrator) — NIE usuwa to jego Części/Złożeń: stają
+się bezprojektowe i zostają w pełni nienaruszone (pliki, załączniki, tagi, historia, relacje
+BOM), dostępne później przez "Całą bazę".
+
 ### Części i Złożenia — rodzaje i właściwości
 
 Część ma jeden z czterech **rodzajów**, każdy z innym zestawem pól:
 
 | Rodzaj | Dodatkowe pola |
 |---|---|
-| Wykonywana | Materiał, Cena |
-| Zakupowa | Producent, Seria/Typ, Podtyp, Numer zamówieniowy 1/2, Masa, Cena |
-| Normalia | Materiał, Norma |
-| Klienta | Klient |
+| Wykonywana | Materiał, Cena, Dodatkowe informacje |
+| Zakupowa | Producent, Seria/Typ, Podtyp, Numer zamówieniowy 1/2, Masa, Cena, Dodatkowe informacje |
+| Normalia | Materiał, Norma, Dodatkowe informacje |
+| Klienta | Klient, Nazwa 2, Dodatkowe informacje |
 
 Złożenie ma jeden z trzech **rodzajów**: Wykonywane, Zakupowe (Producent, Seria/Typ
 i Podtyp) albo Klienta (Klient). Niezależnie od rodzaju można mu wpisać opcjonalną Masę
@@ -173,28 +186,48 @@ Element wydany jest zawsze zwolniony.
 
 ### Zestawienie części (BOM)
 
-Złożenie pokazuje listę swoich komponentów: pozycję, nazwę, ilość, materiał, producenta,
-numery zamówieniowe — razem z komponentami zagnieżdżonych złożeń. Kolejność pozycji można
-zmienić przeciągnięciem albo wpisując numer wprost. Eksport do CSV w dwóch wariantach:
-pełny (każde wystąpienie osobno) albo zsumowany (ten sam komponent użyty kilka razy —
-jeden wiersz z łączną ilością).
+Złożenie pokazuje listę swoich komponentów: pozycję, nazwę, ilość, materiał, normę,
+producenta, numery zamówieniowe — razem z komponentami zagnieżdżonych złożeń. Kolejność
+pozycji można zmienić przeciągnięciem albo wpisując numer wprost. Eksport do CSV w dwóch
+wariantach: pełny (każde wystąpienie osobno) albo zsumowany (ten sam komponent użyty
+kilka razy — jeden wiersz z łączną ilością).
 
-### Materiały i Producenci
+Dostępny jest też widok odwrotny — **Gdzie użyto**: panel szczegółów elementu pokazuje
+każde złożenie, na dowolnej głębokości i w dowolnym projekcie, które go zawiera, z
+przyciskiem do bezpośredniego przejścia.
 
-Osobne, wspólne dla całej firmy katalogi (zakładki **Lista materiałów** i **Producenci** w
-menu głównym) — materiał ma nazwę i grupę/podgrupę, producent ma nazwę i osoby kontaktowe.
-Wybiera się je z listy przy uzupełnianiu właściwości Części, zamiast wpisywać ręcznie.
+### Materiały, Producenci i Klienci
+
+Osobne, wspólne dla całej firmy katalogi (zakładki **Lista materiałów**, **Producenci** i
+**Klienci** w menu głównym) — materiał ma nazwę i grupę/podgrupę, producent ma nazwę,
+osoby kontaktowe i listę Seria/Typ + Podtyp tego, co dostarcza. Wybiera się je z listy przy
+uzupełnianiu właściwości Części/Złożenia, zamiast wpisywać ręcznie.
+
+**Klient** ma nazwę (opcjonalnie drugą nazwę i lokalizację), własne osoby kontaktowe i
+własne drzewko dokumentów, np. norm czy plików referencyjnych — osobne od plików projektu.
+Projekt można opcjonalnie powiązać z Klientem; panel szczegółów tego klienta wypisuje wtedy
+każdy przypisany do niego Projekt, z przyciskiem do bezpośredniego przejścia.
 
 ### Wyszukiwanie i cała baza
 
 Zakładka **Cała baza** przeszukuje wszystkie elementy niezależnie od projektu — po nazwie,
-numerze, tagach, rodzaju. Znalezione filtry można zapisać do ponownego użycia.
+numerze, tagach, rodzaju. Znalezione filtry można zapisać do ponownego użycia, a przycisk
+"Wyczyść filtry" resetuje wszystko naraz.
 
 ### Dokumentacja do pobrania
 
 Z poziomu Projektu, Złożenia albo Części da się pobrać komplet załączonych plików jako ZIP
 (z wyborem, jakie rozszerzenia uwzględnić) — przydatne np. do wysłania kompletu rysunków
 klientowi.
+
+### Powiadomienia
+
+Ikonka dzwonka (u góry po prawej, obok Twojego imienia) pokazuje listę zdarzeń: Twój
+element czeka na sprawdzenie, został wydany albo cofnięty do "W pracy", ma nową rewizję,
+został dodany do projektu lub z niego usunięty, przypisany do Ciebie projekt został
+usunięty, Twoje hasło zostało zmienione przez administratora, albo (tylko administratorzy)
+mało miejsca na dysku na przechowywanie plików. Każde powiadomienie można osobno oznaczyć
+jako przeczytane albo usunąć, a każdy typ można wyłączyć w Ustawienia → Powiadomienia.
 
 ## Konta i dostęp
 

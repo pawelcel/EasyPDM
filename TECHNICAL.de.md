@@ -140,6 +140,14 @@ Administrator). Ein Teil/eine Baugruppe kann auch **dupliziert** werden (die Kop
 erhält eine neue Nummer, einen frischen Status und Eigentümer) — im Baum landet die Kopie
 direkt unter dem Original.
 
+Auch das Projekt selbst kann gelöscht werden (`DELETE /api/projects/{id}`, nur
+Administrator) — dies löscht NICHT seine Elemente: `project_id` wird bei allen auf `NULL`
+gesetzt (nicht kaskadiert), sodass Teile/Baugruppen mit ihren Dateien, Anhängen, Tags,
+Historie und Stücklisten-Beziehungen intakt bleiben, danach nur noch über "Gesamte
+Datenbank" erreichbar. Dies schützt auch Elemente, die über `item_relations` in die
+Stückliste eines anderen Projekts eingebunden sind — das Löschen des besitzenden Projekts
+beschädigt die Struktur des anderen Projekts nicht mehr.
+
 Ein Teil hat vier **Arten** (`properties.rodzaj`), jede mit einem anderen Satz von
 Feldern und einem anderen Symbol im Baum: **Gefertigt** (Material, Preis, Zusätzliche
 Informationen), **Zugekauft** (Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Masse, Preis,
@@ -163,6 +171,14 @@ wie Hersteller/Material: Verknüpfung über den Namen, kein Fremdschlüssel. Dan
 Kunde gewählt ist; die Optionsliste hat höchstens einen Eintrag (den Name 2 des
 gewählten Kunden), leer, falls keiner vorhanden ist. Ein Kundenwechsel löscht einen
 zuvor gewählten Name 2.
+
+Unabhängig von `properties.client` oben ist der **Kundenkatalog** (Tabelle `clients`,
+Reiter Kunden) eine eigenständige Entität erster Klasse: Name/zweiter Name/Standort,
+Kontaktpersonen (`client_contacts`) und ein eigener Dokumentenbaum (`client_nodes`), z. B.
+für Normen oder Referenzdateien, unabhängig von `items`/`item_relations`. Ein Projekt kann
+optional mit einem davon verknüpft werden (`projects.client_id`) — der Detailbereich
+dieses Kunden listet dann jedes ihm zugewiesene Projekt auf (im Rahmen dessen, worauf der
+aktuelle Benutzer Zugriff hat), mit einer Schaltfläche zum direkten Wechsel dorthin.
 
 **Serie/Typ** (`properties.productType`, Tabelle `manufacturer_product_types`) und
 **Untertyp** (`properties.productSubtype`, Tabelle `manufacturer_product_subtypes` mit
@@ -224,6 +240,10 @@ der Form `2.1`). CSV-Export in zwei Varianten: vollständig (jedes Vorkommen ein
 aufgeführt) und zusammengefasst (dieselbe Komponente mehrfach an verschiedenen Stellen
 verwendet — eine Zeile mit der über die gesamte Kette aufgelösten Gesamtmenge).
 
+Auch die umgekehrte Ansicht ist verfügbar (`GET /api/items/{id}/used-in`) — jede
+Baugruppe, in beliebiger Tiefe und projektübergreifend, die ein gegebenes Element enthält,
+angezeigt im Detailbereich des Elements selbst oberhalb der Historie.
+
 Anhänge (`item_attachments`) sind ein von der Struktur getrennter Mechanismus — eine
 beliebige Datei (z. B. CAD) kann über den Eigenschaftenbereich an ein Teil/eine
 Baugruppe/eine Datei angehängt werden; sie können nicht über den Baum links hinzugefügt
@@ -262,6 +282,24 @@ Wenn die Tabelle `users` beim Start der API leer ist, legt sie selbst ein Standa
 **`admin` / `admin`** an (siehe Konsole beim ersten Start) — ändern Sie dieses Passwort
 sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwendung).
 
+### Benachrichtigungen
+
+Benachrichtigungen (Tabellen `notifications`/`notification_preferences`) sind an einen
+bestimmten Benutzer adressiert und werden für zehn Ereignistypen ausgelöst: ein eigenes
+Element geht in Prüfung/wird freigegeben/auf "In Bearbeitung" zurückgesetzt
+(`status_review`/`status_released`/`status_regressed`), eine neue Revision
+(`new_revision`), Zuweisung zu oder Entfernung aus einem Projekt
+(`project_assigned`/`project_unassigned`), Löschung eines zugewiesenen Projekts
+(`project_deleted`), Änderung Ihres Passworts durch einen Administrator
+(`password_changed`), wenig Speicherplatz auf dem Speicher (`low_disk_space`, nur
+Administratoren) und der einmalige Hinweis auf das Beispielprojekt (`sample_project`,
+ausgelöst, wenn eine wirklich leere Datenbank beim ersten Start ein Demo-Projekt/
+eine Baugruppe/zwei Teile anlegt — abgesichert durch die Flag
+`system_state.sample_project_seeded`, sodass er nie erneut auftritt, auch nicht nach
+einem manuellen Löschen in der Gefahrenzone). Jeder Typ kann pro Benutzer einzeln
+deaktiviert werden (Einstellungen → Benachrichtigungen); eine Benachrichtigung kann als
+gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
+
 ### API-Endpunkte
 
 | Methode | Pfad | Was es tut |
@@ -286,6 +324,7 @@ sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwend
 | PATCH | `/api/items/{parentId}/children/{childId}/position` \| `/reorder` | Änderung der Stücklistenposition (einzelne Position oder gesamte neue Reihenfolge) |
 | PATCH | `/api/projects/{projectId}/roots/reorder` | Änderung der Reihenfolge der Baum-Wurzeln eines Projekts |
 | GET | `/api/items/{id}/bom` \| `/bom/csv` \| `/bom/aggregated-csv` | verschachtelte Stückliste (JSON) / CSV-Export (vollständig / zusammengefasst) |
+| GET | `/api/items/{id}/used-in` | jede Baugruppe, in beliebiger Tiefe, die dieses Element enthält — die Umkehrung der Stückliste |
 | GET | `/api/items/{id}/documentation/extensions`, `/documentation` | verfügbare Dateierweiterungen zum Download / ZIP mit Anhängen (Element + Teilbaum) |
 | GET | `/api/projects/{projectId}/documentation/extensions`, `/documentation` | dasselbe, für ein gesamtes Projekt |
 | GET | `/api/tags` | Tag-Liste |
@@ -295,8 +334,12 @@ sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwend
 | GET | `/api/items/{id}/history` | vollständige Historie: Erstellung, Statusänderungen, Revisionen, hinzugefügter/entfernter Anhang, Eigentümersperre/-freigabe (wann/wer/Beschreibung), chronologisch |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | Materialkatalog (Name + Gruppe/Untergruppe) |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | Herstellerkatalog + Kontaktpersonen + Serien/Typen und deren Untertypen |
+| GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]` | Kundenkatalog + Kontaktpersonen |
+| GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | eigener Dokumentenbaum eines Kunden (Ordner/Dateien — Upload/Download/Umbenennen/Löschen/Suche) |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | Anhänge (Upload/Registrierung einer vorhandenen Datei/Liste/Download/Löschen) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | gespeicherte Filtersätze der Ansicht „Gesamte Datenbank" (privat pro Benutzer) |
+| GET/POST/DELETE | `/api/notifications[/{id}]`, `/{id}/read`, `/read-all` | Benachrichtigungsliste / als gelesen markieren (einzeln oder alle) / löschen — für den angemeldeten Benutzer |
+| GET/PATCH | `/api/notification-preferences` | Abschalten von Benachrichtigungen pro Typ für den angemeldeten Benutzer |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | Korrelation CAD-Makro ↔ Browser (siehe `EasyPDM.FreeCad/README.md`) |
 | GET | `/api/config` | Speicherort für Dateien (z. B. zur Verwendung durch das FreeCAD-Makro) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | Speicherort/-statistiken, Verschieben, Sicherung (pg_dump + Dateien in einem ZIP), Wiederherstellung aus einer Sicherung — **nur Administrator** |
@@ -382,10 +425,9 @@ versuchen würde, beide gleichzeitig zu binden, und am bereits belegten Port sch
 würde).
 
 **Update**: `git pull && docker compose up -d --build` — das neue `api`-Image erhält
-den neuen Code, der Container wird neu erstellt, und das Programm **wendet neue
-Datenbankmigrationen beim Start selbst an** (eingebettet in die ausführbare Datei,
-nachverfolgt in der Tabelle `schema_migrations` — siehe `MigrationRunner.cs`) — es muss
-nichts weiter manuell getan werden. Der Schritt `docker-entrypoint-initdb.d` mit
+den neuen Code, der Container wird neu erstellt, und Migrationen werden beim Start
+automatisch angewendet, wie oben — es muss nichts weiter manuell getan werden. Der
+Schritt `docker-entrypoint-initdb.d` mit
 `schema.sql` läuft NUR beim ERSTEN, völlig leeren Start des `pgdata`-Volumes (frische
 Installation); bei einem Update wird er überhaupt nicht berührt, da das Volume bereits
 existiert.

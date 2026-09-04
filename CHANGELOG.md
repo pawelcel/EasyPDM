@@ -112,6 +112,12 @@ All notable changes to EasyPDM are documented in this file.
   project could show parent-folder options from the previously selected project.
 - The Logs page could show content for the wrong date if you switched dates or hit
   "Refresh" again before the previous request finished.
+- Re-sending a status change that didn't actually change anything (e.g. re-confirming
+  "Released" on an item already Released) could still fire a duplicate notification.
+- The status-change confirmation dialog showed two buttons, "Cancel" and "Confirm",
+  even when it was only displaying a blocking error (e.g. an assembly rejected from
+  "Released" because it contains a cancelled item) — "Confirm" did nothing in that
+  case. Now shows a single "OK" button instead.
 
 ## [0.1.1]
 

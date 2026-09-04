@@ -126,6 +126,13 @@ disappear; administrator only). A Part/Assembly can also be **duplicated** (the 
 gets a new number, a fresh status and owner) — from the tree, the copy lands right
 under the original.
 
+A Project itself can also be deleted (`DELETE /api/projects/{id}`, administrator only)
+— this does NOT delete its items: `project_id` is set to `NULL` on all of them (not
+cascaded), so Parts/Assemblies survive with their files, attachments, tags, history and
+BOM relations intact, reachable afterward only through "Whole database". This also
+protects items shared into another project's BOM via `item_relations` — deleting the
+owning project no longer breaks that other project's structure.
+
 A Part has four **kinds** (`properties.rodzaj`), each with a different set of fields and
 a different icon in the tree: **Manufactured** (Material, Price, Additional notes),
 **Purchased** (Manufacturer, Series/Type, Subtype, Order number 1/2, Mass, Price, Additional
@@ -147,6 +154,14 @@ Manufacturer/Material: linked by name, not a foreign key. Next to it, **Name 2**
 a 1:1 column on the client, not a separate table) — locked until a client is picked;
 the option list has at most one entry (the selected client's name2), empty if it has
 none. Changing the client clears a previously chosen Name 2.
+
+Separately from `properties.client` above, the **Clients catalog** (`clients` table,
+Clients tab) is its own first-class entity: name/second name/location, contact people
+(`client_contacts`), and its own document tree (`client_nodes`) for e.g. norms or
+reference files, independent of `items`/`item_relations`. A Project can optionally be
+linked to one (`projects.client_id`) — the client's detail panel then lists every
+Project assigned to it (scoped to what the current user can access), with a button to
+jump straight there.
 
 **Series/Type** (`properties.productType`, table `manufacturer_product_types`) and
 **Subtype** (`properties.productSubtype`, table `manufacturer_product_subtypes`, keyed to
@@ -202,6 +217,10 @@ occurrence listed separately) and aggregated (the same component used several ti
 different places — one row with the combined quantity, expanded through the whole
 chain).
 
+The reverse view is also available (`GET /api/items/{id}/used-in`) — every assembly, at
+any depth and across projects, that contains a given item, shown on the item's own
+detail panel above History.
+
 Attachments (`item_attachments`) are a mechanism separate from the structure — any file
 (e.g. CAD) can be attached to a Part/Assembly/File from the properties panel; they
 cannot be added or removed through the tree on the left. From a Project/Assembly/Part
@@ -238,6 +257,21 @@ If the `users` table is empty when the API starts, it sets up a default
 password right after logging in (`PATCH /api/auth/password`, or from within the web
 application).
 
+### Notifications
+
+Notifications (`notifications`/`notification_preferences` tables) are addressed to a
+specific user and fired for ten event types: an owned item entering review/released/
+reverted to in-progress (`status_review`/`status_released`/`status_regressed`), a new
+revision (`new_revision`), being assigned to or removed from a project
+(`project_assigned`/`project_unassigned`), an assigned project being deleted
+(`project_deleted`), your password being changed by an admin (`password_changed`), low
+disk space on the storage (`low_disk_space`, administrators only), and the one-time
+sample-project notice (`sample_project`, fired when a genuinely empty database seeds one
+demo project/assembly/two parts on first startup — gated by
+`system_state.sample_project_seeded`, so it never re-fires, even after a manual Danger
+Zone wipe). Each type can be individually disabled per user (Settings → Notifications);
+a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
+
 ### API endpoints
 
 | Method | Path | What it does |
@@ -262,6 +296,7 @@ application).
 | PATCH | `/api/items/{parentId}/children/{childId}/position` \| `/reorder` | change BOM position (a single position or the whole new order) |
 | PATCH | `/api/projects/{projectId}/roots/reorder` | change the order of a project's tree roots |
 | GET | `/api/items/{id}/bom` \| `/bom/csv` \| `/bom/aggregated-csv` | nested BOM (JSON) / CSV export (full / aggregated) |
+| GET | `/api/items/{id}/used-in` | every assembly, at any depth, that contains this item — inverse of BOM |
 | GET | `/api/items/{id}/documentation/extensions`, `/documentation` | file extensions available to download / a ZIP with attachments (item + subtree) |
 | GET | `/api/projects/{projectId}/documentation/extensions`, `/documentation` | the same, for a whole project |
 | GET | `/api/tags` | tag list |
@@ -271,8 +306,12 @@ application).
 | GET | `/api/items/{id}/history` | full history: creation, status changes, revisions, attachment added/removed, owner lock/release (when/who/description), chronologically |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | material catalog (name + group/subgroup) |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | manufacturer catalog + contact people + series/types and their subtypes |
+| GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]` | client catalog + contact people |
+| GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | a client's own document tree (folders/files — upload/download/rename/delete/search) |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | attachments (upload/register an existing file/list/download/delete) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | saved filter sets for the "Whole database" view (private per user) |
+| GET/POST/DELETE | `/api/notifications[/{id}]`, `/{id}/read`, `/read-all` | notification list / mark read (one or all) / delete — for the logged-in user |
+| GET/PATCH | `/api/notification-preferences` | per-type notification opt-out for the logged-in user |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | CAD macro ↔ browser correlation (see `EasyPDM.FreeCad/README.md`) |
 | GET | `/api/config` | file storage location (used e.g. by the FreeCAD macro) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | storage location/stats, moving it, backup (pg_dump + files in a ZIP), restore from backup — **administrator only** |
@@ -352,12 +391,10 @@ override with a different port would still try to bind both at once and fail on 
 already taken).
 
 **Update**: `git pull && docker compose up -d --build` — the new `api` image gets the
-new code, the container is recreated, and the program **applies new database migrations
-on its own on startup** (built into the executable, tracked in the `schema_migrations`
-table — see `MigrationRunner.cs`) — nothing else needs to be done manually. The
-`docker-entrypoint-initdb.d` step with `schema.sql` only runs on the FIRST, completely
-empty start of the `pgdata` volume (fresh install); on an update it's not touched at all,
-since the volume already exists.
+new code, the container is recreated, and migrations apply automatically on startup, as
+above — nothing else needs to be done manually. The `docker-entrypoint-initdb.d` step
+with `schema.sql` only runs on the FIRST, completely empty start of the `pgdata` volume
+(fresh install); on an update it's not touched at all, since the volume already exists.
 
 #### Deployment WITHOUT cloning the repo (image only)
 

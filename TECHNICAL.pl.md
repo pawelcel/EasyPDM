@@ -121,6 +121,13 @@ komponentów — element z rodzicem poza usuwanym poddrzewem nie znika; tylko ad
 Część/Złożenie da się też **zduplikować** (kopia dostaje nowy numer, świeży status i
 właściciela) — z poziomu drzewka kopia ląduje zaraz pod oryginałem.
 
+Sam Projekt też da się usunąć (`DELETE /api/projects/{id}`, tylko administrator) — NIE
+usuwa to jego elementów: `project_id` ustawia się na `NULL` u wszystkich (bez kaskady), więc
+Części/Złożenia przetrwają z plikami, załącznikami, tagami, historią i relacjami BOM
+nienaruszonymi, dostępne później wyłącznie przez "Cała baza". Chroni to też elementy
+współdzielone w BOM-ie innego projektu przez `item_relations` — usunięcie macierzystego
+projektu nie psuje już struktury tego innego projektu.
+
 Część ma cztery **rodzaje** (`properties.rodzaj`), każdy z innym zestawem pól i inną ikoną
 w drzewku: **Wykonywana** (Materiał, Cena, Dodatkowe informacje), **Zakupowa** (Producent,
 Seria/Typ, Podtyp, Numer zamówieniowy 1/2, Masa, Cena, Dodatkowe informacje), **Normalia**
@@ -140,6 +147,14 @@ Producent/Materiał: powiązanie po nazwie, nie klucz obcy. Obok niego **Nazwa 2
 kolumna 1:1 z klientem, nie osobna tabela) — zablokowana, dopóki nie wybrano klienta;
 lista opcji zawiera co najwyżej jedną pozycję (nazwę2 wybranego klienta), pustą gdy jej
 nie ma. Zmiana klienta czyści wcześniej wybraną Nazwę 2.
+
+Niezależnie od `properties.client` powyżej, **katalog Klientów** (tabela `clients`,
+zakładka Klienci) jest samodzielnym bytem pierwszej klasy: nazwa/druga nazwa/lokalizacja,
+osoby kontaktowe (`client_contacts`) i własne drzewko dokumentów (`client_nodes`), np. na
+normy czy pliki referencyjne, niezależne od `items`/`item_relations`. Projekt można
+opcjonalnie powiązać z jednym z nich (`projects.client_id`) — panel szczegółów tego klienta
+wypisuje wtedy każdy przypisany do niego Projekt (w zakresie dostępnym aktualnemu
+użytkownikowi), z przyciskiem do bezpośredniego przejścia.
 
 **Seria/Typ** (`properties.productType`, tabela `manufacturer_product_types`) i
 **Podtyp** (`properties.productSubtype`, tabela `manufacturer_product_subtypes` z kluczem
@@ -195,6 +210,10 @@ zagnieżdżonych złożeń, L.p. w formie `2.1`). Eksport do CSV w dwóch warian
 (każde wystąpienie osobno) i zsumowany (ten sam komponent użyty kilka razy w różnych
 miejscach — jeden wiersz z łączną, rozwiniętą przez cały łańcuch ilością).
 
+Dostępny jest też widok odwrotny (`GET /api/items/{id}/used-in`) — każde złożenie, na
+dowolnej głębokości i w dowolnym projekcie, które zawiera dany element, pokazywane na
+panelu szczegółów elementu nad Historią.
+
 Załączniki (`item_attachments`) to osobny mechanizm od struktury — dowolny plik (np. CAD)
 można dopiąć do Części/Złożenia/Pliku z panelu właściwości; nie da się ich dodać ani usunąć
 przez drzewko po lewej. Z poziomu Projektu/Złożenia/Części da się pobrać **dokumentację** —
@@ -227,6 +246,22 @@ Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
 **`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
 po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
 
+### Powiadomienia
+
+Powiadomienia (tabele `notifications`/`notification_preferences`) są adresowane do
+konkretnego użytkownika i wyzwalane dla dziesięciu typów zdarzeń: własny element wchodzi w
+sprawdzanie/zostaje wydany/cofnięty do w_pracy (`status_review`/`status_released`/
+`status_regressed`), nowa rewizja (`new_revision`), przypisanie do lub usunięcie z
+projektu (`project_assigned`/`project_unassigned`), usunięcie przypisanego projektu
+(`project_deleted`), zmiana Twojego hasła przez administratora (`password_changed`), mało
+miejsca na dysku magazynu (`low_disk_space`, tylko administratorzy) oraz jednorazowa
+notatka o przykładowym projekcie (`sample_project`, wyzwalana, gdy zupełnie pusta baza
+zakłada przy pierwszym starcie jeden demonstracyjny projekt/złożenie/dwie części —
+zabezpieczona flagą `system_state.sample_project_seeded`, więc nigdy nie wystąpi ponownie,
+nawet po ręcznym wyczyszczeniu w Strefie zagrożenia). Każdy typ można osobno wyłączyć per
+użytkownik (Ustawienia → Powiadomienia); powiadomienie można oznaczyć jako przeczytane albo
+usunąć (`DELETE /api/notifications/{id}`).
+
 ### Endpointy API
 
 | Metoda | Ścieżka | Co robi |
@@ -251,6 +286,7 @@ po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
 | PATCH | `/api/items/{parentId}/children/{childId}/position` \| `/reorder` | zmiana L.p. w BOM-ie (pojedyncza pozycja albo cała nowa kolejność) |
 | PATCH | `/api/projects/{projectId}/roots/reorder` | zmiana kolejności korzeni drzewka projektu |
 | GET | `/api/items/{id}/bom` \| `/bom/csv` \| `/bom/aggregated-csv` | zagłębiony BOM (JSON) / eksport CSV (pełny / zsumowany) |
+| GET | `/api/items/{id}/used-in` | każde złożenie, na dowolnej głębokości, które zawiera ten element — odwrotność BOM-u |
 | GET | `/api/items/{id}/documentation/extensions`, `/documentation` | rozszerzenia plików dostępne do pobrania / ZIP z załącznikami (element + poddrzewo) |
 | GET | `/api/projects/{projectId}/documentation/extensions`, `/documentation` | to samo, dla całego projektu |
 | GET | `/api/tags` | lista tagów |
@@ -260,8 +296,12 @@ po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
 | GET | `/api/items/{id}/history` | pełna historia: utworzenie, zmiany statusu, rewizje, dodanie/usunięcie załącznika, blokada/zwolnienie właściciela (kiedy/kto/opis), chronologicznie |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | katalog materiałów (nazwa + grupa/podgrupa) |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | katalog producentów + osoby kontaktowe + serie/typy i ich podtypy |
+| GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]` | katalog klientów + osoby kontaktowe |
+| GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | własne drzewko dokumentów klienta (foldery/pliki — upload/pobranie/zmiana nazwy/usunięcie/wyszukiwanie) |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | załączniki (upload/rejestracja istniejącego pliku/lista/pobranie/usunięcie) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | zapisane zestawy filtrów widoku „Cała baza” (prywatne per użytkownik) |
+| GET/POST/DELETE | `/api/notifications[/{id}]`, `/{id}/read`, `/read-all` | lista powiadomień / oznaczenie jako przeczytane (jedno lub wszystkie) / usunięcie — dla zalogowanego użytkownika |
+| GET/PATCH | `/api/notification-preferences` | wyłączenie powiadomień per typ dla zalogowanego użytkownika |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | korelacja makro CAD ↔ przeglądarka (zob. `EasyPDM.FreeCad/README.md`) |
 | GET | `/api/config` | lokalizacja magazynu plików (do użytku np. przez makro FreeCAD) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | lokalizacja/statystyki magazynu, przeniesienie, backup (pg_dump + pliki w ZIP), przywrócenie z backupu — **tylko administrator** |
@@ -338,9 +378,8 @@ DOKLEJA listy jak `ports` między plikami zamiast je zastępować, więc overrid
 portem i tak próbowałby zbindować oba naraz i padłby na tym zajętym).
 
 **Aktualizacja**: `git pull && docker compose up -d --build` — nowy obraz `api` dostaje nowy
-kod, kontener się odtwarza, a program **sam stosuje nowe migracje bazy przy starcie**
-(wbudowane w plik wykonywalny, śledzone w tabeli `schema_migrations` — zob.
-`MigrationRunner.cs`) — nic więcej nie trzeba robić ręcznie. `docker-entrypoint-initdb.d`
+kod, kontener się odtwarza, a migracje stosują się automatycznie przy starcie, jak wyżej —
+nic więcej nie trzeba robić ręcznie. `docker-entrypoint-initdb.d`
 z `schema.sql` odpala się TYLKO przy pierwszym, zupełnie pustym starcie wolumenu `pgdata`
 (świeża instalacja); przy aktualizacji nie jest w ogóle dotykany, bo wolumen już istnieje.
 

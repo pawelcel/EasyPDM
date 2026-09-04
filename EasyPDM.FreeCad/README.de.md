@@ -103,9 +103,9 @@ des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
      (standardmäßig aus dem Label des Dokuments vorgeschlagen), die Art und die davon
      abhängigen Felder: bei einem Teil ist die Art erforderlich — **Gefertigt** →
      Material, **Zugekauft** → Hersteller/Serie-Typ/Untertyp/Bestellnummer 1 und 2/Masse, **Norm**
-     → Material/Norm, **Kundenteil** → Kunde. Eine Baugruppe hat eigene,
+     → Material/Norm, **Kundenteil** → Kunde + Name 2 (erst nach Auswahl eines Kunden). Eine Baugruppe hat eigene,
      ebenfalls erforderliche Arten — **Gefertigt**, **Zugekauft** → Hersteller/Serie-Typ/Untertyp,
-     **Vom Kunden** → Kunde — und die Masse ist immer sichtbar, unabhängig von der gewählten Art;
+     **Vom Kunden** → Kunde + Name 2 — und die Masse ist immer sichtbar, unabhängig von der gewählten Art;
      eine Baugruppe hat nie ein Materialfeld (nur ein Teil). Das Popup hat außerdem die **Checkboxen
      „STEP exportieren" und „PDF exportieren"** (STEP standardmäßig angehakt, PDF nicht —
      siehe Schritt 5 unten, was jede davon beim Export genau bewirkt). Das Ticket ist
@@ -116,7 +116,7 @@ des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
    - **"Duplizieren"** — zunächst zeigt eine Suche das **Quell**-Element (Teil/Baugruppe)
      aus der gesamten Datenbank an, dann öffnet sich DASSELBE Popup wie bei "Neues
      Element", nur vorab mit dessen Eigenschaften ausgefüllt (Art/Material/Hersteller/
-     Bestellnummern/Norm/Masse) — **ohne irgendeine Datei zu kopieren**. Alle Felder
+     Serie-Typ/Untertyp/Bestellnummern/Norm/Masse/Kunde/Name 2) — **ohne irgendeine Datei zu kopieren**. Alle Felder
      lassen sich vor dem Speichern weiterhin bearbeiten — es ist eine gewöhnliche
      Erstellung eines neuen Elements, nur mit Daten aus der Quelle vorbefüllt.
    - **"An Vorhandenes anhängen"** — öffnet eine Suche für ein Teil/eine Baugruppe aus der

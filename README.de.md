@@ -35,6 +35,11 @@ existiert und funktioniert — warum es nicht auch anderen zur Verfügung stelle
 - **Elementsperre** — solange Sie an etwas arbeiten, überschreibt niemand sonst Ihre
   Änderungen ohne Ihre Zustimmung (ein Administrator kann bei Bedarf eine fremde Sperre
   übernehmen oder aufheben — z. B. wenn der Besitzer abwesend ist).
+- **Benachrichtigungen** — ein Glockensymbol zeigt, was Ihre Aufmerksamkeit erfordert: ein
+  eigenes Element wartet auf Prüfung, wurde freigegeben oder auf "In Bearbeitung"
+  zurückgesetzt, hat eine neue Revision, wurde einem Projekt hinzugefügt oder daraus
+  entfernt, oder (für Administratoren) wenig Speicherplatz. Jeder Typ lässt sich einzeln
+  in den Einstellungen abschalten.
 
 ## Erste Inbetriebnahme
 
@@ -88,6 +93,11 @@ Erste Anmeldung bei einem frisch installierten EasyPDM: Benutzername `admin`, Pa
 `admin` — ändern Sie dieses Passwort sofort nach der Anmeldung (Einstellungen →
 Benutzer → das Konto `admin` in der Liste suchen → Passwort ändern).
 
+Eine ganz neue, leere Datenbank erhält beim ersten Start außerdem ein Beispielprojekt —
+eine Baugruppe mit zwei Teilen, etwas zum Erkunden statt einer leeren Fläche. Eine
+Benachrichtigung weist darauf hin und erinnert daran, es vor dem echten Einsatz zu
+löschen (Einstellungen → Dateispeicher → Gefahrenzone).
+
 Nach der Anmeldung: wählen Sie ein Projekt (oder erstellen Sie ein neues, falls Sie die
 Berechtigung haben) — das ist der Container für Ihre Dateien und die
 Baugruppenstruktur — und installieren Sie das Makro für Ihr CAD-Programm, siehe unten.
@@ -134,16 +144,20 @@ einem Elternteil außerhalb des gelöschten Teilbaums verschwindet nicht mit. Ei
 Teil/eine Baugruppe kann auch **dupliziert** werden — die Kopie erhält eine eigene
 Nummer und landet sofort neben dem Original, mit dessen kopierten Eigenschaften.
 
+Auch das Projekt selbst kann gelöscht werden (nur Administrator) — dies löscht NICHT seine
+Teile/Baugruppen: Sie werden projektlos und bleiben vollständig erhalten (Dateien, Anhänge,
+Tags, Historie, Stücklisten-Beziehungen), danach über "Gesamte Datenbank" erreichbar.
+
 ### Teile und Baugruppen — Arten und Eigenschaften
 
 Ein Teil hat eine von vier **Arten**, jede mit einem anderen Satz von Feldern:
 
 | Art | Zusätzliche Felder |
 |---|---|
-| Gefertigt | Material, Preis |
-| Zugekauft | Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Masse, Preis |
-| Norm | Material, Norm |
-| Kundenteil | Kunde |
+| Gefertigt | Material, Preis, Zusätzliche Informationen |
+| Zugekauft | Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Masse, Preis, Zusätzliche Informationen |
+| Norm | Material, Norm, Zusätzliche Informationen |
+| Kundenteil | Kunde, Name 2, Zusätzliche Informationen |
 
 Eine Baugruppe hat eine von drei **Arten**: Gefertigt, Zugekauft (Hersteller, Serie/Typ
 und Untertyp) oder Vom Kunden (Kunde). Unabhängig von der Art kann sie zusätzlich eine
@@ -187,25 +201,36 @@ sperren). Ein freigegebenes Element ist immer entsperrt.
 
 ### Stückliste (BOM)
 
-Eine Baugruppe zeigt die Liste ihrer Komponenten: Position, Name, Menge, Material,
+Eine Baugruppe zeigt die Liste ihrer Komponenten: Position, Name, Menge, Material, Norm,
 Hersteller, Bestellnummern — zusammen mit den Komponenten verschachtelter Baugruppen.
 Die Reihenfolge der Positionen kann per Ziehen oder durch direkte Eingabe einer Nummer
 geändert werden. CSV-Export in zwei Varianten: vollständig (jedes Vorkommen einzeln
 aufgeführt) oder zusammengefasst (dieselbe Komponente mehrfach verwendet — eine Zeile mit
 der Gesamtmenge).
 
-### Materialien und Hersteller
+Auch die umgekehrte Ansicht ist verfügbar — **Verwendet in**: Der Detailbereich eines
+Elements zeigt jede Baugruppe, in beliebiger Tiefe und projektübergreifend, die es
+enthält, mit einer Schaltfläche zum direkten Wechsel dorthin.
 
-Separate, unternehmensweite Kataloge (Reiter **Materialliste** und **Hersteller** im
-Hauptmenü) — ein Material hat einen Namen und eine Gruppe/Untergruppe, ein Hersteller hat
-einen Namen und Kontaktpersonen. Sie werden beim Ausfüllen der Eigenschaften eines Teils
+### Materialien, Hersteller und Kunden
+
+Separate, unternehmensweite Kataloge (Reiter **Materialliste**, **Hersteller** und
+**Kunden** im Hauptmenü) — ein Material hat einen Namen und eine Gruppe/Untergruppe, ein
+Hersteller hat einen Namen, Kontaktpersonen und eine Serie/Typ + Untertyp-Liste dessen,
+was er liefert. Sie werden beim Ausfüllen der Eigenschaften eines Teils/einer Baugruppe
 aus einer Liste ausgewählt, statt von Hand eingetippt zu werden.
+
+Ein **Kunde** hat einen Namen (optional einen zweiten Namen und einen Standort), eigene
+Kontaktpersonen und einen eigenen Dokumentenbaum, z. B. für Normen oder
+Referenzdateien — getrennt von den Projektdateien. Ein Projekt kann optional mit einem
+Kunden verknüpft werden; der Detailbereich dieses Kunden listet dann jedes ihm
+zugewiesene Projekt auf, mit einer Schaltfläche zum direkten Wechsel dorthin.
 
 ### Suche und gesamte Datenbank
 
 Der Reiter **Gesamte Datenbank** durchsucht alle Elemente unabhängig vom Projekt — nach
 Name, Nummer, Tags, Art. Gefundene Filter können zur Wiederverwendung gespeichert
-werden.
+werden, und eine Schaltfläche "Filter zurücksetzen" setzt alles auf einmal zurück.
 
 ### Herunterladbare Dokumentation
 
@@ -213,6 +238,16 @@ Von einem Projekt, einer Baugruppe oder einem Teil aus lässt sich der komplette
 angehängter Dateien als ZIP herunterladen (mit Auswahl, welche Dateierweiterungen
 einbezogen werden sollen) — praktisch z. B., um einen kompletten Zeichnungssatz an einen
 Kunden zu senden.
+
+### Benachrichtigungen
+
+Ein Glockensymbol (oben rechts, neben Ihrem Namen) zeigt eine Liste von Ereignissen: ein
+eigenes Element wartet auf Prüfung, wurde freigegeben oder auf "In Bearbeitung"
+zurückgesetzt, hat eine neue Revision, wurde einem Projekt hinzugefügt oder daraus
+entfernt, ein zugewiesenes Projekt wurde gelöscht, Ihr Passwort wurde von einem
+Administrator geändert, oder (nur Administratoren) wenig Speicherplatz im Dateispeicher.
+Jede Benachrichtigung kann einzeln als gelesen markiert oder gelöscht werden, und jeder
+Typ lässt sich unter Einstellungen → Benachrichtigungen abschalten.
 
 ## Konten und Zugriff
 

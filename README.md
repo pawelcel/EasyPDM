@@ -32,6 +32,10 @@ my own use, and since it already exists and works — why not share it with othe
 - **Item locking** — while you're working on something, no one else can overwrite your
   changes without your consent (an administrator can take over or release someone
   else's lock if needed — e.g. when the owner is away).
+- **Notifications** — a bell icon shows what needs your attention: an item of yours
+  waiting for review, released, or reverted to "In progress", a new revision, being
+  added to or removed from a project, or (administrators) low disk space — each type
+  can be turned off individually in Settings.
 
 ## First run
 
@@ -83,6 +87,10 @@ First login on a freshly installed EasyPDM: username `admin`, password `admin` �
 this password right after logging in (Settings → Users → find the `admin` account in
 the list → change password).
 
+A brand new, empty database also gets one sample project on first startup — an assembly
+with two parts, something to explore instead of a blank slate. A notification points it
+out and reminds you to clear it (Settings → File storage → Danger zone) before real use.
+
 After logging in: pick a project (or create a new one, if you have permission) — that's
 the container for your files and assembly structure — and install the macro for your
 CAD program, see below.
@@ -126,16 +134,20 @@ subtree will not disappear along with it. A Part/Assembly can also be **duplicat
 copy gets its own number and lands right next to the original, with its properties
 copied over.
 
+A project itself can also be deleted (administrator only) — this does NOT delete its
+Parts/Assemblies: they become project-less and stay fully intact (files, attachments,
+tags, history, BOM relations), reachable afterward through "Whole database".
+
 ### Parts and Assemblies — kinds and properties
 
 A Part has one of four **kinds**, each with a different set of fields:
 
 | Kind | Additional fields |
 |---|---|
-| Manufactured | Material, Price |
-| Purchased | Manufacturer, Series/Type, Subtype, Order number 1/2, Mass, Price |
-| Standard | Material, Norm |
-| Client-supplied | Client |
+| Manufactured | Material, Price, Additional notes |
+| Purchased | Manufacturer, Series/Type, Subtype, Order number 1/2, Mass, Price, Additional notes |
+| Standard | Material, Norm, Additional notes |
+| Client-supplied | Client, Name 2, Additional notes |
 
 An Assembly has one of three **kinds**: Manufactured, Purchased (Manufacturer,
 Series/Type and Subtype) or Client-supplied (Client). Whatever the kind, it can also carry
@@ -177,29 +189,49 @@ A released item is always released (unlocked).
 
 ### Bill of materials (BOM)
 
-An Assembly shows the list of its components: position, name, quantity, material,
+An Assembly shows the list of its components: position, name, quantity, material, norm,
 manufacturer, order numbers — together with the components of nested assemblies. The
 position order can be changed by dragging or by typing a number directly. CSV export
 comes in two variants: full (every occurrence listed separately) or aggregated (the same
 component used several times — one row with the combined quantity).
 
-### Materials and Manufacturers
+The reverse view is also available — **Used in**: an item's detail panel shows every
+assembly, at any depth and across projects, that contains it, with a button to jump
+straight there.
 
-Separate, company-wide catalogs (the **Materials list** and **Manufacturers** tabs in
-the main menu) — a material has a name and group/subgroup, a manufacturer has a name and
-contact people. You pick them from a list when filling in a Part's properties, instead
-of typing them in by hand.
+### Materials, Manufacturers and Clients
+
+Separate, company-wide catalogs (the **Materials list**, **Manufacturers** and
+**Clients** tabs in the main menu) — a material has a name and group/subgroup, a
+manufacturer has a name, contact people and a Series/Type + Subtype list of what it
+supplies. You pick them from a list when filling in a Part's/Assembly's properties,
+instead of typing them in by hand.
+
+A **Client** has a name (plus an optional second name and location), its own contact
+people, and its own document tree for e.g. norms or reference files — separate from
+project files. A Project can optionally be linked to a Client; that client's detail
+panel then lists every Project assigned to it, with a button to jump straight there.
 
 ### Search and the whole database
 
 The **Whole database** tab searches all items regardless of project — by name, number,
-tags, kind. Found filters can be saved for reuse.
+tags, kind. Found filters can be saved for reuse, and a "Clear filters" button resets
+everything at once.
 
 ### Downloadable documentation
 
 From a Project, Assembly or Part you can download the complete set of attached files as
 a ZIP (choosing which file extensions to include) — handy for e.g. sending a complete
 set of drawings to a client.
+
+### Notifications
+
+A bell icon (top right, next to your name) shows a list of events: an item you own
+waiting for review, released, or reverted to "In progress", a new revision on your
+item, being assigned to or removed from a project, an assigned project being deleted,
+your password being changed by an administrator, or (administrators only) low disk
+space on the file storage. Each notification can be marked as read or deleted
+individually, and each type can be turned off in Settings → Notifications.
 
 ## Accounts and access
 
