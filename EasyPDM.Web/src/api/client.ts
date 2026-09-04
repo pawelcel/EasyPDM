@@ -546,6 +546,46 @@ export const api = {
       handleResponse<ClientFileSearchResult[]>(r)
     ),
 
+  // Węzły WŁASNE jednej Nazwy 2 -- lustro powyższych, tylko ze ścieżką przez
+  // /name2/{name2Id}/, niewidoczne gdzie indziej (w odróżnieniu od węzłów klienta, które
+  // są odziedziczone -- tylko do odczytu -- przez każdą jego Nazwę 2).
+  getClientName2Nodes: (clientId: number, name2Id: number) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}/nodes`).then((r) => handleResponse<ClientNode[]>(r)),
+
+  createClientName2Folder: (clientId: number, name2Id: number, parentId: string | null, name: string) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}/nodes/folder`, json({ parentId, name })).then((r) =>
+      handleResponse<ClientNode>(r)
+    ),
+
+  uploadClientName2File: (clientId: number, name2Id: number, parentId: string | null, file: File) => {
+    const formData = new FormData()
+    formData.append("file", file)
+    if (parentId) formData.append("parentId", parentId)
+    return fetch(`${BASE}/clients/${clientId}/name2/${name2Id}/nodes/file`, { method: "POST", body: formData }).then(
+      (r) => handleResponse<ClientNode>(r)
+    )
+  },
+
+  renameClientName2Node: (clientId: number, name2Id: number, nodeId: string, name: string) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}/nodes/${nodeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeClientName2Node: (clientId: number, name2Id: number, nodeId: string) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}/nodes/${nodeId}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
+    ),
+
+  clientName2NodeDownloadUrl: (clientId: number, name2Id: number, nodeId: string) =>
+    `${BASE}/clients/${clientId}/name2/${name2Id}/nodes/${nodeId}/file`,
+
+  searchClientName2Files: (clientId: number, name2Id: number, query: string) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}/nodes/search?query=${encodeURIComponent(query)}`).then(
+      (r) => handleResponse<ClientFileSearchResult[]>(r)
+    ),
+
   getSavedFilters: () =>
     fetch(`${BASE}/saved-filters`).then((r) => handleResponse<SavedFilter[]>(r)),
 

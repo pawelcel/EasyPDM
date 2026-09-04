@@ -63,9 +63,11 @@ All notable changes to EasyPDM are documented in this file.
   exists switches the dialog to adding that client a new Name 2 (confirmed with a
   single "OK") instead of creating a duplicate entry. Deleting a Name 2 is a
   one-click action right on its row in that list. Each Name 2 can now also have its
-  own address and its own contacts, kept separate from the client's — its detail
-  panel shows the client's own contacts read-only (inherited by every Name 2) above
-  a second, fully editable section for contacts added directly under that Name 2.
+  own address, its own contacts, and its own files (e.g. different norms for "Bosch
+  Rexroth" than for "Bosch Tabory"), all kept separate from the client's — its detail
+  panel shows the client's own contacts and files read-only (inherited by every
+  Name 2) above a second, fully editable section for the ones added directly under
+  that Name 2.
 
 ### Changed
 - Admins can now bypass another user's item lock for three actions: changing its

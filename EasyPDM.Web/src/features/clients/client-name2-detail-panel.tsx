@@ -12,14 +12,18 @@ import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ContactDialog } from "@/features/clients/client-contact-dialog"
+import { ClientFileSearch } from "@/features/clients/client-file-search"
+import { ClientFileTree } from "@/features/clients/client-file-tree"
 import { useLanguage } from "@/i18n/use-language"
 
-// Szczegóły JEDNEJ Nazwy 2 -- odpowiednik client-detail-panel.tsx, ale bez sekcji
-// Projekty/Pliki (poza zakresem: Nazwa 2 to wariant handlowy klienta, nie osobny byt z
-// własną strukturą dokumentów) i BEZ przycisku usunięcia (usuwanie zostaje wyłącznie przy
-// wierszu w liście po lewej w clients-view.tsx, żeby nie dublować tej samej akcji w dwóch
-// miejscach). Kluczowa różnica: DWIE osobne sekcje kontaktów -- odziedziczone z
-// klienta-rodzica (tylko do odczytu z tego poziomu) i własne tej Nazwy 2 (pełne CRUD).
+// Szczegóły JEDNEJ Nazwy 2 -- odpowiednik client-detail-panel.tsx, ale bez sekcji Projekty
+// (poza zakresem: Nazwa 2 to wariant handlowy klienta, nie osobny byt spięty z projektami)
+// i BEZ przycisku usunięcia (usuwanie zostaje wyłącznie przy wierszu w liście po lewej w
+// clients-view.tsx, żeby nie dublować tej samej akcji w dwóch miejscach). Kluczowa różnica,
+// powtórzona zarówno dla kontaktów jak i plików: DWIE osobne sekcje -- odziedziczone z
+// klienta-rodzica (tylko do odczytu z tego poziomu) i własne tej Nazwy 2 (pełne CRUD). Np.
+// różne normy w "Bosch Rexroth" niż w "Bosch Tabory" -- każda Nazwa 2 dostaje swoje własne
+// pliki, niezależne od plików klienta i od siebie nawzajem.
 function ClientName2DetailPanel({
   clientId,
   name2Id,
@@ -226,6 +230,27 @@ function ClientName2DetailPanel({
         ) : (
           <Hint>{t("common.noContacts")}</Hint>
         )}
+      </div>
+
+      {/* Pliki klienta -- odziedziczone, tylko do odczytu z tego poziomu (dodawanie i
+          zarządzanie nadal wyłącznie w panelu samego klienta), tak samo jak kontakty
+          klienta wyżej. */}
+      <div>
+        <SectionLabel>{t("client.inheritedFilesLabel")}</SectionLabel>
+        <Hint>{t("client.inheritedFilesHint")}</Hint>
+        <div className="mt-1">
+          <ClientFileTree clientId={clientId} readOnly />
+        </div>
+      </div>
+
+      {/* Własne pliki TEJ Nazwy 2 -- pełne dodawanie/organizowanie/usuwanie, niewidoczne
+          nigdzie indziej (ani u rodzica, ani u innych Nazw 2 tego samego klienta). */}
+      <div>
+        <SectionLabel>{t("client.ownFilesLabel", { name2: detail.name2 })}</SectionLabel>
+        <div className="mt-1 flex flex-col gap-3">
+          <ClientFileSearch clientId={clientId} name2Id={name2Id} />
+          <ClientFileTree clientId={clientId} name2Id={name2Id} />
+        </div>
       </div>
 
       {confirmingDeleteContact && (

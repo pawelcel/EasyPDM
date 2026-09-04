@@ -475,11 +475,25 @@ static class ClientEndpoints
 
         // DELETE /api/clients/{id}/name2/{name2Id} — elementy, które mają tę wartość
         // zapisaną w properties.clientName2, zostają nietknięte (to wolny tekst, nie klucz
-        // obcy) — dokładnie tak samo jak przy usunięciu samego klienta.
+        // obcy) — dokładnie tak samo jak przy usunięciu samego klienta. Węzły WŁASNE tej
+        // Nazwy 2 kasują się kaskadowo w bazie (client_nodes.name2_id ON DELETE CASCADE),
+        // ale ich fizyczne pliki trzeba zebrać i skasować z dysku PRZED usunięciem wiersza
+        // -- ta sama dyscyplina co DELETE /api/clients/{id} wyżej.
         app.MapDelete("/api/clients/{id:int}/name2/{name2Id:int}", async (int id, int name2Id) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
+
+            var filePaths = new List<string>();
+            await using (var selectCmd = new NpgsqlCommand(
+                "SELECT file_path FROM client_nodes WHERE client_id = @clientId AND name2_id = @name2Id AND file_path IS NOT NULL;", conn))
+            {
+                selectCmd.Parameters.AddWithValue("clientId", id);
+                selectCmd.Parameters.AddWithValue("name2Id", name2Id);
+                await using var reader = await selectCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    filePaths.Add(reader.GetString(0));
+            }
 
             await using var cmd = new NpgsqlCommand(
                 "DELETE FROM client_name2 WHERE id = @name2Id AND client_id = @clientId;", conn);
@@ -487,12 +501,18 @@ static class ClientEndpoints
             cmd.Parameters.AddWithValue("clientId", id);
             await cmd.ExecuteNonQueryAsync();
 
+            foreach (var path in filePaths)
+            {
+                try { File.Delete(path); } catch (IOException) { /* magazyn i tak jest sierocy — nie blokujemy usunięcia rekordu */ }
+            }
+
             return Results.Ok();
         });
 
-        // GET /api/clients/{id}/nodes — płaska lista wszystkich węzłów (folderów i plików)
-        // klienta; front buduje drzewo po parentId, tak samo jak drzewo projektu buduje się
-        // z płaskiej listy relacji (item_relations).
+        // GET /api/clients/{id}/nodes — płaska lista węzłów (folderów i plików) należących
+        // do samego klienta (name2_id IS NULL); front buduje drzewo po parentId, tak samo
+        // jak drzewo projektu buduje się z płaskiej listy relacji (item_relations). Węzły
+        // WŁASNE poszczególnych Nazw 2 mają osobny endpoint niżej.
         app.MapGet("/api/clients/{id:int}/nodes", async (int id) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
@@ -501,7 +521,7 @@ static class ClientEndpoints
             const string sql = """
                 SELECT id, parent_id, node_type, name, file_size, created_at
                 FROM client_nodes
-                WHERE client_id = @id
+                WHERE client_id = @id AND name2_id IS NULL
                 ORDER BY node_type, name;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -528,8 +548,8 @@ static class ClientEndpoints
                 return Results.NotFound();
 
             const string sql = """
-                INSERT INTO client_nodes (client_id, parent_id, node_type, name)
-                VALUES (@clientId, @parentId, 'folder', @name)
+                INSERT INTO client_nodes (client_id, name2_id, parent_id, node_type, name)
+                VALUES (@clientId, NULL, @parentId, 'folder', @name)
                 RETURNING id, parent_id, node_type, name, file_size, created_at;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -587,8 +607,8 @@ static class ClientEndpoints
             }
 
             const string sql = """
-                INSERT INTO client_nodes (id, client_id, parent_id, node_type, name, file_path, file_size, file_hash)
-                VALUES (@id, @clientId, @parentId, 'file', @name, @filePath, @size, @hash)
+                INSERT INTO client_nodes (id, client_id, name2_id, parent_id, node_type, name, file_path, file_size, file_hash)
+                VALUES (@id, @clientId, NULL, @parentId, 'file', @name, @filePath, @size, @hash)
                 RETURNING id, parent_id, node_type, name, file_size, created_at;
                 """;
             try
@@ -746,22 +766,305 @@ static class ClientEndpoints
 
             return Results.Ok(result);
         });
+
+        // GET /api/clients/{id}/name2/{name2Id}/nodes — płaska lista węzłów WŁASNYCH tej
+        // jednej Nazwy 2 (name2_id ustawiony), niewidoczna gdzie indziej -- w odróżnieniu od
+        // /api/clients/{id}/nodes wyżej, które zawsze zostają węzłami klienta-rodzica
+        // (name2_id NULL), odziedziczonymi (tylko do odczytu z tego poziomu) przez KAŻDĄ
+        // jego Nazwę 2. Ten sam podział co client_contacts.
+        app.MapGet("/api/clients/{id:int}/name2/{name2Id:int}/nodes", async (int id, int name2Id) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await Name2ExistsAsync(conn, id, name2Id))
+                return Results.NotFound();
+
+            const string sql = """
+                SELECT id, parent_id, node_type, name, file_size, created_at
+                FROM client_nodes
+                WHERE client_id = @id AND name2_id = @name2Id
+                ORDER BY node_type, name;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("name2Id", name2Id);
+
+            var result = new List<object>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                result.Add(ReadNode(reader));
+
+            return Results.Ok(result);
+        });
+
+        // POST /api/clients/{id}/name2/{name2Id}/nodes/folder   body: { parentId?, name }
+        app.MapPost("/api/clients/{id:int}/name2/{name2Id:int}/nodes/folder", async (int id, int name2Id, CreateFolderRequest body) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Name))
+                return Results.BadRequest("Nazwa folderu nie może być pusta.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ClientAndParentExistAsync(conn, id, body.ParentId, name2Id))
+                return Results.NotFound();
+
+            const string sql = """
+                INSERT INTO client_nodes (client_id, name2_id, parent_id, node_type, name)
+                VALUES (@clientId, @name2Id, @parentId, 'folder', @name)
+                RETURNING id, parent_id, node_type, name, file_size, created_at;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("clientId", id);
+            cmd.Parameters.AddWithValue("name2Id", name2Id);
+            cmd.Parameters.AddWithValue("parentId", (object?)body.ParentId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("name", body.Name.Trim());
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            await reader.ReadAsync();
+            return Results.Ok(ReadNode(reader));
+        });
+
+        // POST /api/clients/{id}/name2/{name2Id}/nodes/file   multipart/form-data: file (wymagany), parentId (opcjonalny)
+        app.MapPost("/api/clients/{id:int}/name2/{name2Id:int}/nodes/file", async (int id, int name2Id, HttpRequest request) =>
+        {
+            if (!request.HasFormContentType)
+                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+
+            var form = await request.ReadFormAsync();
+            var file = form.Files.GetFile("file");
+            if (file is null || file.Length == 0)
+                return Results.BadRequest("Brak pliku w polu 'file'.");
+
+            Guid? parentId = null;
+            var parentIdRaw = form["parentId"].ToString();
+            if (!string.IsNullOrEmpty(parentIdRaw))
+            {
+                if (!Guid.TryParse(parentIdRaw, out var parsed))
+                    return Results.BadRequest("Niepoprawny parentId.");
+                parentId = parsed;
+            }
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ClientAndParentExistAsync(conn, id, parentId, name2Id))
+                return Results.NotFound();
+
+            var nodeId = Guid.NewGuid();
+            var clientDir = Path.Combine(storage.Path, "clients", id.ToString());
+            Directory.CreateDirectory(clientDir);
+            var extension = Path.GetExtension(file.FileName);
+            var storedPath = Path.Combine(clientDir, $"{nodeId}{extension}");
+
+            await using (var stream = File.Create(storedPath))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            string hash;
+            using (var sha256 = SHA256.Create())
+            await using (var readStream = File.OpenRead(storedPath))
+            {
+                hash = Convert.ToHexString(await sha256.ComputeHashAsync(readStream));
+            }
+
+            const string sql = """
+                INSERT INTO client_nodes (id, client_id, name2_id, parent_id, node_type, name, file_path, file_size, file_hash)
+                VALUES (@id, @clientId, @name2Id, @parentId, 'file', @name, @filePath, @size, @hash)
+                RETURNING id, parent_id, node_type, name, file_size, created_at;
+                """;
+            try
+            {
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("id", nodeId);
+                cmd.Parameters.AddWithValue("clientId", id);
+                cmd.Parameters.AddWithValue("name2Id", name2Id);
+                cmd.Parameters.AddWithValue("parentId", (object?)parentId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("name", file.FileName);
+                cmd.Parameters.AddWithValue("filePath", storedPath);
+                cmd.Parameters.AddWithValue("size", file.Length);
+                cmd.Parameters.AddWithValue("hash", hash);
+
+                await using var reader = await cmd.ExecuteReaderAsync();
+                await reader.ReadAsync();
+                return Results.Ok(ReadNode(reader));
+            }
+            catch
+            {
+                File.Delete(storedPath);
+                throw;
+            }
+        });
+
+        // PATCH /api/clients/{id}/name2/{name2Id}/nodes/{nodeId}   body: { name }
+        app.MapPatch("/api/clients/{id:int}/name2/{name2Id:int}/nodes/{nodeId:guid}",
+            async (int id, int name2Id, Guid nodeId, RenameNodeRequest body) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Name))
+                return Results.BadRequest("Nazwa nie może być pusta.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand(
+                "UPDATE client_nodes SET name = @name WHERE id = @nodeId AND client_id = @clientId AND name2_id = @name2Id;", conn);
+            cmd.Parameters.AddWithValue("name", body.Name.Trim());
+            cmd.Parameters.AddWithValue("nodeId", nodeId);
+            cmd.Parameters.AddWithValue("clientId", id);
+            cmd.Parameters.AddWithValue("name2Id", name2Id);
+
+            var affected = await cmd.ExecuteNonQueryAsync();
+            return affected == 0 ? Results.NotFound() : Results.Ok();
+        });
+
+        // DELETE /api/clients/{id}/name2/{name2Id}/nodes/{nodeId} — sama dyscyplina co
+        // DELETE /api/clients/{id}/nodes/{nodeId} wyżej (rekurencyjny CTE zbiera file_path
+        // PRZED DELETE), tylko dodatkowo korzeń poddrzewa musi należeć do tej Nazwy 2.
+        app.MapDelete("/api/clients/{id:int}/name2/{name2Id:int}/nodes/{nodeId:guid}",
+            async (int id, int name2Id, Guid nodeId) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string selectSql = """
+                WITH RECURSIVE subtree AS (
+                    SELECT id, file_path FROM client_nodes
+                    WHERE id = @nodeId AND client_id = @clientId AND name2_id = @name2Id
+                    UNION ALL
+                    SELECT cn.id, cn.file_path FROM client_nodes cn
+                    JOIN subtree s ON cn.parent_id = s.id
+                )
+                SELECT file_path FROM subtree WHERE file_path IS NOT NULL;
+                """;
+            var filePaths = new List<string>();
+            await using (var selectCmd = new NpgsqlCommand(selectSql, conn))
+            {
+                selectCmd.Parameters.AddWithValue("nodeId", nodeId);
+                selectCmd.Parameters.AddWithValue("clientId", id);
+                selectCmd.Parameters.AddWithValue("name2Id", name2Id);
+                await using var reader = await selectCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    filePaths.Add(reader.GetString(0));
+            }
+
+            await using var deleteCmd = new NpgsqlCommand(
+                "DELETE FROM client_nodes WHERE id = @nodeId AND client_id = @clientId AND name2_id = @name2Id;", conn);
+            deleteCmd.Parameters.AddWithValue("nodeId", nodeId);
+            deleteCmd.Parameters.AddWithValue("clientId", id);
+            deleteCmd.Parameters.AddWithValue("name2Id", name2Id);
+            var affected = await deleteCmd.ExecuteNonQueryAsync();
+            if (affected == 0)
+                return Results.NotFound();
+
+            foreach (var path in filePaths)
+            {
+                try { File.Delete(path); } catch (IOException) { /* magazyn i tak jest sierocy — nie blokujemy usunięcia rekordu */ }
+            }
+
+            return Results.Ok();
+        });
+
+        // GET /api/clients/{id}/name2/{name2Id}/nodes/{nodeId}/file — pobranie pliku
+        // własnego tej Nazwy 2.
+        app.MapGet("/api/clients/{id:int}/name2/{name2Id:int}/nodes/{nodeId:guid}/file",
+            async (int id, int name2Id, Guid nodeId) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string sql = """
+                SELECT file_path, name FROM client_nodes
+                WHERE id = @nodeId AND client_id = @clientId AND name2_id = @name2Id AND node_type = 'file';
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("nodeId", nodeId);
+            cmd.Parameters.AddWithValue("clientId", id);
+            cmd.Parameters.AddWithValue("name2Id", name2Id);
+
+            string path, fileName;
+            await using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                if (!await reader.ReadAsync())
+                    return Results.NotFound();
+                path = reader.GetString(0);
+                fileName = reader.GetString(1);
+            }
+
+            if (!File.Exists(path))
+                return Results.NotFound("Plik zniknął z magazynu na dysku serwera.");
+
+            return Results.File(path, "application/octet-stream", fileName);
+        });
+
+        // GET /api/clients/{id}/name2/{name2Id}/nodes/search?query=... — szuka plików po
+        // nazwie WYŁĄCZNIE w poddrzewie tej Nazwy 2 (nie sięga do plików klienta-rodzica).
+        app.MapGet("/api/clients/{id:int}/name2/{name2Id:int}/nodes/search", async (int id, int name2Id, string query) =>
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return Results.Ok(new List<object>());
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string sql = """
+                WITH RECURSIVE tree AS (
+                    SELECT id, node_type, name, name::text AS path
+                    FROM client_nodes
+                    WHERE client_id = @clientId AND name2_id = @name2Id AND parent_id IS NULL
+                    UNION ALL
+                    SELECT cn.id, cn.node_type, cn.name, t.path || '/' || cn.name
+                    FROM client_nodes cn
+                    JOIN tree t ON cn.parent_id = t.id
+                )
+                SELECT id, path FROM tree
+                WHERE node_type = 'file' AND name ILIKE '%' || @query || '%'
+                ORDER BY path;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("clientId", id);
+            cmd.Parameters.AddWithValue("name2Id", name2Id);
+            cmd.Parameters.AddWithValue("query", query);
+
+            var result = new List<object>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                result.Add(new
+                {
+                    id = reader.GetGuid(0),
+                    path = reader.GetString(1)
+                });
+            }
+
+            return Results.Ok(result);
+        });
     }
 
-    private static async Task<bool> ClientAndParentExistAsync(NpgsqlConnection conn, int clientId, Guid? parentId)
+    private static async Task<bool> ClientAndParentExistAsync(NpgsqlConnection conn, int clientId, Guid? parentId, int? name2Id = null)
     {
-        await using var checkCmd = new NpgsqlCommand("SELECT 1 FROM clients WHERE id = @clientId;", conn);
-        checkCmd.Parameters.AddWithValue("clientId", clientId);
-        if (await checkCmd.ExecuteScalarAsync() is null)
+        await using (var checkCmd = new NpgsqlCommand("SELECT 1 FROM clients WHERE id = @clientId;", conn))
+        {
+            checkCmd.Parameters.AddWithValue("clientId", clientId);
+            if (await checkCmd.ExecuteScalarAsync() is null)
+                return false;
+        }
+
+        if (name2Id is not null && !await Name2ExistsAsync(conn, clientId, name2Id.Value))
             return false;
 
         if (parentId is null)
             return true;
 
-        await using var parentCmd = new NpgsqlCommand(
-            "SELECT 1 FROM client_nodes WHERE id = @parentId AND client_id = @clientId AND node_type = 'folder';", conn);
+        await using var parentCmd = new NpgsqlCommand("""
+            SELECT 1 FROM client_nodes
+            WHERE id = @parentId AND client_id = @clientId AND node_type = 'folder'
+                AND name2_id IS NOT DISTINCT FROM @name2Id;
+            """, conn);
         parentCmd.Parameters.AddWithValue("parentId", parentId.Value);
         parentCmd.Parameters.AddWithValue("clientId", clientId);
+        parentCmd.Parameters.AddWithValue("name2Id", (object?)name2Id ?? DBNull.Value);
         return await parentCmd.ExecuteScalarAsync() is not null;
     }
 

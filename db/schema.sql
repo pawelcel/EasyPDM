@@ -219,6 +219,7 @@ CREATE INDEX idx_client_contacts_name2 ON client_contacts (name2_id);
 CREATE TABLE client_nodes (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_id  INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    name2_id   INTEGER REFERENCES client_name2(id) ON DELETE CASCADE,  -- NULL = klient (odziedziczone, tylko do odczytu, przez każdą Nazwę 2); nie-NULL = wyłącznie ta Nazwa 2
     parent_id  UUID REFERENCES client_nodes(id) ON DELETE CASCADE,
     node_type  TEXT NOT NULL CHECK (node_type IN ('folder', 'file')),
     name       TEXT NOT NULL,
@@ -230,6 +231,7 @@ CREATE TABLE client_nodes (
 );
 CREATE INDEX idx_client_nodes_client ON client_nodes (client_id);
 CREATE INDEX idx_client_nodes_parent ON client_nodes (parent_id);
+CREATE INDEX idx_client_nodes_name2 ON client_nodes (name2_id);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON clients, client_contacts, client_nodes TO pdm_user;
 
@@ -461,4 +463,4 @@ INSERT INTO schema_migrations (filename) VALUES
     ('037_notifications.sql'), ('038_project_is_sample.sql'), ('039_system_state.sql'),
     ('040_manufacturer_product_types.sql'), ('041_manufacturer_product_subtypes.sql'),
     ('042_status_anulowana.sql'), ('043_client_name2.sql'),
-    ('044_client_name2_own_properties.sql');
+    ('044_client_name2_own_properties.sql'), ('045_client_name2_files.sql');

@@ -61,7 +61,20 @@ function countDescendants(node: TreeNode): number {
   return node.children.reduce((sum, child) => sum + 1 + countDescendants(child), 0)
 }
 
-function ClientFileTree({ clientId }: { clientId: number }) {
+// Bez name2Id -- drzewo klienta (jak dotąd). Z name2Id -- drzewo WŁASNE jednej Nazwy 2
+// (osobny magazyn węzłów, patrz ClientEndpoints.cs). readOnly wyłącza cały toolbar i akcje
+// mutujące w wierszach (zostaje tylko rozwijanie folderów i pobieranie plików) -- używane
+// do pokazania odziedziczonego drzewa klienta-rodzica w panelu Nazwy 2, tak samo jak
+// odziedziczone kontakty tam są tylko do odczytu.
+function ClientFileTree({
+  clientId,
+  name2Id,
+  readOnly = false,
+}: {
+  clientId: number
+  name2Id?: number
+  readOnly?: boolean
+}) {
   const { t } = useLanguage()
   const [nodes, setNodes] = useState<ClientNode[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,7 +88,7 @@ function ClientFileTree({ clientId }: { clientId: number }) {
   async function refetch() {
     setLoading(true)
     try {
-      setNodes(await api.getClientNodes(clientId))
+      setNodes(name2Id !== undefined ? await api.getClientName2Nodes(clientId, name2Id) : await api.getClientNodes(clientId))
     } finally {
       setLoading(false)
     }
@@ -84,7 +97,7 @@ function ClientFileTree({ clientId }: { clientId: number }) {
   useEffect(() => {
     refetch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId])
+  }, [clientId, name2Id])
 
   function toggle(id: string) {
     setExpanded((prev) => {
@@ -103,7 +116,8 @@ function ClientFileTree({ clientId }: { clientId: number }) {
   async function handleFileSelected(file: File) {
     setError("")
     try {
-      await api.uploadClientFile(clientId, uploadParentId.current, file)
+      if (name2Id !== undefined) await api.uploadClientName2File(clientId, name2Id, uploadParentId.current, file)
+      else await api.uploadClientFile(clientId, uploadParentId.current, file)
       await refetch()
     } catch {
       setError(t("client.uploadFailed"))
@@ -115,7 +129,8 @@ function ClientFileTree({ clientId }: { clientId: number }) {
     setDeletingPending(true)
     setError("")
     try {
-      await api.removeClientNode(clientId, deletingNode.id)
+      if (name2Id !== undefined) await api.removeClientName2Node(clientId, name2Id, deletingNode.id)
+      else await api.removeClientNode(clientId, deletingNode.id)
       setDeletingNode(null)
       await refetch()
     } catch {
@@ -129,40 +144,45 @@ function ClientFileTree({ clientId }: { clientId: number }) {
 
   return (
     <div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          e.target.value = ""
-          if (file) handleFileSelected(file)
-        }}
-      />
+      {!readOnly && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            e.target.value = ""
+            if (file) handleFileSelected(file)
+          }}
+        />
+      )}
 
-      <div className="mb-1 flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          <NewFolderDialog
-            trigger={
-              <Button size="icon-xs" variant="ghost" aria-label={t("client.newFolderAria")}>
-                <FolderPlus className="size-3.5" />
-              </Button>
-            }
-            onCreate={async (name) => {
-              await api.createClientFolder(clientId, null, name)
-              await refetch()
-            }}
-          />
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            aria-label={t("client.uploadFileAria")}
-            onClick={() => triggerUpload(null)}
-          >
-            <Upload className="size-3.5" />
-          </Button>
+      {!readOnly && (
+        <div className="mb-1 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <NewFolderDialog
+              trigger={
+                <Button size="icon-xs" variant="ghost" aria-label={t("client.newFolderAria")}>
+                  <FolderPlus className="size-3.5" />
+                </Button>
+              }
+              onCreate={async (name) => {
+                if (name2Id !== undefined) await api.createClientName2Folder(clientId, name2Id, null, name)
+                else await api.createClientFolder(clientId, null, name)
+                await refetch()
+              }}
+            />
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label={t("client.uploadFileAria")}
+              onClick={() => triggerUpload(null)}
+            >
+              <Upload className="size-3.5" />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <FormError>{error}</FormError>
 
@@ -176,21 +196,31 @@ function ClientFileTree({ clientId }: { clientId: number }) {
               node={node}
               depth={0}
               expanded={expanded}
+              readOnly={readOnly}
               onToggle={toggle}
               onNewFolder={async (parentId, name) => {
-                await api.createClientFolder(clientId, parentId, name)
+                if (name2Id !== undefined) await api.createClientName2Folder(clientId, name2Id, parentId, name)
+                else await api.createClientFolder(clientId, parentId, name)
                 await refetch()
               }}
               onUpload={triggerUpload}
               onRename={async (nodeId, name) => {
-                await api.renameClientNode(clientId, nodeId, name)
+                if (name2Id !== undefined) await api.renameClientName2Node(clientId, name2Id, nodeId, name)
+                else await api.renameClientNode(clientId, nodeId, name)
                 await refetch()
               }}
               onDelete={(node) => {
                 setError("")
                 setDeletingNode(node)
               }}
-              onDownload={(nodeId) => window.open(api.clientNodeDownloadUrl(clientId, nodeId), "_blank")}
+              onDownload={(nodeId) =>
+                window.open(
+                  name2Id !== undefined
+                    ? api.clientName2NodeDownloadUrl(clientId, name2Id, nodeId)
+                    : api.clientNodeDownloadUrl(clientId, nodeId),
+                  "_blank"
+                )
+              }
             />
           ))}
         </ul>
@@ -224,6 +254,7 @@ function TreeRow({
   node,
   depth,
   expanded,
+  readOnly,
   onToggle,
   onNewFolder,
   onUpload,
@@ -234,6 +265,7 @@ function TreeRow({
   node: TreeNode
   depth: number
   expanded: Set<string>
+  readOnly: boolean
   onToggle: (id: string) => void
   onNewFolder: (parentId: string, name: string) => void | Promise<void>
   onUpload: (parentId: string) => void
@@ -271,7 +303,7 @@ function TreeRow({
         )}
 
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
-          {isFolder && (
+          {isFolder && !readOnly && (
             <>
               <NewFolderDialog
                 trigger={
@@ -301,18 +333,27 @@ function TreeRow({
               <Download className="size-3.5" />
             </Button>
           )}
-          <RenameDialog
-            trigger={
-              <Button size="icon-xs" variant="ghost" aria-label={t("client.renameAria")}>
-                <Pencil className="size-3.5" />
+          {!readOnly && (
+            <>
+              <RenameDialog
+                trigger={
+                  <Button size="icon-xs" variant="ghost" aria-label={t("client.renameAria")}>
+                    <Pencil className="size-3.5" />
+                  </Button>
+                }
+                initialName={node.name}
+                onRename={(name) => onRename(node.id, name)}
+              />
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                aria-label={t("client.deleteNodeAria")}
+                onClick={() => onDelete(node)}
+              >
+                <Trash2 className="size-3.5" />
               </Button>
-            }
-            initialName={node.name}
-            onRename={(name) => onRename(node.id, name)}
-          />
-          <Button size="icon-xs" variant="ghost" aria-label={t("client.deleteNodeAria")} onClick={() => onDelete(node)}>
-            <Trash2 className="size-3.5" />
-          </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -324,6 +365,7 @@ function TreeRow({
               node={child}
               depth={depth + 1}
               expanded={expanded}
+              readOnly={readOnly}
               onToggle={onToggle}
               onNewFolder={onNewFolder}
               onUpload={onUpload}

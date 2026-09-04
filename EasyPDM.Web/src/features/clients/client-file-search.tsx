@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useLanguage } from "@/i18n/use-language"
 
-function ClientFileSearch({ clientId }: { clientId: number }) {
+function ClientFileSearch({ clientId, name2Id }: { clientId: number; name2Id?: number }) {
   const { t } = useLanguage()
   const [query, setQuery] = useState("")
   const debouncedQuery = useDebouncedValue(query, 300)
@@ -23,13 +23,17 @@ function ClientFileSearch({ clientId }: { clientId: number }) {
       return
     }
     let cancelled = false
-    api.searchClientFiles(clientId, debouncedQuery).then((data) => {
+    const search =
+      name2Id !== undefined
+        ? api.searchClientName2Files(clientId, name2Id, debouncedQuery)
+        : api.searchClientFiles(clientId, debouncedQuery)
+    search.then((data) => {
       if (!cancelled) setResults(data)
     })
     return () => {
       cancelled = true
     }
-  }, [clientId, debouncedQuery])
+  }, [clientId, name2Id, debouncedQuery])
 
   return (
     <div>
@@ -50,7 +54,11 @@ function ClientFileSearch({ clientId }: { clientId: number }) {
               {results.map((r) => (
                 <li key={r.id}>
                   <a
-                    href={api.clientNodeDownloadUrl(clientId, r.id)}
+                    href={
+                      name2Id !== undefined
+                        ? api.clientName2NodeDownloadUrl(clientId, name2Id, r.id)
+                        : api.clientNodeDownloadUrl(clientId, r.id)
+                    }
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"

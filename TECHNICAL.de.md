@@ -24,7 +24,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
 
 - **`db/schema.sql`** — das vollständige Schema von Grund auf (aktueller Stand nach allen
   Migrationen).
-- **`db/migrations/`** — Migrationen `002`–`044` für eine bereits bestehende Datenbank:
+- **`db/migrations/`** — Migrationen `002`–`045` für eine bereits bestehende Datenbank:
   Projekte, Elementtypen, Sichtbarkeit im Baum, Status/Revisionen, Materialien
   (+ Gruppen/Untergruppen), Anhänge, Stücklisten-Reihenfolge, Revisionskommentare,
   Anmeldung und Rollen, Projekteigenschaften, kaskadierendes Löschen, Reihenfolge der
@@ -40,7 +40,9 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   Hersteller-Serien/Typen samt ihren Untertypen, den Status „Storniert", die
   Umstellung von Name 2 eines Kunden von einer einzelnen Spalte auf eine 1:N-Liste
   sowie eine eigene Adresse für jede Name 2 samt `name2_id` bei Kundenkontakten (NULL =
-  gehört zum Kunden selbst, schreibgeschützt von jeder seiner Name 2 geerbt). Seit
+  gehört zum Kunden selbst, schreibgeschützt von jeder seiner Name 2 geerbt) sowie
+  dieselbe `name2_id`-Aufteilung bei `client_nodes`, sodass jede Name 2 ihre eigenen
+  Dateien haben kann, unabhängig vom Dateibaum des Kunden selbst. Seit
   Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
   resources) und werden **automatisch bei jedem Start** angewendet — siehe
   `MigrationRunner.cs` und "Inbetriebnahme" unten — sie müssen nicht mehr manuell per

@@ -24,7 +24,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`044` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`045` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -38,7 +38,9 @@ PostgreSQL 18.
   manufacturer series/types with their subtypes, the "Cancelled" status, a client's
   Name 2 becoming a 1:N list instead of a single column, and each Name 2 getting its
   own address plus a `name2_id` on client contacts (NULL = belongs to the client
-  itself, inherited read-only by every Name 2). Since migration 027, files in this folder are embedded in the program
+  itself, inherited read-only by every Name 2), and the same `name2_id` split
+  applied to `client_nodes` so each Name 2 can have its own files, independent of
+  the client's own file tree. Since migration 027, files in this folder are embedded in the program
   (embedded resources) and applied **automatically on every startup** — see
   `MigrationRunner.cs` and "How to run" below — you no longer need to run them
   manually through psql.
