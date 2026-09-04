@@ -140,9 +140,10 @@ Logowanie:
     makro, nie przeglądarka — nie ma jak temu zapobiec bez utraty automatyzacji zmiany
     nazwy pliku/eksportu STEP/BOM złożenia). Przy okazji: to WŁAŚNIE ta sesja makra jest
     tym, co loguje przeglądarkę
-    automatycznie — GET /api/auth/browser-login zamienia token makra na ciasteczko
-    przeglądarki (zob. AuthEndpoints.cs), więc logowanie w makrze i "darmowe" zalogowanie
-    przeglądarki to JEDNA, ta sama operacja, nie dwie osobne.
+    automatycznie — makro wymienia swoją sesję na jednorazowy bilet
+    (POST /api/auth/browser-bridge-ticket), a GET /api/auth/browser-login zamienia ten
+    bilet na ciasteczko przeglądarki (zob. AuthEndpoints.cs), więc logowanie w makrze i
+    "darmowe" zalogowanie przeglądarki to JEDNA, ta sama operacja, nie dwie osobne.
 
 Ograniczenia (świadomie poza zakresem pierwszej wersji):
     - Krok 2 (punkt wyżej) wymaga, żeby domyślna przeglądarka systemowa umiała otworzyć
@@ -848,20 +849,28 @@ def get_storage_root():
 def build_browser_create_url(name, ticket, suggested_item_number=None):
     """Adres, pod którym otwiera się przeglądarka systemowa zamiast natywnego formularza
     właściwości (zob. WaitForTicketDialog/submit_via_browser) — most logowania
-    token->ciasteczko (GET /api/auth/browser-login, ten sam sekret co makro już trzyma
-    w preferencjach) plus deep-link "?ticket=&name=&suggestedItemNumber=" (App.tsx /
-    pending-create-ticket.ts w aplikacji webowej). CELOWO bez projektu/rodzica/typu/wyboru
-    "nowy czy istniejący" — to WSZYSTKO wybiera się w przeglądarce: albo zwykłą, ręczną
-    nawigacją i przyciskiem "Dodaj" tam, gdzie akurat ma sens (dokładnie jak przy ręcznym
-    dodawaniu elementu przez człowieka), albo przez baner "oczekujące żądanie z makra" i
-    jego opcję dogrania do istniejącego elementu (zob. PendingTicketBanner) — bilet dołącza
-    się do NAJBLIŻSZEJ z tych dwóch akcji, niezależnie w jakim projekcie/miejscu drzewa.
-    "suggested_item_number" to PODPOWIEDŹ (nie automatyczna decyzja) dla banera — numer
-    elementu, jeśli etykieta lokalnego dokumentu wygląda jak już wcześniej wysłany przez to
-    samo makro (zob. match_existing_item w submit_via_browser). Frontend i API dzielą jeden
-    origin (Program.cs serwuje wwwroot/ z tego samego procesu), więc "redirect" to zawsze
-    ścieżka względna zaczynająca się od "/" — dokładnie to, co GET /auth/browser-login
-    akceptuje (odrzuca wszystko inne jako potencjalny open-redirect)."""
+    bilet->ciasteczko (GET /api/auth/browser-login) plus deep-link
+    "?ticket=&name=&suggestedItemNumber=" (App.tsx / pending-create-ticket.ts w aplikacji
+    webowej; UWAGA: to DWA różne bilety pod tą samą nazwą parametru na dwóch różnych
+    poziomach tego samego URL-a -- "ticket" w query stringu /auth/browser-login to
+    jednorazowy bilet logowania z POST /auth/browser-bridge-ticket, "ticket" wewnątrz
+    zakodowanego "redirect" to bilet korelacji tworzenia elementu, przekazywany jako
+    argument tej funkcji). Bilet logowania (NIE sam token sesji -- ten nigdy nie ląduje w
+    URL-u, więc nie zostaje w historii przeglądarki) jest jednorazowy i krótkotrwały: makro
+    dostaje go świeżo od API tuż przed otwarciem przeglądarki (zob. POST
+    /browser-bridge-ticket), a GET /browser-login zużywa go przy pierwszym użyciu. CELOWO
+    bez projektu/rodzica/typu/wyboru "nowy czy istniejący" — to WSZYSTKO wybiera się w
+    przeglądarce: albo zwykłą, ręczną nawigacją i przyciskiem "Dodaj" tam, gdzie akurat ma
+    sens (dokładnie jak przy ręcznym dodawaniu elementu przez człowieka), albo przez baner
+    "oczekujące żądanie z makra" i jego opcję dogrania do istniejącego elementu (zob.
+    PendingTicketBanner) — bilet dołącza się do NAJBLIŻSZEJ z tych dwóch akcji, niezależnie
+    w jakim projekcie/miejscu drzewa. "suggested_item_number" to PODPOWIEDŹ (nie
+    automatyczna decyzja) dla banera — numer elementu, jeśli etykieta lokalnego dokumentu
+    wygląda jak już wcześniej wysłany przez to samo makro (zob. match_existing_item w
+    submit_via_browser). Frontend i API dzielą jeden origin (Program.cs serwuje wwwroot/ z
+    tego samego procesu), więc "redirect" to zawsze ścieżka względna zaczynająca się od "/"
+    — dokładnie to, co GET /auth/browser-login akceptuje (odrzuca wszystko inne jako
+    potencjalny open-redirect)."""
     deep_link_params = {"ticket": ticket}
     if name:
         deep_link_params["name"] = name
@@ -869,7 +878,8 @@ def build_browser_create_url(name, ticket, suggested_item_number=None):
         deep_link_params["suggestedItemNumber"] = str(suggested_item_number)
     redirect_path = "/?" + urlencode(deep_link_params)
 
-    login_params = {"token": get_session_token() or "", "redirect": redirect_path}
+    login_ticket = api_post_json("/auth/browser-bridge-ticket", {})["ticket"]
+    login_params = {"ticket": login_ticket, "redirect": redirect_path}
     return f"{get_base_url()}/auth/browser-login?{urlencode(login_params)}"
 
 
@@ -1680,8 +1690,8 @@ def submit_via_browser(doc, target_folder):
     suggested_item_number = matched["itemNumber"] if matched else None
 
     ticket = str(uuid.uuid4())
-    url = build_browser_create_url(doc.Label, ticket, suggested_item_number)
     try:
+        url = build_browser_create_url(doc.Label, ticket, suggested_item_number)
         webbrowser.open(url)
     except Exception as e:
         QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
@@ -1870,8 +1880,8 @@ def process_assembly_tree(top_doc, target_folder=None):
             )
 
             ticket = str(uuid.uuid4())
-            url = build_browser_create_url(suggested_name, ticket)
             try:
+                url = build_browser_create_url(suggested_name, ticket)
                 webbrowser.open(url)
             except Exception as e:
                 QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))

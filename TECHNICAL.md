@@ -278,7 +278,8 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 |---|---|---|
 | POST | `/api/auth/login` \| `/logout` | login / logout — login is the only endpoint that doesn't require a session |
 | GET/PATCH | `/api/auth/me` \| `/password` | the logged-in user's data / changing YOUR OWN password |
-| GET | `/api/auth/browser-login` | token→cookie bridge for CAD macros (opens the browser already logged in) |
+| POST | `/api/auth/browser-bridge-ticket` | mints a one-time, short-lived login-bridge ticket for the caller's own session |
+| GET | `/api/auth/browser-login` | exchanges a bridge ticket (not the raw session token) for a browser cookie, for CAD macros (opens the browser already logged in) |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | account management — **administrator only** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | list/create/edit/delete a project (writes — administrator only; list filtered by access) |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | managing user-to-project assignments — **administrator only** |

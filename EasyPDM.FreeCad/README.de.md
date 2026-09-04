@@ -56,9 +56,12 @@ fertig ist (`GET /api/create-tickets/{ticket}`), und (b) die CAD-Datei selbst an
 angegebene Element anzuhängen — das erledigt weiterhin das Makro, nicht der Browser, da
 sonst die gesamte Automatik der Dateiumbenennung/des STEP-Exports/der
 Baugruppen-Stückliste verloren ginge. Dieselbe Makro-Sitzung ist übrigens auch das, was
-den Browser AUTOMATISCH anmeldet — `GET /api/auth/browser-login` tauscht das Token des
-Makros gegen ein Browser-Cookie — die Anmeldung im Makro und die "kostenlose" Anmeldung
-des Browsers sind also **ein und derselbe Vorgang**, nicht zwei getrennte.
+den Browser AUTOMATISCH anmeldet — das Makro tauscht seine Sitzung gegen ein einmaliges
+Anmelde-Bridge-Ticket (`POST /api/auth/browser-bridge-ticket`), und `GET
+/api/auth/browser-login` tauscht dieses Ticket gegen ein Browser-Cookie (das eigentliche,
+langlebige Sitzungstoken des Makros landet nie in der URL) — die Anmeldung im Makro und die
+"kostenlose" Anmeldung des Browsers sind also **ein und derselbe Vorgang**, nicht zwei
+getrennte.
 
 ## Was es tut
 

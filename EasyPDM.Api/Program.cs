@@ -100,8 +100,9 @@ app.Use(async (context, next) =>
 });
 
 var createTicketStore = new CreateTicketStore();
+var browserBridgeTicketStore = new BrowserBridgeTicketStore();
 
-app.MapAuthEndpoints(connectionString);
+app.MapAuthEndpoints(connectionString, browserBridgeTicketStore);
 app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
 app.MapProjectAccessEndpoints(connectionString);

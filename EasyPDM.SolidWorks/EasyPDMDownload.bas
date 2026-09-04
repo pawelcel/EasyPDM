@@ -22,7 +22,8 @@ Option Explicit
 '
 ' What it does:
 '   1. Picks WHICH item to download the SAME way EasyPDMUpload.bas picks a new item's
-'      home -- opens the system browser, already logged in (token->cookie bridge), on the
+'      home -- opens the system browser, already logged in (a one-time login-bridge ticket,
+'      not the macro's own session token, ends up in the URL), on the
 '      "pending request from a CAD macro" popup (mode=download), where a search box picks
 '      the Part/Assembly, exactly like EasyPDMDownload.FCMacro. The macro waits
 '      (WaitForTicket, polling GET /create-tickets/{ticket}; Escape cancels, no UserForm
@@ -792,16 +793,39 @@ Sub OpenUrlInBrowser(ByVal url As String)
     CreateObject("WScript.Shell").Run """" & url & """", 1, False
 End Sub
 
-' Address that logs the browser in (token->cookie bridge) and deep-links straight to the
-' "pending request from a CAD macro" popup for THIS ticket, in DOWNLOAD mode -- the popup
-' shows a search box immediately (no "new/duplicate/attach" choice, that only applies to
-' uploading) and completes the ticket via the SAME attach-existing endpoint used by
-' EasyPDMUpload.bas's "Attach to existing" -- it does not create or change anything, only
-' tells the macro WHICH item was picked.
+' Address that logs the browser in and deep-links straight to the "pending request from a
+' CAD macro" popup for THIS ticket, in DOWNLOAD mode -- the popup shows a search box
+' immediately (no "new/duplicate/attach" choice, that only applies to uploading) and
+' completes the ticket via the SAME attach-existing endpoint used by EasyPDMUpload.bas's
+' "Attach to existing" -- it does not create or change anything, only tells the macro WHICH
+' item was picked. NOTE: "ticket" in the /auth/browser-login query string below (the login
+' bridge ticket, minted fresh by POST /auth/browser-bridge-ticket) is a DIFFERENT thing from
+' this function's own "ticket" parameter (the download-correlation ticket, embedded inside
+' the encoded "redirect"). The login bridge ticket is one-time and short-lived -- the
+' macro's actual, long-lived session token never appears in the URL.
+' Returns "" (instead of raising) if minting the login bridge ticket fails -- this runs
+' BEFORE main()'s own "On Error GoTo Failed" boundary is set up (see main(), which only
+' wraps the flow starting after the target-folder prompt), so an uncaught error here would
+' surface as VBA's raw runtime-error dialog instead of the app's own friendly one. Shows
+' the same friendly message itself and lets the caller abort cleanly on an empty result.
 Function BuildBrowserDownloadUrl(ByVal ticket As String) As String
     Dim redirectPath As String
     redirectPath = "/?ticket=" & UrlEncode(ticket) & "&mode=download"
-    BuildBrowserDownloadUrl = GetBaseUrl() & "/auth/browser-login?token=" & UrlEncode(GetSessionToken()) & "&redirect=" & UrlEncode(redirectPath)
+
+    On Error GoTo TicketFailed
+    Dim loginTicketResponse As Object
+    Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
+    On Error GoTo 0
+    Dim loginTicket As String
+    loginTicket = JsonGetString(loginTicketResponse, "ticket")
+
+    BuildBrowserDownloadUrl = GetBaseUrl() & "/auth/browser-login?ticket=" & UrlEncode(loginTicket) & "&redirect=" & UrlEncode(redirectPath)
+    Exit Function
+
+TicketFailed:
+    LogLine "POST /auth/browser-bridge-ticket -> ERROR (" & Err.Number & "): " & Err.Description
+    MsgBox T("ErrorPrefix") & Err.Description, vbCritical, T("AppTitle")
+    BuildBrowserDownloadUrl = ""
 End Function
 
 ' Polls GET /create-tickets/{ticket} until the user picks an item in the browser, the wait
@@ -1407,7 +1431,13 @@ Sub main()
     ' WaitForTicket above).
     Dim ticket As String
     ticket = NewGuid()
-    OpenUrlInBrowser BuildBrowserDownloadUrl(ticket)
+    Dim browserUrl As String
+    browserUrl = BuildBrowserDownloadUrl(ticket)
+    If browserUrl = "" Then
+        LogLine "=== Finished: could not start the browser login bridge ==="
+        Exit Sub
+    End If
+    OpenUrlInBrowser browserUrl
 
     Dim ticketData As Object
     Set ticketData = WaitForTicket(ticket)

@@ -138,6 +138,10 @@ All notable changes to EasyPDM are documented in this file.
 - In the "Add item" dialog, changing the selected parent could leave the create-mode
   selector on a mode the new parent doesn't accept (e.g. Folder under an Assembly),
   which the backend then rejected with a raw error instead of the UI preventing it.
+- The CAD-macro "log the browser in automatically" bridge put the macro's actual,
+  30-day session token directly in the URL opened in the system browser, where it
+  could persist in browser history. It now goes through a one-time, short-lived
+  exchange ticket instead — the real session token never appears in a URL.
 
 ## [0.1.1]
 

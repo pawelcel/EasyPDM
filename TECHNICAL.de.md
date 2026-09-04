@@ -306,7 +306,8 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 |---|---|---|
 | POST | `/api/auth/login` \| `/logout` | Anmeldung / Abmeldung — Login ist der einzige Endpunkt ohne erforderliche Sitzung |
 | GET/PATCH | `/api/auth/me` \| `/password` | Daten des angemeldeten Benutzers / Änderung des EIGENEN Passworts |
-| GET | `/api/auth/browser-login` | Token→Cookie-Brücke für CAD-Makros (öffnet den Browser bereits angemeldet) |
+| POST | `/api/auth/browser-bridge-ticket` | stellt ein einmaliges, kurzlebiges Anmelde-Ticket für die eigene Sitzung des Aufrufers aus |
+| GET | `/api/auth/browser-login` | tauscht ein Anmelde-Ticket (nicht das rohe Sitzungstoken) gegen ein Browser-Cookie, für CAD-Makros (öffnet den Browser bereits angemeldet) |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | Kontenverwaltung — **nur Administrator** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | Liste/Erstellung/Bearbeitung/Löschung eines Projekts (Schreiben — nur Administrator; Liste nach Zugriff gefiltert) |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | Verwaltung von Benutzer-Projekt-Zuweisungen — **nur Administrator** |

@@ -39,7 +39,7 @@ static class AuthEndpoints
         }
     }
 
-    public static void MapAuthEndpoints(this WebApplication app, string connectionString)
+    public static void MapAuthEndpoints(this WebApplication app, string connectionString, BrowserBridgeTicketStore ticketStore)
     {
         // POST /api/auth/login   body: { "username": "...", "password": "..." }
         app.MapPost("/api/auth/login", async (HttpContext ctx, LoginRequest body) =>
@@ -138,6 +138,21 @@ static class AuthEndpoints
             return Results.Ok();
         });
 
+        // POST /api/auth/browser-bridge-ticket — zamienia sesję, którą makro CAD trzyma
+        // (nagłówek Cookie skonstruowany ręcznie, zob. get_session_token() w
+        // EasyPDMUpload.FCMacro) na jednorazowy, krótkotrwały bilet do otwarcia przeglądarki
+        // (GET /browser-login niżej), zamiast wysyłać tam wprost 30-dniowy token sesji.
+        // Chronione zwykłym middleware sesji (NIE ma go na liście wyjątków w Program.cs) —
+        // tylko już zalogowany klient (makro z ważnym tokenem) może sobie wystawić bilet.
+        app.MapPost("/api/auth/browser-bridge-ticket", (HttpContext ctx) =>
+        {
+            if (!ctx.Request.Cookies.TryGetValue(CookieName, out var token) || string.IsNullOrEmpty(token))
+                return Results.Unauthorized();
+
+            var ticket = ticketStore.Issue(token);
+            return Results.Ok(new { ticket });
+        });
+
         // GET /api/auth/me — middleware już zagwarantował, że jest zalogowany (inaczej 401
         // zanim ten handler w ogóle by się wykonał).
         app.MapGet("/api/auth/me", (HttpContext ctx) =>
@@ -146,18 +161,21 @@ static class AuthEndpoints
             return Results.Ok(ToPublicUser(user));
         });
 
-        // GET /api/auth/browser-login?token=...&redirect=...   most token -> ciasteczko dla
+        // GET /api/auth/browser-login?ticket=...&redirect=...   most bilet -> ciasteczko dla
         // przeglądarki otwartej przez makro CAD (które ma już własną sesję zapisaną lokalnie,
         // np. w preferencjach FreeCAD) — pozwala otworzyć przeglądarkę systemową od razu
-        // zalogowaną, bez ponownego wpisywania hasła. Token to ten sam token sesji, który
-        // makro i tak już trzyma jako sekret (por. sessionToken w /auth/login) — most nie
-        // wprowadza nowego sekretu, tylko przenosi istniejący z jednego klienta HTTP do
-        // drugiego. Wyjątek od middleware w Program.cs (musi działać BEZ ciasteczka).
-        app.MapGet("/api/auth/browser-login", async (HttpContext ctx, string? token, string? redirect) =>
+        // zalogowaną, bez ponownego wpisywania hasła. "ticket" to jednorazowy, krótkotrwały
+        // bilet z POST /browser-bridge-ticket wyżej, NIE sam token sesji -- dzięki temu
+        // prawdziwy, 30-dniowy sekret nigdy nie ląduje w URL-u otwieranym w przeglądarce (a
+        // więc ani w jej historii, ani w ewentualnych logach) i nawet powtórne otwarcie tego
+        // samego URL-a nic już nie daje (bilet zużywa się przy pierwszym użyciu). Wyjątek od
+        // middleware w Program.cs (musi działać BEZ ciasteczka).
+        app.MapGet("/api/auth/browser-login", async (HttpContext ctx, string? ticket, string? redirect) =>
         {
             var target = SanitizeRedirect(redirect);
 
-            if (!string.IsNullOrEmpty(token))
+            var token = string.IsNullOrEmpty(ticket) ? null : ticketStore.TryConsume(ticket);
+            if (token is not null)
             {
                 var session = await ValidateToken(connectionString, token);
                 if (session is not null)

@@ -268,7 +268,8 @@ usunąć (`DELETE /api/notifications/{id}`).
 |---|---|---|
 | POST | `/api/auth/login` \| `/logout` | logowanie / wylogowanie — login to jedyny endpoint bez wymaganej sesji |
 | GET/PATCH | `/api/auth/me` \| `/password` | dane zalogowanego użytkownika / zmiana WŁASNEGO hasła |
-| GET | `/api/auth/browser-login` | most token→ciasteczko dla makr CAD (otwiera przeglądarkę już zalogowaną) |
+| POST | `/api/auth/browser-bridge-ticket` | wystawia jednorazowy, krótkotrwały bilet logowania dla bieżącej sesji wołającego |
+| GET | `/api/auth/browser-login` | zamienia bilet logowania (nie sam token sesji) na ciasteczko przeglądarki, dla makr CAD (otwiera przeglądarkę już zalogowaną) |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | zarządzanie kontami — **tylko administrator** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | lista/tworzenie/edycja/usunięcie projektu (zapis — tylko administrator; lista filtrowana wg dostępu) |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | zarządzanie przypisaniami użytkowników do projektów — **tylko administrator** |

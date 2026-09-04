@@ -51,10 +51,12 @@ the whole time, in order to (a) poll whether the browser has finished (`GET
 /api/create-tickets/{ticket}`), and (b) attach the CAD file itself to the indicated item
 — this is still done by the macro, not the browser, because otherwise all the automation
 around renaming the file / exporting STEP / building the assembly BOM would disappear.
-The very same macro session is also what logs the browser in AUTOMATICALLY — `GET
-/api/auth/browser-login` exchanges the macro's token for a browser cookie — so logging in
-in the macro and the browser's "free" login are **one and the same operation**, not two
-separate ones.
+The very same macro session is also what logs the browser in AUTOMATICALLY — the macro
+exchanges its session for a one-time login-bridge ticket (`POST
+/api/auth/browser-bridge-ticket`), and `GET /api/auth/browser-login` exchanges that ticket
+for a browser cookie (the macro's actual, long-lived session token never appears in the
+URL) — so logging in in the macro and the browser's "free" login are **one and the same
+operation**, not two separate ones.
 
 ## What it does
 

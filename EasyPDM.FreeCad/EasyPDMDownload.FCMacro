@@ -18,8 +18,8 @@ Co robi:
        zapamiętany w preferencjach FreeCAD, z przyciskiem "..." do zmiany) i pokazuje
        konto/Wyloguj — dokładnie jak "Wyślij do PDM" w EasyPDMUpload.FCMacro. WYBÓR,
        KTÓRĄ Część/Złożenie pobrać, zapada w PRZEGLĄDARCE SYSTEMOWEJ, nie tutaj: po
-       zatwierdzeniu folderu makro od razu otwiera przeglądarkę, już zalogowaną (most
-       token->ciasteczko), na pasku "oczekuje żądanie pobrania z makra CAD" (widoczny na
+       zatwierdzeniu folderu makro od razu otwiera przeglądarkę, już zalogowaną (jednorazowy
+       bilet logowania, nie sam token sesji makra), na pasku "oczekuje żądanie pobrania z makra CAD" (widoczny na
        każdym ekranie aplikacji webowej) z wyszukiwarką Części/Złożenia z CAŁEJ bazy (po
        numerze albo nazwie) — ten sam mechanizm co dogrywanie pliku do istniejącego
        elementu w EasyPDMUpload.FCMacro, tu użyty do wskazania "co pobrać". Po zatwierdzeniu
@@ -357,18 +357,22 @@ def set_download_folder(folder):
 
 def build_browser_download_url(ticket):
     """Adres, pod którym otwiera się przeglądarka systemowa zamiast natywnej wyszukiwarki
-    Części/Złożenia (zob. WaitForTicketDialog/main) — most logowania token->ciasteczko
-    (GET /api/auth/browser-login, ten sam sekret co makro już trzyma w preferencjach —
-    WSPÓLNYCH z EasyPDMUpload.FCMacro) plus deep-link "?ticket=&mode=download"
+    Części/Złożenia (zob. WaitForTicketDialog/main) — most logowania bilet->ciasteczko
+    (GET /api/auth/browser-login) plus deep-link "?ticket=&mode=download"
     (pending-create-ticket.ts w aplikacji webowej) — "mode=download" mówi PendingTicketBanner,
     żeby od razu pokazać samą wyszukiwarkę (bez opcji "nowy element", nieistotnej przy
     pobieraniu) i pominąć checkbox STEP (dotyczy tylko wysyłania). Element wskazuje się przez
     POST /create-tickets/{ticket}/attach-existing — ten sam endpoint co przy dogrywaniu pliku
     w EasyPDMUpload.FCMacro, tu użyty do czystego wskazania "co pobrać", bez tworzenia ani
-    zmieniania niczego. Frontend i API dzielą jeden origin, więc "redirect" to zawsze ścieżka
-    względna zaczynająca się od "/" — dokładnie to, co GET /auth/browser-login akceptuje."""
+    zmieniania niczego. "ticket" w query stringu /auth/browser-login (bilet logowania,
+    jednorazowy, świeżo pobrany z POST /auth/browser-bridge-ticket -- NIGDY sam token sesji,
+    żeby ten nie lądował w historii przeglądarki) to inny byt niż "ticket" wewnątrz
+    zakodowanego "redirect" (bilet korelacji wyboru elementu, argument tej funkcji). Frontend
+    i API dzielą jeden origin, więc "redirect" to zawsze ścieżka względna zaczynająca się od
+    "/" — dokładnie to, co GET /auth/browser-login akceptuje."""
     redirect_path = "/?" + urlencode({"ticket": ticket, "mode": "download"})
-    login_params = {"token": get_session_token() or "", "redirect": redirect_path}
+    login_ticket = api_post_json("/auth/browser-bridge-ticket", {})["ticket"]
+    login_params = {"ticket": login_ticket, "redirect": redirect_path}
     return f"{get_base_url()}/auth/browser-login?{urlencode(login_params)}"
 
 
@@ -409,6 +413,21 @@ def api_get_binary(path):
     try:
         with request.urlopen(req, timeout=120) as resp:
             return resp.read()
+    except error.HTTPError as e:
+        _raise_for_http_error(e)
+    except error.URLError as e:
+        raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
+
+
+def api_post_json(path, payload):
+    data = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    headers.update(_auth_headers())
+    req = request.Request(get_base_url() + path, data=data, method="POST", headers=headers)
+    try:
+        with request.urlopen(req, timeout=15) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body) if body else None
     except error.HTTPError as e:
         _raise_for_http_error(e)
     except error.URLError as e:
@@ -881,8 +900,8 @@ def main():
     target_dir = folder_dialog.result_folder
 
     ticket = str(uuid.uuid4())
-    url = build_browser_download_url(ticket)
     try:
+        url = build_browser_download_url(ticket)
         webbrowser.open(url)
     except Exception as e:
         QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))

@@ -49,8 +49,10 @@ formularz są w przeglądarce?** Bo makro samo musi się cały czas potrafić uw
 żeby (a) odpytać, czy przeglądarka już skończyła (`GET /api/create-tickets/{ticket}`), i
 (b) dograć sam plik CAD do wskazanego elementu — to wciąż robi makro, nie przeglądarka, bo
 inaczej zniknęłaby cała automatyka zmiany nazwy pliku / eksportu STEP / BOM-u złożenia. Ta
-sama sesja makra jest przy okazji tym, co loguje przeglądarkę AUTOMATYCZNIE —
-`GET /api/auth/browser-login` zamienia token makra na ciasteczko przeglądarki — więc
+sama sesja makra jest przy okazji tym, co loguje przeglądarkę AUTOMATYCZNIE — makro wymienia
+swoją sesję na jednorazowy bilet logowania (`POST /api/auth/browser-bridge-ticket`), a
+`GET /api/auth/browser-login` zamienia ten bilet na ciasteczko przeglądarki (prawdziwy,
+długożyjący token sesji makra nigdy nie ląduje w adresie URL) — więc
 logowanie w makrze i "darmowe" zalogowanie przeglądarki to **jedna, ta sama operacja**, nie
 dwie osobne.
 

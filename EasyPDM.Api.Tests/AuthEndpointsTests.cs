@@ -74,16 +74,15 @@ public class AuthEndpointsTests
     // AuthEndpoints.cs, GET /api/auth/browser-login) — token to sessionToken zwracany w
     // treści /auth/login, ten sam sekret, który makro i tak już trzyma lokalnie.
     [Fact]
-    public async Task Browser_login_z_poprawnym_tokenem_ustawia_sesje_i_przekierowuje()
+    public async Task Browser_login_z_poprawnym_biletem_ustawia_sesje_i_przekierowuje()
     {
         await using var factory = new EasyPDMWebApplicationFactory();
         using var loginClient = factory.CreateClient();
-        var loginResponse = await loginClient.PostAsJsonAsync("/api/auth/login", new { username = AdminUsername, password = AdminPassword });
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginBody.GetProperty("sessionToken").GetString();
+        await loginClient.PostAsJsonAsync("/api/auth/login", new { username = AdminUsername, password = AdminPassword });
+        var ticket = await MintBridgeTicket(loginClient);
 
         using var browserClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var response = await browserClient.GetAsync($"/api/auth/browser-login?token={token}&redirect=%2F%3Ffoo%3D1");
+        var response = await browserClient.GetAsync($"/api/auth/browser-login?ticket={ticket}&redirect=%2F%3Ffoo%3D1");
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("/?foo=1", response.Headers.Location?.OriginalString);
@@ -95,12 +94,43 @@ public class AuthEndpointsTests
     }
 
     [Fact]
-    public async Task Browser_login_z_bledym_tokenem_przekierowuje_bez_ustawienia_sesji()
+    public async Task Browser_login_zuzywa_bilet_jednorazowo()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var loginClient = factory.CreateClient();
+        await loginClient.PostAsJsonAsync("/api/auth/login", new { username = AdminUsername, password = AdminPassword });
+        var ticket = await MintBridgeTicket(loginClient);
+
+        using var firstClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await firstClient.GetAsync($"/api/auth/browser-login?ticket={ticket}&redirect=%2F");
+        var firstMe = await firstClient.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, firstMe.StatusCode);
+
+        // Ten sam bilet ponownie (np. z historii przeglądarki) -> już zużyty, brak sesji.
+        using var secondClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await secondClient.GetAsync($"/api/auth/browser-login?ticket={ticket}&redirect=%2F");
+        var secondMe = await secondClient.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, secondMe.StatusCode);
+    }
+
+    [Fact]
+    public async Task Browser_bridge_ticket_wymaga_sesji()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsync("/api/auth/browser-bridge-ticket", null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Browser_login_z_bledym_biletem_przekierowuje_bez_ustawienia_sesji()
     {
         await using var factory = new EasyPDMWebApplicationFactory();
         using var browserClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await browserClient.GetAsync("/api/auth/browser-login?token=nieistniejacy&redirect=%2F");
+        var response = await browserClient.GetAsync("/api/auth/browser-login?ticket=nieistniejacy&redirect=%2F");
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         var me = await browserClient.GetAsync("/api/auth/me");
@@ -116,14 +146,23 @@ public class AuthEndpointsTests
     {
         await using var factory = new EasyPDMWebApplicationFactory();
         using var loginClient = factory.CreateClient();
-        var loginResponse = await loginClient.PostAsJsonAsync("/api/auth/login", new { username = AdminUsername, password = AdminPassword });
-        var loginBody = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginBody.GetProperty("sessionToken").GetString();
+        await loginClient.PostAsJsonAsync("/api/auth/login", new { username = AdminUsername, password = AdminPassword });
+        var ticket = await MintBridgeTicket(loginClient);
 
         using var browserClient = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var response = await browserClient.GetAsync($"/api/auth/browser-login?token={token}&redirect={Uri.EscapeDataString(maliciousRedirect)}");
+        var response = await browserClient.GetAsync($"/api/auth/browser-login?ticket={ticket}&redirect={Uri.EscapeDataString(maliciousRedirect)}");
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("/", response.Headers.Location?.OriginalString);
+    }
+
+    // Bilet mostu logowania (POST /auth/browser-bridge-ticket) -- wymaga już zalogowanego
+    // klienta (ciasteczko sesji), taki jak CAD-owe makro autoryzujące się nagłówkiem Cookie
+    // zbudowanym ręcznie z tokenu, który już trzyma.
+    private static async Task<string> MintBridgeTicket(HttpClient loginClient)
+    {
+        var response = await loginClient.PostAsync("/api/auth/browser-bridge-ticket", null);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return body.GetProperty("ticket").GetString()!;
     }
 }

@@ -39,7 +39,7 @@ Option Explicit
 '     like before. No browser involved: SolidWorks already knows the target with
 '     certainty, a browser round-trip would add nothing.
 '   - Document NOT yet linked: opens the SAME web browser flow as EasyPDMUpload.FCMacro
-'     (already logged in via a token->cookie bridge link, see "Logowanie" below) on the
+'     (already logged in via a one-time login-bridge ticket, see "Logowanie" below) on the
 '     "pending request from a CAD macro" popup -- "New item" / "Duplicate" / "Attach to
 '     existing" all decided THERE, not locally, exactly like the FreeCAD macro. The macro
 '     waits (WaitForTicket, polling GET /create-tickets/{ticket}; Escape cancels, no
@@ -978,7 +978,7 @@ End Sub
 ' Browser ticket flow -- lets the web app (already running, same backend) decide "new item
 ' vs duplicate vs attach to existing" instead of a native dialog, exactly like
 ' EasyPDM.FreeCad/EasyPDMUpload.FCMacro's submit_via_browser. The macro: generates a GUID
-' ticket, opens the browser on the token->cookie bridge (GET /api/auth/browser-login) with
+' ticket, opens the browser on the login bridge (GET /api/auth/browser-login) with
 ' a deep-link to "?ticket=...", waits (WaitForTicket) while the user resolves it in the
 ' "pending request from a CAD macro" popup, then reads back what happened via
 ' GET /api/create-tickets/{ticket}.
@@ -1058,18 +1058,27 @@ Sub OpenUrlInBrowser(ByVal url As String)
     CreateObject("WScript.Shell").Run """" & url & """", 1, False
 End Sub
 
-' Address that logs the browser in (token->cookie bridge, same secret the macro already
-' holds for its own API calls) and deep-links straight to the "pending request from a CAD
-' macro" popup for THIS ticket -- see pending-create-ticket.ts/PendingTicketBanner in the
-' web app. Deliberately WITHOUT a suggested item number hint (unlike the FreeCAD version):
-' this macro already has a MORE reliable way to recognize "already uploaded" via Custom
-' Properties (see GetLinkedItemId), so there is nothing useful to suggest here.
+' Address that logs the browser in and deep-links straight to the "pending request from a
+' CAD macro" popup for THIS ticket -- see pending-create-ticket.ts/PendingTicketBanner in
+' the web app. Deliberately WITHOUT a suggested item number hint (unlike the FreeCAD
+' version): this macro already has a MORE reliable way to recognize "already uploaded" via
+' Custom Properties (see GetLinkedItemId), so there is nothing useful to suggest here.
+' NOTE: "ticket" in the /auth/browser-login query string below (the login bridge ticket,
+' minted fresh by POST /auth/browser-bridge-ticket) is a DIFFERENT thing from the "ticket"
+' parameter of THIS function (the create-correlation ticket, embedded inside the encoded
+' "redirect"). The login bridge ticket is one-time and short-lived -- the macro's actual,
+' long-lived session token never appears in the URL, so it can't leak via browser history.
 Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String) As String
     Dim redirectPath As String
     redirectPath = "/?ticket=" & UrlEncode(ticket)
     If name <> "" Then redirectPath = redirectPath & "&name=" & UrlEncode(name)
 
-    BuildBrowserCreateUrl = GetBaseUrl() & "/auth/browser-login?token=" & UrlEncode(GetSessionToken()) & "&redirect=" & UrlEncode(redirectPath)
+    Dim loginTicketResponse As Object
+    Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
+    Dim loginTicket As String
+    loginTicket = JsonGetString(loginTicketResponse, "ticket")
+
+    BuildBrowserCreateUrl = GetBaseUrl() & "/auth/browser-login?ticket=" & UrlEncode(loginTicket) & "&redirect=" & UrlEncode(redirectPath)
 End Function
 
 ' Polls GET /create-tickets/{ticket} until the user resolves it in the browser, the wait
