@@ -13,10 +13,12 @@ function AddTagRow({
   onAdd,
   className,
   placeholder,
+  disabled,
 }: {
   onAdd: (name: string) => void | Promise<void>
   className?: string
   placeholder?: string
+  disabled?: boolean
 }) {
   const { t } = useLanguage()
   const [value, setValue] = useState("")
@@ -52,9 +54,9 @@ function AddTagRow({
           }}
           placeholder={placeholder ?? t("item.newTagPlaceholder")}
           className="h-7 text-[13px]"
-          disabled={submitting}
+          disabled={submitting || disabled}
         />
-        <Button size="sm" variant="secondary" onClick={submit} disabled={submitting}>
+        <Button size="sm" variant="secondary" onClick={submit} disabled={submitting || disabled}>
           {t("common.add")}
         </Button>
       </div>

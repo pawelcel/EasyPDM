@@ -538,18 +538,38 @@ static class SettingsEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            await using var countCmd = new NpgsqlCommand(
-                "SELECT COUNT(*) FROM items WHERE item_number >= @nextNumber;", conn);
-            countCmd.Parameters.AddWithValue("nextNumber", body.NextNumber);
-            var count = (long)(await countCmd.ExecuteScalarAsync())!;
-            if (count > 0)
-                return Results.BadRequest(
-                    $"Nie można cofnąć numeracji do {body.NextNumber} -- w bazie jest już element z numerem " +
-                    $"{body.NextNumber} lub wyższym. Usuń go (albo wybierz niższy numer) i spróbuj ponownie.");
+            // LOCK TABLE items w tej samej transakcji co sprawdzenie i cofnięcie sekwencji --
+            // bez tego dwa oddzielne round-tripy (SELECT COUNT, potem ALTER SEQUENCE) miały
+            // okno na wyścig: równoległe tworzenie nowego elementu (nextval() + INSERT INTO
+            // items) mogło wpaść między nie i "zabrać" numer, który za chwilę zostałby i tak
+            // przydzielony ponownie przez zresetowaną sekwencję -- duplikat item_number.
+            // EXCLUSIVE blokuje wszelkie równoległe INSERT/UPDATE na items (wymaga co
+            // najmniej ROW EXCLUSIVE), więc taki INSERT po prostu poczeka na zatwierdzenie
+            // tej (krótkiej, tylko-admin) transakcji zamiast wchodzić w kolizję.
+            await using var tx = await conn.BeginTransactionAsync();
 
-            await using var resetCmd = new NpgsqlCommand(
-                $"ALTER SEQUENCE item_number_seq RESTART WITH {body.NextNumber};", conn);
-            await resetCmd.ExecuteNonQueryAsync();
+            await using (var lockCmd = new NpgsqlCommand("LOCK TABLE items IN EXCLUSIVE MODE;", conn, tx))
+                await lockCmd.ExecuteNonQueryAsync();
+
+            await using (var countCmd = new NpgsqlCommand(
+                "SELECT COUNT(*) FROM items WHERE item_number >= @nextNumber;", conn, tx))
+            {
+                countCmd.Parameters.AddWithValue("nextNumber", body.NextNumber);
+                var count = (long)(await countCmd.ExecuteScalarAsync())!;
+                if (count > 0)
+                {
+                    await tx.RollbackAsync();
+                    return Results.BadRequest(
+                        $"Nie można cofnąć numeracji do {body.NextNumber} -- w bazie jest już element z numerem " +
+                        $"{body.NextNumber} lub wyższym. Usuń go (albo wybierz niższy numer) i spróbuj ponownie.");
+                }
+            }
+
+            await using (var resetCmd = new NpgsqlCommand(
+                $"ALTER SEQUENCE item_number_seq RESTART WITH {body.NextNumber};", conn, tx))
+                await resetCmd.ExecuteNonQueryAsync();
+
+            await tx.CommitAsync();
 
             return Results.Ok();
         });

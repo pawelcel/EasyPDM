@@ -41,6 +41,12 @@ static class TagEndpoints
             if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
                 return ItemEndpoints.ProjectAccessForbidden();
 
+            if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
+                return Results.BadRequest("Tagi można zmieniać tylko w statusie 'W pracy'.");
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
+
             const string sql = """
                 INSERT INTO tags (name) VALUES (@name)
                 ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
@@ -76,6 +82,12 @@ static class TagEndpoints
 
             if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
                 return ItemEndpoints.ProjectAccessForbidden();
+
+            if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
+                return Results.BadRequest("Tagi można zmieniać tylko w statusie 'W pracy'.");
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
+                return ItemEndpoints.OwnerLockedForbidden();
 
             const string sql = """
                 DELETE FROM item_tags

@@ -433,13 +433,18 @@ function ItemDetailPanel({
       <div className="flex flex-wrap gap-1.5">
         {item.tags.length > 0 ? (
           item.tags.map((tag) => (
-            <TagPill key={tag} name={tag} onRemove={() => handleRemoveTag(tag)} />
+            <TagPill
+              key={tag}
+              name={tag}
+              onRemove={() => handleRemoveTag(tag)}
+              removable={!isLocked(item) && ownerEditable}
+            />
           ))
         ) : (
           <Hint>{t("item.noTags")}</Hint>
         )}
       </div>
-      <AddTagRow onAdd={handleAddTag} className="mt-2" />
+      <AddTagRow onAdd={handleAddTag} className="mt-2" disabled={isLocked(item) || !ownerEditable} />
 
       <SectionLabel>{t("item.properties")}</SectionLabel>
       {/* Część ma komplet pól zależnych od rodzaju i nie potrzebuje edytora surowych

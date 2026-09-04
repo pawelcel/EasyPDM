@@ -118,6 +118,26 @@ All notable changes to EasyPDM are documented in this file.
   even when it was only displaying a blocking error (e.g. an assembly rejected from
   "Released" because it contains a cancelled item) — "Confirm" did nothing in that
   case. Now shows a single "OK" button instead.
+- Deleting an item completely could silently corrupt a shared assembly's BOM: if a
+  descendant of the deleted item was also used elsewhere (correctly kept), a part
+  reachable ONLY through that surviving descendant could still get deleted along with
+  it, breaking the surviving assembly's structure with no error or warning.
+- Adding or removing a tag never checked the item's owner lock or status — anyone
+  with project access could tag/untag an item locked by someone else, or one outside
+  "In progress", unlike every other property of the item.
+- The BOM CSV export didn't guard against formula/CSV injection: a manufacturer/
+  material/order-number value starting with `=`, `+`, `-` or `@` could execute as a
+  formula when the exported file was opened in Excel/Sheets.
+- Login had no rate limiting — the shipped default `admin`/`admin` account could be
+  brute-forced with unlimited attempts. Now locks out after repeated failures.
+- The session cookie was missing the `Secure` flag when served over HTTPS.
+- Resetting the item-number sequence (Settings → Numbering) had a narrow race: a
+  concurrently created item could grab a number just as the sequence was being
+  rewound, risking a future duplicate `item_number`. Now serialized behind a
+  transaction and table lock.
+- In the "Add item" dialog, changing the selected parent could leave the create-mode
+  selector on a mode the new parent doesn't accept (e.g. Folder under an Assembly),
+  which the backend then rejected with a raw error instead of the UI preventing it.
 
 ## [0.1.1]
 

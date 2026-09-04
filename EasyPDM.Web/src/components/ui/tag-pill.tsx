@@ -12,11 +12,13 @@ function TagPill({
   onRemove,
   onSelect,
   selected,
+  removable = true,
 }: {
   name: string
   onRemove: () => void
   onSelect?: () => void
   selected?: boolean
+  removable?: boolean
 }) {
   const { t } = useLanguage()
 
@@ -32,14 +34,16 @@ function TagPill({
       ) : (
         name
       )}
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={t("tag.removeAria", { name })}
-        className="rounded-full text-muted-foreground hover:text-destructive"
-      >
-        <X className="size-3" />
-      </button>
+      {removable && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={t("tag.removeAria", { name })}
+          className="rounded-full text-muted-foreground hover:text-destructive"
+        >
+          <X className="size-3" />
+        </button>
+      )}
     </Badge>
   )
 }

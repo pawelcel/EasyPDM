@@ -181,6 +181,18 @@ function AddNodeDialog({
     ? rawAvailableModes.filter((m): m is "part" | "assembly" => m === "part" || m === "assembly")
     : rawAvailableModes
   const [mode, setMode] = useState<Mode>(initialMode ?? lockMode ?? availableModes[0] ?? "folder")
+  // Zmiana wybranego rodzica (albo projektu, co czyści rodzica) może uczynić bieżący "mode"
+  // niedostępnym pod nowym rodzicem (np. Złożenie nie przyjmuje Folderu) — bez tego
+  // przyciski trybu poprawnie by się ukryły, ale stan "mode" zostałby przy starym,
+  // niedostępnym wyborze i formularz dalej by go renderował, prowadząc do odrzuconego przez
+  // backend zgłoszenia zamiast zablokowania tego w samym UI.
+  const availableModesKey = availableModes.join(",")
+  useEffect(() => {
+    if (!lockMode && !availableModes.includes(mode)) {
+      setMode(availableModes[0] ?? "folder")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableModesKey, lockMode])
   const [allItems, setAllItems] = useState<Item[]>([])
 
   // Folder / Część

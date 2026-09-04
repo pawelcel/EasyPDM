@@ -1066,6 +1066,23 @@ static class ItemEndpoints
                     return Results.NotFound();
             }
 
+            // "descendants" = wszystko osiągalne z @id. Element inny niż @id ma zostać
+            // skasowany TYLKO jeśli WSZYSCY jego rodzice też zostaną skasowani (żaden
+            // rodzic nie "przeżywa") -- to wymaga fixpointu, bo przeżycie jest zaraźliwe
+            // w dół: jeśli rodzic X przeżywa, to każde jego dziecko w tym poddrzewie też
+            // przeżywa (relacja (X, dziecko) zostaje, bo X nie jest kasowany).
+            // "survivors" liczy to jako rosnący fixpoint: baza -- element ma rodzica SPOZA
+            // descendants (współdzielenie z zupełnie inną gałęzią) -- krok rekurencyjny --
+            // dziecko elementu, który już wiadomo, że przeżywa, też przeżywa. @id sam nigdy
+            // nie trafia do survivors (jest kasowany bezwarunkowo, to jawny cel operacji).
+            //
+            // Poprzednia wersja sprawdzała "czy rodzic jest poza descendants" zamiast "czy
+            // rodzic przeżywa" -- błędnie kasowała element, którego JEDYNY rodzic sam
+            // przeżył (bo miał inny wpięcie gdzie indziej), zamiast zostawić też jego
+            // dzieci nietknięte. Przykład: R (kasowane) -> A -> P, a A ma DODATKOWO rodzica
+            // Z spoza poddrzewa R. A poprawnie przeżywa, ale stara wersja i tak kasowała P
+            // (bo jedyny rodzic P, czyli A, był "w descendants"), cichо psując BOM złożenia
+            // A, mimo że admin nigdy go nie dotknął.
             const string selectSql = """
                 WITH RECURSIVE descendants AS (
                     SELECT @id::uuid AS item_id
@@ -1073,17 +1090,20 @@ static class ItemEndpoints
                     SELECT ir.child_id FROM item_relations ir
                     JOIN descendants d ON ir.parent_id = d.item_id
                 ),
-                to_delete AS (
-                    SELECT d.item_id FROM descendants d
-                    WHERE d.item_id = @id
-                       OR NOT EXISTS (
-                            SELECT 1 FROM item_relations ir2
-                            WHERE ir2.child_id = d.item_id
-                              AND ir2.parent_id NOT IN (SELECT item_id FROM descendants)
-                          )
+                survivors AS (
+                    SELECT ir.child_id AS item_id
+                    FROM item_relations ir
+                    WHERE ir.child_id IN (SELECT item_id FROM descendants WHERE item_id <> @id)
+                      AND ir.parent_id NOT IN (SELECT item_id FROM descendants)
+                    UNION
+                    SELECT ir.child_id
+                    FROM item_relations ir
+                    JOIN survivors s ON ir.parent_id = s.item_id
+                    WHERE ir.child_id IN (SELECT item_id FROM descendants WHERE item_id <> @id)
                 )
                 SELECT i.id, i.file_path FROM items i
-                JOIN to_delete td ON td.item_id = i.id;
+                JOIN descendants d ON d.item_id = i.id
+                WHERE d.item_id = @id OR d.item_id NOT IN (SELECT item_id FROM survivors);
                 """;
 
             var idsToDelete = new List<Guid>();

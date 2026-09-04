@@ -216,8 +216,14 @@ static class BomEndpoints
             ? value.GetString() ?? ""
             : "";
 
+    // Właściwości (material/manufacturer/orderNumber/...) to wolny tekst wpisywany przez
+    // dowolnego użytkownika projektu -- wartość zaczynająca się od =/+/-/@ jest w Excelu/
+    // Sheets interpretowana jako formuła (CSV/formula injection). Wiodący apostrof
+    // wymusza traktowanie komórki jako tekstu bez zmiany widocznej wartości.
     private static string CsvField(string value)
     {
+        if (value.Length > 0 && (value[0] == '=' || value[0] == '+' || value[0] == '-' || value[0] == '@' || value[0] == '\t'))
+            value = "'" + value;
         if (value.Contains(';') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
             return "\"" + value.Replace("\"", "\"\"") + "\"";
         return value;

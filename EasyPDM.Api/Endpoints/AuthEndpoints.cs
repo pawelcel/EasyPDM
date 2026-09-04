@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using Npgsql;
 
@@ -9,6 +10,35 @@ static class AuthEndpoints
     private const string CookieName = "pdm_session";
     private static readonly TimeSpan SessionLifetime = TimeSpan.FromDays(30);
 
+    // Prosta ochrona przed brute-force na /auth/login: w pamięci procesu (jeden node
+    // API, więc nie trzeba rozproszonego stanu), licznik nieudanych prób per nazwa
+    // użytkownika (case-insensitive, tak jak samo pole username w bazie). Po
+    // MaxFailedAttempts kolejnych porażkach z rzędu, konto jest tymczasowo blokowane na
+    // LockoutDuration -- reset licznika przy udanym logowaniu. Świadomie per-username, nie
+    // per-IP (atakujący łatwo rotuje IP, nazwa użytkownika jest tym, co faktycznie chroni
+    // przed odgadnięciem domyślnego hasła "admin"/"admin").
+    private static readonly ConcurrentDictionary<string, LoginAttemptState> FailedAttempts =
+        new(StringComparer.OrdinalIgnoreCase);
+    private const int MaxFailedAttempts = 10;
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
+    private sealed class LoginAttemptState
+    {
+        public int Count;
+        public DateTime LockedUntil;
+    }
+
+    private static void RecordFailedLogin(string username)
+    {
+        var state = FailedAttempts.GetOrAdd(username, _ => new LoginAttemptState());
+        lock (state)
+        {
+            state.Count++;
+            if (state.Count >= MaxFailedAttempts)
+                state.LockedUntil = DateTime.UtcNow.Add(LockoutDuration);
+        }
+    }
+
     public static void MapAuthEndpoints(this WebApplication app, string connectionString)
     {
         // POST /api/auth/login   body: { "username": "...", "password": "..." }
@@ -16,6 +46,16 @@ static class AuthEndpoints
         {
             if (string.IsNullOrWhiteSpace(body.Username) || string.IsNullOrWhiteSpace(body.Password))
                 return Results.BadRequest("Podaj nazwę użytkownika i hasło.");
+
+            if (FailedAttempts.TryGetValue(body.Username, out var attemptState))
+            {
+                DateTime lockedUntil;
+                lock (attemptState) { lockedUntil = attemptState.LockedUntil; }
+                if (lockedUntil > DateTime.UtcNow)
+                    return Results.Text(
+                        "Zbyt wiele nieudanych prób logowania. Spróbuj ponownie za kilka minut.",
+                        statusCode: StatusCodes.Status429TooManyRequests);
+            }
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -29,13 +69,21 @@ static class AuthEndpoints
                 await using var reader = await cmd.ExecuteReaderAsync();
                 // Ten sam komunikat dla złego loginu i złego hasła — nie zdradzamy, które z nich.
                 if (!await reader.ReadAsync())
+                {
+                    RecordFailedLogin(body.Username);
                     return Results.BadRequest("Nieprawidłowa nazwa użytkownika lub hasło.");
+                }
                 user = new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3));
                 passwordHash = reader.GetString(4);
             }
 
             if (!PasswordHasher.Verify(body.Password, passwordHash))
+            {
+                RecordFailedLogin(body.Username);
                 return Results.BadRequest("Nieprawidłowa nazwa użytkownika lub hasło.");
+            }
+
+            FailedAttempts.TryRemove(body.Username, out _);
 
             var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             var expiresAt = DateTime.UtcNow.Add(SessionLifetime);
@@ -52,6 +100,7 @@ static class AuthEndpoints
             ctx.Response.Cookies.Append(CookieName, token, new CookieOptions
             {
                 HttpOnly = true,
+                Secure = ctx.Request.IsHttps,
                 SameSite = SameSiteMode.Lax,
                 Expires = expiresAt,
                 Path = "/",
@@ -116,6 +165,7 @@ static class AuthEndpoints
                     ctx.Response.Cookies.Append(CookieName, token, new CookieOptions
                     {
                         HttpOnly = true,
+                        Secure = ctx.Request.IsHttps,
                         SameSite = SameSiteMode.Lax,
                         Expires = session.Value.ExpiresAt,
                         Path = "/",
