@@ -323,10 +323,20 @@ export interface ClientProjectSummary {
 
 // Druga nazwa/wariant handlowy tego klienta (np. spółka-córka) — jeden klient może mieć
 // kilka, stąd osobna, 1:N tabela zamiast kolumny 1:1 (zob. komentarz przy client_name2 w
-// schema.sql). Element zapisuje samą NAZWĘ w properties.clientName2, nie to id.
+// schema.sql). Element zapisuje samą NAZWĘ w properties.clientName2, nie to id. Ma WŁASNY
+// adres (location), niezależny od adresu klienta-rodzica.
 export interface ClientName2 {
   id: number
   name2: string
+  location: string | null
+}
+
+// Pełne dane jednej Nazwy 2 -- oprócz podstawowych pól (jak w ClientName2, niesionych też
+// przez listę klientów) dochodzą jej WŁASNE kontakty (name2_id ustawiony w bazie),
+// widoczne WYŁĄCZNIE tutaj. Kontakty klienta-rodzica (odziedziczone, tylko do odczytu z
+// tego poziomu) front dociąga osobno przez getClient(clientId).contacts.
+export interface ClientName2Detail extends ClientName2 {
+  contacts: ClientContact[]
 }
 
 export interface ClientDetail {

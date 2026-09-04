@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
-import { ArrowUpRight, Pencil, Trash2 } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
-import type { ClientDetail } from "@/api/types"
+import type { ClientContact, ClientName2Detail } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormError } from "@/components/ui/form-error"
@@ -12,84 +12,73 @@ import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ContactDialog } from "@/features/clients/client-contact-dialog"
-import { ClientFileSearch } from "@/features/clients/client-file-search"
-import { ClientFileTree } from "@/features/clients/client-file-tree"
 import { useLanguage } from "@/i18n/use-language"
 
-function ClientDetailPanel({
-  id,
+// Szczegóły JEDNEJ Nazwy 2 -- odpowiednik client-detail-panel.tsx, ale bez sekcji
+// Projekty/Pliki (poza zakresem: Nazwa 2 to wariant handlowy klienta, nie osobny byt z
+// własną strukturą dokumentów) i BEZ przycisku usunięcia (usuwanie zostaje wyłącznie przy
+// wierszu w liście po lewej w clients-view.tsx, żeby nie dublować tej samej akcji w dwóch
+// miejscach). Kluczowa różnica: DWIE osobne sekcje kontaktów -- odziedziczone z
+// klienta-rodzica (tylko do odczytu z tego poziomu) i własne tej Nazwy 2 (pełne CRUD).
+function ClientName2DetailPanel({
+  clientId,
+  name2Id,
   onClientsRefetch,
-  onDeleted,
-  onNavigateToProject,
 }: {
-  id: number
+  clientId: number
+  name2Id: number
   onClientsRefetch: () => void | Promise<void>
-  onDeleted: () => void
-  onNavigateToProject?: (id: string) => void
 }) {
   const { t } = useLanguage()
-  const [client, setClient] = useState<ClientDetail | null>(null)
-  const [name, setName] = useState("")
+  const [detail, setDetail] = useState<ClientName2Detail | null>(null)
+  const [parentContacts, setParentContacts] = useState<ClientContact[]>([])
+  const [name2, setName2] = useState("")
   const [location, setLocation] = useState("")
   const [nameError, setNameError] = useState("")
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [deletingPending, setDeletingPending] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [confirmingDeleteContactId, setConfirmingDeleteContactId] = useState<number | null>(null)
   const [contactDeletePending, setContactDeletePending] = useState(false)
   const [contactDeleteError, setContactDeleteError] = useState<string | null>(null)
 
   async function refetch() {
-    const data = await api.getClient(id)
-    setClient(data)
-    setName(data.name)
-    setLocation(data.location ?? "")
+    const [detailData, parentData] = await Promise.all([
+      api.getClientName2(clientId, name2Id),
+      api.getClient(clientId),
+    ])
+    setDetail(detailData)
+    setName2(detailData.name2)
+    setLocation(detailData.location ?? "")
+    setParentContacts(parentData.contacts)
   }
 
   useEffect(() => {
     refetch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [clientId, name2Id])
 
   async function save() {
-    if (!client) return
-    const trimmedName = name.trim()
-    if (!trimmedName) {
-      setName(client.name)
+    if (!detail) return
+    const trimmedName2 = name2.trim()
+    if (!trimmedName2) {
+      setName2(detail.name2)
       return
     }
     const trimmedLocation = location.trim() || null
-    if (trimmedName === client.name && trimmedLocation === client.location) {
+    if (trimmedName2 === detail.name2 && trimmedLocation === detail.location) {
       return
     }
     setNameError("")
     try {
-      await api.updateClient(id, { name: trimmedName, location: trimmedLocation })
+      await api.updateClientName2(clientId, name2Id, { name2: trimmedName2, location: trimmedLocation })
       await refetch()
       await onClientsRefetch()
     } catch (err) {
-      setName(client.name)
-      setLocation(client.location ?? "")
+      setName2(detail.name2)
+      setLocation(detail.location ?? "")
       if (err instanceof ApiError && err.status === 409) {
-        setNameError(t("client.nameConflict"))
+        setNameError(t("client.name2Conflict"))
       } else {
-        setNameError(t("client.saveNameFailed"))
+        setNameError(t("client.saveName2Failed"))
       }
-    }
-  }
-
-  async function confirmDelete() {
-    setDeletingPending(true)
-    setDeleteError(null)
-    try {
-      await api.removeClient(id)
-      setConfirmingDelete(false)
-      await onClientsRefetch()
-      onDeleted()
-    } catch (err) {
-      setDeleteError(err instanceof ApiError ? err.message : t("client.deleteFailed"))
-    } finally {
-      setDeletingPending(false)
     }
   }
 
@@ -98,10 +87,9 @@ function ClientDetailPanel({
     setContactDeletePending(true)
     setContactDeleteError(null)
     try {
-      await api.removeClientContact(id, confirmingDeleteContactId)
+      await api.removeClientName2Contact(clientId, name2Id, confirmingDeleteContactId)
       setConfirmingDeleteContactId(null)
       await refetch()
-      await onClientsRefetch()
     } catch (err) {
       setContactDeleteError(err instanceof ApiError ? err.message : t("client.deleteContactFailed"))
     } finally {
@@ -109,74 +97,69 @@ function ClientDetailPanel({
     }
   }
 
-  if (!client) return null
+  if (!detail) return null
 
-  const confirmingDeleteContact = client.contacts.find((c) => c.id === confirmingDeleteContactId) ?? null
+  const confirmingDeleteContact = detail.contacts.find((c) => c.id === confirmingDeleteContactId) ?? null
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
+        <Input
+          value={name2}
+          onChange={(e) => setName2(e.target.value)}
+          onBlur={save}
+          className="text-[15px] font-semibold"
+          placeholder={t("client.name2Label")}
+        />
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="client-name2-location">{t("client.locationLabel")}</Label>
           <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            id="client-name2-location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
             onBlur={save}
-            className="text-[15px] font-semibold"
-            placeholder={t("common.name")}
+            placeholder={t("client.locationPlaceholder")}
           />
-          <div className="flex-1 flex flex-col gap-1">
-            <Label htmlFor="client-location">{t("client.locationLabel")}</Label>
-            <Input
-              id="client-location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              onBlur={save}
-              placeholder={t("client.locationPlaceholder")}
-            />
-          </div>
-          <FormError>{nameError}</FormError>
         </div>
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => {
-            setDeleteError(null)
-            setConfirmingDelete(true)
-          }}
-        >
-          {t("client.deleteButton")}
-        </Button>
+        <FormError>{nameError}</FormError>
       </div>
 
+      {/* Odziedziczone z klienta-rodzica -- tylko do odczytu z tego poziomu (edycja i
+          dodawanie nadal wyłącznie w panelu samego klienta). */}
       <div>
-        <SectionLabel>{t("client.projectsLabel")}</SectionLabel>
-        {client.projects.length > 0 ? (
-          <ul className="mt-1 flex max-h-[7.5rem] flex-col gap-1 overflow-y-auto">
-            {client.projects.map((p) => (
-              <li key={p.id} className="flex items-center gap-2 text-[12.5px]">
-                <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                {onNavigateToProject && (
-                  <Button
-                    type="button"
-                    size="icon-xs"
-                    onClick={() => onNavigateToProject(p.id)}
-                    aria-label={t("client.goToProjectAria")}
-                    title={t("client.goToProjectAria")}
-                  >
-                    <ArrowUpRight />
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
+        <SectionLabel>{t("client.inheritedContactsLabel")}</SectionLabel>
+        <Hint>{t("client.inheritedContactsHint")}</Hint>
+        {parentContacts.length > 0 ? (
+          <Table className="mt-1">
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("common.fullName")}</TableHead>
+                <TableHead>{t("common.position")}</TableHead>
+                <TableHead>{t("common.phone")}</TableHead>
+                <TableHead>{t("common.email")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {parentContacts.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell>{[c.firstName, c.lastName].filter(Boolean).join(" ") || "-"}</TableCell>
+                  <TableCell>{c.position || "-"}</TableCell>
+                  <TableCell>{c.phone || "-"}</TableCell>
+                  <TableCell>{c.email || "-"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         ) : (
-          <Hint>{t("client.noProjects")}</Hint>
+          <Hint>{t("common.noContacts")}</Hint>
         )}
       </div>
 
+      {/* Własne kontakty TEJ Nazwy 2 -- pełne dodawanie/edycja/usuwanie, niewidoczne nigdzie
+          indziej (ani u rodzica, ani u innych Nazw 2 tego samego klienta). */}
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <SectionLabel>{t("client.contactsLabel")}</SectionLabel>
+          <SectionLabel>{t("client.ownContactsLabel", { name2: detail.name2 })}</SectionLabel>
           <ContactDialog
             trigger={
               <Button size="sm" variant="secondary">
@@ -186,14 +169,13 @@ function ClientDetailPanel({
             title={t("client.addContactTitle")}
             confirmLabel={t("common.add")}
             onSubmit={async (body) => {
-              await api.addClientContact(id, body)
+              await api.addClientName2Contact(clientId, name2Id, body)
               await refetch()
-              await onClientsRefetch()
             }}
           />
         </div>
 
-        {client.contacts.length > 0 ? (
+        {detail.contacts.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -205,7 +187,7 @@ function ClientDetailPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {client.contacts.map((c) => (
+              {detail.contacts.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell>{[c.firstName, c.lastName].filter(Boolean).join(" ") || "-"}</TableCell>
                   <TableCell>{c.position || "-"}</TableCell>
@@ -223,7 +205,7 @@ function ClientDetailPanel({
                         confirmLabel={t("common.save")}
                         initial={c}
                         onSubmit={async (body) => {
-                          await api.updateClientContact(id, c.id, body)
+                          await api.updateClientName2Contact(clientId, name2Id, c.id, body)
                           await refetch()
                         }}
                       />
@@ -246,37 +228,6 @@ function ClientDetailPanel({
         )}
       </div>
 
-      {/* Zarządzanie Nazwami 2 (dodanie/usunięcie) jest CELOWO nie tutaj, żeby nie dublować
-          płaskiej listy Nazwa/Nazwa 2 po lewej: dodanie dzieje się przez dynamiczne okno
-          "Dodaj klienta" (wpisanie już istniejącej nazwy przełącza je w tryb dodania nazwy 2,
-          zob. NewClientDialog w clients-view.tsx), a usunięcie przez ikonkę kosza
-          bezpośrednio przy wierszu tej listy. */}
-
-      <div>
-        <SectionLabel>{t("client.filesLabel")}</SectionLabel>
-        <div className="mt-1 flex flex-col gap-3">
-          <ClientFileSearch clientId={id} />
-          <ClientFileTree clientId={id} />
-        </div>
-      </div>
-
-      {confirmingDelete && (
-        <ConfirmDialog
-          open
-          title={t("client.deleteButton")}
-          description={t("client.deleteConfirmDescription", {
-            name: client.name,
-            count: client.contacts.length,
-          })}
-          confirmLabel={t("client.deleteButton")}
-          variant="destructive"
-          onConfirm={confirmDelete}
-          onCancel={() => setConfirmingDelete(false)}
-          pending={deletingPending}
-          error={deleteError}
-        />
-      )}
-
       {confirmingDeleteContact && (
         <ConfirmDialog
           open
@@ -296,4 +247,4 @@ function ClientDetailPanel({
   )
 }
 
-export { ClientDetailPanel }
+export { ClientName2DetailPanel }

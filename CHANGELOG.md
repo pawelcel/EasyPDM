@@ -57,13 +57,15 @@ All notable changes to EasyPDM are documented in this file.
   picked and cleared again if you change it. A client can now have any number of
   Name 2 entries instead of just one — so ten trade names for the same client no
   longer means ten disconnected "Client" catalog entries to pick from. The Clients
-  tab's left-hand list now shows every client alongside each of its Name 2 entries
-  as its own row (Name / Name 2, not buried in a table inside one client), and the
-  "Add client" dialog is dynamic: its name field is a picker over existing clients,
-  and typing/selecting one that already exists switches the dialog to adding that
-  client a new Name 2 (confirmed with a single "OK") instead of creating a
-  duplicate entry. Deleting a Name 2 is a one-click action right on its row in
-  that list.
+  tab's left-hand list now shows every client as a header row with its Name 2
+  entries indented underneath, and the "Add client" dialog is dynamic: its name
+  field is a picker over existing clients, and typing/selecting one that already
+  exists switches the dialog to adding that client a new Name 2 (confirmed with a
+  single "OK") instead of creating a duplicate entry. Deleting a Name 2 is a
+  one-click action right on its row in that list. Each Name 2 can now also have its
+  own address and its own contacts, kept separate from the client's — its detail
+  panel shows the client's own contacts read-only (inherited by every Name 2) above
+  a second, fully editable section for contacts added directly under that Name 2.
 
 ### Changed
 - Admins can now bypass another user's item lock for three actions: changing its

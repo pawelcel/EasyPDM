@@ -5,6 +5,7 @@ import type {
   Client,
   ClientDetail,
   ClientFileSearchResult,
+  ClientName2Detail,
   ClientNode,
   CurrentUser,
   HistoryEntry,
@@ -475,15 +476,37 @@ export const api = {
       handleResponse<{ id: number }>(r)
     ),
 
-  updateClientName2: (clientId: number, name2Id: number, name2: string) =>
+  getClientName2: (clientId: number, name2Id: number) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}`).then((r) =>
+      handleResponse<ClientName2Detail>(r)
+    ),
+
+  updateClientName2: (clientId: number, name2Id: number, body: { name2: string; location: string | null }) =>
     fetch(`${BASE}/clients/${clientId}/name2/${name2Id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name2 }),
+      body: JSON.stringify(body),
     }).then((r) => handleResponse<void>(r)),
 
   removeClientName2: (clientId: number, name2Id: number) =>
     fetch(`${BASE}/clients/${clientId}/name2/${name2Id}`, {
+      method: "DELETE",
+    }).then((r) => handleResponse<void>(r)),
+
+  addClientName2Contact: (clientId: number, name2Id: number, body: ContactWriteBody) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}/contacts`, json(body)).then((r) =>
+      handleResponse<{ id: number }>(r)
+    ),
+
+  updateClientName2Contact: (clientId: number, name2Id: number, contactId: number, body: ContactWriteBody) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeClientName2Contact: (clientId: number, name2Id: number, contactId: number) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}/contacts/${contactId}`, {
       method: "DELETE",
     }).then((r) => handleResponse<void>(r)),
 

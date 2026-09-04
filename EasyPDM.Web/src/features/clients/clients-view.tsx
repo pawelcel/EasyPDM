@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
@@ -28,35 +28,21 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { ClientDetailPanel } from "@/features/clients/client-detail-panel"
+import { ClientName2DetailPanel } from "@/features/clients/client-name2-detail-panel"
 import { useClients } from "@/features/clients/use-clients"
 import { useLanguage } from "@/i18n/use-language"
 
-// Płaska tabela: klient bez nazw 2 daje jeden wiersz (sama nazwa), klient z nazwami 2 —
-// po wierszu na każdą, KAŻDY niosący pełną parę Nazwa+Nazwa 2 (nie tylko pierwszy z nich) —
-// tak żeby każdy wiersz był samodzielną, kompletną pozycją, a nie wyglądał na coś
-// podrzędnego wobec poprzedniego. Wszystkie warianty ("Bosch — Bosch Polska" / "Bosch —
-// Bosch Rexroth" / ...) widoczne od razu w liście po lewej, bez wchodzenia w szczegóły klienta.
-function buildRows(clients: Client[]) {
-  const rows: { clientId: number; clientName: string; name2Id: number | null; name2: string | null }[] = []
-  for (const c of clients) {
-    if (c.name2s.length === 0) {
-      rows.push({ clientId: c.id, clientName: c.name, name2Id: null, name2: null })
-      continue
-    }
-    for (const n of c.name2s) {
-      rows.push({ clientId: c.id, clientName: c.name, name2Id: n.id, name2: n.name2 })
-    }
-  }
-  return rows
-}
+// Zaznaczenie w liście po lewej -- klient sam (name2Id null) albo jedna konkretna jego
+// Nazwa 2. Ten sam clientId niezależnie od tego, co dokładnie zaznaczono, bo obie ścieżki
+// (klient/Nazwa 2) trzeba umieć powiązać z powrotem z klientem-rodzicem.
+type Selection = { clientId: number; name2Id: number | null }
 
 function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: string) => void }) {
   const { t } = useLanguage()
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search, 300)
   const { clients, refetch } = useClients(debouncedSearch)
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const rows = buildRows(clients)
+  const [selection, setSelection] = useState<Selection | null>(null)
 
   const [confirmingDeleteName2, setConfirmingDeleteName2] = useState<
     { clientId: number; name2Id: number; name2: string } | null
@@ -71,6 +57,13 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
     try {
       await api.removeClientName2(confirmingDeleteName2.clientId, confirmingDeleteName2.name2Id)
       setConfirmingDeleteName2(null)
+      // Nazwa 2 właśnie usunięta była akurat zaznaczona -- cofnij zaznaczenie do samego
+      // klienta, inaczej panel po prawej dalej próbowałby pokazać coś, co już nie istnieje.
+      setSelection((current) =>
+        current?.clientId === confirmingDeleteName2.clientId && current.name2Id === confirmingDeleteName2.name2Id
+          ? { clientId: current.clientId, name2Id: null }
+          : current
+      )
       await refetch()
     } catch (err) {
       setName2DeleteError(err instanceof ApiError ? err.message : t("client.deleteName2Failed"))
@@ -93,44 +86,57 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
             clients={clients}
             onCreated={async (id) => {
               await refetch()
-              setSelectedId(id)
+              setSelection({ clientId: id, name2Id: null })
             }}
           />
         </div>
 
-        {rows.length > 0 ? (
+        {/* Grupowane: nazwa klienta jako nagłówek (pogrubiony, klikalny -> zaznacza samego
+            klienta), a pod nią, wcięte, po jednym wierszu na każdą jego Nazwę 2 (klikalny ->
+            zaznacza tę konkretną Nazwę 2, z ikonką kosza). Klient bez Nazw 2 to sam nagłówek,
+            bez niczego pod spodem. */}
+        {clients.length > 0 ? (
           <Table>
             <TableBody>
-              {rows.map((row) => (
-                <TableRow
-                  key={`${row.clientId}-${row.name2Id ?? "none"}`}
-                  onClick={() => setSelectedId(row.clientId)}
-                  data-state={selectedId === row.clientId ? "selected" : undefined}
-                  className="cursor-pointer"
-                >
-                  {/* Nazwa PEŁNA na każdym wierszu (nie tylko pierwszym) -- każdy wiersz ma
-                      być samodzielną, kompletną pozycją, nie czymś podrzędnym wobec
-                      poprzedniego (stąd też brak wcięcia "↳"). */}
-                  <TableCell>
-                    {row.clientName}
-                    {row.name2 && <span className="text-muted-foreground"> — {row.name2}</span>}
-                  </TableCell>
-                  <TableCell>
-                    {row.name2Id !== null && row.name2 !== null && (
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        aria-label={t("client.deleteName2Aria")}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setConfirmingDeleteName2({ clientId: row.clientId, name2Id: row.name2Id!, name2: row.name2! })
-                        }}
-                      >
-                        <Trash2 className="size-3.5 text-muted-foreground" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
+              {clients.map((c) => (
+                <Fragment key={c.id}>
+                  <TableRow
+                    onClick={() => setSelection({ clientId: c.id, name2Id: null })}
+                    data-state={
+                      selection?.clientId === c.id && selection.name2Id === null ? "selected" : undefined
+                    }
+                    className="cursor-pointer"
+                  >
+                    <TableCell colSpan={2} className="font-medium">
+                      {c.name}
+                    </TableCell>
+                  </TableRow>
+                  {c.name2s.map((n) => (
+                    <TableRow
+                      key={`${c.id}-${n.id}`}
+                      onClick={() => setSelection({ clientId: c.id, name2Id: n.id })}
+                      data-state={
+                        selection?.clientId === c.id && selection.name2Id === n.id ? "selected" : undefined
+                      }
+                      className="cursor-pointer"
+                    >
+                      <TableCell className="pl-6 text-muted-foreground">{n.name2}</TableCell>
+                      <TableCell className="w-8">
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={t("client.deleteName2Aria")}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setConfirmingDeleteName2({ clientId: c.id, name2Id: n.id, name2: n.name2 })
+                          }}
+                        >
+                          <Trash2 className="size-3.5 text-muted-foreground" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
               ))}
             </TableBody>
           </Table>
@@ -154,16 +160,23 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
       )}
 
       <div className="col-span-2 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-        {selectedId ? (
+        {selection === null ? (
+          <Hint>{t("client.selectHint")}</Hint>
+        ) : selection.name2Id === null ? (
           <ClientDetailPanel
-            key={selectedId}
-            id={selectedId}
+            key={selection.clientId}
+            id={selection.clientId}
             onClientsRefetch={refetch}
-            onDeleted={() => setSelectedId(null)}
+            onDeleted={() => setSelection(null)}
             onNavigateToProject={onNavigateToProject}
           />
         ) : (
-          <Hint>{t("client.selectHint")}</Hint>
+          <ClientName2DetailPanel
+            key={`${selection.clientId}-${selection.name2Id}`}
+            clientId={selection.clientId}
+            name2Id={selection.name2Id}
+            onClientsRefetch={refetch}
+          />
         )}
       </div>
     </div>

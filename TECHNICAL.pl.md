@@ -22,7 +22,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`043` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`044` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
@@ -33,8 +33,10 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   (element może istnieć bez żadnego projektu, dostępny wyłącznie przez "Cała baza"), adres
   kontaktu producenta/klienta, domyślna wartość/unikalność pozycji BOM, powiadomienia + ich
   preferencje per typ, znacznik przykładowego projektu, mała wewnętrzna tabela flag
-  `system_state`, serie/typy producenta wraz z ich podtypami, status "Anulowana" oraz
-  zamiana Nazwy 2 klienta z pojedynczej kolumny na listę 1:N. Od migracji 027 pliki z tego folderu są wbudowane
+  `system_state`, serie/typy producenta wraz z ich podtypami, status "Anulowana",
+  zamiana Nazwy 2 klienta z pojedynczej kolumny na listę 1:N oraz własny adres każdej
+  Nazwy 2 wraz z `name2_id` przy kontaktach klienta (NULL = kontakt należy do samego
+  klienta, odziedziczony tylko do odczytu przez każdą jego Nazwę 2). Od migracji 027 pliki z tego folderu są wbudowane
   w program (embedded resources) i stosowane **automatycznie przy każdym starcie** — zob.
   `MigrationRunner.cs` i "Jak uruchomić" niżej — nie trzeba ich już odpalać ręcznie przez psql.
 - **`EasyPDM.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone

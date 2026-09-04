@@ -24,7 +24,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`043` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`044` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -35,8 +35,10 @@ PostgreSQL 18.
   exist with no project, reachable only through "Whole database"), manufacturer/client
   contact address, BOM position default/uniqueness, notifications + per-type
   preferences, the sample-project marker, a small internal `system_state` flag table,
-  manufacturer series/types with their subtypes, the "Cancelled" status, and a client's
-  Name 2 becoming a 1:N list instead of a single column. Since migration 027, files in this folder are embedded in the program
+  manufacturer series/types with their subtypes, the "Cancelled" status, a client's
+  Name 2 becoming a 1:N list instead of a single column, and each Name 2 getting its
+  own address plus a `name2_id` on client contacts (NULL = belongs to the client
+  itself, inherited read-only by every Name 2). Since migration 027, files in this folder are embedded in the program
   (embedded resources) and applied **automatically on every startup** — see
   `MigrationRunner.cs` and "How to run" below — you no longer need to run them
   manually through psql.

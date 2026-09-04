@@ -187,6 +187,7 @@ CREATE TABLE client_name2 (
     id        SERIAL PRIMARY KEY,
     client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     name2     TEXT NOT NULL,
+    location  TEXT,
     UNIQUE (client_id, name2)
 );
 
@@ -195,9 +196,13 @@ CREATE INDEX idx_client_name2_client ON client_name2 (client_id);
 GRANT SELECT, INSERT, UPDATE, DELETE ON client_name2 TO pdm_user;
 GRANT USAGE, SELECT ON SEQUENCE client_name2_id_seq TO pdm_user;
 
+-- name2_id NULL -- kontakt należy do samego klienta (rodzica), odziedziczony (tylko do
+-- odczytu z tego poziomu) przez KAŻDĄ jego Nazwę 2. name2_id ustawiony -- kontakt należy
+-- WYŁĄCZNIE do tej jednej Nazwy 2, niewidoczny gdzie indziej.
 CREATE TABLE client_contacts (
     id         SERIAL PRIMARY KEY,
     client_id  INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    name2_id   INTEGER REFERENCES client_name2(id) ON DELETE CASCADE,
     first_name TEXT,
     last_name  TEXT,
     phone      TEXT,
@@ -206,6 +211,7 @@ CREATE TABLE client_contacts (
     address    TEXT
 );
 CREATE INDEX idx_client_contacts_client ON client_contacts (client_id);
+CREATE INDEX idx_client_contacts_name2 ON client_contacts (name2_id);
 
 -- Jedna tabela z node_type CHECK ('folder'/'file'), analogicznie do items.item_type, ale
 -- bez part/assembly/status/rewizji/właściciela/BOM -- tylko to, co faktycznie potrzebne
@@ -454,4 +460,5 @@ INSERT INTO schema_migrations (filename) VALUES
     ('035_item_relations_position_default.sql'), ('036_item_relations_position_unique.sql'),
     ('037_notifications.sql'), ('038_project_is_sample.sql'), ('039_system_state.sql'),
     ('040_manufacturer_product_types.sql'), ('041_manufacturer_product_subtypes.sql'),
-    ('042_status_anulowana.sql'), ('043_client_name2.sql');
+    ('042_status_anulowana.sql'), ('043_client_name2.sql'),
+    ('044_client_name2_own_properties.sql');

@@ -59,7 +59,7 @@ static class ClientEndpoints
             if (clients.Count > 0)
             {
                 const string name2Sql = """
-                    SELECT client_id, id, name2 FROM client_name2
+                    SELECT client_id, id, name2, location FROM client_name2
                     WHERE client_id = ANY(@clientIds)
                     ORDER BY name2;
                     """;
@@ -71,7 +71,7 @@ static class ClientEndpoints
                     var clientId = reader.GetInt32(0);
                     if (!name2sByClient.TryGetValue(clientId, out var list))
                         name2sByClient[clientId] = list = [];
-                    list.Add(new { id = reader.GetInt32(1), name2 = reader.GetString(2) });
+                    list.Add(ReadName2(reader, idIndex: 1, name2Index: 2, locationIndex: 3));
                 }
             }
 
@@ -114,18 +114,22 @@ static class ClientEndpoints
 
             var name2s = new List<object>();
             await using (var name2Cmd = new NpgsqlCommand(
-                "SELECT id, name2 FROM client_name2 WHERE client_id = @id ORDER BY name2;", conn))
+                "SELECT id, name2, location FROM client_name2 WHERE client_id = @id ORDER BY name2;", conn))
             {
                 name2Cmd.Parameters.AddWithValue("id", id);
                 await using var reader = await name2Cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
-                    name2s.Add(new { id = reader.GetInt32(0), name2 = reader.GetString(1) });
+                    name2s.Add(ReadName2(reader, idIndex: 0, name2Index: 1, locationIndex: 2));
             }
 
+            // WYŁĄCZNIE kontakty samego klienta (name2_id IS NULL) -- kontakty przypisane
+            // do konkretnej Nazwy 2 są odziedziczone przez nią z tego widoku (zob.
+            // GET .../name2/{name2Id} niżej), ale nie odwrotnie: nie "spływają w górę" do
+            // tego, co widać tutaj, przy samym kliencie.
             const string contactsSql = """
                 SELECT id, first_name, last_name, phone, position, email, address
                 FROM client_contacts
-                WHERE client_id = @id
+                WHERE client_id = @id AND name2_id IS NULL
                 ORDER BY last_name, first_name;
                 """;
             var contacts = new List<object>();
@@ -334,7 +338,50 @@ static class ClientEndpoints
             }
         });
 
-        // PATCH /api/clients/{id}/name2/{name2Id}   body: { "name2": "..." }
+        // GET /api/clients/{id}/name2/{name2Id} — pojedyncza Nazwa 2 razem z JEJ WŁASNYMI
+        // kontaktami (name2_id = @name2Id -- NIE kontaktami klienta-rodzica, te dociąga
+        // osobno panel po stronie frontu przez GET /api/clients/{id}, żeby dało się je
+        // pokazać w osobnej, wyraźnie podpisanej, tylko-do-odczytu sekcji zamiast mieszać
+        // je z własnymi kontaktami tej Nazwy 2).
+        app.MapGet("/api/clients/{id:int}/name2/{name2Id:int}", async (int id, int name2Id) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            string name2;
+            string? location;
+            await using (var name2Cmd = new NpgsqlCommand(
+                "SELECT name2, location FROM client_name2 WHERE id = @name2Id AND client_id = @clientId;", conn))
+            {
+                name2Cmd.Parameters.AddWithValue("name2Id", name2Id);
+                name2Cmd.Parameters.AddWithValue("clientId", id);
+                await using var reader = await name2Cmd.ExecuteReaderAsync();
+                if (!await reader.ReadAsync())
+                    return Results.NotFound();
+                name2 = reader.GetString(0);
+                location = reader.IsDBNull(1) ? null : reader.GetString(1);
+            }
+
+            const string contactsSql = """
+                SELECT id, first_name, last_name, phone, position, email, address
+                FROM client_contacts
+                WHERE client_id = @clientId AND name2_id = @name2Id
+                ORDER BY last_name, first_name;
+                """;
+            var contacts = new List<object>();
+            await using (var contactsCmd = new NpgsqlCommand(contactsSql, conn))
+            {
+                contactsCmd.Parameters.AddWithValue("clientId", id);
+                contactsCmd.Parameters.AddWithValue("name2Id", name2Id);
+                await using var reader = await contactsCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    contacts.Add(ReadContact(reader));
+            }
+
+            return Results.Ok(new { id = name2Id, name2, location, contacts });
+        });
+
+        // PATCH /api/clients/{id}/name2/{name2Id}   body: { "name2": "...", "location": "..." }
         app.MapPatch("/api/clients/{id:int}/name2/{name2Id:int}", async (int id, int name2Id, Name2Request body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name2))
@@ -344,10 +391,11 @@ static class ClientEndpoints
             await conn.OpenAsync();
 
             await using var cmd = new NpgsqlCommand(
-                "UPDATE client_name2 SET name2 = @name2 WHERE id = @name2Id AND client_id = @clientId;", conn);
+                "UPDATE client_name2 SET name2 = @name2, location = @location WHERE id = @name2Id AND client_id = @clientId;", conn);
             cmd.Parameters.AddWithValue("name2Id", name2Id);
             cmd.Parameters.AddWithValue("clientId", id);
             cmd.Parameters.AddWithValue("name2", body.Name2.Trim());
+            cmd.Parameters.AddWithValue("location", (object?)NullIfBlank(body.Location) ?? DBNull.Value);
 
             try
             {
@@ -358,6 +406,71 @@ static class ClientEndpoints
             {
                 return Results.Conflict("Ten klient ma już taką nazwę 2.");
             }
+        });
+
+        // POST/PATCH/DELETE /api/clients/{id}/name2/{name2Id}/contacts... — kontakty
+        // WŁASNE tej jednej Nazwy 2 (name2_id ustawiony), widoczne WYŁĄCZNIE tutaj -- w
+        // odróżnieniu od /api/clients/{id}/contacts wyżej, które zawsze zostają
+        // kontaktami klienta-rodzica (name2_id NULL), odziedziczonymi (tylko do odczytu)
+        // przez KAŻDĄ jego Nazwę 2 w GET /name2/{name2Id} powyżej.
+        app.MapPost("/api/clients/{id:int}/name2/{name2Id:int}/contacts", async (int id, int name2Id, ClientContactRequest body) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await Name2ExistsAsync(conn, id, name2Id))
+                return Results.NotFound("Nazwa 2 nie istnieje.");
+
+            const string sql = """
+                INSERT INTO client_contacts (client_id, name2_id, first_name, last_name, phone, position, email, address)
+                VALUES (@clientId, @name2Id, @firstName, @lastName, @phone, @position, @email, @address)
+                RETURNING id;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("name2Id", name2Id);
+            AddContactParameters(cmd, id, body);
+
+            var contactId = (int)(await cmd.ExecuteScalarAsync())!;
+            return Results.Created($"/api/clients/{id}/name2/{name2Id}/contacts/{contactId}", new { id = contactId });
+        });
+
+        // PATCH /api/clients/{id}/name2/{name2Id}/contacts/{contactId}
+        app.MapPatch("/api/clients/{id:int}/name2/{name2Id:int}/contacts/{contactId:int}",
+            async (int id, int name2Id, int contactId, ClientContactRequest body) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string sql = """
+                UPDATE client_contacts SET
+                    first_name = @firstName, last_name = @lastName, phone = @phone,
+                    position = @position, email = @email, address = @address
+                WHERE id = @contactId AND client_id = @clientId AND name2_id = @name2Id;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("contactId", contactId);
+            cmd.Parameters.AddWithValue("name2Id", name2Id);
+            AddContactParameters(cmd, id, body);
+
+            var affected = await cmd.ExecuteNonQueryAsync();
+            return affected == 0 ? Results.NotFound() : Results.Ok();
+        });
+
+        // DELETE /api/clients/{id}/name2/{name2Id}/contacts/{contactId}
+        app.MapDelete("/api/clients/{id:int}/name2/{name2Id:int}/contacts/{contactId:int}",
+            async (int id, int name2Id, int contactId) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand(
+                "DELETE FROM client_contacts WHERE id = @contactId AND client_id = @clientId AND name2_id = @name2Id;", conn);
+            cmd.Parameters.AddWithValue("contactId", contactId);
+            cmd.Parameters.AddWithValue("clientId", id);
+            cmd.Parameters.AddWithValue("name2Id", name2Id);
+            await cmd.ExecuteNonQueryAsync();
+
+            return Results.Ok();
         });
 
         // DELETE /api/clients/{id}/name2/{name2Id} — elementy, które mają tę wartość
@@ -652,6 +765,15 @@ static class ClientEndpoints
         return await parentCmd.ExecuteScalarAsync() is not null;
     }
 
+    private static async Task<bool> Name2ExistsAsync(NpgsqlConnection conn, int clientId, int name2Id)
+    {
+        await using var cmd = new NpgsqlCommand(
+            "SELECT 1 FROM client_name2 WHERE id = @name2Id AND client_id = @clientId;", conn);
+        cmd.Parameters.AddWithValue("name2Id", name2Id);
+        cmd.Parameters.AddWithValue("clientId", clientId);
+        return await cmd.ExecuteScalarAsync() is not null;
+    }
+
     private static void AddClientParameters(NpgsqlCommand cmd, ClientRequest body)
     {
         cmd.Parameters.AddWithValue("name", body.Name.Trim());
@@ -680,6 +802,13 @@ static class ClientEndpoints
         address = reader.IsDBNull(6) ? null : reader.GetString(6)
     };
 
+    private static object ReadName2(NpgsqlDataReader reader, int idIndex, int name2Index, int locationIndex) => new
+    {
+        id = reader.GetInt32(idIndex),
+        name2 = reader.GetString(name2Index),
+        location = reader.IsDBNull(locationIndex) ? null : reader.GetString(locationIndex)
+    };
+
     private static object ReadNode(NpgsqlDataReader reader) => new
     {
         id = reader.GetGuid(0),
@@ -695,6 +824,6 @@ static class ClientEndpoints
 
 record ClientRequest(string Name, string? Location);
 record ClientContactRequest(string? FirstName, string? LastName, string? Phone, string? Position, string? Email, string? Address);
-record Name2Request(string Name2);
+record Name2Request(string Name2, string? Location = null);
 record CreateFolderRequest(Guid? ParentId, string Name);
 record RenameNodeRequest(string Name);
