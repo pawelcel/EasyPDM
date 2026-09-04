@@ -19,7 +19,7 @@ static class ProjectEndpoints
             await conn.OpenAsync();
 
             const string sql = """
-                SELECT p.id, p.name, p.description, p.client, p.client_id, c.name, c.name2,
+                SELECT p.id, p.name, p.description, p.client, p.client_id, c.name,
                        p.start_date, p.end_date, p.created_at, COUNT(i.id) AS item_count
                 FROM projects p
                 LEFT JOIN items i ON i.project_id = p.id
@@ -56,7 +56,6 @@ static class ProjectEndpoints
                 VALUES (@name, @description, @clientId, @startDate, @endDate)
                 RETURNING id, name, description, client, client_id,
                     (SELECT name FROM clients WHERE clients.id = client_id) AS client_name,
-                    (SELECT name2 FROM clients WHERE clients.id = client_id) AS client_name2,
                     start_date, end_date, created_at;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -99,7 +98,6 @@ static class ProjectEndpoints
                 WHERE id = @id
                 RETURNING id, name, description, client, client_id,
                     (SELECT name FROM clients WHERE clients.id = client_id) AS client_name,
-                    (SELECT name2 FROM clients WHERE clients.id = client_id) AS client_name2,
                     start_date, end_date, created_at,
                     (SELECT COUNT(*) FROM items WHERE items.project_id = projects.id);
                 """;
@@ -197,11 +195,10 @@ static class ProjectEndpoints
         client = reader.IsDBNull(3) ? null : reader.GetString(3),
         clientId = reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4),
         clientName = reader.IsDBNull(5) ? null : reader.GetString(5),
-        clientName2 = reader.IsDBNull(6) ? null : reader.GetString(6),
-        startDate = reader.IsDBNull(7) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(7),
-        endDate = reader.IsDBNull(8) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(8),
-        createdAt = reader.GetDateTime(9),
-        itemCount = itemCount ?? reader.GetInt64(10)
+        startDate = reader.IsDBNull(6) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(6),
+        endDate = reader.IsDBNull(7) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(7),
+        createdAt = reader.GetDateTime(8),
+        itemCount = itemCount ?? reader.GetInt64(9)
     };
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);

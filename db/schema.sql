@@ -176,9 +176,24 @@ GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_subtypes_id_seq TO pdm_user
 CREATE TABLE clients (
     id       SERIAL PRIMARY KEY,
     name     TEXT NOT NULL UNIQUE,
-    name2    TEXT,
     location TEXT
 );
+
+-- Nazwa 2 klienta -- 1:N (nie kolumna 1:1 na clients), bo jeden klient może mieć kilka
+-- drugich nazw/wariantów handlowych (np. różne spółki-córki tego samego "Bosch"), tak samo
+-- jak manufacturer_product_types rozwiązuje wiele typów produktu jednego producenta.
+-- Element trzyma tylko NAZWĘ wybranej nazwy 2 w properties.clientName2, bez klucza obcego.
+CREATE TABLE client_name2 (
+    id        SERIAL PRIMARY KEY,
+    client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    name2     TEXT NOT NULL,
+    UNIQUE (client_id, name2)
+);
+
+CREATE INDEX idx_client_name2_client ON client_name2 (client_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON client_name2 TO pdm_user;
+GRANT USAGE, SELECT ON SEQUENCE client_name2_id_seq TO pdm_user;
 
 CREATE TABLE client_contacts (
     id         SERIAL PRIMARY KEY,
@@ -439,4 +454,4 @@ INSERT INTO schema_migrations (filename) VALUES
     ('035_item_relations_position_default.sql'), ('036_item_relations_position_unique.sql'),
     ('037_notifications.sql'), ('038_project_is_sample.sql'), ('039_system_state.sql'),
     ('040_manufacturer_product_types.sql'), ('041_manufacturer_product_subtypes.sql'),
-    ('042_status_anulowana.sql');
+    ('042_status_anulowana.sql'), ('043_client_name2.sql');

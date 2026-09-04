@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useClientName2s } from "@/features/clients/use-client-name2"
 import { useClients } from "@/features/clients/use-clients"
 import { useMaterials } from "@/features/materials/use-materials"
 import {
@@ -270,7 +271,8 @@ function ClientAndName2Fields({
   const { clients } = useClients("")
   const clientNames = clients.map((c) => c.name)
   const matched = clients.find((c) => c.name === clientName)
-  const name2Options = matched?.name2 ? [matched.name2] : []
+  const { name2s } = useClientName2s(clientName)
+  const name2Options = name2s.map((n) => n.name2)
   const name2Disabled = disabled || !clientName
 
   async function save(key: "client" | "clientName2", next: string) {

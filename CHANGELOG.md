@@ -53,8 +53,13 @@ All notable changes to EasyPDM are documented in this file.
 - The Client-supplied kind (Part or Assembly) now has a "Client" field, picked from
   the Clients catalog — previously there was no way to record which client a
   client-supplied item actually belongs to. Next to it, on the same line, "Name 2" —
-  that client's second name, offered only once a client is picked and cleared again
-  if you change it.
+  one of that client's second names/trade variants, offered only once a client is
+  picked and cleared again if you change it. A client can now have any number of
+  Name 2 entries (managed as a list on the client's detail panel) instead of just
+  one, and the "Add client" dialog is dynamic: typing an existing client's name
+  switches it to adding that client a new Name 2 instead of creating a duplicate
+  entry — so ten trade names for the same client no longer means ten disconnected
+  "Client" catalog entries to pick from.
 
 ### Changed
 - Admins can now bypass another user's item lock for three actions: changing its

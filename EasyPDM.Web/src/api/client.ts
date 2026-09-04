@@ -64,7 +64,6 @@ type ContactWriteBody = {
 
 type ClientWriteBody = {
   name: string
-  name2: string | null
   location: string | null
 }
 
@@ -468,6 +467,23 @@ export const api = {
 
   removeClientContact: (clientId: number, contactId: number) =>
     fetch(`${BASE}/clients/${clientId}/contacts/${contactId}`, {
+      method: "DELETE",
+    }).then((r) => handleResponse<void>(r)),
+
+  addClientName2: (clientId: number, name2: string) =>
+    fetch(`${BASE}/clients/${clientId}/name2`, json({ name2 })).then((r) =>
+      handleResponse<{ id: number }>(r)
+    ),
+
+  updateClientName2: (clientId: number, name2Id: number, name2: string) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name2 }),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeClientName2: (clientId: number, name2Id: number) =>
+    fetch(`${BASE}/clients/${clientId}/name2/${name2Id}`, {
       method: "DELETE",
     }).then((r) => handleResponse<void>(r)),
 

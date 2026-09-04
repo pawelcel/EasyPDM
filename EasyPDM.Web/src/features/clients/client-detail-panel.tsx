@@ -37,7 +37,6 @@ function ClientDetailPanel({
   const { t } = useLanguage()
   const [client, setClient] = useState<ClientDetail | null>(null)
   const [name, setName] = useState("")
-  const [name2, setName2] = useState("")
   const [location, setLocation] = useState("")
   const [nameError, setNameError] = useState("")
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -46,12 +45,17 @@ function ClientDetailPanel({
   const [confirmingDeleteContactId, setConfirmingDeleteContactId] = useState<number | null>(null)
   const [contactDeletePending, setContactDeletePending] = useState(false)
   const [contactDeleteError, setContactDeleteError] = useState<string | null>(null)
+  const [name2Input, setName2Input] = useState("")
+  const [addName2Pending, setAddName2Pending] = useState(false)
+  const [addName2Error, setAddName2Error] = useState("")
+  const [confirmingDeleteName2Id, setConfirmingDeleteName2Id] = useState<number | null>(null)
+  const [name2DeletePending, setName2DeletePending] = useState(false)
+  const [name2DeleteError, setName2DeleteError] = useState<string | null>(null)
 
   async function refetch() {
     const data = await api.getClient(id)
     setClient(data)
     setName(data.name)
-    setName2(data.name2 ?? "")
     setLocation(data.location ?? "")
   }
 
@@ -67,29 +71,59 @@ function ClientDetailPanel({
       setName(client.name)
       return
     }
-    const trimmedName2 = name2.trim() || null
     const trimmedLocation = location.trim() || null
-    if (
-      trimmedName === client.name &&
-      trimmedName2 === client.name2 &&
-      trimmedLocation === client.location
-    ) {
+    if (trimmedName === client.name && trimmedLocation === client.location) {
       return
     }
     setNameError("")
     try {
-      await api.updateClient(id, { name: trimmedName, name2: trimmedName2, location: trimmedLocation })
+      await api.updateClient(id, { name: trimmedName, location: trimmedLocation })
       await refetch()
       await onClientsRefetch()
     } catch (err) {
       setName(client.name)
-      setName2(client.name2 ?? "")
       setLocation(client.location ?? "")
       if (err instanceof ApiError && err.status === 409) {
         setNameError(t("client.nameConflict"))
       } else {
         setNameError(t("client.saveNameFailed"))
       }
+    }
+  }
+
+  async function addName2() {
+    const trimmed = name2Input.trim()
+    if (!trimmed) {
+      setAddName2Error(t("client.name2Required"))
+      return
+    }
+    setAddName2Pending(true)
+    setAddName2Error("")
+    try {
+      await api.addClientName2(id, trimmed)
+      setName2Input("")
+      await refetch()
+    } catch (err) {
+      setAddName2Error(
+        err instanceof ApiError && err.status === 409 ? t("client.name2Conflict") : t("client.addName2Failed")
+      )
+    } finally {
+      setAddName2Pending(false)
+    }
+  }
+
+  async function confirmRemoveName2() {
+    if (confirmingDeleteName2Id === null) return
+    setName2DeletePending(true)
+    setName2DeleteError(null)
+    try {
+      await api.removeClientName2(id, confirmingDeleteName2Id)
+      setConfirmingDeleteName2Id(null)
+      await refetch()
+    } catch (err) {
+      setName2DeleteError(err instanceof ApiError ? err.message : t("client.deleteName2Failed"))
+    } finally {
+      setName2DeletePending(false)
     }
   }
 
@@ -127,6 +161,7 @@ function ClientDetailPanel({
   if (!client) return null
 
   const confirmingDeleteContact = client.contacts.find((c) => c.id === confirmingDeleteContactId) ?? null
+  const confirmingDeleteName2 = client.name2s.find((n) => n.id === confirmingDeleteName2Id) ?? null
 
   return (
     <div className="flex flex-col gap-4">
@@ -139,27 +174,15 @@ function ClientDetailPanel({
             className="text-[15px] font-semibold"
             placeholder={t("common.name")}
           />
-          <div className="flex gap-2">
-            <div className="flex-1 flex flex-col gap-1">
-              <Label htmlFor="client-name2">{t("client.name2Label")}</Label>
-              <Input
-                id="client-name2"
-                value={name2}
-                onChange={(e) => setName2(e.target.value)}
-                onBlur={save}
-                placeholder={t("client.name2Placeholder")}
-              />
-            </div>
-            <div className="flex-1 flex flex-col gap-1">
-              <Label htmlFor="client-location">{t("client.locationLabel")}</Label>
-              <Input
-                id="client-location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                onBlur={save}
-                placeholder={t("client.locationPlaceholder")}
-              />
-            </div>
+          <div className="flex-1 flex flex-col gap-1">
+            <Label htmlFor="client-location">{t("client.locationLabel")}</Label>
+            <Input
+              id="client-location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              onBlur={save}
+              placeholder={t("client.locationPlaceholder")}
+            />
           </div>
           <FormError>{nameError}</FormError>
         </div>
@@ -273,6 +296,53 @@ function ClientDetailPanel({
         )}
       </div>
 
+      {/* Nazwy 2 -- podpowiedzi do wyboru przy elemencie Klienta (zob. ClientAndName2Fields).
+          Jeden klient może mieć kilka (np. różne spółki-córki) -- stąd lista z osobnym
+          dodawaniem/usuwaniem zamiast pojedynczego pola, tak samo jak Serie/Typy producenta. */}
+      <div>
+        <SectionLabel>{t("client.name2sLabel")}</SectionLabel>
+
+        <div className="mt-1 flex items-start gap-1.5">
+          <Input
+            value={name2Input}
+            onChange={(e) => setName2Input(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addName2()
+            }}
+            placeholder={t("client.name2Placeholder")}
+            className="min-w-0 flex-1"
+          />
+          <Button variant="secondary" onClick={addName2} disabled={addName2Pending}>
+            {t("common.add")}
+          </Button>
+        </div>
+        <FormError>{addName2Error}</FormError>
+
+        {client.name2s.length > 0 ? (
+          <Table className="mt-2">
+            <TableBody>
+              {client.name2s.map((n) => (
+                <TableRow key={n.id}>
+                  <TableCell>{n.name2}</TableCell>
+                  <TableCell className="w-10">
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label={t("client.deleteName2Aria")}
+                      onClick={() => setConfirmingDeleteName2Id(n.id)}
+                    >
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <Hint>{t("client.noName2s")}</Hint>
+        )}
+      </div>
+
       <div>
         <SectionLabel>{t("client.filesLabel")}</SectionLabel>
         <div className="mt-1 flex flex-col gap-3">
@@ -311,6 +381,20 @@ function ClientDetailPanel({
           onCancel={() => setConfirmingDeleteContactId(null)}
           pending={contactDeletePending}
           error={contactDeleteError}
+        />
+      )}
+
+      {confirmingDeleteName2 && (
+        <ConfirmDialog
+          open
+          title={t("client.deleteName2Aria")}
+          description={t("client.deleteName2ConfirmDescription", { name: confirmingDeleteName2.name2 })}
+          confirmLabel={t("common.delete")}
+          variant="destructive"
+          onConfirm={confirmRemoveName2}
+          onCancel={() => setConfirmingDeleteName2Id(null)}
+          pending={name2DeletePending}
+          error={name2DeleteError}
         />
       )}
     </div>

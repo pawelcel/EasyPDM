@@ -40,7 +40,6 @@ export interface Project {
   client: string | null
   clientId: number | null
   clientName: string | null
-  clientName2: string | null
   startDate: string | null
   endDate: string | null
   createdAt: string
@@ -295,13 +294,14 @@ export interface ManufacturerDetail {
 }
 
 // Lekki wpis do listy/wyszukiwarki klientów (zakładka "Klienci") — bez osób kontaktowych
-// (te dociągane są osobno, dopiero po zaznaczeniu konkretnego klienta). Osobny typ od
-// Manufacturer mimo podobieństwa — Klient ma dodatkowo name2/location i własne drzewko
-// plików (ClientNode), więc moduły są celowo niezależne.
+// (te dociągane są osobno, dopiero po zaznaczeniu konkretnego klienta) ani nazw 2 (może
+// być ich kilka na klienta, zob. ClientName2 niżej — dociągane tak samo jak
+// ManufacturerProductType, dopiero w ClientDetail). Osobny typ od Manufacturer mimo
+// podobieństwa — Klient ma dodatkowo location i własne drzewko plików (ClientNode), więc
+// moduły są celowo niezależne.
 export interface Client {
   id: number
   name: string
-  name2: string | null
   location: string | null
   contactCount: number
 }
@@ -321,11 +321,19 @@ export interface ClientProjectSummary {
   name: string
 }
 
+// Druga nazwa/wariant handlowy tego klienta (np. spółka-córka) — jeden klient może mieć
+// kilka, stąd osobna, 1:N tabela zamiast kolumny 1:1 (zob. komentarz przy client_name2 w
+// schema.sql). Element zapisuje samą NAZWĘ w properties.clientName2, nie to id.
+export interface ClientName2 {
+  id: number
+  name2: string
+}
+
 export interface ClientDetail {
   id: number
   name: string
-  name2: string | null
   location: string | null
+  name2s: ClientName2[]
   contacts: ClientContact[]
   projects: ClientProjectSummary[]
 }

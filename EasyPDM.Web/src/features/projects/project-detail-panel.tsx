@@ -39,11 +39,10 @@ function formFromProject(project: Project): ProjectForm {
   }
 }
 
-// Nazwa + (jeśli jest) Nazwa 2, do etykiety w wyszukiwarce Klienta -- ten sam wzorzec co
-// wyszukiwanie po Nazwie i Nazwie 2 w zakładce "Klienci".
+// Projekt łączy się z Klientem jako całością (nie z konkretną Nazwą 2 -- może ich mieć
+// kilka, zob. ClientName2), więc etykieta w wyszukiwarce to zawsze sama nazwa główna.
 function clientLabel(client: Client | undefined): string {
-  if (!client) return ""
-  return client.name2 ? `${client.name} — ${client.name2}` : client.name
+  return client?.name ?? ""
 }
 
 function ProjectDetailPanel({

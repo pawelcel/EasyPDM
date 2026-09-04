@@ -26,10 +26,10 @@ import { Label } from "@/components/ui/label"
 import { useClients } from "@/features/clients/use-clients"
 import { useLanguage } from "@/i18n/use-language"
 
-// Nazwa + (jeśli jest) Nazwa 2, do etykiety w wyszukiwarce Klienta.
+// Projekt łączy się z Klientem jako całością (nie z konkretną Nazwą 2 -- może ich mieć
+// kilka, zob. ClientName2), więc etykieta w wyszukiwarce to zawsze sama nazwa główna.
 function clientLabel(client: Client | undefined): string {
-  if (!client) return ""
-  return client.name2 ? `${client.name} — ${client.name2}` : client.name
+  return client?.name ?? ""
 }
 
 function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void }) {

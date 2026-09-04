@@ -154,8 +154,8 @@ Series/Type and Subtype) or Client-supplied (Client). Whatever the kind, it can 
 an optional Mass and any custom properties.
 
 **Client** — for the Client-supplied kind, picked from the same catalog as the Clients tab.
-Next to it, **Name 2** — that client's second name from the catalog (if it has one) —
-locked until you pick a client.
+Next to it, **Name 2** — one of that client's second names/trade variants from the catalog
+(a client can have several, e.g. different subsidiaries) — locked until you pick a client.
 
 **Series/Type** is an entry from the chosen manufacturer's list (Manufacturers tab), and
 **Subtype** narrows it down within that series (e.g. series "Cylindrical roller bearings"
@@ -207,10 +207,12 @@ manufacturer has a name, contact people and a Series/Type + Subtype list of what
 supplies. You pick them from a list when filling in a Part's/Assembly's properties,
 instead of typing them in by hand.
 
-A **Client** has a name (plus an optional second name and location), its own contact
-people, and its own document tree for e.g. norms or reference files — separate from
-project files. A Project can optionally be linked to a Client; that client's detail
-panel then lists every Project assigned to it, with a button to jump straight there.
+A **Client** has a name (plus an optional location), a list of second names/trade variants
+(add as many as you need — typing an existing client's name into "Add client" switches to
+adding it a new one instead of creating a duplicate), its own contact people, and its own
+document tree for e.g. norms or reference files — separate from project files. A Project
+can optionally be linked to a Client; that client's detail panel then lists every Project
+assigned to it, with a button to jump straight there.
 
 ### Search and the whole database
 

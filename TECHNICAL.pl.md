@@ -22,7 +22,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`042` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`043` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
@@ -33,7 +33,8 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   (element może istnieć bez żadnego projektu, dostępny wyłącznie przez "Cała baza"), adres
   kontaktu producenta/klienta, domyślna wartość/unikalność pozycji BOM, powiadomienia + ich
   preferencje per typ, znacznik przykładowego projektu, mała wewnętrzna tabela flag
-  `system_state`, serie/typy producenta wraz z ich podtypami oraz status "Anulowana". Od migracji 027 pliki z tego folderu są wbudowane
+  `system_state`, serie/typy producenta wraz z ich podtypami, status "Anulowana" oraz
+  zamiana Nazwy 2 klienta z pojedynczej kolumny na listę 1:N. Od migracji 027 pliki z tego folderu są wbudowane
   w program (embedded resources) i stosowane **automatycznie przy każdym starcie** — zob.
   `MigrationRunner.cs` i "Jak uruchomić" niżej — nie trzeba ich już odpalać ręcznie przez psql.
 - **`EasyPDM.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
@@ -143,18 +144,25 @@ sprzed tej wersji nie mają rodzaju i pokazują podpowiedź, żeby go wybrać.
 **Klient** (`properties.client`, tabela `clients`) — dla rodzaju Klienta, Część lub
 Złożenie, wybierany z katalogu Klientów (zakładka Klienci) tym samym wzorcem co
 Producent/Materiał: powiązanie po nazwie, nie klucz obcy. Obok niego **Nazwa 2**
-(`properties.clientName2`) — druga nazwa TEGO klienta z katalogu (`clients.name2`,
-kolumna 1:1 z klientem, nie osobna tabela) — zablokowana, dopóki nie wybrano klienta;
-lista opcji zawiera co najwyżej jedną pozycję (nazwę2 wybranego klienta), pustą gdy jej
-nie ma. Zmiana klienta czyści wcześniej wybraną Nazwę 2.
+(`properties.clientName2`) — jedna z drugich nazw/wariantów handlowych TEGO klienta z
+katalogu (tabela `client_name2`, relacja 1:N do klienta — jeden klient może mieć ich kilka,
+np. różne spółki-córki handlujące pod tą samą nazwą główną, nie kolumna 1:1) —
+zablokowana, dopóki nie wybrano klienta; lista opcji zawiera wszystkie Nazwy 2 tego
+klienta, pustą gdy nie ma żadnej. Zmiana klienta czyści wcześniej wybraną Nazwę 2. Samo
+okno "Dodaj klienta" jest "dynamiczne": wpisanie/wybranie nazwy, która już istnieje w
+katalogu, przełącza je z zakładania duplikatu klienta na dodanie temu istniejącemu
+klientowi nowej Nazwy 2 — to właśnie chroni przed rozdrobnieniem jednego klienta (np.
+"Bosch") na kilka niemal identycznych wpisów w katalogu, zakładanych tylko po to, żeby
+zapisać różne warianty Nazwy 2.
 
 Niezależnie od `properties.client` powyżej, **katalog Klientów** (tabela `clients`,
-zakładka Klienci) jest samodzielnym bytem pierwszej klasy: nazwa/druga nazwa/lokalizacja,
-osoby kontaktowe (`client_contacts`) i własne drzewko dokumentów (`client_nodes`), np. na
-normy czy pliki referencyjne, niezależne od `items`/`item_relations`. Projekt można
-opcjonalnie powiązać z jednym z nich (`projects.client_id`) — panel szczegółów tego klienta
-wypisuje wtedy każdy przypisany do niego Projekt (w zakresie dostępnym aktualnemu
-użytkownikowi), z przyciskiem do bezpośredniego przejścia.
+zakładka Klienci) jest samodzielnym bytem pierwszej klasy: nazwa/lokalizacja, lista Nazw 2
+(`client_name2`), osoby kontaktowe (`client_contacts`) i własne drzewko dokumentów
+(`client_nodes`), np. na normy czy pliki referencyjne, niezależne od `items`/
+`item_relations`. Projekt można opcjonalnie powiązać z jednym z nich (`projects.client_id`)
+— panel szczegółów tego klienta wypisuje wtedy każdy przypisany do niego Projekt (w
+zakresie dostępnym aktualnemu użytkownikowi), z przyciskiem do bezpośredniego przejścia.
+Projekt łączy się z klientem jako całością, nie z konkretną Nazwą 2.
 
 **Seria/Typ** (`properties.productType`, tabela `manufacturer_product_types`) i
 **Podtyp** (`properties.productSubtype`, tabela `manufacturer_product_subtypes` z kluczem
@@ -297,7 +305,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET | `/api/items/{id}/history` | pełna historia: utworzenie, zmiany statusu, rewizje, dodanie/usunięcie załącznika, blokada/zwolnienie właściciela (kiedy/kto/opis), chronologicznie |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | katalog materiałów (nazwa + grupa/podgrupa) |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | katalog producentów + osoby kontaktowe + serie/typy i ich podtypy |
-| GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]` | katalog klientów + osoby kontaktowe |
+| GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | katalog klientów + osoby kontaktowe + ich lista Nazw 2 |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | własne drzewko dokumentów klienta (foldery/pliki — upload/pobranie/zmiana nazwy/usunięcie/wyszukiwanie) |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | załączniki (upload/rejestracja istniejącego pliku/lista/pobranie/usunięcie) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | zapisane zestawy filtrów widoku „Cała baza” (prywatne per użytkownik) |

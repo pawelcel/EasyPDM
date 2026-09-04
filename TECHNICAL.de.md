@@ -24,7 +24,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
 
 - **`db/schema.sql`** — das vollständige Schema von Grund auf (aktueller Stand nach allen
   Migrationen).
-- **`db/migrations/`** — Migrationen `002`–`042` für eine bereits bestehende Datenbank:
+- **`db/migrations/`** — Migrationen `002`–`043` für eine bereits bestehende Datenbank:
   Projekte, Elementtypen, Sichtbarkeit im Baum, Status/Revisionen, Materialien
   (+ Gruppen/Untergruppen), Anhänge, Stücklisten-Reihenfolge, Revisionskommentare,
   Anmeldung und Rollen, Projekteigenschaften, kaskadierendes Löschen, Reihenfolge der
@@ -37,7 +37,8 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   erreichbar), Kontaktadresse von Hersteller/Kunde, Standardwert/Eindeutigkeit der
   Stücklistenposition, Benachrichtigungen + deren Einstellungen pro Typ, Markierung des
   Beispielprojekts, eine kleine interne Zustandstabelle `system_state`,
-  Hersteller-Serien/Typen samt ihren Untertypen sowie den Status „Storniert". Seit
+  Hersteller-Serien/Typen samt ihren Untertypen, den Status „Storniert" sowie die
+  Umstellung von Name 2 eines Kunden von einer einzelnen Spalte auf eine 1:N-Liste. Seit
   Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
   resources) und werden **automatisch bei jedem Start** angewendet — siehe
   `MigrationRunner.cs` und "Inbetriebnahme" unten — sie müssen nicht mehr manuell per
@@ -166,19 +167,26 @@ Versionen haben keine Art und zeigen einen Hinweis, eine auszuwählen.
 **Kunde** (`properties.client`, Tabelle `clients`) — für die Art Kundenteil, bei Teil
 oder Baugruppe, ausgewählt aus dem Kundenkatalog (Reiter Kunden) nach demselben Muster
 wie Hersteller/Material: Verknüpfung über den Namen, kein Fremdschlüssel. Daneben **Name 2**
-(`properties.clientName2`) — der zweite Name DIESES Kunden aus dem Katalog
-(`clients.name2`, eine 1:1-Spalte am Kunden, keine eigene Tabelle) — gesperrt, bis ein
-Kunde gewählt ist; die Optionsliste hat höchstens einen Eintrag (den Name 2 des
-gewählten Kunden), leer, falls keiner vorhanden ist. Ein Kundenwechsel löscht einen
-zuvor gewählten Name 2.
+(`properties.clientName2`) — einer der zweiten Namen/Handelsvarianten DIESES Kunden aus
+dem Katalog (Tabelle `client_name2`, eine 1:N-Beziehung zum Kunden — ein Kunde kann
+mehrere haben, z. B. verschiedene Tochtergesellschaften unter demselben Hauptnamen, keine
+1:1-Spalte) — gesperrt, bis ein Kunde gewählt ist; die Optionsliste enthält alle Namen 2
+dieses Kunden, leer, falls keiner vorhanden ist. Ein Kundenwechsel löscht einen zuvor
+gewählten Name 2. Der Dialog „Kunde hinzufügen" selbst ist „dynamisch": Wird ein bereits
+im Katalog vorhandener Name eingegeben/ausgewählt, wechselt er vom Anlegen eines
+doppelten Kunden zum Hinzufügen eines neuen Namens 2 zu diesem bestehenden Kunden — genau
+das verhindert, dass ein Kunde (z. B. „Bosch") in mehrere fast identische Katalogeinträge
+zerfällt, nur um verschiedene Name-2-Varianten festzuhalten.
 
 Unabhängig von `properties.client` oben ist der **Kundenkatalog** (Tabelle `clients`,
-Reiter Kunden) eine eigenständige Entität erster Klasse: Name/zweiter Name/Standort,
-Kontaktpersonen (`client_contacts`) und ein eigener Dokumentenbaum (`client_nodes`), z. B.
-für Normen oder Referenzdateien, unabhängig von `items`/`item_relations`. Ein Projekt kann
-optional mit einem davon verknüpft werden (`projects.client_id`) — der Detailbereich
-dieses Kunden listet dann jedes ihm zugewiesene Projekt auf (im Rahmen dessen, worauf der
-aktuelle Benutzer Zugriff hat), mit einer Schaltfläche zum direkten Wechsel dorthin.
+Reiter Kunden) eine eigenständige Entität erster Klasse: Name/Standort, seine Liste von
+Namen 2 (`client_name2`), Kontaktpersonen (`client_contacts`) und ein eigener
+Dokumentenbaum (`client_nodes`), z. B. für Normen oder Referenzdateien, unabhängig von
+`items`/`item_relations`. Ein Projekt kann optional mit einem davon verknüpft werden
+(`projects.client_id`) — der Detailbereich dieses Kunden listet dann jedes ihm zugewiesene
+Projekt auf (im Rahmen dessen, worauf der aktuelle Benutzer Zugriff hat), mit einer
+Schaltfläche zum direkten Wechsel dorthin. Ein Projekt verknüpft sich mit dem Kunden als
+Ganzem, nicht mit einem bestimmten Namen 2.
 
 **Serie/Typ** (`properties.productType`, Tabelle `manufacturer_product_types`) und
 **Untertyp** (`properties.productSubtype`, Tabelle `manufacturer_product_subtypes` mit
@@ -335,7 +343,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET | `/api/items/{id}/history` | vollständige Historie: Erstellung, Statusänderungen, Revisionen, hinzugefügter/entfernter Anhang, Eigentümersperre/-freigabe (wann/wer/Beschreibung), chronologisch |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | Materialkatalog (Name + Gruppe/Untergruppe) |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | Herstellerkatalog + Kontaktpersonen + Serien/Typen und deren Untertypen |
-| GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]` | Kundenkatalog + Kontaktpersonen |
+| GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | Kundenkatalog + Kontaktpersonen + deren Namen-2-Liste |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | eigener Dokumentenbaum eines Kunden (Ordner/Dateien — Upload/Download/Umbenennen/Löschen/Suche) |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | Anhänge (Upload/Registrierung einer vorhandenen Datei/Liste/Download/Löschen) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | gespeicherte Filtersätze der Ansicht „Gesamte Datenbank" (privat pro Benutzer) |

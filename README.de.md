@@ -164,7 +164,8 @@ und Untertyp) oder Vom Kunden (Kunde). Unabhängig von der Art kann sie zusätzl
 optionale Masse und beliebige eigene Eigenschaften tragen.
 
 **Kunde** — für die Art „Vom Kunden“, ausgewählt aus demselben Katalog wie der Reiter Kunden.
-Daneben **Name 2** — der zweite Name dieses Kunden aus dem Katalog (falls vorhanden) —
+Daneben **Name 2** — einer der zweiten Namen/Handelsvarianten dieses Kunden aus dem Katalog
+(ein Kunde kann mehrere haben, z. B. verschiedene Tochtergesellschaften) —
 gesperrt, bis ein Kunde gewählt ist.
 
 **Serie/Typ** ist ein Eintrag aus der Liste des gewählten Herstellers (Reiter Hersteller),
@@ -220,11 +221,13 @@ Hersteller hat einen Namen, Kontaktpersonen und eine Serie/Typ + Untertyp-Liste 
 was er liefert. Sie werden beim Ausfüllen der Eigenschaften eines Teils/einer Baugruppe
 aus einer Liste ausgewählt, statt von Hand eingetippt zu werden.
 
-Ein **Kunde** hat einen Namen (optional einen zweiten Namen und einen Standort), eigene
-Kontaktpersonen und einen eigenen Dokumentenbaum, z. B. für Normen oder
-Referenzdateien — getrennt von den Projektdateien. Ein Projekt kann optional mit einem
-Kunden verknüpft werden; der Detailbereich dieses Kunden listet dann jedes ihm
-zugewiesene Projekt auf, mit einer Schaltfläche zum direkten Wechsel dorthin.
+Ein **Kunde** hat einen Namen (optional einen Standort), eine Liste zweiter Namen/
+Handelsvarianten (beliebig viele — die Eingabe des Namens eines bereits vorhandenen Kunden
+im Dialog „Kunde hinzufügen" fügt diesem stattdessen einen weiteren hinzu, statt einen
+doppelten Kunden anzulegen), eigene Kontaktpersonen und einen eigenen Dokumentenbaum, z. B.
+für Normen oder Referenzdateien — getrennt von den Projektdateien. Ein Projekt kann
+optional mit einem Kunden verknüpft werden; der Detailbereich dieses Kunden listet dann
+jedes ihm zugewiesene Projekt auf, mit einer Schaltfläche zum direkten Wechsel dorthin.
 
 ### Suche und gesamte Datenbank
 

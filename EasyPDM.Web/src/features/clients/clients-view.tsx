@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Plus } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
+import type { Client } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -38,6 +39,7 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
             className="flex-1"
           />
           <NewClientDialog
+            clients={clients}
             onCreated={async (id) => {
               await refetch()
               setSelectedId(id)
@@ -56,10 +58,7 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
                     selectedId === c.id ? "bg-accent" : ""
                   }`}
                 >
-                  <span className="flex-1 truncate">
-                    {c.name}
-                    {c.name2 && <span className="text-muted-foreground"> — {c.name2}</span>}
-                  </span>
+                  <span className="flex-1 truncate">{c.name}</span>
                   <span className="shrink-0 text-[12px] text-muted-foreground">
                     {c.contactCount} {t(c.contactCount === 1 ? "client.contactSingular" : "client.contactPlural")}
                   </span>
@@ -89,35 +88,68 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
   )
 }
 
-function NewClientDialog({ onCreated }: { onCreated: (id: number) => void | Promise<void> }) {
+// Okno "dynamiczne": wpisana/wybrana nazwa jest na bieżąco porównywana z katalogiem. Jeśli
+// pasuje do JUŻ ISTNIEJĄCEGO klienta, okno przełącza się w tryb "dodaj temu klientowi nazwę
+// 2" zamiast próbować założyć drugiego klienta o tej samej nazwie (co i tak odbiłoby się od
+// UNIQUE na clients.name) — dokładnie to, co pozwala jednemu "Bosch" mieć wiele nazw 2
+// zamiast wielu osobnych, niepowiązanych ze sobą wpisów "Bosch" w katalogu.
+function NewClientDialog({
+  clients,
+  onCreated,
+}: {
+  clients: Client[]
+  onCreated: (id: number) => void | Promise<void>
+}) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
+  const [name2, setName2] = useState("")
   const [error, setError] = useState("")
+  const [pending, setPending] = useState(false)
+
+  const trimmedName = name.trim()
+  const matchedClient = trimmedName
+    ? (clients.find((c) => c.name.toLowerCase() === trimmedName.toLowerCase()) ?? null)
+    : null
 
   function reset() {
     setName("")
+    setName2("")
     setError("")
   }
 
   async function submit() {
-    const trimmed = name.trim()
-    if (!trimmed) {
+    if (!trimmedName) {
       setError(t("client.nameRequired"))
       return
     }
     setError("")
+    setPending(true)
     try {
-      const { id } = await api.createClient({ name: trimmed, name2: null, location: null })
-      setOpen(false)
-      reset()
-      await onCreated(id)
+      if (matchedClient) {
+        const trimmedName2 = name2.trim()
+        if (!trimmedName2) {
+          setError(t("client.name2Required"))
+          return
+        }
+        await api.addClientName2(matchedClient.id, trimmedName2)
+        setOpen(false)
+        reset()
+        await onCreated(matchedClient.id)
+      } else {
+        const { id } = await api.createClient({ name: trimmedName, location: null })
+        setOpen(false)
+        reset()
+        await onCreated(id)
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setError(t("client.nameConflict"))
+        setError(matchedClient ? t("client.name2Conflict") : t("client.nameConflict"))
       } else {
-        setError(t("client.addFailed"))
+        setError(matchedClient ? t("client.addName2Failed") : t("client.addFailed"))
       }
+    } finally {
+      setPending(false)
     }
   }
 
@@ -132,7 +164,7 @@ function NewClientDialog({ onCreated }: { onCreated: (id: number) => void | Prom
       <DialogTrigger render={<Button size="icon-sm" aria-label={t("client.addAria")}><Plus className="size-4" /></Button>} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("client.addTitle")}</DialogTitle>
+          <DialogTitle>{matchedClient ? t("client.addName2Title") : t("client.addTitle")}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-2">
           <Label htmlFor="client-name">{t("common.name")}</Label>
@@ -142,13 +174,27 @@ function NewClientDialog({ onCreated }: { onCreated: (id: number) => void | Prom
             onChange={(e) => setName(e.target.value)}
             placeholder={t("client.namePlaceholder")}
           />
+          {matchedClient && (
+            <>
+              <Hint>{t("client.existingClientHint")}</Hint>
+              <Label htmlFor="client-new-name2">{t("client.name2Label")}</Label>
+              <Input
+                id="client-new-name2"
+                value={name2}
+                onChange={(e) => setName2(e.target.value)}
+                placeholder={t("client.name2Placeholder")}
+              />
+            </>
+          )}
           <FormError>{error}</FormError>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={submit}>{t("common.add")}</Button>
+          <Button onClick={submit} disabled={pending}>
+            {matchedClient ? t("client.addName2Button") : t("common.add")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

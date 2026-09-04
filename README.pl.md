@@ -152,8 +152,9 @@ i Podtyp) albo Klienta (Klient). Niezależnie od rodzaju można mu wpisać opcjo
 i dowolne własne właściwości.
 
 **Klient** — dla rodzaju Klienta, wybierany z tego samego katalogu co zakładka Klienci. Obok
-pojawia się **Nazwa 2** — druga nazwa TEGO klienta z katalogu (o ile ją ma) — pole
-zablokowane, dopóki nie wybierzesz klienta.
+pojawia się **Nazwa 2** — jedna z drugich nazw/wariantów handlowych TEGO klienta z katalogu
+(klient może mieć ich kilka, np. różne spółki-córki) — pole zablokowane, dopóki nie
+wybierzesz klienta.
 
 **Seria/Typ** to pozycja z listy danego producenta (zakładka Producenci), a **Podtyp** to
 uszczegółowienie w obrębie tej serii (np. seria „Łożyska walcowe” → podtypy NU/NJ/NUP), oba
@@ -203,10 +204,12 @@ Osobne, wspólne dla całej firmy katalogi (zakładki **Lista materiałów**, **
 osoby kontaktowe i listę Seria/Typ + Podtyp tego, co dostarcza. Wybiera się je z listy przy
 uzupełnianiu właściwości Części/Złożenia, zamiast wpisywać ręcznie.
 
-**Klient** ma nazwę (opcjonalnie drugą nazwę i lokalizację), własne osoby kontaktowe i
-własne drzewko dokumentów, np. norm czy plików referencyjnych — osobne od plików projektu.
-Projekt można opcjonalnie powiązać z Klientem; panel szczegółów tego klienta wypisuje wtedy
-każdy przypisany do niego Projekt, z przyciskiem do bezpośredniego przejścia.
+**Klient** ma nazwę (opcjonalnie lokalizację), listę drugich nazw/wariantów handlowych
+(dowolną liczbę — wpisanie w oknie "Dodaj klienta" nazwy już istniejącego klienta dodaje mu
+kolejną, zamiast zakładać duplikat), własne osoby kontaktowe i własne drzewko dokumentów,
+np. norm czy plików referencyjnych — osobne od plików projektu. Projekt można opcjonalnie
+powiązać z Klientem; panel szczegółów tego klienta wypisuje wtedy każdy przypisany do niego
+Projekt, z przyciskiem do bezpośredniego przejścia.
 
 ### Wyszukiwanie i cała baza
 

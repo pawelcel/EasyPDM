@@ -11,9 +11,11 @@ import {
 import { useLanguage } from "@/i18n/use-language"
 
 // Lista klientów wynika wprost z przekazanych projektów (Project już niesie
-// clientId/clientName/clientName2) -- w odróżnieniu od ManufacturerFilterSelect nie ma
+// clientId/clientName) -- w odróżnieniu od ManufacturerFilterSelect nie ma
 // tu osobnego zapytania do całego katalogu Klientów, bo w "Cała baza" i tak liczy się
-// tylko to, którzy klienci faktycznie mają tu jakiś projekt/element.
+// tylko to, którzy klienci faktycznie mają tu jakiś projekt/element. Sam klient (nie jego
+// ewentualne nazwy 2 -- może ich być kilka, projekt nie wskazuje żadnej konkretnej) jest
+// tym, do czego projekt jest powiązany (projects.client_id).
 function ClientFilterSelect({
   projects,
   value,
@@ -31,7 +33,7 @@ function ClientFilterSelect({
     const byId = new Map<number, string>()
     for (const p of projects) {
       if (p.clientId == null || byId.has(p.clientId)) continue
-      byId.set(p.clientId, p.clientName2 ? `${p.clientName} — ${p.clientName2}` : (p.clientName ?? ""))
+      byId.set(p.clientId, p.clientName ?? "")
     }
     return [...byId.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [projects])

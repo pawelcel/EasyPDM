@@ -24,7 +24,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`042` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`043` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -35,7 +35,8 @@ PostgreSQL 18.
   exist with no project, reachable only through "Whole database"), manufacturer/client
   contact address, BOM position default/uniqueness, notifications + per-type
   preferences, the sample-project marker, a small internal `system_state` flag table,
-  manufacturer series/types with their subtypes, and the "Cancelled" status. Since migration 027, files in this folder are embedded in the program
+  manufacturer series/types with their subtypes, the "Cancelled" status, and a client's
+  Name 2 becoming a 1:N list instead of a single column. Since migration 027, files in this folder are embedded in the program
   (embedded resources) and applied **automatically on every startup** — see
   `MigrationRunner.cs` and "How to run" below — you no longer need to run them
   manually through psql.
@@ -150,18 +151,24 @@ before this version have no kind and show a hint prompting you to pick one.
 **Client** (`properties.client`, table `clients`) — for the Client-supplied kind, on a
 Part or Assembly, picked from the Clients catalog (Clients tab) the same way as
 Manufacturer/Material: linked by name, not a foreign key. Next to it, **Name 2**
-(`properties.clientName2`) — that client's second name from the catalog (`clients.name2`,
-a 1:1 column on the client, not a separate table) — locked until a client is picked;
-the option list has at most one entry (the selected client's name2), empty if it has
-none. Changing the client clears a previously chosen Name 2.
+(`properties.clientName2`) — one of that client's second names/trade variants from the
+catalog (table `client_name2`, a 1:N relation to the client — one client can have several,
+e.g. different subsidiaries trading under the same parent name — not a 1:1 column) —
+locked until a client is picked; the option list offers every Name 2 that client has,
+empty if it has none. Changing the client clears a previously chosen Name 2. The New
+Client dialog itself is "dynamic": typing/picking a name that already exists in the
+catalog switches it from creating a duplicate client to adding a new Name 2 to that
+existing one instead — this is what keeps one client (e.g. "Bosch") from fragmenting into
+several near-duplicate catalog entries just to record different Name 2 variants.
 
 Separately from `properties.client` above, the **Clients catalog** (`clients` table,
-Clients tab) is its own first-class entity: name/second name/location, contact people
-(`client_contacts`), and its own document tree (`client_nodes`) for e.g. norms or
-reference files, independent of `items`/`item_relations`. A Project can optionally be
-linked to one (`projects.client_id`) — the client's detail panel then lists every
-Project assigned to it (scoped to what the current user can access), with a button to
-jump straight there.
+Clients tab) is its own first-class entity: name/location, its list of Name 2 entries
+(`client_name2`), contact people (`client_contacts`), and its own document tree
+(`client_nodes`) for e.g. norms or reference files, independent of `items`/`item_relations`.
+A Project can optionally be linked to one (`projects.client_id`) — the client's detail
+panel then lists every Project assigned to it (scoped to what the current user can
+access), with a button to jump straight there. A Project links to the client as a whole,
+not to one specific Name 2.
 
 **Series/Type** (`properties.productType`, table `manufacturer_product_types`) and
 **Subtype** (`properties.productSubtype`, table `manufacturer_product_subtypes`, keyed to
@@ -307,7 +314,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET | `/api/items/{id}/history` | full history: creation, status changes, revisions, attachment added/removed, owner lock/release (when/who/description), chronologically |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | material catalog (name + group/subgroup) |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | manufacturer catalog + contact people + series/types and their subtypes |
-| GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]` | client catalog + contact people |
+| GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | client catalog + contact people + their Name 2 list |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | a client's own document tree (folders/files — upload/download/rename/delete/search) |
 | GET/POST/DELETE | `/api/items/{itemId}/attachments[/{id}]`, `/register`, `/api/attachments/{id}/file` | attachments (upload/register an existing file/list/download/delete) |
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | saved filter sets for the "Whole database" view (private per user) |
