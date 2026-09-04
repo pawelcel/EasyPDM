@@ -157,7 +157,12 @@ Versionen haben keine Art und zeigen einen Hinweis, eine auszuwählen.
 
 **Kunde** (`properties.client`, Tabelle `clients`) — für die Art Kundenteil, bei Teil
 oder Baugruppe, ausgewählt aus dem Kundenkatalog (Reiter Kunden) nach demselben Muster
-wie Hersteller/Material: Verknüpfung über den Namen, kein Fremdschlüssel.
+wie Hersteller/Material: Verknüpfung über den Namen, kein Fremdschlüssel. Daneben **Name 2**
+(`properties.clientName2`) — der zweite Name DIESES Kunden aus dem Katalog
+(`clients.name2`, eine 1:1-Spalte am Kunden, keine eigene Tabelle) — gesperrt, bis ein
+Kunde gewählt ist; die Optionsliste hat höchstens einen Eintrag (den Name 2 des
+gewählten Kunden), leer, falls keiner vorhanden ist. Ein Kundenwechsel löscht einen
+zuvor gewählten Name 2.
 
 **Serie/Typ** (`properties.productType`, Tabelle `manufacturer_product_types`) und
 **Untertyp** (`properties.productSubtype`, Tabelle `manufacturer_product_subtypes` mit

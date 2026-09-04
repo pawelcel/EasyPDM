@@ -142,6 +142,8 @@ Series/Type and Subtype) or Client-supplied (Client). Whatever the kind, it can 
 an optional Mass and any custom properties.
 
 **Client** — for the Client-supplied kind, picked from the same catalog as the Clients tab.
+Next to it, **Name 2** — that client's second name from the catalog (if it has one) —
+locked until you pick a client.
 
 **Series/Type** is an entry from the chosen manufacturer's list (Manufacturers tab), and
 **Subtype** narrows it down within that series (e.g. series "Cylindrical roller bearings"

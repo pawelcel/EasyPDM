@@ -150,6 +150,8 @@ und Untertyp) oder Vom Kunden (Kunde). Unabhängig von der Art kann sie zusätzl
 optionale Masse und beliebige eigene Eigenschaften tragen.
 
 **Kunde** — für die Art „Vom Kunden“, ausgewählt aus demselben Katalog wie der Reiter Kunden.
+Daneben **Name 2** — der zweite Name dieses Kunden aus dem Katalog (falls vorhanden) —
+gesperrt, bis ein Kunde gewählt ist.
 
 **Serie/Typ** ist ein Eintrag aus der Liste des gewählten Herstellers (Reiter Hersteller),
 und **Untertyp** verfeinert sie innerhalb dieser Serie (z. B. Serie „Zylinderrollenlager“

@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  ClientField,
+  ClientAndName2Fields,
   ManufacturerField,
   MaterialField,
   ProductTypeAndSubtypeFields,
@@ -71,7 +71,7 @@ const PART_KIND_FIELDS: Record<string, string[]> = {
     "priceDate",
   ],
   Normalia: ["material", "norm"],
-  Klienta: ["client"],
+  Klienta: ["client", "clientName2"],
 }
 
 // Złożenie ma "Masę" zawsze dostępną przez generyczny PropertyEditor (zob.
@@ -80,7 +80,7 @@ const PART_KIND_FIELDS: Record<string, string[]> = {
 const ASSEMBLY_KIND_FIELDS: Record<string, string[]> = {
   Wykonywane: [],
   Zakupowe: ["manufacturer", "productType", "productSubtype"],
-  Klienta: ["client"],
+  Klienta: ["client", "clientName2"],
 }
 
 // Rodzaj/Nazwa/Materiał — wydzielone z reszty formularza, bo pokazują się od razu w
@@ -216,6 +216,8 @@ function PartPropertyForm({
       fields = { manufacturer: value, productType: "", productSubtype: "" }
     } else if (key === "productType" && value !== propValue("productType")) {
       fields = { productType: value, productSubtype: "" }
+    } else if (key === "client" && value !== propValue("client")) {
+      fields = { client: value, clientName2: "" }
     }
     await api.updateProperties(item.id, fields)
     await onChanged()
@@ -263,7 +265,13 @@ function PartPropertyForm({
 
       {rodzaj === "Klienta" && (
         <>
-          <ClientField value={propValue("client")} onSave={saveField} disabled={locked} onError={setError} />
+          <ClientAndName2Fields
+            clientName={propValue("client")}
+            clientName2={propValue("clientName2")}
+            onSave={saveField}
+            disabled={locked}
+            onError={setError}
+          />
           <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
         </>
       )}

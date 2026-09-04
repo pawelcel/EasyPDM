@@ -247,15 +247,21 @@ function ManufacturerField({
   )
 }
 
-// Klient z katalogu (zakładka Klienci) — pole dla Części/Złożenia rodzaju "Klienta", tym
-// samym wzorcem co ManufacturerField: wolny tekst dopasowany po nazwie, nie klucz obcy.
-function ClientField({
-  value,
+// Klient z katalogu (zakładka Klienci) i jego Nazwa 2, jedna obok drugiej — tym samym
+// wzorcem co ProductTypeAndSubtypeFields: Nazwa 2 zablokowana, dopóki nie wybrano Klienta,
+// a jej lista opcji to WYŁĄCZNIE nazwa2 WYBRANEGO klienta (ten sam klient ma jedną,
+// konkretną nazwę2 w katalogu — zob. clients.name2 w schema.sql — więc lista ma co najwyżej
+// jedną pozycję; pusta, jeśli klient nie ma ustawionej nazwy2). Obie wartości zapisują samą
+// nazwę, tak jak ManufacturerField.
+function ClientAndName2Fields({
+  clientName,
+  clientName2,
   onSave,
   disabled,
   onError,
 }: {
-  value: string
+  clientName: string
+  clientName2: string
   onSave: (key: string, value: string) => void | Promise<void>
   disabled: boolean
   onError?: (message: string | null) => void
@@ -263,49 +269,78 @@ function ClientField({
   const { t } = useLanguage()
   const { clients } = useClients("")
   const clientNames = clients.map((c) => c.name)
-  const matched = clients.find((c) => c.name === value)
+  const matched = clients.find((c) => c.name === clientName)
+  const name2Options = matched?.name2 ? [matched.name2] : []
+  const name2Disabled = disabled || !clientName
 
-  async function save(next: string) {
+  async function save(key: "client" | "clientName2", next: string) {
     try {
       onError?.(null)
-      await onSave("client", next)
+      await onSave(key, next)
     } catch (err) {
       onError?.(err instanceof Error ? err.message : t("part.saveFieldFailed"))
     }
   }
 
-  return (
-    <>
-      <Label>{t("part.client")}</Label>
-      {clients.length > 0 ? (
-        <div className="flex gap-1.5">
-          <div className="flex-1">
-            <Combobox
-              items={clientNames}
-              value={value || null}
-              onValueChange={(v) => save((v as string | null) ?? "")}
-              itemToStringLabel={(name: string) => name}
-              disabled={disabled}
-            >
-              <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear />
-              <ComboboxContent>
-                <ComboboxEmpty>{t("part.noMatchingClients")}</ComboboxEmpty>
-                <ComboboxList>
-                  {(name: string) => (
-                    <ComboboxItem key={name} value={name}>
-                      {name}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
-          </div>
-          <ClientInfoButton clientId={matched?.id ?? null} />
-        </div>
-      ) : (
+  if (clients.length === 0) {
+    return (
+      <>
+        <Label>{t("part.client")}</Label>
         <Hint>{t("part.noClientsHint")}</Hint>
-      )}
-    </>
+      </>
+    )
+  }
+
+  return (
+    <div className="flex items-end gap-1.5">
+      <div className="min-w-0 flex-1">
+        <Label>{t("part.client")}</Label>
+        <Combobox
+          items={clientNames}
+          value={clientName || null}
+          onValueChange={(v) => save("client", (v as string | null) ?? "")}
+          itemToStringLabel={(name: string) => name}
+          disabled={disabled}
+        >
+          <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear />
+          <ComboboxContent>
+            <ComboboxEmpty>{t("part.noMatchingClients")}</ComboboxEmpty>
+            <ComboboxList>
+              {(name: string) => (
+                <ComboboxItem key={name} value={name}>
+                  {name}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <Label>{t("part.clientName2")}</Label>
+        <Combobox
+          items={name2Options}
+          value={clientName2 || null}
+          onValueChange={(v) => save("clientName2", (v as string | null) ?? "")}
+          itemToStringLabel={(name: string) => name}
+          disabled={name2Disabled}
+        >
+          <ComboboxInput placeholder={t("part.searchPlaceholder")} showClear disabled={name2Disabled} />
+          <ComboboxContent>
+            <ComboboxEmpty>{t("part.noMatchingClientName2")}</ComboboxEmpty>
+            <ComboboxList>
+              {(name: string) => (
+                <ComboboxItem key={name} value={name}>
+                  {name}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+      </div>
+
+      <ClientInfoButton clientId={matched?.id ?? null} />
+    </div>
   )
 }
 
@@ -589,4 +624,4 @@ function PropField({
   )
 }
 
-export { ClientField, ManufacturerField, MaterialField, ProductTypeAndSubtypeFields, PropField }
+export { ClientAndName2Fields, ManufacturerField, MaterialField, ProductTypeAndSubtypeFields, PropField }

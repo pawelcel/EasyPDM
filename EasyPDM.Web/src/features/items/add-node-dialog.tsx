@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  ClientField,
+  ClientAndName2Fields,
   ManufacturerField,
   MaterialField,
   ProductTypeAndSubtypeFields,
@@ -125,7 +125,7 @@ function AddNodeDialog({
   }
   function seedExtraProps(): Record<string, string> {
     const result: Record<string, string> = {}
-    for (const key of ["material", "manufacturer", "productType", "productSubtype", "orderNumber", "orderNumber2", "norm", "client"]) {
+    for (const key of ["material", "manufacturer", "productType", "productSubtype", "orderNumber", "orderNumber2", "norm", "client", "clientName2"]) {
       const v = initialProperties?.[key]
       if (typeof v === "string") result[key] = v
     }
@@ -314,7 +314,11 @@ function AddNodeDialog({
           if (extraProps[key]?.trim()) properties[key] = extraProps[key].trim()
         }
       }
-      if (rodzaj === "Klienta" && extraProps.client?.trim()) properties.client = extraProps.client.trim()
+      if (rodzaj === "Klienta") {
+        for (const key of ["client", "clientName2"]) {
+          if (extraProps[key]?.trim()) properties[key] = extraProps[key].trim()
+        }
+      }
     }
 
     setSubmitting(true)
@@ -608,7 +612,12 @@ function AddNodeDialog({
               />
             )}
             {rodzaj === "Klienta" && (
-              <ClientField value={extraProps.client ?? ""} onSave={setExtraField} disabled={false} />
+              <ClientAndName2Fields
+                clientName={extraProps.client ?? ""}
+                clientName2={extraProps.clientName2 ?? ""}
+                onSave={setExtraField}
+                disabled={false}
+              />
             )}
 
             {ticket && (
@@ -692,7 +701,12 @@ function AddNodeDialog({
               </>
             )}
             {mode === "assembly" && rodzaj === "Klienta" && (
-              <ClientField value={extraProps.client ?? ""} onSave={setExtraField} disabled={false} />
+              <ClientAndName2Fields
+                clientName={extraProps.client ?? ""}
+                clientName2={extraProps.clientName2 ?? ""}
+                onSave={setExtraField}
+                disabled={false}
+              />
             )}
 
             {mode === "assembly" && (

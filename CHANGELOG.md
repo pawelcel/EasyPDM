@@ -52,7 +52,9 @@ All notable changes to EasyPDM are documented in this file.
   tree/list turns red.
 - The Client-supplied kind (Part or Assembly) now has a "Client" field, picked from
   the Clients catalog — previously there was no way to record which client a
-  client-supplied item actually belongs to.
+  client-supplied item actually belongs to. Next to it, on the same line, "Name 2" —
+  that client's second name, offered only once a client is picked and cleared again
+  if you change it.
 
 ### Changed
 - Admins can now bypass another user's item lock for three actions: changing its

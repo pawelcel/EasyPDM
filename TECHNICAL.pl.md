@@ -135,7 +135,11 @@ sprzed tej wersji nie mają rodzaju i pokazują podpowiedź, żeby go wybrać.
 
 **Klient** (`properties.client`, tabela `clients`) — dla rodzaju Klienta, Część lub
 Złożenie, wybierany z katalogu Klientów (zakładka Klienci) tym samym wzorcem co
-Producent/Materiał: powiązanie po nazwie, nie klucz obcy.
+Producent/Materiał: powiązanie po nazwie, nie klucz obcy. Obok niego **Nazwa 2**
+(`properties.clientName2`) — druga nazwa TEGO klienta z katalogu (`clients.name2`,
+kolumna 1:1 z klientem, nie osobna tabela) — zablokowana, dopóki nie wybrano klienta;
+lista opcji zawiera co najwyżej jedną pozycję (nazwę2 wybranego klienta), pustą gdy jej
+nie ma. Zmiana klienta czyści wcześniej wybraną Nazwę 2.
 
 **Seria/Typ** (`properties.productType`, tabela `manufacturer_product_types`) i
 **Podtyp** (`properties.productSubtype`, tabela `manufacturer_product_subtypes` z kluczem

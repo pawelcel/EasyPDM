@@ -142,7 +142,11 @@ before this version have no kind and show a hint prompting you to pick one.
 
 **Client** (`properties.client`, table `clients`) — for the Client-supplied kind, on a
 Part or Assembly, picked from the Clients catalog (Clients tab) the same way as
-Manufacturer/Material: linked by name, not a foreign key.
+Manufacturer/Material: linked by name, not a foreign key. Next to it, **Name 2**
+(`properties.clientName2`) — that client's second name from the catalog (`clients.name2`,
+a 1:1 column on the client, not a separate table) — locked until a client is picked;
+the option list has at most one entry (the selected client's name2), empty if it has
+none. Changing the client clears a previously chosen Name 2.
 
 **Series/Type** (`properties.productType`, table `manufacturer_product_types`) and
 **Subtype** (`properties.productSubtype`, table `manufacturer_product_subtypes`, keyed to

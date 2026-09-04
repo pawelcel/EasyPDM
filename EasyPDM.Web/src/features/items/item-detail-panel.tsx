@@ -67,6 +67,7 @@ const ASSEMBLY_MANAGED_PROPERTY_KEYS = new Set([
   "productType",
   "productSubtype",
   "client",
+  "clientName2",
 ])
 
 function propertyEditorEntries(item: Item): Record<string, unknown> {
