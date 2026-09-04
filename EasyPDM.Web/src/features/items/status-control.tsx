@@ -142,6 +142,7 @@ function StatusControl({
           }}
           pending={submitting}
           error={error}
+          singleAckOnError
         />
       )}
     </div>
