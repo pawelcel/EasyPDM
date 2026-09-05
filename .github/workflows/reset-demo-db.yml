@@ -1,0 +1,41 @@
+name: Reset demo database daily
+
+# Codziennie o ustalonej porze czyści bazę publicznego dema (Neon) i restartuje aplikację
+# na Render, żeby ta -- tak jak przy pierwszym uruchomieniu na pustej bazie -- sama
+# odtworzyła konto admin/admin i przykładowy projekt startowy. Samo czyszczenie bazy nie
+# wystarcza: tę odbudowę robi aplikacja WYŁĄCZNIE przy starcie, gdy wykryje pustą bazę --
+# jeśli kontener cały czas działa, nie zauważy zmiany, stąd krok restartu przez Deploy Hook
+# zaraz po czyszczeniu. Nie wymaga w ogóle, żeby kontener akurat działał w danym momencie --
+# działa bezpośrednio na bazie w Neon, niezależnie od stanu Render.
+#
+# Wymaga dwóch sekretów repo (Settings -> Secrets and variables -> Actions):
+#   RESET_PSQL_URL        -- connection string Neon, np. postgresql://user:haslo@host.neon.tech/neondb?sslmode=require
+#   RENDER_DEPLOY_HOOK_URL -- Deploy Hook z Render (Settings usługi -> Deploy Hook)
+on:
+  schedule:
+    # 02:00 UTC codziennie = ok. 03:00/04:00 czasu polskiego (zależnie od czasu letniego)
+    - cron: "0 2 * * *"
+  workflow_dispatch: {} # pozwala też odpalić reset ręcznie z zakładki "Actions"
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo (potrzebne dla db/schema.sql)
+        uses: actions/checkout@v5
+
+      - name: Install psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Reset schema and reload
+        env:
+          RESET_PSQL_URL: ${{ secrets.RESET_PSQL_URL }}
+        run: |
+          psql "$RESET_PSQL_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+          psql "$RESET_PSQL_URL" -f db/schema.sql
+
+      - name: Restart app on Render (żeby odtworzyć admin/admin i przykładowy projekt)
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          curl -sS -X POST "$RENDER_DEPLOY_HOOK_URL"
