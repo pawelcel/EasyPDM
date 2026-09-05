@@ -2,6 +2,8 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.3]
+
 ## [0.2]
 
 ### Added

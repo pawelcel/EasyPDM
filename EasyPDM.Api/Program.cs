@@ -216,7 +216,7 @@ static async Task EnsureSampleProjectAsync(string connectionString, ILogger logg
     // wyjątkiem (drugi proces po prostu rezygnuje, tak jakby zobaczył niepusty "projects").
     try
     {
-        const string projectName = "Przykładowy projekt";
+        const string projectName = "Sample project";
         Guid projectId;
         await using (var cmd = new NpgsqlCommand(
             """
@@ -227,8 +227,8 @@ static async Task EnsureSampleProjectAsync(string connectionString, ILogger logg
         {
             cmd.Parameters.AddWithValue("name", projectName);
             cmd.Parameters.AddWithValue("description",
-                "Projekt demonstracyjny wygenerowany automatycznie przy pierwszym uruchomieniu. " +
-                "Usuń go przed rozpoczęciem prawdziwej pracy (Ustawienia -> Magazyn plików -> Danger zone).");
+                "Demo project generated automatically on first startup. " +
+                "Delete it before starting real work (Settings -> File storage -> Danger zone).");
             projectId = (Guid)(await cmd.ExecuteScalarAsync())!;
         }
 
@@ -249,7 +249,7 @@ static async Task EnsureSampleProjectAsync(string connectionString, ILogger logg
             cmd.Parameters.AddWithValue("id", assemblyId);
             cmd.Parameters.AddWithValue("projectId", projectId);
             cmd.Parameters.AddWithValue("itemType", "assembly");
-            cmd.Parameters.AddWithValue("fileName", "Złożenie przykładowe");
+            cmd.Parameters.AddWithValue("fileName", "Sample assembly");
             cmd.Parameters.AddWithValue("props", "{}");
             cmd.Parameters.AddWithValue("status", "w_pracy");
             cmd.Parameters.AddWithValue("revisionNumber", 1);
@@ -267,7 +267,7 @@ static async Task EnsureSampleProjectAsync(string connectionString, ILogger logg
             cmd.Parameters.AddWithValue("id", boltId);
             cmd.Parameters.AddWithValue("projectId", projectId);
             cmd.Parameters.AddWithValue("itemType", "part");
-            cmd.Parameters.AddWithValue("fileName", "Śruba M6x20");
+            cmd.Parameters.AddWithValue("fileName", "Bolt M6x20");
             cmd.Parameters.AddWithValue("props", """{"rodzaj":"Normalia"}""");
             cmd.Parameters.AddWithValue("status", "sprawdzany");
             cmd.Parameters.AddWithValue("revisionNumber", 1);
@@ -285,7 +285,7 @@ static async Task EnsureSampleProjectAsync(string connectionString, ILogger logg
             cmd.Parameters.AddWithValue("id", bodyId);
             cmd.Parameters.AddWithValue("projectId", projectId);
             cmd.Parameters.AddWithValue("itemType", "part");
-            cmd.Parameters.AddWithValue("fileName", "Korpus");
+            cmd.Parameters.AddWithValue("fileName", "Housing");
             cmd.Parameters.AddWithValue("props", """{"rodzaj":"Wykonywana"}""");
             cmd.Parameters.AddWithValue("status", "wydany");
             cmd.Parameters.AddWithValue("revisionNumber", 2);
