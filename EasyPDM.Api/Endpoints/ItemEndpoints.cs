@@ -554,6 +554,66 @@ static class ItemEndpoints
         // GET /api/items/{id}
         // Szczegóły pojedynczego elementu.
         // ============================================================
+        // GET /api/items/by-number/{itemNumber} — sam item_number (unikalny, nextval z
+        // item_number_seq) zamiast guid, żeby makro CAD mogło rozwiązać "do jakiego elementu
+        // należy ten plik" wprost z numeru zaszytego w nazwie pliku (konwencja
+        // "numer (nazwa).REWIZJA.rozszerzenie"), bez znajomości jego id ani dopasowywania
+        // nazwy na wyczucie -- używane przy wgrywaniu rysunku SolidWorks (.SLDDRW) jako
+        // załącznika roli "drawing" do już istniejącej Części/Złożenia. Ten sam otwarty
+        // dostęp (bez HasProjectAccessAsync) i ten sam kształt odpowiedzi co GET
+        // /api/items/{id} poniżej -- lustro tamtego zapytania, tylko z innym WHERE.
+        app.MapGet("/api/items/by-number/{itemNumber:int}", async (int itemNumber) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string sql = """
+                SELECT i.id, i.project_id, i.file_name, i.file_type, i.file_path, i.properties, i.modified_at,
+                       i.item_type, i.item_number, i.item_number_prefix, i.show_in_tree, i.status, i.revision_number,
+                       i.root_position, i.owner_id, i.owner_locked, u.display_name
+                FROM items i
+                LEFT JOIN users u ON u.id = i.owner_id
+                WHERE i.item_number = @itemNumber;
+                """;
+
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("itemNumber", itemNumber);
+
+            Dictionary<string, object?> byNumberResult;
+            await using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                if (!await reader.ReadAsync())
+                    return Results.NotFound();
+
+                byNumberResult = new Dictionary<string, object?>
+                {
+                    ["id"] = reader.GetGuid(0),
+                    ["projectId"] = reader.IsDBNull(1) ? null : reader.GetGuid(1),
+                    ["fileName"] = reader.GetString(2),
+                    ["fileType"] = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    ["filePath"] = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    ["properties"] = JsonDocument.Parse(reader.GetFieldValue<string>(5)).RootElement,
+                    ["modifiedAt"] = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                    ["itemType"] = reader.GetString(7),
+                    ["itemNumber"] = reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                    ["itemNumberPrefix"] = reader.IsDBNull(9) ? null : reader.GetString(9),
+                    ["showInTree"] = reader.GetBoolean(10),
+                    ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
+                    ["revisionNumber"] = reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                    ["rootPosition"] = reader.GetInt32(13),
+                    ["ownerId"] = reader.IsDBNull(14) ? null : reader.GetGuid(14),
+                    ["ownerLocked"] = reader.GetBoolean(15),
+                    ["ownerDisplayName"] = reader.IsDBNull(16) ? null : reader.GetString(16),
+                };
+            }
+
+            var byNumberId = (Guid)byNumberResult["id"]!;
+            var tagsByNumberItem = await LoadTagsForItems(connectionString, new List<Guid> { byNumberId });
+            byNumberResult["tags"] = tagsByNumberItem.TryGetValue(byNumberId, out var byNumberTags) ? byNumberTags : new List<string>();
+
+            return Results.Ok(byNumberResult);
+        });
+
         app.MapGet("/api/items/{id:guid}", async (Guid id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);

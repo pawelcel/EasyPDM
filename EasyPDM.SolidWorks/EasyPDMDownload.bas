@@ -1144,26 +1144,29 @@ End Sub
 ' recurses into assembly children.
 ' ============================================================================
 
-' Picks the attachment matching the item's CURRENT revision. If none match this macro
+' Picks the attachment matching the item's CURRENT revision for a given role (default
+' "cad", the file to actually open -- see roleFilter param). If none match this macro
 ' family's naming convention (e.g. the item was only ever attached manually in the web
-' app), falls back to the most recently uploaded attachment (the list is already sorted
-' ascending by upload date) as the best approximation.
-Private Function FindCurrentAttachment(ByVal item As Object, ByVal attachments As Object) As Object
+' app), falls back to the most recently uploaded attachment of that role (the list is
+' already sorted ascending by upload date) as the best approximation.
+Private Function FindCurrentAttachment(ByVal item As Object, ByVal attachments As Object, Optional ByVal roleFilter As String = "cad") As Object
     If attachments Is Nothing Or attachments.Count = 0 Then Exit Function
 
-    ' Only "cad"-role attachments (or no role at all -- older/manually-attached files from
-    ' before roles existed, treated as CAD for backward compatibility) are actual files to
-    ' download/open -- "step"/"pdf" attachments are separate preview exports, never files to
-    ' open in the CAD program. Without this filter, the fallbacks below (newest upload, or
-    ' the last regex match) could -- and in practice did, once PDF export was added, since
-    ' PDF uploads last -- pick a PDF instead of the real CAD file, causing an error when the
-    ' macro tried to open it.
+    ' Only attachments of roleFilter (or no role at all, ONLY when roleFilter = "cad" --
+    ' older/manually-attached files from before roles existed, treated as CAD for backward
+    ' compatibility; a roleless file is NEVER a match for "drawing", which never existed
+    ' before that role did) are actual files to download/open for that purpose -- other
+    ' roles ("step"/"pdf", or "cad" when looking for "drawing" and vice versa) are separate
+    ' exports/attachments, never files to open in the CAD program. Without this filter, the
+    ' fallbacks below (newest upload, or the last regex match) could -- and in practice did,
+    ' once PDF export was added, since PDF uploads last -- pick a PDF instead of the real
+    ' CAD file, causing an error when the macro tried to open it.
     Dim cadAttachments As New Collection
     Dim rawAttachment As Variant
     For Each rawAttachment In attachments
         Dim attRole As String
         attRole = JsonGetString(rawAttachment, "role", "")
-        If attRole = "" Or attRole = "cad" Then cadAttachments.Add rawAttachment
+        If (attRole = "" And roleFilter = "cad") Or attRole = roleFilter Then cadAttachments.Add rawAttachment
     Next rawAttachment
     If cadAttachments.Count = 0 Then Exit Function
 
@@ -1359,6 +1362,46 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
     EnsureDirectory targetDir
     WriteBytesToFile bytes, targetPath
     AppendLog T("Dl_Saved") & currentName
+
+    ' Also fetch and save (never Open) any "drawing"-role attachment for this revision,
+    ' alongside the part/assembly file -- so manually opening it later in SolidWorks
+    ' resolves its model reference automatically (same folder, matching filename). Purely
+    ' best-effort: a missing/failed drawing download never fails the whole DownloadItem call,
+    ' since the part/assembly file above is already saved successfully at this point.
+    Dim currentDrawing As Object
+    Set currentDrawing = FindCurrentAttachment(item, attachments, "drawing")
+    If Not currentDrawing Is Nothing Then
+        Dim drawingName As String
+        drawingName = JsonGetString(currentDrawing, "fileName", "")
+        Dim drawingPath As String
+        drawingPath = targetDir & "\" & drawingName
+
+        Dim drawingAlreadyThere As Boolean
+        drawingAlreadyThere = False
+        If Dir(drawingPath) <> "" Then
+            On Error Resume Next
+            drawingAlreadyThere = (FileLen(drawingPath) = JsonGetLong(currentDrawing, "fileSize", -1))
+            On Error GoTo 0
+        End If
+
+        If Not drawingAlreadyThere Then
+            Dim drawingBytes() As Byte
+            On Error Resume Next
+            Err.Clear
+            drawingBytes = ApiGetBinary("/attachments/" & JsonGetString(currentDrawing, "id", "") & "/file")
+            Dim drawingErrNum As Long, drawingErrDesc As String
+            drawingErrNum = Err.Number
+            drawingErrDesc = Err.Description
+            On Error GoTo 0
+            If drawingErrNum = 0 Then
+                WriteBytesToFile drawingBytes, drawingPath
+                AppendLog T("Dl_Saved") & drawingName
+            Else
+                AppendLog "  " & label & T("Dl_ErrorDownloadingMid") & drawingName & " (" & drawingErrDesc & ")."
+            End If
+        End If
+    End If
+
     DownloadItem = targetPath
 End Function
 

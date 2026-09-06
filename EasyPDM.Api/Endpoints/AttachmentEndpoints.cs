@@ -63,8 +63,8 @@ static class AttachmentEndpoints
 
             var role = form["role"].ToString();
             if (role == "") role = null;
-            if (role is not null && role is not ("pdf" or "step" or "cad"))
-                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad' albo puste.");
+            if (role is not null && role is not ("pdf" or "step" or "cad" or "drawing"))
+                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad', 'drawing' albo puste.");
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
@@ -140,8 +140,8 @@ static class AttachmentEndpoints
         // "podpiąć" jako załącznik dowolny plik z dysku serwera.
         app.MapPost("/api/items/{itemId:guid}/attachments/register", async (Guid itemId, RegisterAttachmentRequest body, HttpContext ctx) =>
         {
-            if (body.Role is not null && body.Role is not ("pdf" or "step" or "cad"))
-                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad' albo puste.");
+            if (body.Role is not null && body.Role is not ("pdf" or "step" or "cad" or "drawing"))
+                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad', 'drawing' albo puste.");
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)

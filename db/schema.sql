@@ -320,7 +320,10 @@ CREATE TABLE item_attachments (
     --     SolidWorks/FreeCAD, odróżniony od zwykłych, ręcznie dodanych załączników.
     --     WIELE na element dozwolone (jeden na rewizję, nazwy zawierają literę rewizji,
     --     więc kolejne przesłania się nie nadpisują — historia rewizji zostaje widoczna).
-    preview_role TEXT CHECK (preview_role IN ('pdf', 'step', 'cad'))
+    --   drawing — plik rysunku technicznego SolidWorks (.SLDDRW) wgrany przez makro OBOK
+    --     własnego pliku "cad" Części/Złożenia, którego dotyczy. Tak jak "cad" -- WIELE na
+    --     element dozwolone, jeden na rewizję, ta sama konwencja nazwy pliku.
+    preview_role TEXT CHECK (preview_role IN ('pdf', 'step', 'cad', 'drawing'))
 );
 
 CREATE INDEX idx_item_attachments_item ON item_attachments (item_id);
@@ -463,4 +466,5 @@ INSERT INTO schema_migrations (filename) VALUES
     ('037_notifications.sql'), ('038_project_is_sample.sql'), ('039_system_state.sql'),
     ('040_manufacturer_product_types.sql'), ('041_manufacturer_product_subtypes.sql'),
     ('042_status_anulowana.sql'), ('043_client_name2.sql'),
-    ('044_client_name2_own_properties.sql'), ('045_client_name2_files.sql');
+    ('044_client_name2_own_properties.sql'), ('045_client_name2_files.sql'),
+    ('046_attachment_drawing_role.sql');

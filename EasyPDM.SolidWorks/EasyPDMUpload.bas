@@ -131,6 +131,7 @@ Private swApp As Object
 ' as a possible cause if "Variable not defined" is ever seen on one of these again.
 Private Const SW_DOC_PART As Long = 1                      ' swDocumentTypes_e.swDocPART
 Private Const SW_DOC_ASSEMBLY As Long = 2                   ' swDocumentTypes_e.swDocASSEMBLY
+Private Const SW_DOC_DRAWING As Long = 3                    ' swDocumentTypes_e.swDocDRAWING
 Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e.swCustomInfoText
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
@@ -253,6 +254,12 @@ Private Function T_PL(ByVal key As String) As String
         Case "NoActiveSavedDocument": T_PL = "Brak aktywnego, zapisanego dokumentu."
         Case "ExportStepPrompt": T_PL = "Wyeksportowac i wyslac model STEP (podglad 3D)?"
         Case "ExportPdfPrompt": T_PL = "Wyeksportowac i wyslac plik PDF?"
+        Case "Dwg_CannotIdentifyItem": T_PL = "Nie udalo sie rozpoznac, do ktorego elementu PDM nalezy ten rysunek -- zapisz najpierw czesc/zlozenie przez EasyPDM (zeby dostalo nazwe w formacie 'numer (nazwa)'), a potem zapisz rysunek z tego pliku."
+        Case "Dwg_ItemNotFoundPrefix": T_PL = "Nie znaleziono w EasyPDM elementu nr "
+        Case "Dwg_ItemNotFoundSuffix": T_PL = "."
+        Case "Dwg_NotPartOrAssembly": T_PL = "Znaleziony element nie jest Czescia ani Zlozeniem -- rysunki mozna podpinac tylko do nich."
+        Case "Dwg_UploadedPrefix": T_PL = "Rysunek przeslany i podpiety do elementu nr "
+        Case "Dwg_UploadedSuffix": T_PL = "."
         Case "AlreadyLinkedConfirm": T_PL = "Ten dokument jest juz powiazany z elementem PDM. Podpiac biezaca wersje jako nowa rewizje/aktualizacje?"
         Case "AlreadyLinkedConfirmPrefix": T_PL = "Ten dokument jest juz powiazany z elementem PDM nr "
         Case "AlreadyLinkedConfirmSuffix": T_PL = ". Jesli to NIE jest ta sama czesc (np. zrobiles 'Zapisz jako' z innej, juz podpietej czesci) -- kliknij Nie i podepnij ten plik recznie do wlasciwego elementu. Podpiac biezaca wersje jako nowa rewizje/aktualizacje TEGO elementu?"
@@ -317,6 +324,12 @@ Private Function T_EN(ByVal key As String) As String
         Case "NoActiveSavedDocument": T_EN = "No active, saved document."
         Case "ExportStepPrompt": T_EN = "Export and upload STEP model (3D preview)?"
         Case "ExportPdfPrompt": T_EN = "Export and upload a PDF file?"
+        Case "Dwg_CannotIdentifyItem": T_EN = "Could not identify which PDM item this drawing belongs to -- save the Part/Assembly through EasyPDM first (so it gets a filename in the 'number (name)' format), then save the drawing from that file."
+        Case "Dwg_ItemNotFoundPrefix": T_EN = "Could not find EasyPDM item number "
+        Case "Dwg_ItemNotFoundSuffix": T_EN = "."
+        Case "Dwg_NotPartOrAssembly": T_EN = "The found item is not a Part or an Assembly -- drawings can only be attached to those."
+        Case "Dwg_UploadedPrefix": T_EN = "Drawing uploaded and attached to item number "
+        Case "Dwg_UploadedSuffix": T_EN = "."
         Case "AlreadyLinkedConfirm": T_EN = "This document is already linked to a PDM item. Attach the current version as a new revision/update?"
         Case "AlreadyLinkedConfirmPrefix": T_EN = "This document is already linked to PDM item #"
         Case "AlreadyLinkedConfirmSuffix": T_EN = ". If this is NOT the same part (e.g. you did a Save As from a different, already-linked part) -- click No and link this file manually to the correct item instead. Attach the current version as a new revision/update to THIS item?"
@@ -381,6 +394,12 @@ Private Function T_DE(ByVal key As String) As String
         Case "NoActiveSavedDocument": T_DE = "Kein aktives, gespeichertes Dokument."
         Case "ExportStepPrompt": T_DE = "STEP-Modell exportieren und hochladen (3D-Vorschau)?"
         Case "ExportPdfPrompt": T_DE = "PDF-Datei exportieren und hochladen?"
+        Case "Dwg_CannotIdentifyItem": T_DE = "Es konnte nicht ermittelt werden, zu welchem PDM-Element diese Zeichnung gehoert -- speichern Sie zuerst das Teil/die Baugruppe ueber EasyPDM (damit es einen Dateinamen im Format 'Nummer (Name)' erhaelt), und speichern Sie dann die Zeichnung aus dieser Datei."
+        Case "Dwg_ItemNotFoundPrefix": T_DE = "EasyPDM-Element Nr. "
+        Case "Dwg_ItemNotFoundSuffix": T_DE = " wurde nicht gefunden."
+        Case "Dwg_NotPartOrAssembly": T_DE = "Das gefundene Element ist weder ein Teil noch eine Baugruppe -- Zeichnungen koennen nur daran angehaengt werden."
+        Case "Dwg_UploadedPrefix": T_DE = "Zeichnung hochgeladen und an Element Nr. "
+        Case "Dwg_UploadedSuffix": T_DE = " angehaengt."
         Case "AlreadyLinkedConfirm": T_DE = "Dieses Dokument ist bereits mit einem PDM-Element verknuepft. Die aktuelle Version als neue Revision/Aktualisierung anhaengen?"
         Case "AlreadyLinkedConfirmPrefix": T_DE = "Dieses Dokument ist bereits mit PDM-Element Nr. "
         Case "AlreadyLinkedConfirmSuffix": T_DE = " verknuepft. Falls dies NICHT dasselbe Teil ist (z. B. haben Sie ein 'Speichern unter' von einem anderen, bereits verknuepften Teil gemacht) -- klicken Sie Nein und verknuepfen Sie diese Datei stattdessen manuell mit dem richtigen Element. Die aktuelle Version als neue Revision/Aktualisierung DIESES Elements anhaengen?"
@@ -1405,7 +1424,7 @@ End Function
 ' the web app can show it under its "CAD attachments" section, separately from ordinary,
 ' attachments -- one per revision (unique filename per revision means these ACCUMULATE,
 ' unlike the single-slot "pdf"/"step" roles which replace the previous attachment).
-Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long, ByVal targetFolder As String) As Boolean
+Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long, ByVal targetFolder As String, Optional ByVal role As String = "cad") As Boolean
     Dim ext As String
     Dim dotPos As Long
     dotPos = InStrRev(filePath, ".")
@@ -1525,7 +1544,7 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
             Dim registerErrNum As Long, registerErrDesc As String
             On Error Resume Next
             Err.Clear
-            ApiRegisterAttachment itemId, targetPath, "cad"
+            ApiRegisterAttachment itemId, targetPath, role
             registerErrNum = Err.Number
             registerErrDesc = Err.Description
             On Error GoTo 0
@@ -1572,9 +1591,83 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
     End If
 
     LogLine "Plain HTTP upload: /items/" & itemId & "/attachments as """ & newFilename & """"
-    ApiUploadFile "/items/" & itemId & "/attachments", filePath, newFilename, "role", "cad"
+    ApiUploadFile "/items/" & itemId & "/attachments", filePath, newFilename, "role", role
     RenameAndUpload = True
 End Function
+
+' Entry point for an active Drawing (.SLDDRW) document -- see the SW_DOC_DRAWING branch in
+' main(). A drawing is never itself a PDM item; it documents an existing Part/Assembly,
+' identified by parsing the leading "<itemNumber> (" that RenameAndUpload already gives
+' every Part/Assembly file it saves (SolidWorks proposes this exact base filename by default
+' when a drawing is created FROM an already-renamed model, so this holds in the common
+' case). Once resolved, uploads through the SAME RenameAndUpload used for the model itself --
+' identical Save-As/embed-link/accumulate-per-revision mechanics -- just with role="drawing"
+' instead of the default "cad".
+Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
+    Dim fname As String
+    fname = Mid(filePath, InStrRev(filePath, "\") + 1)
+
+    Dim re As Object
+    Set re = CreateObject("VBScript.RegExp")
+    re.Pattern = "^(\d+)\s*\("
+    If Not re.Test(fname) Then
+        MsgBox T("Dwg_CannotIdentifyItem"), vbExclamation, T("AppTitle")
+        LogLine "Drawing upload: could not parse an item number out of """ & fname & """ -- done."
+        Exit Sub
+    End If
+
+    Dim m As Object
+    Set m = re.Execute(fname)
+    Dim itemNumber As Long
+    itemNumber = CLng(m(0).SubMatches(0))
+
+    Dim item As Object
+    On Error Resume Next
+    Err.Clear
+    Set item = ApiGet("/items/by-number/" & itemNumber)
+    Dim lookupErrNum As Long
+    lookupErrNum = Err.Number
+    On Error GoTo 0
+    If item Is Nothing Or lookupErrNum <> 0 Then
+        If lookupErrNum = ERR_AUTH Then
+            MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+            SetSessionToken ""
+        Else
+            MsgBox T("Dwg_ItemNotFoundPrefix") & itemNumber & T("Dwg_ItemNotFoundSuffix"), vbExclamation, T("AppTitle")
+        End If
+        LogLine "Drawing upload: item #" & itemNumber & " lookup failed (err=" & lookupErrNum & ")."
+        Exit Sub
+    End If
+
+    Dim itemType As String
+    itemType = JsonGetString(item, "itemType", "")
+    If itemType <> "part" And itemType <> "assembly" Then
+        MsgBox T("Dwg_NotPartOrAssembly"), vbExclamation, T("AppTitle")
+        LogLine "Drawing upload: item #" & itemNumber & " is a '" & itemType & "', not part/assembly -- done."
+        Exit Sub
+    End If
+
+    Dim itemId As String, name As String, revision As Long
+    itemId = JsonGetString(item, "id", "")
+    name = JsonGetString(item, "fileName", "")
+    revision = JsonGetLong(item, "revisionNumber", 1)
+
+    LogLine "Drawing upload: matched item #" & itemNumber & " (" & name & "), uploading as role=drawing."
+
+    On Error GoTo Failed
+    RenameAndUpload swModel, filePath, itemId, itemNumber, name, revision, GetDownloadFolder(), "drawing"
+    MsgBox T("Dwg_UploadedPrefix") & itemNumber & T("Dwg_UploadedSuffix"), vbInformation, T("AppTitle")
+    Exit Sub
+
+Failed:
+    LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
+    If Err.Number = ERR_AUTH Then
+        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+        SetSessionToken ""
+    Else
+        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
+    End If
+End Sub
 
 ' Exports swModel's visible geometry to a temporary .step file and uploads it as an
 ' attachment tagged role="step" (replacing any previous "step" attachment first) -- feeds
@@ -2450,6 +2543,17 @@ Sub main()
         Exit Sub
     End If
     LogLine "Active document: """ & filePath & """, detected type: " & itemTypeGuess
+
+    ' A Drawing (.SLDDRW) is never itself a PDM item -- it's documentation FOR an existing
+    ' Part/Assembly, uploaded as a "drawing"-role attachment on that item instead. Never
+    ' linked via the EasyPDM_ItemId custom property (nothing above ever sets it on a
+    ' Drawing), so this is handled as its own early, separate path -- entirely before (and
+    ' instead of) the itemTypeGuess-based Part/Assembly dispatch below, which assumes the
+    ' active document itself becomes/updates a top-level item.
+    If swApp.ActiveDoc.GetType() = SW_DOC_DRAWING Then
+        UploadDrawingForActiveDoc swApp.ActiveDoc, filePath
+        Exit Sub
+    End If
 
     ' Target folder for local "Save As under the PDM name" copies -- asked ONCE, up front,
     ' before Step 1, so it covers BOTH the auto-detected assembly components (leaves-first,

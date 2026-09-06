@@ -1274,11 +1274,18 @@ def _upload_pdf_attachment(doc, item_id):
     try:
         import FreeCADGui as Gui
 
-        objs = [
-            obj for obj in doc.Objects
-            if hasattr(obj, "Shape") and obj.Shape and not obj.Shape.isNull()
-            and getattr(obj, "Visibility", True)
-        ]
+        # Prawdziwa strona TechDraw (rysunek techniczny) ma pierwszeństwo nad surowym
+        # eksportem brył -- to jest właśnie ta "ugruntowana ścieżka" z komentarza wyżej.
+        # Bierzemy pierwszą znalezioną (typowy dokument ma najwyżej jedną).
+        techdraw_pages = [obj for obj in doc.Objects if obj.TypeId == "TechDraw::DrawPage"]
+        if techdraw_pages:
+            objs = [techdraw_pages[0]]
+        else:
+            objs = [
+                obj for obj in doc.Objects
+                if hasattr(obj, "Shape") and obj.Shape and not obj.Shape.isNull()
+                and getattr(obj, "Visibility", True)
+            ]
         if not objs:
             return
 

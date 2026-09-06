@@ -124,6 +124,7 @@ function AttachmentsPanel({
   const [previewing, setPreviewing] = useState<Attachment | null>(null)
   const genericInputRef = useRef<HTMLInputElement>(null)
   const cadInputRef = useRef<HTMLInputElement>(null)
+  const drawingInputRef = useRef<HTMLInputElement>(null)
 
   async function refetch() {
     setAttachments(await api.getAttachments(itemId))
@@ -142,7 +143,7 @@ function AttachmentsPanel({
     }
   }, [itemId])
 
-  async function uploadFile(file: File, role: "pdf" | "step" | "cad" | null) {
+  async function uploadFile(file: File, role: "pdf" | "step" | "cad" | "drawing" | null) {
     setError(null)
     setUploading(true)
     try {
@@ -174,6 +175,14 @@ function AttachmentsPanel({
     if (file) uploadFile(file, "cad")
   }
 
+  // Sama logika co "cad" wyżej -- "drawing" (rysunek SolidWorks .SLDDRW wgrany przez makro
+  // OBOK własnego pliku CAD Części/Złożenia) też się KUMULUJE, jeden na rewizję.
+  function handleDrawingFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (file) uploadFile(file, "drawing")
+  }
+
   // Na rolę przypada najwyżej jeden załącznik — nowy zastępuje poprzedni. Zastępowanie
   // (usunięcie starego, także fizycznego pliku) robi backend (patrz
   // ReplaceExistingRoleAttachmentAsync w AttachmentEndpoints.cs), więc działa identycznie
@@ -196,6 +205,7 @@ function AttachmentsPanel({
   const pdfAttachment = attachments.find((a) => a.role === "pdf")
   const stepAttachment = attachments.find((a) => a.role === "step")
   const cadAttachments = attachments.filter((a) => a.role === "cad")
+  const drawingAttachments = attachments.filter((a) => a.role === "drawing")
   const genericAttachments = attachments.filter((a) => !a.role)
 
   return (
@@ -228,6 +238,76 @@ function AttachmentsPanel({
         {cadAttachments.length > 0 ? (
           <ul className="flex flex-col gap-1">
             {cadAttachments.map((attachment) => (
+              <li
+                key={attachment.id}
+                className="flex items-center justify-between gap-2 text-[13px]"
+              >
+                <a
+                  className="truncate text-primary hover:underline"
+                  href={api.attachmentDownloadUrl(attachment.id)}
+                  download
+                >
+                  {attachment.fileName}
+                </a>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="text-muted-foreground">
+                    {formatUploadedAt(attachment.uploadedAt)}
+                    {attachment.uploadedAt && attachment.fileSize !== null && " · "}
+                    {formatSize(attachment.fileSize)}
+                  </span>
+                  {previewKindOf(attachment.fileName) && (
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      onClick={() => setPreviewing(attachment)}
+                      aria-label={t("common.preview")}
+                    >
+                      <Eye className="size-3 text-muted-foreground" />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    onClick={() => handleDelete(attachment)}
+                    disabled={locked}
+                    aria-label={t("common.deleteNamed", { name: attachment.fileName })}
+                  >
+                    <Trash2 className="size-3 text-muted-foreground" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Hint>{t("item.noFile")}</Hint>
+        )}
+      </div>
+
+      <div className="mb-3 rounded-lg bg-muted/30 p-2 ring-1 ring-foreground/10">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[11px] font-medium text-muted-foreground uppercase">
+            {t("item.drawingAttachments")}
+          </span>
+          <input
+            ref={drawingInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleDrawingFileSelected}
+            disabled={locked || uploading}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={locked || uploading}
+            onClick={() => drawingInputRef.current?.click()}
+          >
+            <Upload className="size-3.5" /> {t("common.add")}
+          </Button>
+        </div>
+
+        {drawingAttachments.length > 0 ? (
+          <ul className="flex flex-col gap-1">
+            {drawingAttachments.map((attachment) => (
               <li
                 key={attachment.id}
                 className="flex items-center justify-between gap-2 text-[13px]"
