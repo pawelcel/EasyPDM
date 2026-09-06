@@ -1265,12 +1265,12 @@ def _upload_pdf_attachment(doc, item_id):
     AttachmentEndpoints.cs), więc -- w odróżnieniu od _upload_step_attachment powyżej --
     nie ma tu ręcznego pobierania/kasowania poprzedniego załącznika przed wysyłką.
 
-    NIEZWERYFIKOWANE na żywym FreeCAD: Gui.export() dla dowolnej Części/Ciała (a nie strony
-    TechDraw) do .pdf nie jest tak ugruntowaną ścieżką jak Part.export() do STEP -- FreeCAD
-    najpewniej wspiera PDF głównie z poziomu rysunków TechDraw, więc to może się nie udać
-    dla zwykłej Części/Złożenia. Stąd try/except obejmujący WSZYSTKO -- w najgorszym razie
-    PDF po prostu nie powstanie, bez wpływu na resztę wysyłki. Potwierdź na pierwszym
-    prawdziwym uruchomieniu."""
+    POTWIERDZONE na żywym FreeCAD: eksport surowych brył (bez strony TechDraw) do PDF
+    faktycznie działa, ale gdy strona TechDraw JEST w dokumencie, samo podanie jej w liście
+    obiektów do Gui.export() NIE WYSTARCZY -- musi być dodatkowo "aktywną stroną" FreeCAD
+    (patrz doubleClicked() niżej), inaczej eksport cicho spada z powrotem do renderu 3D
+    zamiast dać błąd. Stąd try/except obejmujący WSZYSTKO -- w najgorszym razie PDF po
+    prostu nie powstanie, bez wpływu na resztę wysyłki."""
     try:
         import FreeCADGui as Gui
 
@@ -1278,8 +1278,22 @@ def _upload_pdf_attachment(doc, item_id):
         # eksportem brył -- to jest właśnie ta "ugruntowana ścieżka" z komentarza wyżej.
         # Bierzemy pierwszą znalezioną (typowy dokument ma najwyżej jedną).
         techdraw_pages = [obj for obj in doc.Objects if obj.TypeId == "TechDraw::DrawPage"]
+        previous_active_view = None
         if techdraw_pages:
             objs = [techdraw_pages[0]]
+            # POTWIERDZONE NA ŻYWO: Gui.export() ze stroną TechDraw w liście obiektów
+            # produkuje prawdziwy rysunek TYLKO gdy ta strona jest akurat "aktywną stroną"
+            # FreeCAD (własne pojęcie TechDraw, powiązane z otwarciem jej zakładki widoku 2D)
+            # -- z aktywną zakładką bryły PartDesign zamiast tego eksport CICHO spada z
+            # powrotem do renderu 3D, bez żadnego błędu. doubleClicked() symuluje dokładnie
+            # to kliknięcie strony w drzewie, które ręcznie naprawiało ten sam problem.
+            # Zapamiętujemy poprzedni aktywny widok, żeby po eksporcie oddać użytkownikowi
+            # dokładnie to, na czym pracował.
+            try:
+                previous_active_view = Gui.ActiveDocument.ActiveView
+                objs[0].ViewObject.doubleClicked()
+            except Exception:
+                pass
         else:
             objs = [
                 obj for obj in doc.Objects
@@ -1303,6 +1317,11 @@ def _upload_pdf_attachment(doc, item_id):
             )
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+            if previous_active_view is not None:
+                try:
+                    Gui.ActiveDocument.ActiveView = previous_active_view
+                except Exception:
+                    pass
     except Exception:
         pass
 
