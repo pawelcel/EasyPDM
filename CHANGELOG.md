@@ -55,6 +55,12 @@ All notable changes to EasyPDM are documented in this file.
   convert the path through that code page before touching disk. Local file writes for
   downloaded attachment bytes now go through ADODB.Stream instead, which handles the full
   Unicode filename correctly.
+- SolidWorks: uploading a file whose PDM-derived name contains non-ASCII characters (e.g.
+  Polish diacritics) sent that name mangled through the Windows machine's current ANSI code
+  page inside the upload's multipart HTTP request, arriving at the server (which assumes
+  UTF-8 throughout) as invalid byte sequences — visible as literal replacement characters
+  wherever that file's name was shown afterward. It's now encoded as UTF-8 instead. Existing
+  attachments already uploaded with a mangled name need re-uploading to pick up the fix.
 
 ## [0.2]
 

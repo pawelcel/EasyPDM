@@ -942,8 +942,12 @@ Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional 
     tail = vbCrLf & "--" & boundary & "--" & vbCrLf
 
     Dim headBytes() As Byte, tailBytes() As Byte, fileBytes() As Byte
-    headBytes = StrConv(head, vbFromUnicode)
-    tailBytes = StrConv(tail, vbFromUnicode)
+    ' Utf8EncodeBytes, NOT StrConv(..., vbFromUnicode) -- the server assumes UTF-8
+    ' throughout; StrConv goes through the Windows machine's current ANSI code page and
+    ' mangled a Polish item name in the "filename=" header (confirmed in practice: it showed
+    ' up as replacement characters in the web app after upload).
+    headBytes = Utf8EncodeBytes(head)
+    tailBytes = Utf8EncodeBytes(tail)
     fileBytes = ReadFileBytes(filePath)
 
     Dim totalLen As Long
@@ -1049,12 +1053,13 @@ End Function
 ' Percent-encoding for a query string component -- VBA has no built-in URL encoder.
 ' Operates on UTF-8 BYTES (not characters), so a document name with Polish diacritics
 ' encodes correctly, not just plain ASCII tickets/names.
-Function UrlEncode(ByVal s As String) As String
-    If Len(s) = 0 Then
-        UrlEncode = ""
-        Exit Function
-    End If
-
+' Converts a VBA (Unicode) string to its UTF-8 byte representation -- NOT StrConv(s,
+' vbFromUnicode), which goes through the Windows machine's current ANSI code page instead
+' and silently mangles any character outside it (confirmed in practice: a Polish item name
+' sent this way through ApiUploadFile's multipart Content-Disposition header arrived at the
+' server, which assumes UTF-8 throughout, as invalid byte sequences -- shown as literal
+' replacement characters in the web app).
+Function Utf8EncodeBytes(ByVal s As String) As Byte()
     Dim stream As Object
     Set stream = CreateObject("ADODB.Stream")
     stream.Type = 2 ' adTypeText
@@ -1081,6 +1086,18 @@ Function UrlEncode(ByVal s As String) As String
             bytes = trimmed
         End If
     End If
+
+    Utf8EncodeBytes = bytes
+End Function
+
+Function UrlEncode(ByVal s As String) As String
+    If Len(s) = 0 Then
+        UrlEncode = ""
+        Exit Function
+    End If
+
+    Dim bytes() As Byte
+    bytes = Utf8EncodeBytes(s)
 
     Dim result As String
     Dim i As Long, b As Byte
