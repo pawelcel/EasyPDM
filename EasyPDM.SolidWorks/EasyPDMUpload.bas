@@ -877,39 +877,25 @@ Function ApiRegisterAttachment(ByVal itemId As String, ByVal filePath As String,
 End Function
 
 ' Reads the whole file as a byte array -- used for the plain HTTP upload (when the PDM
-' storage is not visible in this machine's file system). filePath is typically the document
-' RenameAndUpload/SaveAs just wrote AND SolidWorks is still holding open as the active
-' document -- confirmed in practice: ADODB.Stream.LoadFromFile called directly on it failed
-' with "Nie mozna otworzyc pliku" ("Cannot open file"), apparently requesting a stricter
-' sharing mode than SolidWorks allows on its own open document. FileCopy (already proven
-' elsewhere in RenameAndUpload's "storage visible" branch to read this exact kind of
-' still-open file successfully, AND to handle a Unicode filePath correctly) copies it to a
-' private temp file first; THAT copy -- nothing else has it open -- is then read via
-' ADODB.Stream (not the legacy Open/Get/Close statements, which share WriteBytesToFile's ANSI
-' code-page limitation in EasyPDMDownload.bas, confirmed there with a "Bad file name or
-' number" error on an item name with Polish diacritics).
+' storage is not visible in this machine's file system). Deliberately the plain legacy
+' Open/Get/Close statements, NOT ADODB.Stream -- confirmed in practice that this exact
+' pattern (reading a Polish-named file RenameAndUpload/SaveAs just wrote, which SolidWorks
+' is still holding open as the active document) already works fine here. An ADODB.Stream
+' rewrite, tried as a preemptive fix mirroring WriteBytesToFile's real Unicode-path bug in
+' EasyPDMDownload.bas, turned out to be unnecessary for READING and caused two different new
+' failures instead ("Cannot open file", then "Permission denied") -- reverted.
 Private Function ReadFileBytes(ByVal filePath As String) As Byte()
-    Dim tempPath As String
-    tempPath = Environ$("TEMP") & "\EasyPDM_upload_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000))
-    FileCopy filePath, tempPath
-
-    Dim stream As Object
-    Set stream = CreateObject("ADODB.Stream")
-    stream.Type = 1 ' adTypeBinary
-    stream.Open
-    stream.LoadFromFile tempPath
+    Dim fileNum As Integer
     Dim buffer() As Byte
-    If stream.Size > 0 Then
-        buffer = stream.Read
+    fileNum = FreeFile
+    Open filePath For Binary Access Read As #fileNum
+    If LOF(fileNum) > 0 Then
+        ReDim buffer(1 To LOF(fileNum))
+        Get #fileNum, , buffer
     Else
         ReDim buffer(0 To -1) ' empty array
     End If
-    stream.Close
-
-    On Error Resume Next
-    Kill tempPath
-    On Error GoTo 0
-
+    Close #fileNum
     ReadFileBytes = buffer
 End Function
 
