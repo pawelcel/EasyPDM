@@ -258,6 +258,7 @@ Private Function T_PL(ByVal key As String) As String
         Case "ExportStepPrompt": T_PL = "Wyeksportowac i wyslac model STEP (podglad 3D)?"
         Case "ExportPdfPrompt": T_PL = "Wyeksportowac i wyslac plik PDF?"
         Case "Dwg_CannotIdentifyItem": T_PL = "Nie udalo sie rozpoznac, do ktorego elementu PDM nalezy ten rysunek -- zapisz najpierw czesc/zlozenie przez EasyPDM (zeby dostalo nazwe w formacie 'numer (nazwa)'), a potem zapisz rysunek z tego pliku."
+        Case "Dwg_ReferencedPartNotLinkedPrompt": T_PL = "Ten rysunek dokumentuje czesc/zlozenie, ktore nie zostalo jeszcze wyslane do EasyPDM. Wyslac je teraz jako nowy element (numer/nazwe/rewizje ustalisz w przegladarce), a potem ten rysunek?"
         Case "Dwg_ItemNotFoundPrefix": T_PL = "Nie znaleziono w EasyPDM elementu nr "
         Case "Dwg_ItemNotFoundSuffix": T_PL = "."
         Case "Dwg_NotPartOrAssembly": T_PL = "Znaleziony element nie jest Czescia ani Zlozeniem -- rysunki mozna podpinac tylko do nich."
@@ -331,6 +332,7 @@ Private Function T_EN(ByVal key As String) As String
         Case "ExportStepPrompt": T_EN = "Export and upload STEP model (3D preview)?"
         Case "ExportPdfPrompt": T_EN = "Export and upload a PDF file?"
         Case "Dwg_CannotIdentifyItem": T_EN = "Could not identify which PDM item this drawing belongs to -- save the Part/Assembly through EasyPDM first (so it gets a filename in the 'number (name)' format), then save the drawing from that file."
+        Case "Dwg_ReferencedPartNotLinkedPrompt": T_EN = "This drawing documents a Part/Assembly that hasn't been uploaded to EasyPDM yet. Upload it now as a new item (you'll pick the number/name/revision in the browser), then this drawing?"
         Case "Dwg_ItemNotFoundPrefix": T_EN = "Could not find EasyPDM item number "
         Case "Dwg_ItemNotFoundSuffix": T_EN = "."
         Case "Dwg_NotPartOrAssembly": T_EN = "The found item is not a Part or an Assembly -- drawings can only be attached to those."
@@ -404,6 +406,7 @@ Private Function T_DE(ByVal key As String) As String
         Case "ExportStepPrompt": T_DE = "STEP-Modell exportieren und hochladen (3D-Vorschau)?"
         Case "ExportPdfPrompt": T_DE = "PDF-Datei exportieren und hochladen?"
         Case "Dwg_CannotIdentifyItem": T_DE = "Es konnte nicht ermittelt werden, zu welchem PDM-Element diese Zeichnung gehoert -- speichern Sie zuerst das Teil/die Baugruppe ueber EasyPDM (damit es einen Dateinamen im Format 'Nummer (Name)' erhaelt), und speichern Sie dann die Zeichnung aus dieser Datei."
+        Case "Dwg_ReferencedPartNotLinkedPrompt": T_DE = "Diese Zeichnung dokumentiert ein Teil/eine Baugruppe, das/die noch nicht zu EasyPDM hochgeladen wurde. Jetzt als neues Element hochladen (Nummer/Name/Revision legen Sie im Browser fest) und dann diese Zeichnung?"
         Case "Dwg_ItemNotFoundPrefix": T_DE = "EasyPDM-Element Nr. "
         Case "Dwg_ItemNotFoundSuffix": T_DE = " wurde nicht gefunden."
         Case "Dwg_NotPartOrAssembly": T_DE = "Das gefundene Element ist weder ein Teil noch eine Baugruppe -- Zeichnungen koennen nur daran angehaengt werden."
@@ -1705,6 +1708,48 @@ Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
         Exit Sub
     End If
 
+    ' No already-linked candidate found via the view tree -- if the drawing documents
+    ' exactly ONE distinct, currently open Part/Assembly that was never uploaded to EasyPDM
+    ' at all (no EasyPDM_ItemId yet), offer to upload IT first (full flow, incl. the browser
+    ' round-trip for its own number/name/revision) and then continue straight into the
+    ' drawing upload -- instead of forcing a separate, manual macro run on the part first.
+    ' Only handles the single-unlinked-reference case (typical single-part drawing, the
+    ' reported scenario) -- an assembly drawing with SEVERAL different unlinked references
+    ' still falls through to the filename fallback below, same as today.
+    If candidateIds.Count = 0 Then
+        Dim refDocs As Collection
+        Set refDocs = FindReferencedDocsInDrawingViews(swModel)
+        If refDocs.Count = 1 Then
+            Dim onlyRefDoc As Object
+            Set onlyRefDoc = refDocs(1)
+            Dim refDocType As Long
+            refDocType = onlyRefDoc.GetType()
+            If refDocType = SW_DOC_PART Or refDocType = SW_DOC_ASSEMBLY Then
+                If MsgBox(T("Dwg_ReferencedPartNotLinkedPrompt"), vbYesNo + vbQuestion, T("AppTitle")) = vbYes Then
+                    Dim refFilePath As String, refItemTypeGuess As String, refDefaultName As String
+                    If GetDocInfo(onlyRefDoc, refFilePath, refItemTypeGuess, refDefaultName) Then
+                        Dim refResult As Object
+                        Set refResult = UploadPartOrAssemblyDoc(onlyRefDoc, refFilePath, refItemTypeGuess, refDefaultName)
+                        If Not refResult Is Nothing Then
+                            Dim linkedItem As Object
+                            Set linkedItem = FetchItemById(CStr(refResult.Item("itemId")))
+                            If Not linkedItem Is Nothing Then
+                                UploadDrawingToItemNatively swModel, filePath, linkedItem
+                                Exit Sub
+                            End If
+                        End If
+                    End If
+                    ' Cancelled or failed partway through the referenced part's own upload
+                    ' (already messaged by UploadPartOrAssemblyDoc/GetDocInfo themselves) --
+                    ' stop here rather than confusingly falling through to the filename
+                    ' fallback for a part we just tried to upload.
+                    LogLine "Drawing upload: referenced part/assembly auto-upload did not complete -- done."
+                    Exit Sub
+                End If
+            End If
+        End If
+    End If
+
     Dim fname As String
     fname = Mid(filePath, InStrRev(filePath, "\") + 1)
 
@@ -1778,6 +1823,45 @@ Function FindLinkedCandidatesInDrawingViews(ByVal swDraw As Object) As Collectio
     Loop
 
     Set FindLinkedCandidatesInDrawingViews = result
+End Function
+
+' Same view-walk as FindLinkedCandidatesInDrawingViews above, but collects every DISTINCT
+' referenced document OBJECT regardless of link status (used to offer auto-uploading a
+' still-unlinked Part/Assembly the drawing documents -- see UploadDrawingForActiveDoc).
+' Deduplicates by path; a never-saved document has no path (GetPathName() = ""), so those
+' fall back to an in-memory identity key (ObjPtr) instead, so two different unsaved
+' documents are never merged into one.
+Function FindReferencedDocsInDrawingViews(ByVal swDraw As Object) As Collection
+    Dim result As New Collection
+    Dim seen As Object
+    Set seen = CreateObject("Scripting.Dictionary")
+
+    Dim view As Object
+    On Error Resume Next
+    Set view = swDraw.GetFirstView()
+    On Error GoTo 0
+    Do While Not view Is Nothing
+        Dim refDoc As Object
+        On Error Resume Next
+        Set refDoc = view.ReferencedDocument
+        On Error GoTo 0
+        If Not refDoc Is Nothing Then
+            Dim refKey As String
+            refKey = refDoc.GetPathName()
+            If refKey = "" Then refKey = "objptr:" & ObjPtr(refDoc)
+            If Not seen.Exists(refKey) Then
+                seen.Add refKey, True
+                result.Add refDoc
+            End If
+        End If
+        Dim nextView As Object
+        On Error Resume Next
+        Set nextView = view.GetNextView()
+        On Error GoTo 0
+        Set view = nextView
+    Loop
+
+    Set FindReferencedDocsInDrawingViews = result
 End Function
 
 ' GET /items/{id} -- Nothing (rather than raising) on any failure, including auth expiry --
@@ -2661,19 +2745,16 @@ End Function
 '     number/name/revision) works fine on a document with no existing path, unlike Save3.
 '     filePath stays "" through this branch on purpose; RenameAndUpload derives the file
 '     extension from the document's own type in that case instead of from filePath.
-Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As String, ByRef defaultName As String) As Boolean
-    Dim swModel As Object
-    Set swModel = swApp.ActiveDoc
-    If swModel Is Nothing Then
-        GetActiveDocInfo = False
-        Exit Function
-    End If
-
+' Parametrized by model (not just the active document) so UploadDrawingForActiveDoc can run
+' the exact same "unsaved? ask to save; else Save3" logic on a drawing's still-unlinked
+' referenced Part/Assembly, not only on swApp.ActiveDoc -- same wrapper pattern as
+' GetLinkedItemId/GetLinkedItemIdOn and SetLinkedItem/SetLinkedItemOn below.
+Function GetDocInfo(ByVal swModel As Object, ByRef filePath As String, ByRef itemTypeGuess As String, ByRef defaultName As String) As Boolean
     filePath = swModel.GetPathName()
 
     If filePath = "" Then
         If MsgBox(T("UnsavedDocumentPrompt"), vbYesNo + vbQuestion, T("AppTitle")) <> vbYes Then
-            GetActiveDocInfo = False
+            GetDocInfo = False
             Exit Function
         End If
     Else
@@ -2682,12 +2763,12 @@ Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As Strin
         saveOk = swModel.Save3(0, saveErr, saveWarn)
         If Not saveOk Then
             MsgBox T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
-            GetActiveDocInfo = False
+            GetDocInfo = False
             Exit Function
         End If
         filePath = swModel.GetPathName()
         If filePath = "" Then
-            GetActiveDocInfo = False
+            GetDocInfo = False
             Exit Function
         End If
     End If
@@ -2703,7 +2784,15 @@ Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As Strin
 
     defaultName = BaseNameFromPath(filePath)
 
-    GetActiveDocInfo = True
+    GetDocInfo = True
+End Function
+
+Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As String, ByRef defaultName As String) As Boolean
+    If swApp.ActiveDoc Is Nothing Then
+        GetActiveDocInfo = False
+        Exit Function
+    End If
+    GetActiveDocInfo = GetDocInfo(swApp.ActiveDoc, filePath, itemTypeGuess, defaultName)
 End Function
 
 Private Function GetCustPropMgrOn(ByVal model As Object) As Object
@@ -2813,6 +2902,21 @@ Sub main()
         Exit Sub
     End If
 
+    UploadPartOrAssemblyDoc swApp.ActiveDoc, filePath, itemTypeGuess, defaultName
+End Sub
+
+' Runs the full "upload this Part/Assembly document to EasyPDM" flow -- target folder
+' prompt, assembly component tree (Step 1), already-linked-vs-new-item-in-browser decision
+' (Step 2), attaching Step 1's components under the result (Step 3), and the final
+' success/error messaging -- against an ARBITRARY model document, not necessarily
+' swApp.ActiveDoc. Extracted out of Sub main() so UploadDrawingForActiveDoc can run this
+' same flow on a drawing's still-unlinked referenced Part/Assembly before continuing with
+' the drawing itself (see its own comment) -- ordinary use from main() on the active
+' document is unchanged, just routed through this function instead of being inlined.
+' Returns the resultInfo Dictionary (keys: itemId/itemNumber/name/revision) on success,
+' Nothing if cancelled or failed at any point (messaging for every such case happens here,
+' same as it always has -- callers don't need to show anything more themselves).
+Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As String, ByVal itemTypeGuess As String, ByVal defaultName As String) As Object
     ' Target folder for local "Save As under the PDM name" copies -- asked ONCE, up front,
     ' before Step 1, so it covers BOTH the auto-detected assembly components (leaves-first,
     ' see ProcessAssemblyTree) AND the top-level document itself. Same registry key as
@@ -2823,7 +2927,7 @@ Sub main()
     targetFolder = Trim(InputBox(T("PromptTargetFolder"), T("TitleTargetFolder"), GetDownloadFolder()))
     If targetFolder = "" Then
         LogLine "Target folder prompt cancelled -- done."
-        Exit Sub
+        Exit Function
     End If
     If Right(targetFolder, 1) = "\" Then targetFolder = Left(targetFolder, Len(targetFolder) - 1)
     EnsureDirectory targetFolder
@@ -2841,22 +2945,19 @@ Sub main()
     Dim edgesForTop As New Collection
     Dim lockedComponents As New Collection
     If itemTypeGuess = "assembly" Then
-        If ProcessAssemblyTree(swApp.ActiveDoc, edgesForTop, targetFolder, lockedComponents) Then
+        If ProcessAssemblyTree(swModel, edgesForTop, targetFolder, lockedComponents) Then
             LogLine "Cancelled during assembly tree processing -- done."
-            Exit Sub
+            Exit Function
         End If
     End If
 
-    Dim swActiveModel As Object
-    Set swActiveModel = swApp.ActiveDoc
-
     Dim linkedItemId As String
-    linkedItemId = GetLinkedItemId()
+    linkedItemId = GetLinkedItemIdOn(swModel)
 
     If linkedItemId <> "" Then
         If Not ItemStillExists(linkedItemId) Then
             LogLine "Linked PDM item " & linkedItemId & " no longer exists on the server (deleted?) -- clearing the stale local link, treating this document as not yet linked."
-            SetLinkedItem "", ""
+            SetLinkedItemOn swModel, "", ""
             MsgBox T("StaleLinkCleared"), vbInformation, T("AppTitle")
             linkedItemId = ""
         End If
@@ -2896,7 +2997,7 @@ Sub main()
 
         Dim confirmUpdate As VbMsgBoxResult
         confirmUpdate = MsgBox(confirmText, vbYesNo + vbQuestion, T("AppTitle"))
-        If confirmUpdate <> vbYes Then Exit Sub
+        If confirmUpdate <> vbYes Then Exit Function
 
         ' Defaults match the browser checkboxes' own defaults (STEP on, PDF off) via
         ' vbDefaultButton1/2 -- Enter alone picks the same answer the browser form would
@@ -2906,10 +3007,10 @@ Sub main()
         Dim nativeExportPdf As Boolean
         nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
 
-        Set resultInfo = PushToExistingItem(swActiveModel, linkedItemId, filePath, targetFolder)
+        Set resultInfo = PushToExistingItem(swModel, linkedItemId, filePath, targetFolder)
         If Not resultInfo Is Nothing Then
-            If nativeExportStep Then UploadStepAttachment swActiveModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
-            If nativeExportPdf Then UploadPdfAttachment swActiveModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+            If nativeExportStep Then UploadStepAttachment swModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+            If nativeExportPdf Then UploadPdfAttachment swModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
         End If
     Else
         ' Not yet linked -- "new item vs duplicate vs attach to existing" is decided in
@@ -2924,7 +3025,7 @@ Sub main()
         If ticketData Is Nothing Then
             MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
             LogLine "=== Finished: browser ticket cancelled/timed out ==="
-            Exit Sub
+            Exit Function
         End If
 
         Dim exportStep As Boolean
@@ -2949,15 +3050,15 @@ Sub main()
         End If
 
         If isExisting Then
-            Set resultInfo = PushToExistingItem(swActiveModel, ticketItemId, filePath, targetFolder)
+            Set resultInfo = PushToExistingItem(swModel, ticketItemId, filePath, targetFolder)
             If resultInfo Is Nothing Then
                 MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
                 LogLine "=== Finished: existing item declined a new revision ==="
-                Exit Sub
+                Exit Function
             End If
             linkedItemId = ticketItemId
-            If exportStep Then UploadStepAttachment swActiveModel, ticketItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
-            If exportPdf Then UploadPdfAttachment swActiveModel, ticketItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+            If exportStep Then UploadStepAttachment swModel, ticketItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+            If exportPdf Then UploadPdfAttachment swModel, ticketItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
         Else
             ' New item -- it already exists server-side (the browser called POST /nodes
             ' with this ticket), so finish DIRECTLY with the file upload; creating another
@@ -2967,15 +3068,15 @@ Sub main()
             Dim ticketName As String
             ticketName = JsonGetString(ticketData, "name", defaultName)
 
-            RenameAndUpload swActiveModel, filePath, ticketItemId, ticketItemNumber, ticketName, 1, targetFolder
+            RenameAndUpload swModel, filePath, ticketItemId, ticketItemNumber, ticketName, 1, targetFolder
             linkedItemId = ticketItemId
             Set resultInfo = CreateObject("Scripting.Dictionary")
             resultInfo.Add "itemId", ticketItemId
             resultInfo.Add "itemNumber", ticketItemNumber
             resultInfo.Add "name", ticketName
             resultInfo.Add "revision", 1
-            If exportStep Then UploadStepAttachment swActiveModel, ticketItemId, ticketItemNumber, ticketName, 1
-            If exportPdf Then UploadPdfAttachment swActiveModel, ticketItemId, ticketItemNumber, ticketName, 1
+            If exportStep Then UploadStepAttachment swModel, ticketItemId, ticketItemNumber, ticketName, 1
+            If exportPdf Then UploadPdfAttachment swModel, ticketItemId, ticketItemNumber, ticketName, 1
         End If
     End If
 
@@ -3021,7 +3122,7 @@ Sub main()
         ' resultInfo above) already set and saved this same Custom Property BEFORE
         ' uploading, so the file actually sent to the server already carries it. Kept here
         ' as cheap insurance for the top-level document specifically.
-        SetLinkedItem linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0))
+        SetLinkedItemOn swModel, linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0))
         LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
                 ", revision " & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & " ==="
 
@@ -3042,7 +3143,8 @@ Sub main()
     Else
         LogLine "=== Finished without uploading (cancelled or no new revision) ==="
     End If
-    Exit Sub
+    Set UploadPartOrAssemblyDoc = resultInfo
+    Exit Function
 
 Failed:
     LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
@@ -3053,7 +3155,7 @@ Failed:
     Else
         MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
     End If
-End Sub
+End Function
 
 ' Separate Sub -- can be bound to your own toolbar button/shortcut to log out of EasyPDM
 ' without running the whole upload flow (the next run of "main" will ask to log in again).
