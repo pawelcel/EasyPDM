@@ -1100,17 +1100,50 @@ Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String) As 
     BuildBrowserCreateUrl = GetBaseUrl() & "/auth/browser-login?ticket=" & UrlEncode(loginTicket) & "&redirect=" & UrlEncode(redirectPath)
 End Function
 
-' Polls GET /create-tickets/{ticket} until the user resolves it in the browser, the wait
-' times out (10 minutes), or the user presses Escape. Returns the parsed ticket data
-' (Dictionary with itemId/itemNumber/name/exportStep/existing) on success, or Nothing on
-' cancel/timeout -- the caller treats both the same way ("nothing was sent").
+' Same two-ticket nesting as BuildBrowserCreateUrl above (login-bridge ticket wrapping the
+' real redirect), but for the "pick which item this drawing belongs to" popup (see
+' pending-drawing-ticket.ts/PendingDrawingTicketBanner) -- used when the drawing's own views
+' reference MULTIPLE different already-linked items (see UploadDrawingForActiveDoc) and this
+' macro can't disambiguate on its own. candidateItemIds is a Collection of item id strings
+' (guids) -- passed straight through in the URL, comma-separated; the browser side fetches
+' each one's own display details itself (GET /items/{id}, same as everywhere else in the web
+' app), so nothing but the bare ids needs to travel here.
+Function BuildBrowserDrawingUrl(ByVal ticket As String, ByVal candidateItemIds As Collection) As String
+    Dim candidatesParam As String
+    candidatesParam = ""
+    Dim id As Variant
+    For Each id In candidateItemIds
+        If candidatesParam <> "" Then candidatesParam = candidatesParam & ","
+        candidatesParam = candidatesParam & id
+    Next id
+
+    Dim redirectPath As String
+    redirectPath = "/?drawingTicket=" & UrlEncode(ticket) & "&candidates=" & UrlEncode(candidatesParam)
+
+    Dim loginTicketResponse As Object
+    Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
+    Dim loginTicket As String
+    loginTicket = JsonGetString(loginTicketResponse, "ticket")
+
+    BuildBrowserDrawingUrl = GetBaseUrl() & "/auth/browser-login?ticket=" & UrlEncode(loginTicket) & "&redirect=" & UrlEncode(redirectPath)
+End Function
+
+' Polls GET {endpointPath}{ticket} until the user resolves it in the browser, the wait times
+' out (10 minutes), or the user presses Escape. Returns the parsed ticket data (Dictionary
+' with itemId plus whatever else that endpoint returns -- itemNumber/name/exportStep/existing
+' for a create-ticket, or exportPdf for a drawing-ticket, see DrawingTicketStore.cs) on
+' success, or Nothing on cancel/timeout -- the caller treats both the same way ("nothing was
+' sent"). endpointPath defaults to the create-ticket namespace; pass "/drawing-tickets/" for
+' the "pick which item this drawing belongs to" flow (BuildBrowserDrawingUrl) -- both
+' endpoints share the same two-state shape (pending vs. non-empty "itemId"), so nothing else
+' here needs to change per ticket kind.
 '
 ' No UserForm exists in this file (see file header) to host a visible "Cancel" button, so
 ' Escape (checked every tick via GetAsyncKeyState) is the only available cancel gesture;
 ' progress is shown in SolidWorks's own status bar instead of a dialog. Uses tick/poll
 ' COUNTERS rather than Timer()/Now() on purpose -- Timer() resets at midnight, which would
 ' misfire the 10-minute timeout for a wait that happens to straddle it.
-Function WaitForTicket(ByVal ticket As String) As Object
+Function WaitForTicket(ByVal ticket As String, Optional ByVal endpointPath As String = "/create-tickets/") As Object
     Const TICK_MS As Long = 400
     Const POLL_EVERY_MS As Long = 2000
     Const TIMEOUT_MS As Long = 600000 ' 10 minutes, same as EasyPDMUpload.FCMacro
@@ -1139,7 +1172,7 @@ Function WaitForTicket(ByVal ticket As String) As Object
             Dim data As Object
             Set data = Nothing
             On Error Resume Next
-            Set data = ApiGet("/create-tickets/" & ticket)
+            Set data = ApiGet(endpointPath & ticket)
             On Error GoTo 0
             If Not data Is Nothing Then
                 If JsonGetString(data, "itemId", "") <> "" Then
@@ -1596,15 +1629,49 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
 End Function
 
 ' Entry point for an active Drawing (.SLDDRW) document -- see the SW_DOC_DRAWING branch in
-' main(). A drawing is never itself a PDM item; it documents an existing Part/Assembly,
-' identified by parsing the leading "<itemNumber> (" that RenameAndUpload already gives
-' every Part/Assembly file it saves (SolidWorks proposes this exact base filename by default
-' when a drawing is created FROM an already-renamed model, so this holds in the common
-' case). Once resolved, uploads through the SAME RenameAndUpload used for the model itself --
-' identical Save-As/embed-link/accumulate-per-revision mechanics -- just with role="drawing"
-' instead of the default "cad" -- and, on confirmation via the same ExportPdfPrompt used
-' elsewhere, exports the drawing sheet itself to PDF via UploadPdfAttachment.
+' main(). A drawing is never itself a PDM item; it documents an existing Part/Assembly.
+' Matched two ways, tried in order:
+'   1) Read directly off the drawing's own views (FindLinkedCandidatesInDrawingViews below):
+'      each view (besides the sheet-format view itself) has a ReferencedDocument -- the
+'      actual Part/Assembly model it's showing. If that model is CURRENTLY OPEN in this
+'      SolidWorks session and was already linked to EasyPDM (has the EasyPDM_ItemId Custom
+'      Property, same as GetLinkedItemIdOn already reads for assembly components), that's a
+'      far more reliable signal than the drawing's own filename -- doesn't depend on any
+'      naming convention at all. A drawing can reference MORE THAN ONE distinct item this way
+'      (e.g. an assembly drawing with a detail view of one specific part) -- if so, this
+'      macro can't guess which one is right, so it opens the browser with the found
+'      candidates instead (AskBrowserWhichItemForDrawing) rather than picking one blindly.
+'   2) If NO linked model could be found this way (referenced model closed, or never sent
+'      through EasyPDM before), falls back to parsing the leading "<itemNumber> (" that
+'      RenameAndUpload already gives every Part/Assembly file it saves (SolidWorks proposes
+'      this exact base filename by default when a drawing is created FROM an already-renamed
+'      model, so this still holds in the common case where (1) doesn't apply).
+' Either way, uploads through the SAME RenameAndUpload used for the model itself -- identical
+' Save-As/embed-link/accumulate-per-revision mechanics -- just with role="drawing" instead of
+' the default "cad" -- and, on confirmation, exports the drawing sheet itself to PDF via
+' UploadPdfAttachment (see UploadDrawingToItem below).
+'
+' UNVERIFIED against a live SolidWorks install: the view-walking in step 1 (GetFirstView/
+' GetNextView/ReferencedDocument) -- confirm on the first real run, especially that
+' ReferencedDocument only resolves when the referenced model is actually open.
 Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
+    Dim candidateIds As Collection
+    Set candidateIds = FindLinkedCandidatesInDrawingViews(swModel)
+
+    If candidateIds.Count = 1 Then
+        Dim singleItem As Object
+        Set singleItem = FetchItemById(CStr(candidateIds(1)))
+        If Not singleItem Is Nothing Then
+            UploadDrawingToItemNatively swModel, filePath, singleItem
+            Exit Sub
+        End If
+        ' Stale/deleted link -- fall through to the filename-based fallback below instead of
+        ' failing outright, same tolerant spirit as the rest of this macro.
+    ElseIf candidateIds.Count > 1 Then
+        AskBrowserWhichItemForDrawing swModel, filePath, candidateIds
+        Exit Sub
+    End If
+
     Dim fname As String
     fname = Mid(filePath, InStrRev(filePath, "\") + 1)
 
@@ -1640,6 +1707,117 @@ Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
         Exit Sub
     End If
 
+    UploadDrawingToItemNatively swModel, filePath, item
+End Sub
+
+' Collects the DISTINCT item ids (guids) of already-EasyPDM-linked models referenced by any
+' of the active drawing's views -- see UploadDrawingForActiveDoc's header comment. Skips
+' views whose ReferencedDocument is Nothing (model not currently open) and models with no
+' EasyPDM_ItemId Custom Property set (never linked). Returns an empty Collection if nothing
+' was found (caller falls back to filename parsing).
+Function FindLinkedCandidatesInDrawingViews(ByVal swDraw As Object) As Collection
+    Dim result As New Collection
+    Dim seen As Object
+    Set seen = CreateObject("Scripting.Dictionary")
+
+    Dim view As Object
+    On Error Resume Next
+    Set view = swDraw.GetFirstView()
+    On Error GoTo 0
+    Do While Not view Is Nothing
+        Dim refDoc As Object
+        On Error Resume Next
+        Set refDoc = view.ReferencedDocument
+        On Error GoTo 0
+        If Not refDoc Is Nothing Then
+            Dim linkedId As String
+            linkedId = GetLinkedItemIdOn(refDoc)
+            If linkedId <> "" And Not seen.Exists(linkedId) Then
+                seen.Add linkedId, True
+                result.Add linkedId
+            End If
+        End If
+        Dim nextView As Object
+        On Error Resume Next
+        Set nextView = view.GetNextView()
+        On Error GoTo 0
+        Set view = nextView
+    Loop
+
+    Set FindLinkedCandidatesInDrawingViews = result
+End Function
+
+' GET /items/{id} -- Nothing (rather than raising) on any failure, including auth expiry --
+' callers of this helper treat "couldn't resolve" as "fall back to the filename-based path"
+' rather than a hard error, so a stale/expired link here should never abort the whole upload.
+Function FetchItemById(ByVal itemId As String) As Object
+    Dim result As Object
+    Set result = Nothing
+    On Error Resume Next
+    Set result = ApiGet("/items/" & itemId)
+    On Error GoTo 0
+    Set FetchItemById = result
+End Function
+
+' Opens the browser for the "pick which item this drawing belongs to" popup (multiple
+' distinct candidates found, see FindLinkedCandidatesInDrawingViews) and waits for the
+' resolution -- same wait/cancel/timeout mechanics as the ordinary create-ticket flow
+' (WaitForTicket), just against the /drawing-tickets/ namespace, and the PDF export choice is
+' asked THERE (as a checkbox alongside the item picker) instead of a separate native MsgBox.
+Sub AskBrowserWhichItemForDrawing(ByVal swModel As Object, ByVal filePath As String, ByVal candidateIds As Collection)
+    On Error GoTo Failed
+
+    Dim ticket As String
+    ticket = NewGuid()
+
+    Dim url As String
+    url = BuildBrowserDrawingUrl(ticket, candidateIds)
+    OpenUrlInBrowser url
+
+    Dim ticketData As Object
+    Set ticketData = WaitForTicket(ticket, "/drawing-tickets/")
+    If ticketData Is Nothing Then
+        MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
+        LogLine "Drawing upload: browser disambiguation cancelled/timed out -- done."
+        Exit Sub
+    End If
+
+    Dim chosenItem As Object
+    Set chosenItem = ApiGet("/items/" & JsonGetString(ticketData, "itemId", ""))
+    Dim exportPdfChoice As Boolean
+    exportPdfChoice = ticketData.Exists("exportPdf") And CBool(ticketData.Item("exportPdf"))
+
+    UploadDrawingToItem swModel, filePath, chosenItem, exportPdfChoice
+    Exit Sub
+
+Failed:
+    LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
+    If Err.Number = ERR_AUTH Then
+        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+        SetSessionToken ""
+    Else
+        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
+    End If
+End Sub
+
+' Fast, fully native path (single unambiguous match, either via the drawing's own views or
+' the filename fallback) -- asks ExportPdfPrompt exactly like the top-level document upload
+' flow does (off by default via vbDefaultButton2), then delegates to UploadDrawingToItem.
+Sub UploadDrawingToItemNatively(ByVal swModel As Object, ByVal filePath As String, ByVal item As Object)
+    Dim nativeExportPdf As Boolean
+    nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
+    UploadDrawingToItem swModel, filePath, item, nativeExportPdf
+End Sub
+
+' Shared tail end for all three drawing-upload paths above (single view-match, filename
+' fallback, browser-resolved) -- validates item type, uploads the drawing itself via
+' RenameAndUpload(role="drawing"), and optionally the drawing's own PDF export via
+' UploadPdfAttachment (replacing the item's single "pdf" slot with a real, print-quality
+' drawing sheet instead of the rendered 3D-view snapshot it might hold today).
+Sub UploadDrawingToItem(ByVal swModel As Object, ByVal filePath As String, ByVal item As Object, ByVal exportPdf As Boolean)
+    Dim itemNumber As Long
+    itemNumber = JsonGetLong(item, "itemNumber", 0)
+
     Dim itemType As String
     itemType = JsonGetString(item, "itemType", "")
     If itemType <> "part" And itemType <> "assembly" Then
@@ -1655,19 +1833,10 @@ Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
 
     LogLine "Drawing upload: matched item #" & itemNumber & " (" & name & "), uploading as role=drawing."
 
-    ' Same prompt/default as the normal Part/Assembly path (ExportPdfPrompt, off by
-    ' default via vbDefaultButton2) -- UploadPdfAttachment is fully generic (just
-    ' swModel.Extension.SaveAs to .pdf), and a Drawing sheet is SolidWorks' own
-    ' well-supported source for PDF export, unlike a bare Part/Assembly. Uploading it
-    ' replaces the item's single "pdf" slot -- upgrading it from a rendered 3D-view
-    ' snapshot to an actual print-quality drawing sheet.
-    Dim nativeExportPdf As Boolean
-    nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
-
     On Error GoTo Failed
     Dim uploadOk As Boolean
     uploadOk = RenameAndUpload(swModel, filePath, itemId, itemNumber, name, revision, GetDownloadFolder(), "drawing")
-    If uploadOk And nativeExportPdf Then
+    If uploadOk And exportPdf Then
         UploadPdfAttachment swModel, itemId, itemNumber, name, revision
     End If
     MsgBox T("Dwg_UploadedPrefix") & itemNumber & T("Dwg_UploadedSuffix"), vbInformation, T("AppTitle")

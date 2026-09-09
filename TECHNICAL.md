@@ -302,6 +302,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | managing user-to-project assignments — **administrator only** |
 | GET | `/api/items?search=&tag=&projectId=` | filtered item list (filtered by project access) |
 | GET | `/api/items/{id}` | item details |
+| GET | `/api/items/by-number/{itemNumber}` | item details by item number instead of guid — used by the SolidWorks macro to resolve a Drawing (.SLDDRW) to the Part/Assembly it documents |
 | POST | `/api/projects/{projectId}/nodes` | creates a Folder/Part/Assembly/File without an upload (optionally with a ticket for a CAD macro) |
 | POST | `/api/projects/{projectId}/items` | **multipart/form-data**: file upload (optional `parentId`) |
 | GET | `/api/items/{id}/file` | download the uploaded file |
@@ -331,6 +332,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET/POST/DELETE | `/api/notifications[/{id}]`, `/{id}/read`, `/read-all` | notification list / mark read (one or all) / delete — for the logged-in user |
 | GET/PATCH | `/api/notification-preferences` | per-type notification opt-out for the logged-in user |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | CAD macro ↔ browser correlation (see `EasyPDM.FreeCad/README.md`) |
+| GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | SolidWorks macro ↔ browser correlation for "which item does this Drawing belong to" when its views reference more than one already-linked item |
 | GET | `/api/config` | file storage location (used e.g. by the FreeCAD macro) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | storage location/stats, moving it, backup (pg_dump + files in a ZIP), restore from backup — **administrator only** |
 | GET/PATCH | `/api/settings/backup-schedule` | automatic backup schedule (enable/disable, frequency, day, time, number of kept copies) — **administrator only** |

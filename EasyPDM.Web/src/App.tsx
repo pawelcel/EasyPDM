@@ -13,6 +13,7 @@ import { ProjectSelect } from "@/features/projects/project-select"
 import { useProjects } from "@/features/projects/use-projects"
 import { AddNodeDialog } from "@/features/items/add-node-dialog"
 import { ItemList } from "@/features/items/item-list"
+import { PendingDrawingTicketBanner } from "@/features/items/pending-drawing-ticket-banner"
 import { PendingTicketBanner } from "@/features/items/pending-ticket-banner"
 import { useItems } from "@/features/items/use-items"
 import { MaterialsView } from "@/features/materials/materials-view"
@@ -185,6 +186,7 @@ function App() {
           </div>
 
           <PendingTicketBanner />
+          <PendingDrawingTicketBanner />
 
           {view === "projects" && (
             <div className="flex flex-wrap gap-2.5">

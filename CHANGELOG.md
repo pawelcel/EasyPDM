@@ -6,13 +6,19 @@ All notable changes to EasyPDM are documented in this file.
 
 ### Added
 - Technical drawings are now handled properly instead of being confused with a rendered
-  3D-view PDF. FreeCAD detects an actual TechDraw drawing page in the document and exports
-  the PDF from that page instead of guessing from raw shapes. SolidWorks recognizes an open
-  Drawing (.SLDDRW) and, matching it by item number to the Part/Assembly it documents,
-  uploads it as its own "Rysunki"/"Drawings" attachment — separate from, and accumulating
-  alongside, the part's own CAD file (one drawing per revision). Downloading a Part/Assembly
-  now also fetches its current drawing (if any) and saves it next to the model file, without
-  opening it.
+  3D-view PDF. FreeCAD detects an actual TechDraw drawing page in the document (activating
+  it first if needed) and exports the PDF from that page instead of guessing from raw
+  shapes. SolidWorks recognizes an open Drawing (.SLDDRW) and matches it to the Part/
+  Assembly it documents by reading its views' own references to already-linked models
+  first, falling back to the item number in the drawing's filename only when that finds
+  nothing — if the drawing's views point at more than one distinct item (e.g. an assembly
+  drawing with a detail view of a single part), a browser window opens to pick the right
+  one, with an "export PDF" option right there too. Either way it uploads as its own
+  "Rysunki"/"Drawings" attachment — separate from, and accumulating alongside, the part's
+  own CAD file (one drawing per revision) — and can optionally export/upload the drawing
+  sheet itself as the item's PDF, upgrading it from a rendered 3D-view snapshot to a real
+  print-quality drawing. Downloading a Part/Assembly now also fetches its current drawing
+  (if any) and saves it next to the model file, without opening it.
 
 ## [0.2]
 

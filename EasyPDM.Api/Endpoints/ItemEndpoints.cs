@@ -4,7 +4,7 @@ using Npgsql;
 
 static class ItemEndpoints
 {
-    public static void MapItemEndpoints(this WebApplication app, string connectionString, StorageSettings storage, CreateTicketStore createTicketStore)
+    public static void MapItemEndpoints(this WebApplication app, string connectionString, StorageSettings storage, CreateTicketStore createTicketStore, DrawingTicketStore drawingTicketStore)
     {
         // GET /api/create-tickets/{ticket} — odpytywane przez makro CAD po otwarciu
         // przeglądarki (zob. Ticket w POST /nodes poniżej): "pending" dopóki przeglądarka nie
@@ -61,6 +61,42 @@ static class ItemEndpoints
             var fileName = reader.GetString(2);
 
             createTicketStore.Complete(ticket, body.ItemId, itemNumber, itemNumberPrefix, fileName, body.ExportStep, body.ExportPdf, existing: true);
+            return Results.Ok();
+        });
+
+        // GET /api/drawing-tickets/{ticket} — odpytywane przez makro SolidWorks po otwarciu
+        // przeglądarki z listą kandydatów (zob. BuildBrowserDrawingUrl w EasyPDMUpload.bas —
+        // makro nie potrafiło samo rozstrzygnąć, do którego elementu podpiąć wgrywany rysunek,
+        // bo różne widoki wskazywały na różne elementy). Ten sam kształt odpowiedzi/ten sam
+        // dwustanowy trik (nieznany bilet == "pending") co GET /create-tickets/{ticket} wyżej.
+        app.MapGet("/api/drawing-tickets/{ticket:guid}", (Guid ticket) =>
+        {
+            if (!drawingTicketStore.TryGet(ticket, out var state))
+                return Results.Accepted(value: new { status = "pending" });
+
+            return Results.Ok(new { itemId = state.ItemId, exportPdf = state.ExportPdf });
+        });
+
+        // POST /api/drawing-tickets/{ticket}/resolve   body: { itemId, exportPdf }
+        // Wołane z przeglądarki po wybraniu, do którego z kandydatów podpiąć rysunek (i czy
+        // dodatkowo wyeksportować/wysłać PDF z samego rysunku) — jedyny sposób dopełnienia
+        // tego rodzaju biletu, w odróżnieniu od create-ticketów nie ma tu ścieżki "nowy
+        // element", bo rysunek zawsze dotyczy JUŻ ISTNIEJĄCEJ Części/Złożenia.
+        app.MapPost("/api/drawing-tickets/{ticket:guid}/resolve", async (Guid ticket, ResolveDrawingTicketRequest body, HttpContext ctx) =>
+        {
+            var info = await GetItemTypeAndStatus(connectionString, body.ItemId);
+            if (info is null)
+                return Results.NotFound("Element nie istnieje.");
+            if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
+                return Results.BadRequest("Rysunek można podpiąć tylko do Części albo Złożenia.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
+            drawingTicketStore.Complete(ticket, body.ItemId, body.ExportPdf);
             return Results.Ok();
         });
 
@@ -1434,6 +1470,7 @@ static class ItemEndpoints
 
 record CreateNodeRequest(string Name, string ItemType, JsonElement? Properties, Guid? ParentId, Guid? Ticket, bool? ExportStep, bool? ExportPdf);
 record AttachExistingTicketRequest(Guid ItemId, bool? ExportStep, bool? ExportPdf);
+record ResolveDrawingTicketRequest(Guid ItemId, bool ExportPdf);
 record VisibilityRequest(bool ShowInTree);
 record RenameRequest(string Name);
 record StatusRequest(string Status, string? Comment = null);

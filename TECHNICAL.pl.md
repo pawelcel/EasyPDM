@@ -293,6 +293,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | zarządzanie przypisaniami użytkowników do projektów — **tylko administrator** |
 | GET | `/api/items?search=&tag=&projectId=` | lista elementów z filtrami (filtrowana wg dostępu do projektu) |
 | GET | `/api/items/{id}` | szczegóły elementu |
+| GET | `/api/items/by-number/{itemNumber}` | szczegóły elementu po numerze zamiast guidzie — używane przez makro SolidWorks do rozwiązania, do której Części/Złożenia należy rysunek (.SLDDRW) |
 | POST | `/api/projects/{projectId}/nodes` | tworzy Folder/Część/Złożenie/Plik bez uploadu (opcjonalnie z ticketem dla makra CAD) |
 | POST | `/api/projects/{projectId}/items` | **multipart/form-data**: upload pliku (opcjonalnie `parentId`) |
 | GET | `/api/items/{id}/file` | pobranie wgranego pliku |
@@ -322,6 +323,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET/POST/DELETE | `/api/notifications[/{id}]`, `/{id}/read`, `/read-all` | lista powiadomień / oznaczenie jako przeczytane (jedno lub wszystkie) / usunięcie — dla zalogowanego użytkownika |
 | GET/PATCH | `/api/notification-preferences` | wyłączenie powiadomień per typ dla zalogowanego użytkownika |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | korelacja makro CAD ↔ przeglądarka (zob. `EasyPDM.FreeCad/README.md`) |
+| GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | korelacja makro SolidWorks ↔ przeglądarka dla "do którego elementu należy ten rysunek", gdy jego widoki wskazują na więcej niż jeden już podlinkowany element |
 | GET | `/api/config` | lokalizacja magazynu plików (do użytku np. przez makro FreeCAD) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | lokalizacja/statystyki magazynu, przeniesienie, backup (pg_dump + pliki w ZIP), przywrócenie z backupu — **tylko administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | harmonogram automatycznej kopii zapasowej (włącz/wyłącz, częstotliwość, dzień, godzina, liczba przechowywanych kopii) — **tylko administrator** |

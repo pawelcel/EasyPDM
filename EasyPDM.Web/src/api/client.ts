@@ -170,6 +170,14 @@ export const api = {
       (r) => handleResponse<void>(r)
     ),
 
+  // Dopełnienie biletu "wybór elementu dla rysunku SolidWorks" (zob. pending-drawing-ticket.ts)
+  // -- makro znalazło kilku kandydatów po drzewie widoków rysunku i nie potrafiło samo
+  // rozstrzygnąć, do którego podpiąć plik, więc otworzyło przeglądarkę z listą do wyboru.
+  resolveDrawingTicket: (ticket: string, itemId: string, exportPdf: boolean) =>
+    fetch(`${BASE}/drawing-tickets/${ticket}/resolve`, json({ itemId, exportPdf })).then((r) =>
+      handleResponse<void>(r)
+    ),
+
   deleteItem: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}`, { method: "DELETE" }).then((r) =>
       handleResponse<{ deletedCount: number }>(r)

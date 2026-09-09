@@ -332,6 +332,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | Verwaltung von Benutzer-Projekt-Zuweisungen — **nur Administrator** |
 | GET | `/api/items?search=&tag=&projectId=` | gefilterte Elementliste (nach Projektzugriff gefiltert) |
 | GET | `/api/items/{id}` | Elementdetails |
+| GET | `/api/items/by-number/{itemNumber}` | Elementdetails nach Elementnummer statt Guid — verwendet vom SolidWorks-Makro, um eine Zeichnung (.SLDDRW) dem Teil/der Baugruppe zuzuordnen, die sie dokumentiert |
 | POST | `/api/projects/{projectId}/nodes` | erstellt Ordner/Teil/Baugruppe/Datei ohne Upload (optional mit Ticket für ein CAD-Makro) |
 | POST | `/api/projects/{projectId}/items` | **multipart/form-data**: Datei-Upload (optional `parentId`) |
 | GET | `/api/items/{id}/file` | Download der hochgeladenen Datei |
@@ -361,6 +362,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET/POST/DELETE | `/api/notifications[/{id}]`, `/{id}/read`, `/read-all` | Benachrichtigungsliste / als gelesen markieren (einzeln oder alle) / löschen — für den angemeldeten Benutzer |
 | GET/PATCH | `/api/notification-preferences` | Abschalten von Benachrichtigungen pro Typ für den angemeldeten Benutzer |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | Korrelation CAD-Makro ↔ Browser (siehe `EasyPDM.FreeCad/README.md`) |
+| GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | Korrelation SolidWorks-Makro ↔ Browser für "zu welchem Element gehört diese Zeichnung", wenn ihre Ansichten auf mehr als ein bereits verknüpftes Element verweisen |
 | GET | `/api/config` | Speicherort für Dateien (z. B. zur Verwendung durch das FreeCAD-Makro) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | Speicherort/-statistiken, Verschieben, Sicherung (pg_dump + Dateien in einem ZIP), Wiederherstellung aus einer Sicherung — **nur Administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | Zeitplan für automatische Sicherung (ein-/ausschalten, Häufigkeit, Tag, Uhrzeit, Anzahl aufbewahrter Kopien) — **nur Administrator** |
