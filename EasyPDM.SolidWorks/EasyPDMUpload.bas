@@ -250,6 +250,9 @@ Private Function T_PL(ByVal key As String) As String
         Case "CreatedButFailedAttachPart2": T_PL = ", ale nie udalo sie podpiac go pod "
         Case "CreatedButFailedAttachPart3": T_PL = ": "
         Case "FailedToSaveDocument": T_PL = "Nie udalo sie zapisac dokumentu -- zapisz go recznie (Ctrl+S) i uruchom makro ponownie."
+        Case "UnsavedDocumentPrompt": T_PL = "Ten dokument nie zostal jeszcze zapisany. Zapisac go teraz jako nowy element w EasyPDM (nazwe i rewizje ustalisz w przegladarce) i kontynuowac?"
+        Case "UnsavedComponentsWarningPrefix": T_PL = "W zlozeniu znaleziono "
+        Case "UnsavedComponentsWarningSuffix": T_PL = " komponent(-ow) bez zapisanego pliku (wirtualny/nieosadzony) -- NIE zostana wyslane. Zapisz je najpierw recznie w SolidWorks (Plik -> Zapisz), a potem uruchom makro ponownie:"
         Case "MustRunInsideSolidWorks": T_PL = "To makro musi byc uruchomione z poziomu SolidWorks."
         Case "NoActiveSavedDocument": T_PL = "Brak aktywnego, zapisanego dokumentu."
         Case "ExportStepPrompt": T_PL = "Wyeksportowac i wyslac model STEP (podglad 3D)?"
@@ -320,6 +323,9 @@ Private Function T_EN(ByVal key As String) As String
         Case "CreatedButFailedAttachPart2": T_EN = ", but failed to attach it under "
         Case "CreatedButFailedAttachPart3": T_EN = ": "
         Case "FailedToSaveDocument": T_EN = "Failed to save the document -- save it manually (Ctrl+S) and run the macro again."
+        Case "UnsavedDocumentPrompt": T_EN = "This document hasn't been saved yet. Save it now as a new item in EasyPDM (you'll pick the name and revision in the browser) and continue?"
+        Case "UnsavedComponentsWarningPrefix": T_EN = "Found "
+        Case "UnsavedComponentsWarningSuffix": T_EN = " component(s) in the assembly with no saved file (virtual/embedded) -- they will NOT be uploaded. Save them manually in SolidWorks first (File -> Save), then run the macro again:"
         Case "MustRunInsideSolidWorks": T_EN = "This macro must be run from inside SolidWorks."
         Case "NoActiveSavedDocument": T_EN = "No active, saved document."
         Case "ExportStepPrompt": T_EN = "Export and upload STEP model (3D preview)?"
@@ -390,6 +396,9 @@ Private Function T_DE(ByVal key As String) As String
         Case "CreatedButFailedAttachPart2": T_DE = ", aber die Zuordnung unter "
         Case "CreatedButFailedAttachPart3": T_DE = " ist fehlgeschlagen: "
         Case "FailedToSaveDocument": T_DE = "Speichern des Dokuments fehlgeschlagen -- speichern Sie es manuell (Strg+S) und starten Sie das Makro erneut."
+        Case "UnsavedDocumentPrompt": T_DE = "Dieses Dokument wurde noch nicht gespeichert. Jetzt als neues Element in EasyPDM speichern (Name und Revision legen Sie im Browser fest) und fortfahren?"
+        Case "UnsavedComponentsWarningPrefix": T_DE = "In der Baugruppe wurden "
+        Case "UnsavedComponentsWarningSuffix": T_DE = " Komponente(n) ohne gespeicherte Datei gefunden (virtuell/eingebettet) -- sie werden NICHT hochgeladen. Speichern Sie sie zuerst manuell in SolidWorks (Datei -> Speichern), und starten Sie das Makro dann erneut:"
         Case "MustRunInsideSolidWorks": T_DE = "Dieses Makro muss innerhalb von SolidWorks ausgefuehrt werden."
         Case "NoActiveSavedDocument": T_DE = "Kein aktives, gespeichertes Dokument."
         Case "ExportStepPrompt": T_DE = "STEP-Modell exportieren und hochladen (3D-Vorschau)?"
@@ -1461,7 +1470,19 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
     Dim ext As String
     Dim dotPos As Long
     dotPos = InStrRev(filePath, ".")
-    If dotPos > 0 Then ext = Mid(filePath, dotPos) Else ext = ""
+    If dotPos > 0 Then
+        ext = Mid(filePath, dotPos)
+    Else
+        ' filePath has no extension to read -- true for a never-saved document (GetActiveDocInfo
+        ' left it as "" on purpose, see its own comment), where this SaveAs call below is what
+        ' gives the document its VERY FIRST location on disk. Derive the extension from the
+        ' document's own type instead.
+        Select Case swModel.GetType()
+            Case SW_DOC_PART: ext = ".sldprt"
+            Case SW_DOC_ASSEMBLY: ext = ".sldasm"
+            Case Else: ext = ""
+        End Select
+    End If
 
     Dim newFilename As String
     newFilename = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ext
@@ -1489,6 +1510,18 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
         Else
             LogLine "Local Save As to """ & newLocalPath & """ failed (errors=" & saveErrors & ", warnings=" & saveWarnings & ", err=" & saveAsErrNum & ") -- uploading from the original path instead."
         End If
+    End If
+
+    ' Unlike every other caller, a never-saved document (see GetActiveDocInfo) arrives here
+    ' with filePath = "" -- if the SaveAs above also failed, there is no "original path" to
+    ' fall back to at all (the tolerant fallback in the Else branch just above assumes one
+    ' always exists). Uploading from an empty path would fail deep inside the HTTP/file-read
+    ' code with a confusing error, so stop here with a clear one instead.
+    If filePath = "" Then
+        MsgBox T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
+        LogLine "RenameAndUpload: never-saved document still has no local path after a failed Save As -- aborting."
+        RenameAndUpload = False
+        Exit Function
     End If
 
     ' Embed the PDM link into the file itself BEFORE uploading -- setting the Custom
@@ -2067,7 +2100,7 @@ End Function
 ' virtual (no file) components are skipped: GetModelDoc2() returning Nothing or an empty
 ' GetPathName() is used as the "cannot inspect, skip it" signal rather than hardcoding a
 ' swComponentSuppressionState_e enum value that cannot be verified without SolidWorks.
-Private Sub VisitAssemblyComponents(ByVal parentModel As Object, ByVal parentPath As String, ByRef order As Collection, ByRef models As Object, ByRef edges As Collection, ByRef visited As Object)
+Private Sub VisitAssemblyComponents(ByVal parentModel As Object, ByVal parentPath As String, ByRef order As Collection, ByRef models As Object, ByRef edges As Collection, ByRef visited As Object, ByRef unsavedComponentNames As Collection)
     If parentModel Is Nothing Then Exit Sub
     If parentModel.GetType() <> SW_DOC_ASSEMBLY Then Exit Sub
 
@@ -2128,6 +2161,7 @@ Private Sub VisitAssemblyComponents(ByVal parentModel As Object, ByVal parentPat
             childPath = childModel.GetPathName()
             If childPath = "" Then
                 LogLine "Skipping component with no file on disk (virtual/embedded): " & comp.Name2
+                unsavedComponentNames.Add comp.Name2
                 GoTo NextComp
             End If
 
@@ -2148,7 +2182,7 @@ NextComp:
 
         If Not visited.Exists(pathKey) Then
             visited.Add pathKey, True
-            VisitAssemblyComponents childModel2, CStr(pathKey), order, models, edges, visited
+            VisitAssemblyComponents childModel2, CStr(pathKey), order, models, edges, visited, unsavedComponentNames
             If Not models.Exists(pathKey) Then
                 Set models(pathKey) = childModel2
                 order.Add pathKey
@@ -2176,17 +2210,19 @@ Function DiscoverComponentTree(ByVal topModel As Object) As Object
     Dim edges As New Collection
     Dim visited As Object
     Set visited = CreateObject("Scripting.Dictionary")
+    Dim unsavedComponentNames As New Collection
 
     Dim topPath As String
     topPath = topModel.GetPathName()
     visited.Add topPath, True
-    VisitAssemblyComponents topModel, topPath, order, models, edges, visited
+    VisitAssemblyComponents topModel, topPath, order, models, edges, visited, unsavedComponentNames
 
     Dim result As Object
     Set result = CreateObject("Scripting.Dictionary")
     result.Add "order", order
     result.Add "models", models
     result.Add "edges", edges
+    result.Add "unsavedComponentNames", unsavedComponentNames
     Set DiscoverComponentTree = result
 End Function
 
@@ -2303,6 +2339,24 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
 
     Dim tree As Object
     Set tree = DiscoverComponentTree(topModel)
+
+    ' Components with no file on disk yet (virtual/embedded, never individually saved) are
+    ' silently excluded from "order" by VisitAssemblyComponents -- surfaced here as one
+    ' explicit warning instead, so the user knows some of what they see in the SolidWorks
+    ' tree won't show up in EasyPDM, rather than wondering why the BOM looks incomplete.
+    Dim unsavedComponentNames As Collection
+    Set unsavedComponentNames = tree("unsavedComponentNames")
+    If unsavedComponentNames.Count > 0 Then
+        Dim unsavedList As String
+        Dim unsavedName As Variant
+        For Each unsavedName In unsavedComponentNames
+            unsavedList = unsavedList & "- " & unsavedName & vbCrLf
+        Next unsavedName
+        MsgBox T("UnsavedComponentsWarningPrefix") & unsavedComponentNames.Count & T("UnsavedComponentsWarningSuffix") & vbCrLf & vbCrLf & unsavedList, _
+               vbExclamation, T("AppTitle")
+        LogLine "ProcessAssemblyTree: " & unsavedComponentNames.Count & " component(s) skipped (no file on disk)."
+    End If
+
     Dim order As Collection
     Set order = tree("order")
     LogLine "ProcessAssemblyTree: discovered " & order.Count & " component(s) in the tree (excluding the top-level document itself)."
@@ -2594,6 +2648,19 @@ Function BaseNameFromPath(ByVal path As String) As String
     BaseNameFromPath = baseName
 End Function
 
+' A never-saved (untitled) active document is handled differently from one that already has
+' a path on disk but unsaved CHANGES pending:
+'   - Already has a path -- Save3 is the right call (writes to that same path, no dialog
+'     needed) and a failure there is a real, unexpected problem worth stopping for.
+'   - No path at all (GetPathName() = "") -- Save3 CANNOT succeed silently (there is nowhere
+'     to write yet), and calling it from macro code does NOT reliably pop SolidWorks' own
+'     interactive Save As dialog either (confirmed in practice: it just fails outright).
+'     Rather than forcing the user out to a manual Ctrl+S first, ask once and, on
+'     confirmation, let the REST of the normal flow give it a location for the first time --
+'     RenameAndUpload's own SaveAs (once the browser round-trip has resolved a real item
+'     number/name/revision) works fine on a document with no existing path, unlike Save3.
+'     filePath stays "" through this branch on purpose; RenameAndUpload derives the file
+'     extension from the document's own type in that case instead of from filePath.
 Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As String, ByRef defaultName As String) As Boolean
     Dim swModel As Object
     Set swModel = swApp.ActiveDoc
@@ -2602,19 +2669,27 @@ Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As Strin
         Exit Function
     End If
 
-    Dim saveErr As Long, saveWarn As Long
     filePath = swModel.GetPathName()
-    Dim saveOk As Boolean
-    saveOk = swModel.Save3(0, saveErr, saveWarn)
-    If Not saveOk Then
-        MsgBox T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
-        GetActiveDocInfo = False
-        Exit Function
-    End If
-    filePath = swModel.GetPathName()
+
     If filePath = "" Then
-        GetActiveDocInfo = False
-        Exit Function
+        If MsgBox(T("UnsavedDocumentPrompt"), vbYesNo + vbQuestion, T("AppTitle")) <> vbYes Then
+            GetActiveDocInfo = False
+            Exit Function
+        End If
+    Else
+        Dim saveErr As Long, saveWarn As Long
+        Dim saveOk As Boolean
+        saveOk = swModel.Save3(0, saveErr, saveWarn)
+        If Not saveOk Then
+            MsgBox T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
+            GetActiveDocInfo = False
+            Exit Function
+        End If
+        filePath = swModel.GetPathName()
+        If filePath = "" Then
+            GetActiveDocInfo = False
+            Exit Function
+        End If
     End If
 
     Select Case swModel.GetType()

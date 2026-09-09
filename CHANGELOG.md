@@ -23,6 +23,13 @@ All notable changes to EasyPDM are documented in this file.
   its name — a shortcut to add another Name 2 to that client without going through the
   regular "Add client" dialog's search. The client's own name comes pre-filled and locked;
   only the new Name 2 needs typing.
+- SolidWorks: uploading a document that has never been saved no longer just fails with
+  "save it first" — the macro now asks whether to save it as a new item (name/revision
+  picked in the browser, same as any other new upload) and, on confirmation, gives it its
+  first location on disk itself once that's resolved, instead of requiring a manual Ctrl+S
+  beforehand. If an assembly being uploaded contains several such never-saved (virtual)
+  components, a single warning now lists all of them upfront — they still won't be
+  uploaded (there's nothing to read them from), but at least it's no longer silent.
 
 ## [0.2]
 
