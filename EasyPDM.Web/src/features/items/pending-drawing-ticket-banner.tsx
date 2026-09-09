@@ -68,14 +68,16 @@ function PendingDrawingTicketBanner() {
           <DialogTitle>{t("app.pendingDrawingTicketTitle")}</DialogTitle>
         </DialogHeader>
 
-        <Hint>{t("app.pendingDrawingTicketHint")}</Hint>
-
         {loading ? (
           <Hint>{t("common.loading")}</Hint>
         ) : candidates.length === 0 ? (
           <Hint>{t("app.pendingDrawingTicketNoCandidates")}</Hint>
         ) : (
           <div className="flex flex-col gap-2">
+            {/* Ten podpis ma sens TYLKO obok faktycznej listy do wyboru -- osobno, nad
+                stanem ładowania albo komunikatem "nic nie znaleziono", wyglądał jak
+                sprzeczność ("znalazło kilka" tuż nad "nie znaleziono żadnego"). */}
+            <Hint>{t("app.pendingDrawingTicketHint")}</Hint>
             <div className="flex flex-col gap-1.5">
               {candidates.map((c) => (
                 <label key={c.id} className="flex cursor-pointer items-center gap-2 text-sm">
