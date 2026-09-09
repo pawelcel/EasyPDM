@@ -27,7 +27,10 @@ All notable changes to EasyPDM are documented in this file.
   elements and only some of them are already in EasyPDM (e.g. an assembly drawing with an
   extra detail view of one of its own components that was never uploaded on its own), the
   upload is now blocked with a message listing what's missing, rather than silently
-  attaching the drawing to just the linked item(s) and leaving the rest untracked.
+  attaching the drawing to just the linked item(s) and leaving the rest untracked -- this
+  also catches a component whose local link is stale (the item it used to point at was since
+  deleted from EasyPDM), which previously still counted as "linked" and let the upload
+  through.
 - Clients tab: hovering a client's row in the list now reveals a small "+" button next to
   its name — a shortcut to add another Name 2 to that client without going through the
   regular "Add client" dialog's search. The client's own name comes pre-filled and locked;

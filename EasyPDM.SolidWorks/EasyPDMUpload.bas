@@ -1853,7 +1853,20 @@ Function FindLinkedCandidatesInDrawingViews(ByVal swDraw As Object) As Collectio
             linkedId = GetLinkedItemIdOn(refDoc)
             If linkedId <> "" And Not seen.Exists(linkedId) Then
                 seen.Add linkedId, True
-                result.Add linkedId
+                ' The Custom Property is only local evidence of a PAST link -- the PDM item
+                ' it points at may have since been deleted server-side (stale link, same
+                ' concept as ItemStillExists/StaleLinkCleared for the active document itself,
+                ' see UploadPartOrAssemblyDoc). Confirmed in practice: a stale link here was
+                ' silently counted as a real candidate, so the drawing upload went ahead
+                ' attached to a genuinely-deleted item while the browser ticket dialog (which
+                ' re-fetches each candidate by id) simply couldn't show it. Clear the local
+                ' property and do NOT treat this document as a linked candidate instead.
+                If ItemStillExists(linkedId) Then
+                    result.Add linkedId
+                Else
+                    LogLine "Drawing upload: view's referenced document had a stale link to deleted item " & linkedId & " -- clearing it, treating as unlinked."
+                    SetLinkedItemOn refDoc, "", ""
+                End If
             End If
         End If
         Dim nextView As Object
