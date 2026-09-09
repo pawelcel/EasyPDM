@@ -1703,6 +1703,8 @@ Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
     Dim refDocs As Collection
     Set refDocs = FindReferencedDocsInDrawingViews(swModel)
 
+    LogLine "Drawing upload: view walk found " & candidateIds.Count & " linked candidate(s) and " & refDocs.Count & " total distinct referenced document(s) (see per-view lines above)."
+
     ' The drawing's views can reference MORE distinct documents than are linked to a PDM
     ' item -- e.g. an assembly drawing with an extra detail view of one of the assembly's
     ' own components that was never itself uploaded. Letting the upload proceed anyway
@@ -1870,6 +1872,10 @@ End Function
 ' Deduplicates by path; a never-saved document has no path (GetPathName() = ""), so those
 ' fall back to an in-memory identity key (ObjPtr) instead, so two different unsaved
 ' documents are never merged into one.
+' Logs one line per view it walks (name, referenced document path/title or "Nothing", and
+' linked-item-id status) -- diagnostic output only (no MsgBox), kept permanently since the
+' view-walking behavior here is UNVERIFIED against a live SolidWorks install and this is the
+' only way to see what it actually found without attaching a debugger.
 Function FindReferencedDocsInDrawingViews(ByVal swDraw As Object) As Collection
     Dim result As New Collection
     Dim seen As Object
@@ -1879,20 +1885,43 @@ Function FindReferencedDocsInDrawingViews(ByVal swDraw As Object) As Collection
     On Error Resume Next
     Set view = swDraw.GetFirstView()
     On Error GoTo 0
+    Dim viewIndex As Long
+    viewIndex = 0
     Do While Not view Is Nothing
+        viewIndex = viewIndex + 1
+        Dim viewName As String
+        viewName = ""
+        On Error Resume Next
+        viewName = view.Name
+        On Error GoTo 0
+
         Dim refDoc As Object
         On Error Resume Next
         Set refDoc = view.ReferencedDocument
         On Error GoTo 0
-        If Not refDoc Is Nothing Then
+        If refDoc Is Nothing Then
+            LogLine "Drawing upload: view #" & viewIndex & " (""" & viewName & """) -- ReferencedDocument is Nothing."
+        Else
             Dim refKey As String
             refKey = refDoc.GetPathName()
-            If refKey = "" Then refKey = "objptr:" & ObjPtr(refDoc)
+            Dim refDisplayName As String
+            refDisplayName = refKey
+            If refKey = "" Then
+                refKey = "objptr:" & ObjPtr(refDoc)
+                Dim refTitleDiag As String
+                refTitleDiag = ""
+                On Error Resume Next
+                refTitleDiag = refDoc.GetTitle()
+                On Error GoTo 0
+                refDisplayName = "(unsaved: " & refTitleDiag & ")"
+            End If
+            LogLine "Drawing upload: view #" & viewIndex & " (""" & viewName & """) -- referenced document """ & refDisplayName & """, linked item id = """ & GetLinkedItemIdOn(refDoc) & """."
             If Not seen.Exists(refKey) Then
                 seen.Add refKey, True
                 result.Add refDoc
             End If
         End If
+
         Dim nextView As Object
         On Error Resume Next
         Set nextView = view.GetNextView()
