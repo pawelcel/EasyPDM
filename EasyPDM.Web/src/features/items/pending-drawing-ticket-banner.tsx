@@ -13,7 +13,13 @@ import { useLanguage } from "@/i18n/use-language"
 // SolidWorks" (zob. pending-drawing-ticket.ts) -- w odróżnieniu od PendingTicketBanner
 // (nowy element / dogranie po wyszukiwaniu) tu kandydatów jest z góry znana, krótka lista
 // (id-y wprost z URL-a), więc zamiast wyszukiwarki wystarczy prosta lista do zaznaczenia.
-// Tak samo NIEODRZUCALNY jak PendingTicketBanner -- makro czeka po drugiej stronie.
+//
+// W ODRÓŻNIENIU od PendingTicketBanner (celowo nieodrzucalny, bo tam ZAWSZE da się coś
+// wybrać/utworzyć) TUTAJ jest przycisk Anuluj -- kandydatów może się okazać zero (np. id-y z
+// URL-a już nie istnieją) albo żaden z pokazanych nie jest tym właściwym, więc musi być
+// jakieś wyjście z okna. Anuluj NIE woła żadnego API -- po prostu zamyka popup lokalnie;
+// makro po drugiej stronie samo w końcu przestanie czekać (WaitForTicket ma własny timeout
+// i Escape), dokładnie tak samo jak przy zwykłym anulowaniu tworzenia nowego elementu.
 function PendingDrawingTicketBanner() {
   const { t } = useLanguage()
   const pendingTicket = usePendingDrawingTicket()
@@ -66,6 +72,8 @@ function PendingDrawingTicketBanner() {
 
         {loading ? (
           <Hint>{t("common.loading")}</Hint>
+        ) : candidates.length === 0 ? (
+          <Hint>{t("app.pendingDrawingTicketNoCandidates")}</Hint>
         ) : (
           <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-1.5">
@@ -98,6 +106,9 @@ function PendingDrawingTicketBanner() {
         )}
 
         <DialogFooter>
+          <Button variant="outline" onClick={clearPendingDrawingTicket} disabled={submitting}>
+            {t("common.cancel")}
+          </Button>
           <Button onClick={confirmResolve} disabled={!itemId || submitting || loading}>
             {submitting ? t("common.saving") : t("common.ok")}
           </Button>

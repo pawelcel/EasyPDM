@@ -13,7 +13,8 @@ All notable changes to EasyPDM are documented in this file.
   first, falling back to the item number in the drawing's filename only when that finds
   nothing — if the drawing's views point at more than one distinct item (e.g. an assembly
   drawing with a detail view of a single part), a browser window opens to pick the right
-  one, with an "export PDF" option right there too. Either way it uploads as its own
+  one (with a Cancel button, and a clear message if none of the candidates could actually
+  be found), with an "export PDF" option right there too. Either way it uploads as its own
   "Rysunki"/"Drawings" attachment — separate from, and accumulating alongside, the part's
   own CAD file (one drawing per revision) — and can optionally export/upload the drawing
   sheet itself as the item's PDF, upgrading it from a rendered 3D-view snapshot to a real
@@ -25,7 +26,9 @@ All notable changes to EasyPDM are documented in this file.
   only the new Name 2 needs typing. A Name 2's own detail panel now shows which client it
   belongs to right at the top, and its delete button moved out of the list (no more trash
   icon next to each Name 2 row) into the panel itself, in the same spot the client's own
-  delete button already sits.
+  delete button already sits. Its confirmation dialog no longer says "Name 2" (a term with
+  no meaning to most users) — just a plain "Delete?" naming the entry itself, with "No"/
+  "Delete" buttons.
 - SolidWorks: uploading a document that has never been saved no longer just fails with
   "save it first" — the macro now asks whether to save it as a new item (name/revision
   picked in the browser, same as any other new upload) and, on confirmation, gives it its

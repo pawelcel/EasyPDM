@@ -298,9 +298,10 @@ function ClientName2DetailPanel({
       {confirmingDelete && (
         <ConfirmDialog
           open
-          title={t("client.deleteName2Aria")}
+          title={t("client.confirmDeleteTitle")}
           description={t("client.deleteName2ConfirmDescription", { name: detail.name2 })}
           confirmLabel={t("common.delete")}
+          cancelLabel={t("common.no")}
           variant="destructive"
           onConfirm={confirmDelete}
           onCancel={() => setConfirmingDelete(false)}
