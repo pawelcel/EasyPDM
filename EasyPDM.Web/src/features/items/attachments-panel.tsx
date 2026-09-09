@@ -50,7 +50,7 @@ function RoleSlot({
   return (
     <div className="flex-1 rounded-lg bg-muted/30 p-2 ring-1 ring-foreground/10">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[11px] font-medium text-muted-foreground uppercase">{headerLabel}</span>
+        <span className="text-[12.5px] font-medium text-muted-foreground uppercase">{headerLabel}</span>
         <input
           ref={inputRef}
           type="file"
@@ -224,7 +224,7 @@ function AttachmentsPanel({
       <div className="mb-3 flex gap-2">
         <div className="flex-1 rounded-lg bg-muted/30 p-2 ring-1 ring-foreground/10">
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase">
+            <span className="text-[12.5px] font-medium text-muted-foreground uppercase">
               {t("item.cadAttachments")}
             </span>
             <input
@@ -294,7 +294,7 @@ function AttachmentsPanel({
 
         <div className="flex-1 rounded-lg bg-muted/30 p-2 ring-1 ring-foreground/10">
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase">
+            <span className="text-[12.5px] font-medium text-muted-foreground uppercase">
               {t("item.drawingAttachments")}
             </span>
             <input
