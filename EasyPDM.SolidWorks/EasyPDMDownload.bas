@@ -1239,14 +1239,24 @@ Private Function LocalRevisionFiles(ByVal targetDir As String, ByVal itemNumber 
     Set LocalRevisionFiles = result
 End Function
 
+' Uses ADODB.Stream (not the legacy Open/Put/Close statements) so targetPath can contain
+' ANY Unicode character. Confirmed in practice: VBA's legacy Open statement converts the
+' path to the system's current ANSI code page before calling into Windows -- an item/
+' attachment name with characters not representable there (e.g. Polish diacritics on a
+' non-Polish code page) silently turns into literal "?", which is itself an illegal Windows
+' filename character, so the write failed outright with "Bad file name or number".
+' ADODB.Stream.SaveToFile goes through the Unicode Windows APIs instead and has no such
+' limitation.
 Sub WriteBytesToFile(ByRef bytes() As Byte, ByVal targetPath As String)
-    Dim fileNum As Integer
-    fileNum = FreeFile
-    Open targetPath For Binary Access Write As #fileNum
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+    stream.Type = 1 ' adTypeBinary
+    stream.Open
     If UBound(bytes) >= LBound(bytes) Then
-        Put #fileNum, , bytes
+        stream.Write bytes
     End If
-    Close #fileNum
+    stream.SaveToFile targetPath, 2 ' adSaveCreateOverWrite -- targetPath may already exist
+    stream.Close
 End Sub
 
 ' Downloads the current CAD file of Part/Assembly "item" into targetDir (see rules 3 and 4

@@ -877,19 +877,24 @@ Function ApiRegisterAttachment(ByVal itemId As String, ByVal filePath As String,
 End Function
 
 ' Reads the whole file as a byte array -- used for the plain HTTP upload (when the PDM
-' storage is not visible in this machine's file system).
+' storage is not visible in this machine's file system). Uses ADODB.Stream (not the legacy
+' Open/Get/Close statements) so filePath can contain ANY Unicode character -- same ANSI
+' code-page limitation as WriteBytesToFile in EasyPDMDownload.bas (confirmed there in
+' practice with a "Bad file name or number" error on an item name with Polish diacritics);
+' LoadFromFile goes through the Unicode Windows APIs instead.
 Private Function ReadFileBytes(ByVal filePath As String) As Byte()
-    Dim fileNum As Integer
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+    stream.Type = 1 ' adTypeBinary
+    stream.Open
+    stream.LoadFromFile filePath
     Dim buffer() As Byte
-    fileNum = FreeFile
-    Open filePath For Binary Access Read As #fileNum
-    If LOF(fileNum) > 0 Then
-        ReDim buffer(1 To LOF(fileNum))
-        Get #fileNum, , buffer
+    If stream.Size > 0 Then
+        buffer = stream.Read
     Else
         ReDim buffer(0 To -1) ' empty array
     End If
-    Close #fileNum
+    stream.Close
     ReadFileBytes = buffer
 End Function
 
