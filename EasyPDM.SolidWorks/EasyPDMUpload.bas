@@ -877,17 +877,27 @@ Function ApiRegisterAttachment(ByVal itemId As String, ByVal filePath As String,
 End Function
 
 ' Reads the whole file as a byte array -- used for the plain HTTP upload (when the PDM
-' storage is not visible in this machine's file system). Uses ADODB.Stream (not the legacy
-' Open/Get/Close statements) so filePath can contain ANY Unicode character -- same ANSI
-' code-page limitation as WriteBytesToFile in EasyPDMDownload.bas (confirmed there in
-' practice with a "Bad file name or number" error on an item name with Polish diacritics);
-' LoadFromFile goes through the Unicode Windows APIs instead.
+' storage is not visible in this machine's file system). filePath is typically the document
+' RenameAndUpload/SaveAs just wrote AND SolidWorks is still holding open as the active
+' document -- confirmed in practice: ADODB.Stream.LoadFromFile called directly on it failed
+' with "Nie mozna otworzyc pliku" ("Cannot open file"), apparently requesting a stricter
+' sharing mode than SolidWorks allows on its own open document. FileCopy (already proven
+' elsewhere in RenameAndUpload's "storage visible" branch to read this exact kind of
+' still-open file successfully, AND to handle a Unicode filePath correctly) copies it to a
+' private temp file first; THAT copy -- nothing else has it open -- is then read via
+' ADODB.Stream (not the legacy Open/Get/Close statements, which share WriteBytesToFile's ANSI
+' code-page limitation in EasyPDMDownload.bas, confirmed there with a "Bad file name or
+' number" error on an item name with Polish diacritics).
 Private Function ReadFileBytes(ByVal filePath As String) As Byte()
+    Dim tempPath As String
+    tempPath = Environ$("TEMP") & "\EasyPDM_upload_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000))
+    FileCopy filePath, tempPath
+
     Dim stream As Object
     Set stream = CreateObject("ADODB.Stream")
     stream.Type = 1 ' adTypeBinary
     stream.Open
-    stream.LoadFromFile filePath
+    stream.LoadFromFile tempPath
     Dim buffer() As Byte
     If stream.Size > 0 Then
         buffer = stream.Read
@@ -895,6 +905,11 @@ Private Function ReadFileBytes(ByVal filePath As String) As Byte()
         ReDim buffer(0 To -1) ' empty array
     End If
     stream.Close
+
+    On Error Resume Next
+    Kill tempPath
+    On Error GoTo 0
+
     ReadFileBytes = buffer
 End Function
 

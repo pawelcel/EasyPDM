@@ -55,7 +55,9 @@ All notable changes to EasyPDM are documented in this file.
   non-Polish system — could fail outright with "Bad file name or number", since VBA's legacy
   file I/O statements convert the path through that code page before touching disk. Local
   file reads/writes for attachment bytes now go through ADODB.Stream instead, which handles
-  the full Unicode filename correctly.
+  the full Unicode filename correctly. The plain-HTTP upload path also now stages the file
+  through a private temp copy first, since reading the SolidWorks-saved file directly could
+  fail with "Cannot open file" while SolidWorks still had it open as the active document.
 
 ## [0.2]
 
