@@ -17,28 +17,35 @@ import { ClientFileTree } from "@/features/clients/client-file-tree"
 import { useLanguage } from "@/i18n/use-language"
 
 // Szczegóły JEDNEJ Nazwy 2 -- odpowiednik client-detail-panel.tsx, ale bez sekcji Projekty
-// (poza zakresem: Nazwa 2 to wariant handlowy klienta, nie osobny byt spięty z projektami)
-// i BEZ przycisku usunięcia (usuwanie zostaje wyłącznie przy wierszu w liście po lewej w
-// clients-view.tsx, żeby nie dublować tej samej akcji w dwóch miejscach). Kluczowa różnica,
-// powtórzona zarówno dla kontaktów jak i plików: DWIE osobne sekcje -- odziedziczone z
-// klienta-rodzica (tylko do odczytu z tego poziomu) i własne tej Nazwy 2 (pełne CRUD). Np.
-// różne normy w "Bosch Rexroth" niż w "Bosch Tabory" -- każda Nazwa 2 dostaje swoje własne
-// pliki, niezależne od plików klienta i od siebie nawzajem.
+// (poza zakresem: Nazwa 2 to wariant handlowy klienta, nie osobny byt spięty z projektami).
+// Przycisk usunięcia jest tu, w tym samym miejscu co u klienta (nagłówek, po prawej) --
+// zamiast przy wierszu w liście po lewej, żeby nie trzeba było wchodzić w szczegóły, żeby
+// zobaczyć, co dokładnie się usuwa. Kluczowa różnica, powtórzona zarówno dla kontaktów jak
+// i plików: DWIE osobne sekcje -- odziedziczone z klienta-rodzica (tylko do odczytu z tego
+// poziomu) i własne tej Nazwy 2 (pełne CRUD). Np. różne normy w "Bosch Rexroth" niż w
+// "Bosch Tabory" -- każda Nazwa 2 dostaje swoje własne pliki, niezależne od plików klienta
+// i od siebie nawzajem.
 function ClientName2DetailPanel({
   clientId,
   name2Id,
   onClientsRefetch,
+  onDeleted,
 }: {
   clientId: number
   name2Id: number
   onClientsRefetch: () => void | Promise<void>
+  onDeleted: () => void
 }) {
   const { t } = useLanguage()
   const [detail, setDetail] = useState<ClientName2Detail | null>(null)
+  const [parentClientName, setParentClientName] = useState("")
   const [parentContacts, setParentContacts] = useState<ClientContact[]>([])
   const [name2, setName2] = useState("")
   const [location, setLocation] = useState("")
   const [nameError, setNameError] = useState("")
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deletingPending, setDeletingPending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [confirmingDeleteContactId, setConfirmingDeleteContactId] = useState<number | null>(null)
   const [contactDeletePending, setContactDeletePending] = useState(false)
   const [contactDeleteError, setContactDeleteError] = useState<string | null>(null)
@@ -51,6 +58,7 @@ function ClientName2DetailPanel({
     setDetail(detailData)
     setName2(detailData.name2)
     setLocation(detailData.location ?? "")
+    setParentClientName(parentData.name)
     setParentContacts(parentData.contacts)
   }
 
@@ -86,6 +94,21 @@ function ClientName2DetailPanel({
     }
   }
 
+  async function confirmDelete() {
+    setDeletingPending(true)
+    setDeleteError(null)
+    try {
+      await api.removeClientName2(clientId, name2Id)
+      setConfirmingDelete(false)
+      await onClientsRefetch()
+      onDeleted()
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : t("client.deleteName2Failed"))
+    } finally {
+      setDeletingPending(false)
+    }
+  }
+
   async function confirmRemoveContact() {
     if (confirmingDeleteContactId === null) return
     setContactDeletePending(true)
@@ -107,25 +130,43 @@ function ClientName2DetailPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Input
-          value={name2}
-          onChange={(e) => setName2(e.target.value)}
-          onBlur={save}
-          className="text-[15px] font-semibold"
-          placeholder={t("client.name2Label")}
-        />
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="client-name2-location">{t("client.locationLabel")}</Label>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 flex flex-col gap-2">
+          {/* Rodzic wypisany na samej górze -- w odróżnieniu od klienta ta Nazwa 2 nie
+              istnieje samodzielnie, więc zanim cokolwiek innego, jasne jest, czyja to
+              Nazwa 2. */}
+          <div className="text-[12.5px] text-muted-foreground">
+            {t("client.parentClientLabel")}: {parentClientName}
+          </div>
           <Input
-            id="client-name2-location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            value={name2}
+            onChange={(e) => setName2(e.target.value)}
             onBlur={save}
-            placeholder={t("client.locationPlaceholder")}
+            className="text-[15px] font-semibold"
+            placeholder={t("client.name2Label")}
           />
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="client-name2-location">{t("client.locationLabel")}</Label>
+            <Input
+              id="client-name2-location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              onBlur={save}
+              placeholder={t("client.locationPlaceholder")}
+            />
+          </div>
+          <FormError>{nameError}</FormError>
         </div>
-        <FormError>{nameError}</FormError>
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={() => {
+            setDeleteError(null)
+            setConfirmingDelete(true)
+          }}
+        >
+          {t("client.deleteName2Aria")}
+        </Button>
       </div>
 
       {/* Odziedziczone z klienta-rodzica -- tylko do odczytu z tego poziomu (edycja i
@@ -252,6 +293,20 @@ function ClientName2DetailPanel({
           <ClientFileTree clientId={clientId} name2Id={name2Id} />
         </div>
       </div>
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          open
+          title={t("client.deleteName2Aria")}
+          description={t("client.deleteName2ConfirmDescription", { name: detail.name2 })}
+          confirmLabel={t("common.delete")}
+          variant="destructive"
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirmingDelete(false)}
+          pending={deletingPending}
+          error={deleteError}
+        />
+      )}
 
       {confirmingDeleteContact && (
         <ConfirmDialog

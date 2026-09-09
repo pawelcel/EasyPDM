@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
 import type { Client } from "@/api/types"
@@ -12,7 +12,6 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
   Dialog,
   DialogContent,
@@ -43,35 +42,7 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
   const debouncedSearch = useDebouncedValue(search, 300)
   const { clients, refetch } = useClients(debouncedSearch)
   const [selection, setSelection] = useState<Selection | null>(null)
-
-  const [confirmingDeleteName2, setConfirmingDeleteName2] = useState<
-    { clientId: number; name2Id: number; name2: string } | null
-  >(null)
-  const [name2DeletePending, setName2DeletePending] = useState(false)
-  const [name2DeleteError, setName2DeleteError] = useState<string | null>(null)
   const [quickAddClient, setQuickAddClient] = useState<Client | null>(null)
-
-  async function confirmRemoveName2() {
-    if (!confirmingDeleteName2) return
-    setName2DeletePending(true)
-    setName2DeleteError(null)
-    try {
-      await api.removeClientName2(confirmingDeleteName2.clientId, confirmingDeleteName2.name2Id)
-      setConfirmingDeleteName2(null)
-      // Nazwa 2 właśnie usunięta była akurat zaznaczona -- cofnij zaznaczenie do samego
-      // klienta, inaczej panel po prawej dalej próbowałby pokazać coś, co już nie istnieje.
-      setSelection((current) =>
-        current?.clientId === confirmingDeleteName2.clientId && current.name2Id === confirmingDeleteName2.name2Id
-          ? { clientId: current.clientId, name2Id: null }
-          : current
-      )
-      await refetch()
-    } catch (err) {
-      setName2DeleteError(err instanceof ApiError ? err.message : t("client.deleteName2Failed"))
-    } finally {
-      setName2DeletePending(false)
-    }
-  }
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -136,19 +107,12 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
                       }
                       className="cursor-pointer"
                     >
-                      <TableCell className="pl-6 text-muted-foreground">{n.name2}</TableCell>
-                      <TableCell className="w-8">
-                        <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          aria-label={t("client.deleteName2Aria")}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setConfirmingDeleteName2({ clientId: c.id, name2Id: n.id, name2: n.name2 })
-                          }}
-                        >
-                          <Trash2 className="size-3.5 text-muted-foreground" />
-                        </Button>
+                      {/* Bez przycisku usunięcia tutaj -- usuwanie Nazwy 2 jest teraz w jej
+                          własnym panelu szczegółów, w tym samym miejscu co usuwanie klienta
+                          (zob. client-name2-detail-panel.tsx), zamiast dublować tę akcję
+                          jeszcze raz w samej liście. */}
+                      <TableCell colSpan={2} className="pl-6 text-muted-foreground">
+                        {n.name2}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -160,20 +124,6 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
           <Hint>{search ? t("client.noMatches") : t("client.emptyAll")}</Hint>
         )}
       </div>
-
-      {confirmingDeleteName2 && (
-        <ConfirmDialog
-          open
-          title={t("client.deleteName2Aria")}
-          description={t("client.deleteName2ConfirmDescription", { name: confirmingDeleteName2.name2 })}
-          confirmLabel={t("common.delete")}
-          variant="destructive"
-          onConfirm={confirmRemoveName2}
-          onCancel={() => setConfirmingDeleteName2(null)}
-          pending={name2DeletePending}
-          error={name2DeleteError}
-        />
-      )}
 
       {quickAddClient && (
         <QuickAddName2Dialog
@@ -200,6 +150,7 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
             clientId={selection.clientId}
             name2Id={selection.name2Id}
             onClientsRefetch={refetch}
+            onDeleted={() => setSelection({ clientId: selection.clientId, name2Id: null })}
           />
         )}
       </div>

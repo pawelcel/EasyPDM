@@ -22,7 +22,10 @@ All notable changes to EasyPDM are documented in this file.
 - Clients tab: hovering a client's row in the list now reveals a small "+" button next to
   its name — a shortcut to add another Name 2 to that client without going through the
   regular "Add client" dialog's search. The client's own name comes pre-filled and locked;
-  only the new Name 2 needs typing.
+  only the new Name 2 needs typing. A Name 2's own detail panel now shows which client it
+  belongs to right at the top, and its delete button moved out of the list (no more trash
+  icon next to each Name 2 row) into the panel itself, in the same spot the client's own
+  delete button already sits.
 - SolidWorks: uploading a document that has never been saved no longer just fails with
   "save it first" — the macro now asks whether to save it as a new item (name/revision
   picked in the browser, same as any other new upload) and, on confirmation, gives it its
