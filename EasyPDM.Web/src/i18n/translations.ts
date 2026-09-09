@@ -394,6 +394,8 @@ const pl = {
 
   "client.searchPlaceholder": "Szukaj klienta…",
   "client.addAria": "Dodaj klienta",
+  "client.quickAddName2Aria": "Dodaj nazwę 2 temu klientowi",
+  "client.quickAddName2Placeholder": "np. Bosch Rexroth",
   "client.contactSingular": "kontakt",
   "client.contactPlural": "kontaktów",
   "client.noMatches": "Brak pasujących klientów.",
@@ -1046,6 +1048,8 @@ const en: Record<TranslationKey, string> = {
 
   "client.searchPlaceholder": "Search client…",
   "client.addAria": "Add client",
+  "client.quickAddName2Aria": "Add a Name 2 to this client",
+  "client.quickAddName2Placeholder": "e.g. Bosch Rexroth",
   "client.contactSingular": "contact",
   "client.contactPlural": "contacts",
   "client.noMatches": "No matching clients.",
@@ -1696,6 +1700,8 @@ const de: Record<TranslationKey, string> = {
 
   "client.searchPlaceholder": "Kunde suchen…",
   "client.addAria": "Kunde hinzufügen",
+  "client.quickAddName2Aria": "Diesem Kunden eine Name 2 hinzufügen",
+  "client.quickAddName2Placeholder": "z. B. Bosch Rexroth",
   "client.contactSingular": "Kontakt",
   "client.contactPlural": "Kontakte",
   "client.noMatches": "Keine passenden Kunden.",

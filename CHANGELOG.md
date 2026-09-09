@@ -19,6 +19,10 @@ All notable changes to EasyPDM are documented in this file.
   sheet itself as the item's PDF, upgrading it from a rendered 3D-view snapshot to a real
   print-quality drawing. Downloading a Part/Assembly now also fetches its current drawing
   (if any) and saves it next to the model file, without opening it.
+- Clients tab: hovering a client's row in the list now reveals a small "+" button next to
+  its name — a shortcut to add another Name 2 to that client without going through the
+  regular "Add client" dialog's search. The client's own name comes pre-filled and locked;
+  only the new Name 2 needs typing.
 
 ## [0.2]
 

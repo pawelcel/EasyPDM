@@ -49,6 +49,7 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
   >(null)
   const [name2DeletePending, setName2DeletePending] = useState(false)
   const [name2DeleteError, setName2DeleteError] = useState<string | null>(null)
+  const [quickAddClient, setQuickAddClient] = useState<Client | null>(null)
 
   async function confirmRemoveName2() {
     if (!confirmingDeleteName2) return
@@ -105,10 +106,25 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
                     data-state={
                       selection?.clientId === c.id && selection.name2Id === null ? "selected" : undefined
                     }
-                    className="cursor-pointer"
+                    className="group cursor-pointer"
                   >
-                    <TableCell colSpan={2} className="font-medium">
-                      {c.name}
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell className="w-8">
+                      {/* Widoczny tylko po najechaniu -- szybki skrót do dodania kolejnej
+                          Nazwy 2 temu klientowi bez przechodzenia przez wyszukiwanie w
+                          NewClientDialog (ten sam mechanizm co Trash2 przy Nazwie 2 niżej). */}
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label={t("client.quickAddName2Aria")}
+                        className="opacity-0 group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setQuickAddClient(c)
+                        }}
+                      >
+                        <Plus className="size-3.5 text-muted-foreground" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                   {c.name2s.map((n) => (
@@ -156,6 +172,14 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
           onCancel={() => setConfirmingDeleteName2(null)}
           pending={name2DeletePending}
           error={name2DeleteError}
+        />
+      )}
+
+      {quickAddClient && (
+        <QuickAddName2Dialog
+          client={quickAddClient}
+          onClose={() => setQuickAddClient(null)}
+          onCreated={refetch}
         />
       )}
 
@@ -305,6 +329,74 @@ function NewClientDialog({
           </Button>
           <Button onClick={submit} disabled={pending}>
             {matchedClient ? t("common.ok") : t("common.add")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Skrót z listy po lewej (widoczny tylko po najechaniu na wiersz klienta, zob. przycisk "+"
+// wyżej) -- ten sam efekt co NewClientDialog wpisujące już istniejącą nazwę klienta, tylko
+// bez przechodzenia przez wyszukiwanie: klient jest już znany (to JEGO wiersz), więc pole
+// nazwy jest tu z góry wypełnione i zablokowane, można wpisać tylko Nazwę 2. W odróżnieniu od
+// NewClientDialog Nazwa 2 jest tu WYMAGANA (to jedyny sens tego przycisku -- samo zaznaczenie
+// klienta i tak jest już jedno kliknięcie na jego wiersz obok).
+function QuickAddName2Dialog({
+  client,
+  onClose,
+  onCreated,
+}: {
+  client: Client
+  onClose: () => void
+  onCreated: () => void | Promise<void>
+}) {
+  const { t } = useLanguage()
+  const [name2, setName2] = useState("")
+  const [error, setError] = useState("")
+  const [pending, setPending] = useState(false)
+
+  async function submit() {
+    const trimmedName2 = name2.trim()
+    if (!trimmedName2) return
+    setError("")
+    setPending(true)
+    try {
+      await api.addClientName2(client.id, trimmedName2)
+      onClose()
+      await onCreated()
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 409 ? t("client.name2Conflict") : t("client.addName2Failed"))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("client.addName2Title")}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="quick-add-name2-client">{t("common.name")}</Label>
+          <Input id="quick-add-name2-client" value={client.name} disabled />
+          <Label htmlFor="quick-add-name2-value">{t("client.name2Label")}</Label>
+          <Input
+            id="quick-add-name2-value"
+            value={name2}
+            onChange={(e) => setName2(e.target.value)}
+            placeholder={t("client.quickAddName2Placeholder")}
+            autoFocus
+          />
+          <FormError>{error}</FormError>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button onClick={submit} disabled={pending || !name2.trim()}>
+            {t("common.ok")}
           </Button>
         </DialogFooter>
       </DialogContent>
