@@ -1602,7 +1602,8 @@ End Function
 ' when a drawing is created FROM an already-renamed model, so this holds in the common
 ' case). Once resolved, uploads through the SAME RenameAndUpload used for the model itself --
 ' identical Save-As/embed-link/accumulate-per-revision mechanics -- just with role="drawing"
-' instead of the default "cad".
+' instead of the default "cad" -- and, on confirmation via the same ExportPdfPrompt used
+' elsewhere, exports the drawing sheet itself to PDF via UploadPdfAttachment.
 Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
     Dim fname As String
     fname = Mid(filePath, InStrRev(filePath, "\") + 1)
@@ -1654,8 +1655,21 @@ Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
 
     LogLine "Drawing upload: matched item #" & itemNumber & " (" & name & "), uploading as role=drawing."
 
+    ' Same prompt/default as the normal Part/Assembly path (ExportPdfPrompt, off by
+    ' default via vbDefaultButton2) -- UploadPdfAttachment is fully generic (just
+    ' swModel.Extension.SaveAs to .pdf), and a Drawing sheet is SolidWorks' own
+    ' well-supported source for PDF export, unlike a bare Part/Assembly. Uploading it
+    ' replaces the item's single "pdf" slot -- upgrading it from a rendered 3D-view
+    ' snapshot to an actual print-quality drawing sheet.
+    Dim nativeExportPdf As Boolean
+    nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
+
     On Error GoTo Failed
-    RenameAndUpload swModel, filePath, itemId, itemNumber, name, revision, GetDownloadFolder(), "drawing"
+    Dim uploadOk As Boolean
+    uploadOk = RenameAndUpload(swModel, filePath, itemId, itemNumber, name, revision, GetDownloadFolder(), "drawing")
+    If uploadOk And nativeExportPdf Then
+        UploadPdfAttachment swModel, itemId, itemNumber, name, revision
+    End If
     MsgBox T("Dwg_UploadedPrefix") & itemNumber & T("Dwg_UploadedSuffix"), vbInformation, T("AppTitle")
     Exit Sub
 
