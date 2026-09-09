@@ -259,6 +259,8 @@ Private Function T_PL(ByVal key As String) As String
         Case "ExportPdfPrompt": T_PL = "Wyeksportowac i wyslac plik PDF?"
         Case "Dwg_CannotIdentifyItem": T_PL = "Nie udalo sie rozpoznac, do ktorego elementu PDM nalezy ten rysunek -- zapisz najpierw czesc/zlozenie przez EasyPDM (zeby dostalo nazwe w formacie 'numer (nazwa)'), a potem zapisz rysunek z tego pliku."
         Case "Dwg_ReferencedPartNotLinkedPrompt": T_PL = "Ten rysunek dokumentuje czesc/zlozenie, ktore nie zostalo jeszcze wyslane do EasyPDM. Wyslac je teraz jako nowy element (numer/nazwe/rewizje ustalisz w przegladarce), a potem ten rysunek?"
+        Case "Dwg_UnlinkedReferencesBlockedPrefix": T_PL = "Ten rysunek dokumentuje wiecej niz jeden element, a "
+        Case "Dwg_UnlinkedReferencesBlockedSuffix": T_PL = " z nich nie jest jeszcze w EasyPDM -- rysunek NIE zostal wyslany (podpiecie go teraz utworzyloby powiazanie z czescia bez wlasnego rekordu w PDM, ktora nie sciagnie sie poprawnie gdzie indziej). Wyslij najpierw brakujace czesci/zlozenia osobno przez EasyPDM, a potem zapisz ten rysunek ponownie:"
         Case "Dwg_ItemNotFoundPrefix": T_PL = "Nie znaleziono w EasyPDM elementu nr "
         Case "Dwg_ItemNotFoundSuffix": T_PL = "."
         Case "Dwg_NotPartOrAssembly": T_PL = "Znaleziony element nie jest Czescia ani Zlozeniem -- rysunki mozna podpinac tylko do nich."
@@ -333,6 +335,8 @@ Private Function T_EN(ByVal key As String) As String
         Case "ExportPdfPrompt": T_EN = "Export and upload a PDF file?"
         Case "Dwg_CannotIdentifyItem": T_EN = "Could not identify which PDM item this drawing belongs to -- save the Part/Assembly through EasyPDM first (so it gets a filename in the 'number (name)' format), then save the drawing from that file."
         Case "Dwg_ReferencedPartNotLinkedPrompt": T_EN = "This drawing documents a Part/Assembly that hasn't been uploaded to EasyPDM yet. Upload it now as a new item (you'll pick the number/name/revision in the browser), then this drawing?"
+        Case "Dwg_UnlinkedReferencesBlockedPrefix": T_EN = "This drawing documents more than one element, and "
+        Case "Dwg_UnlinkedReferencesBlockedSuffix": T_EN = " of them isn't in EasyPDM yet -- the drawing was NOT uploaded (linking it now would create a link to a part with no PDM record of its own, which wouldn't download correctly elsewhere). Upload the missing Part(s)/Assembly(-ies) through EasyPDM first, then save this drawing again:"
         Case "Dwg_ItemNotFoundPrefix": T_EN = "Could not find EasyPDM item number "
         Case "Dwg_ItemNotFoundSuffix": T_EN = "."
         Case "Dwg_NotPartOrAssembly": T_EN = "The found item is not a Part or an Assembly -- drawings can only be attached to those."
@@ -407,6 +411,8 @@ Private Function T_DE(ByVal key As String) As String
         Case "ExportPdfPrompt": T_DE = "PDF-Datei exportieren und hochladen?"
         Case "Dwg_CannotIdentifyItem": T_DE = "Es konnte nicht ermittelt werden, zu welchem PDM-Element diese Zeichnung gehoert -- speichern Sie zuerst das Teil/die Baugruppe ueber EasyPDM (damit es einen Dateinamen im Format 'Nummer (Name)' erhaelt), und speichern Sie dann die Zeichnung aus dieser Datei."
         Case "Dwg_ReferencedPartNotLinkedPrompt": T_DE = "Diese Zeichnung dokumentiert ein Teil/eine Baugruppe, das/die noch nicht zu EasyPDM hochgeladen wurde. Jetzt als neues Element hochladen (Nummer/Name/Revision legen Sie im Browser fest) und dann diese Zeichnung?"
+        Case "Dwg_UnlinkedReferencesBlockedPrefix": T_DE = "Diese Zeichnung dokumentiert mehr als ein Element, und "
+        Case "Dwg_UnlinkedReferencesBlockedSuffix": T_DE = " davon sind noch nicht in EasyPDM -- die Zeichnung wurde NICHT hochgeladen (eine Verknuepfung jetzt wuerde ein Teil ohne eigenen PDM-Datensatz verknuepfen, das sich anderswo nicht korrekt herunterladen liesse). Laden Sie die fehlenden Teile/Baugruppen zuerst einzeln ueber EasyPDM hoch und speichern Sie diese Zeichnung dann erneut:"
         Case "Dwg_ItemNotFoundPrefix": T_DE = "EasyPDM-Element Nr. "
         Case "Dwg_ItemNotFoundSuffix": T_DE = " wurde nicht gefunden."
         Case "Dwg_NotPartOrAssembly": T_DE = "Das gefundene Element ist weder ein Teil noch eine Baugruppe -- Zeichnungen koennen nur daran angehaengt werden."
@@ -1694,6 +1700,45 @@ Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
     Dim candidateIds As Collection
     Set candidateIds = FindLinkedCandidatesInDrawingViews(swModel)
 
+    Dim refDocs As Collection
+    Set refDocs = FindReferencedDocsInDrawingViews(swModel)
+
+    ' The drawing's views can reference MORE distinct documents than are linked to a PDM
+    ' item -- e.g. an assembly drawing with an extra detail view of one of the assembly's
+    ' own components that was never itself uploaded. Letting the upload proceed anyway
+    ' (attached to whichever item IS linked, silently ignoring the rest) would create a PDM
+    ' drawing that documents a part with no PDM record of its own -- downloading that item
+    ' elsewhere later would be missing it. Block outright rather than guessing/dropping it.
+    ' The one exception (exactly one reference total, and it's not linked at all) is offered
+    ' an automatic upload below instead of being blocked here.
+    If refDocs.Count > candidateIds.Count And Not (refDocs.Count = 1 And candidateIds.Count = 0) Then
+        Dim unlinkedNames As New Collection
+        Dim refDocForCheck As Variant
+        For Each refDocForCheck In refDocs
+            If GetLinkedItemIdOn(refDocForCheck) = "" Then
+                Dim refTitle As String
+                refTitle = refDocForCheck.GetPathName()
+                If refTitle = "" Then
+                    refTitle = refDocForCheck.GetTitle()
+                Else
+                    refTitle = BaseNameFromPath(refTitle)
+                End If
+                unlinkedNames.Add refTitle
+            End If
+        Next refDocForCheck
+
+        Dim unlinkedList As String
+        Dim unlinkedNameVariant As Variant
+        For Each unlinkedNameVariant In unlinkedNames
+            unlinkedList = unlinkedList & "- " & unlinkedNameVariant & vbCrLf
+        Next unlinkedNameVariant
+
+        MsgBox T("Dwg_UnlinkedReferencesBlockedPrefix") & unlinkedNames.Count & T("Dwg_UnlinkedReferencesBlockedSuffix") & vbCrLf & vbCrLf & unlinkedList, _
+               vbExclamation, T("AppTitle")
+        LogLine "Drawing upload: blocked -- " & unlinkedNames.Count & " referenced document(s) not linked to any PDM item (alongside " & candidateIds.Count & " that are)."
+        Exit Sub
+    End If
+
     If candidateIds.Count = 1 Then
         Dim singleItem As Object
         Set singleItem = FetchItemById(CStr(candidateIds(1)))
@@ -1708,44 +1753,38 @@ Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
         Exit Sub
     End If
 
-    ' No already-linked candidate found via the view tree -- if the drawing documents
-    ' exactly ONE distinct, currently open Part/Assembly that was never uploaded to EasyPDM
-    ' at all (no EasyPDM_ItemId yet), offer to upload IT first (full flow, incl. the browser
-    ' round-trip for its own number/name/revision) and then continue straight into the
-    ' drawing upload -- instead of forcing a separate, manual macro run on the part first.
-    ' Only handles the single-unlinked-reference case (typical single-part drawing, the
-    ' reported scenario) -- an assembly drawing with SEVERAL different unlinked references
-    ' still falls through to the filename fallback below, same as today.
-    If candidateIds.Count = 0 Then
-        Dim refDocs As Collection
-        Set refDocs = FindReferencedDocsInDrawingViews(swModel)
-        If refDocs.Count = 1 Then
-            Dim onlyRefDoc As Object
-            Set onlyRefDoc = refDocs(1)
-            Dim refDocType As Long
-            refDocType = onlyRefDoc.GetType()
-            If refDocType = SW_DOC_PART Or refDocType = SW_DOC_ASSEMBLY Then
-                If MsgBox(T("Dwg_ReferencedPartNotLinkedPrompt"), vbYesNo + vbQuestion, T("AppTitle")) = vbYes Then
-                    Dim refFilePath As String, refItemTypeGuess As String, refDefaultName As String
-                    If GetDocInfo(onlyRefDoc, refFilePath, refItemTypeGuess, refDefaultName) Then
-                        Dim refResult As Object
-                        Set refResult = UploadPartOrAssemblyDoc(onlyRefDoc, refFilePath, refItemTypeGuess, refDefaultName)
-                        If Not refResult Is Nothing Then
-                            Dim linkedItem As Object
-                            Set linkedItem = FetchItemById(CStr(refResult.Item("itemId")))
-                            If Not linkedItem Is Nothing Then
-                                UploadDrawingToItemNatively swModel, filePath, linkedItem
-                                Exit Sub
-                            End If
+    ' No already-linked candidate found via the view tree -- per the guard above, at this
+    ' point the drawing references either no (resolvable) documents at all, or exactly one,
+    ' entirely unlinked one. If it's the latter and it's a Part/Assembly, offer to upload it
+    ' first (full flow, incl. the browser round-trip for its own number/name/revision) and
+    ' then continue straight into the drawing upload, instead of forcing a separate, manual
+    ' macro run on the part first.
+    If candidateIds.Count = 0 And refDocs.Count = 1 Then
+        Dim onlyRefDoc As Object
+        Set onlyRefDoc = refDocs(1)
+        Dim refDocType As Long
+        refDocType = onlyRefDoc.GetType()
+        If refDocType = SW_DOC_PART Or refDocType = SW_DOC_ASSEMBLY Then
+            If MsgBox(T("Dwg_ReferencedPartNotLinkedPrompt"), vbYesNo + vbQuestion, T("AppTitle")) = vbYes Then
+                Dim refFilePath As String, refItemTypeGuess As String, refDefaultName As String
+                If GetDocInfo(onlyRefDoc, refFilePath, refItemTypeGuess, refDefaultName) Then
+                    Dim refResult As Object
+                    Set refResult = UploadPartOrAssemblyDoc(onlyRefDoc, refFilePath, refItemTypeGuess, refDefaultName)
+                    If Not refResult Is Nothing Then
+                        Dim linkedItem As Object
+                        Set linkedItem = FetchItemById(CStr(refResult.Item("itemId")))
+                        If Not linkedItem Is Nothing Then
+                            UploadDrawingToItemNatively swModel, filePath, linkedItem
+                            Exit Sub
                         End If
                     End If
-                    ' Cancelled or failed partway through the referenced part's own upload
-                    ' (already messaged by UploadPartOrAssemblyDoc/GetDocInfo themselves) --
-                    ' stop here rather than confusingly falling through to the filename
-                    ' fallback for a part we just tried to upload.
-                    LogLine "Drawing upload: referenced part/assembly auto-upload did not complete -- done."
-                    Exit Sub
                 End If
+                ' Cancelled or failed partway through the referenced part's own upload
+                ' (already messaged by UploadPartOrAssemblyDoc/GetDocInfo themselves) --
+                ' stop here rather than confusingly falling through to the filename
+                ' fallback for a part we just tried to upload.
+                LogLine "Drawing upload: referenced part/assembly auto-upload did not complete -- done."
+                Exit Sub
             End If
         End If
     End If

@@ -23,7 +23,11 @@ All notable changes to EasyPDM are documented in this file.
   a Part/Assembly that has never itself been uploaded to EasyPDM, the macro now offers to
   upload that Part/Assembly first (full flow, including picking its number/name/revision in
   the browser) and then continues straight into the drawing upload, instead of requiring a
-  separate macro run on the part first.
+  separate macro run on the part first. If the drawing instead documents SEVERAL distinct
+  elements and only some of them are already in EasyPDM (e.g. an assembly drawing with an
+  extra detail view of one of its own components that was never uploaded on its own), the
+  upload is now blocked with a message listing what's missing, rather than silently
+  attaching the drawing to just the linked item(s) and leaving the rest untracked.
 - Clients tab: hovering a client's row in the list now reveals a small "+" button next to
   its name — a shortcut to add another Name 2 to that client without going through the
   regular "Add client" dialog's search. The client's own name comes pre-filled and locked;
