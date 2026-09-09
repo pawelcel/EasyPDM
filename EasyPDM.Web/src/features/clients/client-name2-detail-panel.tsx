@@ -135,7 +135,7 @@ function ClientName2DetailPanel({
           {/* Rodzic wypisany na samej górze -- w odróżnieniu od klienta ta Nazwa 2 nie
               istnieje samodzielnie, więc zanim cokolwiek innego, jasne jest, czyja to
               Nazwa 2. */}
-          <div className="text-[12.5px] text-muted-foreground">
+          <div className="text-[15px] text-muted-foreground">
             {t("client.parentClientLabel")}: {parentClientName}
           </div>
           <Input
@@ -160,12 +160,13 @@ function ClientName2DetailPanel({
         <Button
           size="sm"
           variant="destructive"
+          aria-label={t("client.deleteName2Aria")}
           onClick={() => {
             setDeleteError(null)
             setConfirmingDelete(true)
           }}
         >
-          {t("client.deleteName2Aria")}
+          {t("common.delete")}
         </Button>
       </div>
 
