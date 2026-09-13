@@ -21,11 +21,13 @@ function ClientDetailPanel({
   onClientsRefetch,
   onDeleted,
   onNavigateToProject,
+  onAddName2,
 }: {
   id: number
   onClientsRefetch: () => void | Promise<void>
   onDeleted: () => void
   onNavigateToProject?: (id: string) => void
+  onAddName2: (client: Pick<ClientDetail, "id" | "name">) => void
 }) {
   const { t } = useLanguage()
   const [client, setClient] = useState<ClientDetail | null>(null)
@@ -136,16 +138,21 @@ function ClientDetailPanel({
           </div>
           <FormError>{nameError}</FormError>
         </div>
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => {
-            setDeleteError(null)
-            setConfirmingDelete(true)
-          }}
-        >
-          {t("client.deleteButton")}
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" variant="secondary" onClick={() => onAddName2(client)}>
+            {t("client.addName2Button")}
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              setDeleteError(null)
+              setConfirmingDelete(true)
+            }}
+          >
+            {t("client.deleteButton")}
+          </Button>
+        </div>
       </div>
 
       <div>
@@ -246,11 +253,11 @@ function ClientDetailPanel({
         )}
       </div>
 
-      {/* Zarządzanie Nazwami 2 (dodanie/usunięcie) jest CELOWO nie tutaj, żeby nie dublować
-          płaskiej listy Nazwa/Nazwa 2 po lewej: dodanie dzieje się przez dynamiczne okno
-          "Dodaj klienta" (wpisanie już istniejącej nazwy przełącza je w tryb dodania nazwy 2,
-          zob. NewClientDialog w clients-view.tsx), a usunięcie przez ikonkę kosza
-          bezpośrednio przy wierszu tej listy. */}
+      {/* Dodanie drugiej nazwy stąd (przycisk w nagłówku wyżej) otwiera to samo okno co
+          "+" po najechaniu na wiersz klienta w liście po lewej (QuickAddName2Dialog w
+          clients-view.tsx) -- ten panel tylko przekazuje żądanie w górę, bo okno jest
+          wspólne dla obu miejsc. Usunięcie zostaje we własnym panelu szczegółów danej
+          Nazwy 2 (client-name2-detail-panel.tsx), nie tutaj. */}
 
       <div>
         <SectionLabel>{t("client.filesLabel")}</SectionLabel>

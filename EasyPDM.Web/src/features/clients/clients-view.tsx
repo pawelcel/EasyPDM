@@ -42,7 +42,10 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
   const debouncedSearch = useDebouncedValue(search, 300)
   const { clients, refetch } = useClients(debouncedSearch)
   const [selection, setSelection] = useState<Selection | null>(null)
-  const [quickAddClient, setQuickAddClient] = useState<Client | null>(null)
+  // Pick<>, nie Client -- ta sama akcja jest teraz wywoływana zarówno z wiersza klienta w
+  // liście (ma pełny Client) jak i z ClientDetailPanel (ma szerszy ClientDetail) -- oknu
+  // (QuickAddName2Dialog) i tak potrzeba tylko id/name.
+  const [quickAddClient, setQuickAddClient] = useState<Pick<Client, "id" | "name"> | null>(null)
 
   return (
     <div className="grid grid-cols-3 gap-4">
@@ -143,6 +146,7 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
             onClientsRefetch={refetch}
             onDeleted={() => setSelection(null)}
             onNavigateToProject={onNavigateToProject}
+            onAddName2={setQuickAddClient}
           />
         ) : (
           <ClientName2DetailPanel
@@ -298,7 +302,7 @@ function QuickAddName2Dialog({
   onClose,
   onCreated,
 }: {
-  client: Client
+  client: Pick<Client, "id" | "name">
   onClose: () => void
   onCreated: () => void | Promise<void>
 }) {
