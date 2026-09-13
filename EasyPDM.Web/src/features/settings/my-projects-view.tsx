@@ -8,6 +8,9 @@ import { useLanguage } from "@/i18n/use-language"
 // wyświetla to, co backend i tak już zwrócił zalogowanemu użytkownikowi.
 function MyProjectsView({ displayName, projects }: { displayName: string; projects: Project[] }) {
   const { t } = useLanguage()
+  // "Moje AKTYWNE projekty" -- zamknięty nie powinien tu wisieć (nadal widoczny/dostępny
+  // przez wyszukiwanie w Całej bazie, tylko nie w tym zestawieniu).
+  const activeProjects = projects.filter((p) => !p.closed)
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -17,11 +20,11 @@ function MyProjectsView({ displayName, projects }: { displayName: string; projec
         <SectionLabel>{t("myProjects.title")}</SectionLabel>
         <Hint>{t("myProjects.description")}</Hint>
 
-        {projects.length === 0 ? (
+        {activeProjects.length === 0 ? (
           <Hint>{t("myProjects.empty")}</Hint>
         ) : (
           <ul className="mt-2 flex flex-col gap-0.5">
-            {projects.map((p) => (
+            {activeProjects.map((p) => (
               <li
                 key={p.id}
                 className="truncate rounded-md px-2 py-1.5 text-sm hover:bg-accent"

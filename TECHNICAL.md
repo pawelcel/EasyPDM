@@ -182,7 +182,16 @@ specific Name 2 of that client (`projects.client_name2_id`), picked right next t
 Client field in the project's own form — cleared when the client is changed, and set back
 to null (not deleted) if that Name 2 itself is later removed. The project selector dropdown
 and the project's own row at the top of its structure show "Project (Client, Name 2)" when
-set.
+set, and everywhere the project list is sorted by client name, then Name 2, then the
+project's own name.
+
+A project also carries a `closed` flag, toggled by a button in its own properties. A closed
+project drops out of the "active" lists (selector, "My projects", the new-item project
+picker) but keeps existing exactly as before otherwise — its items remain fully searchable
+through "Whole database", and the same button reopens it. `GET /api/projects` always
+returns every project regardless of `closed`; each list decides for itself whether to filter
+closed ones out (the project detail view, reached directly by id, deliberately does not, so
+a closed project stays reachable and toggleable once you land on it).
 
 **Series/Type** (`properties.productType`, table `manufacturer_product_types`) and
 **Subtype** (`properties.productSubtype`, table `manufacturer_product_subtypes`, keyed to

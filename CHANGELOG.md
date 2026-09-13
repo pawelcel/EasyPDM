@@ -52,6 +52,12 @@ All notable changes to EasyPDM are documented in this file.
   project selector dropdown and the project's own row at the top of its structure now show
   "Project (Client, Name 2)" instead of the item count in parentheses, which wasn't
   particularly useful there.
+- A project can now be closed (and reopened) with a single button in its own properties. A
+  closed project drops out of the project selector, "My projects", and the picker shown when
+  adding a new item — but nothing about it actually changes: its items stay fully searchable
+  through "Whole database", and the button flips it back open at any time. The project list
+  everywhere is also now sorted by client name, then the client's Name 2, then the project's
+  own name, instead of just alphabetically by project name.
 
 ### Fixed
 - SolidWorks: downloading an item whose name contains characters outside the Windows

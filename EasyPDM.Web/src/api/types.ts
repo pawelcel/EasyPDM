@@ -45,6 +45,10 @@ export interface Project {
   // properties.clientName2 na elementach).
   clientName2Id: number | null
   clientName2Name: string | null
+  // A closed project drops out of the "active projects" lists (selector, "My projects", the
+  // new-item project picker) but stays fully searchable through "Whole database" and can be
+  // reopened.
+  closed: boolean
   startDate: string | null
   endDate: string | null
   createdAt: string

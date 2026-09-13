@@ -154,7 +154,11 @@ function AddNodeDialog({
       : (parentCandidates.find((i) => i.id === selectedParentId)?.itemType ?? null)
 
   useEffect(() => {
-    if (needsProjectPicker && open) api.getProjects().then(setProjects)
+    // Zamknięty projekt nie ma się tu pojawić -- nie ma sensu dorzucać nowych elementów do
+    // projektu, który jest odłożony na bok.
+    if (needsProjectPicker && open) {
+      api.getProjects().then((list) => setProjects(list.filter((p) => !p.closed)))
+    }
   }, [needsProjectPicker, open])
 
   useEffect(() => {

@@ -176,7 +176,17 @@ Projekt może też opcjonalnie wskazać jedną konkretną Nazwę 2 tego klienta
 (`projects.client_name2_id`), wybieraną tuż obok pola Klient we własnym formularzu projektu
 — czyszczoną przy zmianie klienta, i zerowaną (nie kasującą projektu), gdy ta Nazwa 2
 zostanie później usunięta. Rozwijana lista wyboru projektu i pierwszy wiersz struktury
-samego projektu pokazują wtedy "Projekt (Klient, Nazwa 2)".
+samego projektu pokazują wtedy "Projekt (Klient, Nazwa 2)", a wszędzie lista projektów jest
+sortowana po nazwie klienta, potem Nazwie 2, na końcu po nazwie samego projektu.
+
+Projekt niesie też flagę `closed`, przełączaną przyciskiem we własnych właściwościach.
+Zamknięty projekt znika z list "aktywnych" (selektor, "Moje projekty", picker projektu przy
+dodawaniu elementu), ale poza tym nic się nie zmienia -- jego elementy nadal są w pełni
+wyszukiwalne przez "Cała baza", a ten sam przycisk otwiera go z powrotem.
+`GET /api/projects` zawsze zwraca wszystkie projekty niezależnie od `closed` -- każda lista
+sama decyduje, czy odfiltrować zamknięte (widok szczegółów projektu, osiągany bezpośrednio po
+id, celowo tego nie robi, żeby zamknięty projekt zostawał osiągalny i przełączalny z powrotem
+po dotarciu do niego).
 
 **Seria/Typ** (`properties.productType`, tabela `manufacturer_product_types`) i
 **Podtyp** (`properties.productSubtype`, tabela `manufacturer_product_subtypes` z kluczem

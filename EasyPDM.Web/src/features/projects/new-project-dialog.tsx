@@ -72,6 +72,7 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
         description: description.trim() || null,
         clientId,
         clientName2Id,
+        closed: false,
         startDate: startDate || null,
         endDate: endDate || null,
       })

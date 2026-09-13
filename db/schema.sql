@@ -246,6 +246,10 @@ CREATE INDEX idx_projects_client ON projects (client_id);
 ALTER TABLE projects ADD COLUMN client_name2_id INTEGER REFERENCES client_name2(id) ON DELETE SET NULL;
 CREATE INDEX idx_projects_client_name2 ON projects (client_name2_id);
 
+-- A closed project drops out of the "active projects" lists but is otherwise untouched --
+-- its items stay fully searchable through "Whole database" and the flag can be toggled back.
+ALTER TABLE projects ADD COLUMN closed BOOLEAN NOT NULL DEFAULT false;
+
 -- ============================================================
 -- Powiadomienia -- zdarzenia dotyczące elementów/projektów/konta, adresowane do
 -- konkretnego użytkownika, plus per-użytkownik wyłączenia poszczególnych typów.

@@ -201,7 +201,18 @@ bestimmten Namen 2 dieses Kunden zeigen (`projects.client_name2_id`), ausgewähl
 neben dem Feld Kunde im eigenen Projektformular — wird beim Wechsel des Kunden geleert und
 bei späterem Löschen dieses Namens 2 auf null zurückgesetzt (das Projekt bleibt bestehen).
 Die Projektauswahlliste und die eigene Zeile des Projekts oben in seiner Struktur zeigen
-dann "Projekt (Kunde, Name 2)".
+dann "Projekt (Kunde, Name 2)", und die Projektliste ist überall sortiert nach Kundenname,
+dann Name 2, zuletzt nach dem Namen des Projekts selbst.
+
+Ein Projekt trägt außerdem ein `closed`-Flag, umgeschaltet über eine Schaltfläche in seinen
+eigenen Eigenschaften. Ein geschlossenes Projekt fällt aus den "aktiven" Listen heraus
+(Auswahlliste, "Meine Projekte", der Projekt-Picker beim Hinzufügen eines Elements), bleibt
+aber ansonsten unverändert -- seine Elemente bleiben über "Gesamte Datenbank" vollständig
+durchsuchbar, und dieselbe Schaltfläche öffnet es wieder. `GET /api/projects` liefert immer
+alle Projekte unabhängig von `closed` -- jede Liste entscheidet selbst, ob geschlossene
+herausgefiltert werden (die Projektdetailansicht, direkt über die id erreicht, tut dies
+absichtlich nicht, damit ein geschlossenes Projekt erreichbar und wieder umschaltbar bleibt,
+sobald man dort angelangt ist).
 
 **Serie/Typ** (`properties.productType`, Tabelle `manufacturer_product_types`) und
 **Untertyp** (`properties.productSubtype`, Tabelle `manufacturer_product_subtypes` mit

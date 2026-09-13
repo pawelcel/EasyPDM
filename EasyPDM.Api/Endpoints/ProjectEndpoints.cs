@@ -20,7 +20,7 @@ static class ProjectEndpoints
 
             const string sql = """
                 SELECT p.id, p.name, p.description, p.client, p.client_id, c.name,
-                       p.client_name2_id, n2.name2,
+                       p.client_name2_id, n2.name2, p.closed,
                        p.start_date, p.end_date, p.created_at, COUNT(i.id) AS item_count
                 FROM projects p
                 LEFT JOIN items i ON i.project_id = p.id
@@ -30,7 +30,7 @@ static class ProjectEndpoints
                     SELECT 1 FROM project_users pu WHERE pu.project_id = p.id AND pu.user_id = @userId
                 )
                 GROUP BY p.id, c.id, n2.id
-                ORDER BY p.name;
+                ORDER BY c.name, n2.name2, p.name;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("isAdmin", user.Role == "admin");
@@ -42,7 +42,7 @@ static class ProjectEndpoints
             return Results.Ok(result);
         });
 
-        // POST /api/projects   body: { name, description?, client?, clientName2Id?, startDate?, endDate? }
+        // POST /api/projects   body: { name, description?, client?, clientName2Id?, closed, startDate?, endDate? }
         app.MapPost("/api/projects", async (HttpContext ctx, ProjectRequest body) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
@@ -58,19 +58,20 @@ static class ProjectEndpoints
                 return Results.BadRequest(name2Error);
 
             const string sql = """
-                INSERT INTO projects (name, description, client_id, client_name2_id, start_date, end_date)
-                VALUES (@name, @description, @clientId, @clientName2Id, @startDate, @endDate)
+                INSERT INTO projects (name, description, client_id, client_name2_id, closed, start_date, end_date)
+                VALUES (@name, @description, @clientId, @clientName2Id, @closed, @startDate, @endDate)
                 RETURNING id, name, description, client, client_id,
                     (SELECT name FROM clients WHERE clients.id = client_id) AS client_name,
                     client_name2_id,
                     (SELECT name2 FROM client_name2 WHERE client_name2.id = client_name2_id) AS client_name2_name,
-                    start_date, end_date, created_at;
+                    closed, start_date, end_date, created_at;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("name", body.Name.Trim());
             cmd.Parameters.AddWithValue("description", (object?)body.Description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("clientId", (object?)body.ClientId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("clientName2Id", (object?)body.ClientName2Id ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("closed", body.Closed);
             cmd.Parameters.AddWithValue("startDate", (object?)body.StartDate ?? DBNull.Value);
             cmd.Parameters.AddWithValue("endDate", (object?)body.EndDate ?? DBNull.Value);
 
@@ -86,7 +87,7 @@ static class ProjectEndpoints
             }
         });
 
-        // PATCH /api/projects/{id}   body: { name, description?, client?, clientName2Id?, startDate?, endDate? }
+        // PATCH /api/projects/{id}   body: { name, description?, client?, clientName2Id?, closed, startDate?, endDate? }
         app.MapPatch("/api/projects/{id:guid}", async (Guid id, HttpContext ctx, ProjectRequest body) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
@@ -107,6 +108,7 @@ static class ProjectEndpoints
                     description = @description,
                     client_id = @clientId,
                     client_name2_id = @clientName2Id,
+                    closed = @closed,
                     start_date = @startDate,
                     end_date = @endDate
                 WHERE id = @id
@@ -114,7 +116,7 @@ static class ProjectEndpoints
                     (SELECT name FROM clients WHERE clients.id = client_id) AS client_name,
                     client_name2_id,
                     (SELECT name2 FROM client_name2 WHERE client_name2.id = client_name2_id) AS client_name2_name,
-                    start_date, end_date, created_at,
+                    closed, start_date, end_date, created_at,
                     (SELECT COUNT(*) FROM items WHERE items.project_id = projects.id);
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -123,6 +125,7 @@ static class ProjectEndpoints
             cmd.Parameters.AddWithValue("description", (object?)body.Description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("clientId", (object?)body.ClientId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("clientName2Id", (object?)body.ClientName2Id ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("closed", body.Closed);
             cmd.Parameters.AddWithValue("startDate", (object?)body.StartDate ?? DBNull.Value);
             cmd.Parameters.AddWithValue("endDate", (object?)body.EndDate ?? DBNull.Value);
 
@@ -214,10 +217,11 @@ static class ProjectEndpoints
         clientName = reader.IsDBNull(5) ? null : reader.GetString(5),
         clientName2Id = reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
         clientName2Name = reader.IsDBNull(7) ? null : reader.GetString(7),
-        startDate = reader.IsDBNull(8) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(8),
-        endDate = reader.IsDBNull(9) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(9),
-        createdAt = reader.GetDateTime(10),
-        itemCount = itemCount ?? reader.GetInt64(11)
+        closed = reader.GetBoolean(8),
+        startDate = reader.IsDBNull(9) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(9),
+        endDate = reader.IsDBNull(10) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(10),
+        createdAt = reader.GetDateTime(11),
+        itemCount = itemCount ?? reader.GetInt64(12)
     };
 
     // Projekt ma prawdziwy klucz obcy do JEDNEJ Nazwy 2 (nie dopasowanie po nazwie jak
@@ -242,4 +246,4 @@ static class ProjectEndpoints
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }
 
-record ProjectRequest(string Name, string? Description, int? ClientId, int? ClientName2Id, DateOnly? StartDate, DateOnly? EndDate);
+record ProjectRequest(string Name, string? Description, int? ClientId, int? ClientName2Id, bool Closed, DateOnly? StartDate, DateOnly? EndDate);

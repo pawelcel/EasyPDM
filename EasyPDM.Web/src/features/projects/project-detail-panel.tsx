@@ -26,6 +26,7 @@ type ProjectForm = {
   description: string
   clientId: number | null
   clientName2Id: number | null
+  closed: boolean
   startDate: string
   endDate: string
 }
@@ -36,6 +37,7 @@ function formFromProject(project: Project): ProjectForm {
     description: project.description ?? "",
     clientId: project.clientId,
     clientName2Id: project.clientName2Id,
+    closed: project.closed,
     startDate: project.startDate ?? "",
     endDate: project.endDate ?? "",
   }
@@ -90,6 +92,7 @@ function ProjectDetailPanel({
         description: next.description.trim() || null,
         clientId: next.clientId,
         clientName2Id: next.clientName2Id,
+        closed: next.closed,
         startDate: next.startDate || null,
         endDate: next.endDate || null,
       })
@@ -158,6 +161,24 @@ function ProjectDetailPanel({
           itemWord: t(project.itemCount === 1 ? "project.itemSingular" : "project.itemPlural"),
         })}
       </div>
+      {form.closed && <Hint>{t("project.closedHint")}</Hint>}
+      {isAdmin && (
+        // Poza blokiem !hideActions celowo -- w odróżnieniu od Usuń/Dokumentacja (które
+        // ProjectTreeView pokazuje we własnej belce nad drzewem zamiast tutaj), ten przycisk
+        // ma być widoczny zawsze, niezależnie skąd panel jest wywołany.
+        <Button
+          size="sm"
+          variant="secondary"
+          className="mt-1.5"
+          onClick={() => {
+            const next = { ...form, closed: !form.closed }
+            setForm(next)
+            save(next)
+          }}
+        >
+          {form.closed ? t("project.reopenButton") : t("project.closeButton")}
+        </Button>
+      )}
 
       <SectionLabel>{t("item.properties")}</SectionLabel>
       <div className="flex flex-col gap-2">
