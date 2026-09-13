@@ -172,7 +172,11 @@ zakładka Klienci) jest samodzielnym bytem pierwszej klasy: nazwa/lokalizacja, l
 `item_relations`. Projekt można opcjonalnie powiązać z jednym z nich (`projects.client_id`)
 — panel szczegółów tego klienta wypisuje wtedy każdy przypisany do niego Projekt (w
 zakresie dostępnym aktualnemu użytkownikowi), z przyciskiem do bezpośredniego przejścia.
-Projekt łączy się z klientem jako całością, nie z konkretną Nazwą 2.
+Projekt może też opcjonalnie wskazać jedną konkretną Nazwę 2 tego klienta
+(`projects.client_name2_id`), wybieraną tuż obok pola Klient we własnym formularzu projektu
+— czyszczoną przy zmianie klienta, i zerowaną (nie kasującą projektu), gdy ta Nazwa 2
+zostanie później usunięta. Rozwijana lista wyboru projektu i pierwszy wiersz struktury
+samego projektu pokazują wtedy "Projekt (Klient, Nazwa 2)".
 
 **Seria/Typ** (`properties.productType`, tabela `manufacturer_product_types`) i
 **Podtyp** (`properties.productSubtype`, tabela `manufacturer_product_subtypes` z kluczem

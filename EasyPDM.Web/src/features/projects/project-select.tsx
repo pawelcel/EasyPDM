@@ -5,7 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { Project } from "@/api/types"
+import { projectLabel, type Project } from "@/api/types"
 import { useLanguage } from "@/i18n/use-language"
 
 function ProjectSelect({
@@ -28,7 +28,7 @@ function ProjectSelect({
         <SelectValue>
           {(v: string) => {
             const project = projects.find((p) => p.id === v)
-            return project ? `${project.name} (${project.itemCount})` : t("addNode.selectProjectPlaceholder")
+            return project ? projectLabel(project) : t("addNode.selectProjectPlaceholder")
           }}
         </SelectValue>
       </SelectTrigger>
@@ -36,7 +36,7 @@ function ProjectSelect({
         <SelectItem value="none">{t("addNode.selectProjectPlaceholder")}</SelectItem>
         {projects.map((p) => (
           <SelectItem key={p.id} value={p.id}>
-            {p.name} ({p.itemCount})
+            {projectLabel(p)}
           </SelectItem>
         ))}
       </SelectContent>

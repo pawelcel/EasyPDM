@@ -47,6 +47,11 @@ All notable changes to EasyPDM are documented in this file.
   beforehand. If an assembly being uploaded contains several such never-saved (virtual)
   components, a single warning now lists all of them upfront — they still won't be
   uploaded (there's nothing to read them from), but at least it's no longer silent.
+- A project can now optionally point at one specific Name 2 of its client (not just the
+  client itself), picked right next to the Client field in the project's own form. The
+  project selector dropdown and the project's own row at the top of its structure now show
+  "Project (Client, Name 2)" instead of the item count in parentheses, which wasn't
+  particularly useful there.
 
 ### Fixed
 - SolidWorks: downloading an item whose name contains characters outside the Windows

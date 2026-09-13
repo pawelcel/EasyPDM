@@ -177,8 +177,12 @@ Clients tab) is its own first-class entity: name/location, its list of Name 2 en
 (`client_nodes`) for e.g. norms or reference files, independent of `items`/`item_relations`.
 A Project can optionally be linked to one (`projects.client_id`) — the client's detail
 panel then lists every Project assigned to it (scoped to what the current user can
-access), with a button to jump straight there. A Project links to the client as a whole,
-not to one specific Name 2.
+access), with a button to jump straight there. A Project can also optionally point at one
+specific Name 2 of that client (`projects.client_name2_id`), picked right next to the
+Client field in the project's own form — cleared when the client is changed, and set back
+to null (not deleted) if that Name 2 itself is later removed. The project selector dropdown
+and the project's own row at the top of its structure show "Project (Client, Name 2)" when
+set.
 
 **Series/Type** (`properties.productType`, table `manufacturer_product_types`) and
 **Subtype** (`properties.productSubtype`, table `manufacturer_product_subtypes`, keyed to

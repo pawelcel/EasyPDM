@@ -196,8 +196,12 @@ Dokumentenbaum (`client_nodes`), z. B. für Normen oder Referenzdateien, unabhä
 `items`/`item_relations`. Ein Projekt kann optional mit einem davon verknüpft werden
 (`projects.client_id`) — der Detailbereich dieses Kunden listet dann jedes ihm zugewiesene
 Projekt auf (im Rahmen dessen, worauf der aktuelle Benutzer Zugriff hat), mit einer
-Schaltfläche zum direkten Wechsel dorthin. Ein Projekt verknüpft sich mit dem Kunden als
-Ganzem, nicht mit einem bestimmten Namen 2.
+Schaltfläche zum direkten Wechsel dorthin. Ein Projekt kann optional auch auf einen
+bestimmten Namen 2 dieses Kunden zeigen (`projects.client_name2_id`), ausgewählt direkt
+neben dem Feld Kunde im eigenen Projektformular — wird beim Wechsel des Kunden geleert und
+bei späterem Löschen dieses Namens 2 auf null zurückgesetzt (das Projekt bleibt bestehen).
+Die Projektauswahlliste und die eigene Zeile des Projekts oben in seiner Struktur zeigen
+dann "Projekt (Kunde, Name 2)".
 
 **Serie/Typ** (`properties.productType`, Tabelle `manufacturer_product_types`) und
 **Untertyp** (`properties.productSubtype`, Tabelle `manufacturer_product_subtypes` mit

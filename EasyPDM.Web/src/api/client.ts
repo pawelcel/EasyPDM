@@ -43,6 +43,7 @@ type ProjectWriteBody = {
   name: string
   description: string | null
   clientId: number | null
+  clientName2Id: number | null
   startDate: string | null
   endDate: string | null
 }

@@ -40,6 +40,11 @@ export interface Project {
   client: string | null
   clientId: number | null
   clientName: string | null
+  // Klient może mieć wiele Nazw 2 (patrz ClientName2 niżej) -- projekt wskazuje co najwyżej
+  // JEDNĄ konkretną, tym polem (prawdziwy klucz obcy, nie dopasowanie po nazwie jak przy
+  // properties.clientName2 na elementach).
+  clientName2Id: number | null
+  clientName2Name: string | null
   startDate: string | null
   endDate: string | null
   createdAt: string
@@ -90,6 +95,17 @@ export function itemDisplayLabel(
   return item.itemNumber !== null
     ? `${item.itemNumberPrefix ?? ""}${item.itemNumber} (${item.fileName})`
     : item.fileName
+}
+
+// Nazwa projektu, plus w nawiasie Nazwa/Nazwa 2 jego klienta (gdy przypisane) -- pusty
+// nawias się nie pokazuje wcale, Nazwa 2 tylko gdy projekt ma ją faktycznie wybraną.
+export function projectLabel(
+  project: Pick<Project, "name" | "clientName" | "clientName2Name">
+): string {
+  const parts = [project.clientName, project.clientName2Name].filter(
+    (v): v is string => !!v
+  )
+  return parts.length > 0 ? `${project.name} (${parts.join(", ")})` : project.name
 }
 
 // Rewizje wyświetlamy jako wielkie litery zamiast cyfr: 1->A, 2->B, ..., 26->Z, 27->AA...

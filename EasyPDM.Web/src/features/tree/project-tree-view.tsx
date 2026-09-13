@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react"
 import { api } from "@/api/client"
-import { STATUS_LABEL_KEYS, type ItemStatus, type Project } from "@/api/types"
+import { projectLabel, STATUS_LABEL_KEYS, type ItemStatus, type Project } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormError } from "@/components/ui/form-error"
@@ -389,7 +389,7 @@ function ProjectTreeView({
           <ItemTree
             tree={tree}
             projectId={project.id}
-            projectName={project.name}
+            projectName={projectLabel(project)}
             isProjectSelected={selection.kind === "project"}
             selectedId={selection.kind === "item" ? selection.id : null}
             onSelect={(id, parentId) => setSelection({ kind: "item", id, parentId })}

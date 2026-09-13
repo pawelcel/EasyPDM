@@ -26,8 +26,8 @@ import { Label } from "@/components/ui/label"
 import { useClients } from "@/features/clients/use-clients"
 import { useLanguage } from "@/i18n/use-language"
 
-// Projekt łączy się z Klientem jako całością (nie z konkretną Nazwą 2 -- może ich mieć
-// kilka, zob. ClientName2), więc etykieta w wyszukiwarce to zawsze sama nazwa główna.
+// Etykieta w wyszukiwarce klienta to zawsze sama nazwa główna -- Nazwa 2 (gdy klient ją ma
+// i użytkownik chce wskazać konkretną) wybierana jest osobnym Comboboxem niżej.
 function clientLabel(client: Client | undefined): string {
   return client?.name ?? ""
 }
@@ -39,15 +39,19 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [clientId, setClientId] = useState<number | null>(null)
+  const [clientName2Id, setClientName2Id] = useState<number | null>(null)
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
+  const name2s = clients.find((c) => c.id === clientId)?.name2s ?? []
+
   function reset() {
     setName("")
     setDescription("")
     setClientId(null)
+    setClientName2Id(null)
     setStartDate("")
     setEndDate("")
     setError("")
@@ -67,6 +71,7 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
         name: trimmed,
         description: description.trim() || null,
         clientId,
+        clientName2Id,
         startDate: startDate || null,
         endDate: endDate || null,
       })
@@ -118,7 +123,10 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
             <Combobox
               items={clients.map((c) => c.id)}
               value={clientId}
-              onValueChange={(v) => setClientId((v as number | null) ?? null)}
+              onValueChange={(v) => {
+                setClientId((v as number | null) ?? null)
+                setClientName2Id(null)
+              }}
               itemToStringLabel={(id: number) => clientLabel(clients.find((c) => c.id === id))}
             >
               <ComboboxInput id="new-project-client" placeholder={t("part.searchPlaceholder")} showClear />
@@ -136,6 +144,31 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
           ) : (
             <Hint>{t("project.noClientsHint")}</Hint>
           )}
+          <Label htmlFor="new-project-client-name2">{t("project.clientName2")}</Label>
+          <Combobox
+            items={name2s.map((n) => n.id)}
+            value={clientName2Id}
+            onValueChange={(v) => setClientName2Id((v as number | null) ?? null)}
+            itemToStringLabel={(id: number) => name2s.find((n) => n.id === id)?.name2 ?? ""}
+            disabled={!clientId}
+          >
+            <ComboboxInput
+              id="new-project-client-name2"
+              placeholder={t("part.searchPlaceholder")}
+              showClear
+              disabled={!clientId}
+            />
+            <ComboboxContent>
+              <ComboboxEmpty>{t("project.noMatchingClientName2")}</ComboboxEmpty>
+              <ComboboxList>
+                {(id: number) => (
+                  <ComboboxItem key={id} value={id}>
+                    {name2s.find((n) => n.id === id)?.name2 ?? ""}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
           <div className="flex gap-2">
             <div className="flex flex-1 flex-col gap-2">
               <Label htmlFor="new-project-start">{t("project.startDate")}</Label>

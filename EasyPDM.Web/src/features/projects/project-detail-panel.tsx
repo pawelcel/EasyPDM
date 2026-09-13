@@ -25,6 +25,7 @@ type ProjectForm = {
   name: string
   description: string
   clientId: number | null
+  clientName2Id: number | null
   startDate: string
   endDate: string
 }
@@ -34,13 +35,14 @@ function formFromProject(project: Project): ProjectForm {
     name: project.name,
     description: project.description ?? "",
     clientId: project.clientId,
+    clientName2Id: project.clientName2Id,
     startDate: project.startDate ?? "",
     endDate: project.endDate ?? "",
   }
 }
 
-// Projekt łączy się z Klientem jako całością (nie z konkretną Nazwą 2 -- może ich mieć
-// kilka, zob. ClientName2), więc etykieta w wyszukiwarce to zawsze sama nazwa główna.
+// Etykieta w wyszukiwarce klienta to zawsze sama nazwa główna -- Nazwa 2 (gdy klient ją ma
+// i użytkownik chce wskazać konkretną) wybierana jest osobnym Comboboxem niżej.
 function clientLabel(client: Client | undefined): string {
   return client?.name ?? ""
 }
@@ -66,6 +68,7 @@ function ProjectDetailPanel({
   const { t } = useLanguage()
   const { clients } = useClients("")
   const [form, setForm] = useState(() => formFromProject(project))
+  const name2s = clients.find((c) => c.id === form.clientId)?.name2s ?? []
   const [error, setError] = useState("")
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deletingPending, setDeletingPending] = useState(false)
@@ -86,6 +89,7 @@ function ProjectDetailPanel({
         name: next.name.trim(),
         description: next.description.trim() || null,
         clientId: next.clientId,
+        clientName2Id: next.clientName2Id,
         startDate: next.startDate || null,
         endDate: next.endDate || null,
       })
@@ -187,7 +191,7 @@ function ProjectDetailPanel({
             items={clients.map((c) => c.id)}
             value={form.clientId}
             onValueChange={(v) => {
-              const next = { ...form, clientId: (v as number | null) ?? null }
+              const next = { ...form, clientId: (v as number | null) ?? null, clientName2Id: null }
               setForm(next)
               save(next)
             }}
@@ -212,6 +216,36 @@ function ProjectDetailPanel({
         {!form.clientId && project.client && (
           <Hint>{t("project.legacyClientValue", { value: project.client })}</Hint>
         )}
+
+        <Label htmlFor="project-client-name2">{t("project.clientName2")}</Label>
+        <Combobox
+          items={name2s.map((n) => n.id)}
+          value={form.clientName2Id}
+          onValueChange={(v) => {
+            const next = { ...form, clientName2Id: (v as number | null) ?? null }
+            setForm(next)
+            save(next)
+          }}
+          itemToStringLabel={(id: number) => name2s.find((n) => n.id === id)?.name2 ?? ""}
+          disabled={!isAdmin || !form.clientId}
+        >
+          <ComboboxInput
+            id="project-client-name2"
+            placeholder={t("part.searchPlaceholder")}
+            showClear
+            disabled={!isAdmin || !form.clientId}
+          />
+          <ComboboxContent>
+            <ComboboxEmpty>{t("project.noMatchingClientName2")}</ComboboxEmpty>
+            <ComboboxList>
+              {(id: number) => (
+                <ComboboxItem key={id} value={id}>
+                  {name2s.find((n) => n.id === id)?.name2 ?? ""}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
 
         <div className="flex gap-2">
           <div className="flex flex-1 flex-col gap-2">

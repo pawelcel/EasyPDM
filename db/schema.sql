@@ -241,6 +241,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON clients, client_contacts, client_nodes T
 ALTER TABLE projects ADD COLUMN client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL;
 CREATE INDEX idx_projects_client ON projects (client_id);
 
+-- Klient może mieć wiele Nazw 2 (client_name2, relacja 1:N) -- client_id samo nie wystarcza,
+-- gdy projekt trzeba pokazać z konkretną Nazwą 2. ON DELETE SET NULL, jak wyżej.
+ALTER TABLE projects ADD COLUMN client_name2_id INTEGER REFERENCES client_name2(id) ON DELETE SET NULL;
+CREATE INDEX idx_projects_client_name2 ON projects (client_name2_id);
+
 -- ============================================================
 -- Powiadomienia -- zdarzenia dotyczące elementów/projektów/konta, adresowane do
 -- konkretnego użytkownika, plus per-użytkownik wyłączenia poszczególnych typów.
