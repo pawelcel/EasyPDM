@@ -101,15 +101,16 @@ export function itemDisplayLabel(
     : item.fileName
 }
 
-// Nazwa projektu, plus w nawiasie Nazwa/Nazwa 2 jego klienta (gdy przypisane) -- pusty
-// nawias się nie pokazuje wcale, Nazwa 2 tylko gdy projekt ma ją faktycznie wybraną.
+// Nazwa/Nazwa 2 klienta (gdy przypisane), a w nawiasie dopiero nazwa samego projektu -- brak
+// klienta pokazuje samą nazwę projektu bez nawiasu, Nazwa 2 tylko gdy projekt ma ją
+// faktycznie wybraną.
 export function projectLabel(
   project: Pick<Project, "name" | "clientName" | "clientName2Name">
 ): string {
   const parts = [project.clientName, project.clientName2Name].filter(
     (v): v is string => !!v
   )
-  return parts.length > 0 ? `${project.name} (${parts.join(", ")})` : project.name
+  return parts.length > 0 ? `${parts.join(", ")} (${project.name})` : project.name
 }
 
 // Rewizje wyświetlamy jako wielkie litery zamiast cyfr: 1->A, 2->B, ..., 26->Z, 27->AA...
