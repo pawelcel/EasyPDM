@@ -1717,27 +1717,43 @@ def submit_via_browser(doc, target_folder):
             QtWidgets.QMessageBox.Yes,
         )
         if confirm == QtWidgets.QMessageBox.Yes:
-            native_export_step = QtWidgets.QMessageBox.question(
-                None, t("pdm_title"), t("export_step_prompt"),
-                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                QtWidgets.QMessageBox.Yes,
-            ) == QtWidgets.QMessageBox.Yes
-            native_export_pdf = QtWidgets.QMessageBox.question(
-                None, t("pdm_title"), t("export_pdf_prompt"),
-                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                QtWidgets.QMessageBox.No,
-            ) == QtWidgets.QMessageBox.Yes
-
             def confirm_new_revision():
                 dlg = NewRevisionDialog()
                 if dlg.exec() != QtWidgets.QDialog.Accepted:
                     return None
                 return dlg.comment_text()
 
-            return push_to_existing_item(
+            # STEP/PDF export questions asked ONLY AFTER push_to_existing_item's own
+            # status/revision gate has already passed -- it internally asks "create a new
+            # revision?" for a "wydany" item (None back if declined) and hard-blocks
+            # "sprawdzany" entirely (also None back). Asking export questions BEFORE that
+            # (as this used to, passing native_export_step/pdf straight into the call)
+            # risked the user answering "yes, export STEP" for an item whose revision they
+            # then decline, or one that turns out blocked -- an answer to a question for an
+            # operation that then never happens. export_step/export_pdf forced False here;
+            # _upload_step_attachment/_upload_pdf_attachment are called directly below
+            # instead, once we actually know the upload went through.
+            result = push_to_existing_item(
                 doc, matched["id"], confirm_new_revision,
-                target_folder=target_folder, export_step=native_export_step, export_pdf=native_export_pdf,
+                target_folder=target_folder, export_step=False, export_pdf=False,
             )
+            if result is None:
+                return None
+
+            if QtWidgets.QMessageBox.question(
+                None, t("pdm_title"), t("export_step_prompt"),
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.Yes,
+            ) == QtWidgets.QMessageBox.Yes:
+                _upload_step_attachment(doc, matched["id"])
+            if QtWidgets.QMessageBox.question(
+                None, t("pdm_title"), t("export_pdf_prompt"),
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.No,
+            ) == QtWidgets.QMessageBox.Yes:
+                _upload_pdf_attachment(doc, matched["id"])
+
+            return result
         # "Nie" -- spada do zwykłego formularza w przeglądarce poniżej, z tym samym
         # dopasowaniem nadal podpowiedzianym tam (suggested_item_number), na wypadek gdyby
         # user jednak chciał wybrać "Dogranie do istniejącego" ręcznie.

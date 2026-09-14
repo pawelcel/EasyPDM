@@ -3153,16 +3153,23 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         confirmUpdate = MsgBox(confirmText, vbYesNo + vbQuestion, T("AppTitle"))
         If confirmUpdate <> vbYes Then Exit Function
 
-        ' Defaults match the browser checkboxes' own defaults (STEP on, PDF off) via
-        ' vbDefaultButton1/2 -- Enter alone picks the same answer the browser form would
-        ' start with.
-        Dim nativeExportStep As Boolean
-        nativeExportStep = (MsgBox(T("ExportStepPrompt"), vbYesNo + vbQuestion + vbDefaultButton1, T("AppTitle")) = vbYes)
-        Dim nativeExportPdf As Boolean
-        nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
-
         Set resultInfo = PushToExistingItem(oDoc, linkedItemId, filePath, targetFolder)
+        ' STEP/PDF export questions asked ONLY AFTER PushToExistingItem's own status/
+        ' revision gate has already passed -- it internally asks "create a new revision?"
+        ' for a "wydany" item (Nothing back if declined) and hard-blocks "sprawdzany"
+        ' entirely (also Nothing back). Asking export questions BEFORE that, as this used
+        ' to, risked the user answering "yes, export STEP" for an item whose revision they
+        ' then decline, or one that turns out blocked -- an answer to a question for an
+        ' operation that then never happens.
         If Not resultInfo Is Nothing Then
+            ' Defaults match the browser checkboxes' own defaults (STEP on, PDF off) via
+            ' vbDefaultButton1/2 -- Enter alone picks the same answer the browser form
+            ' would start with.
+            Dim nativeExportStep As Boolean
+            nativeExportStep = (MsgBox(T("ExportStepPrompt"), vbYesNo + vbQuestion + vbDefaultButton1, T("AppTitle")) = vbYes)
+            Dim nativeExportPdf As Boolean
+            nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
+
             If nativeExportStep Then UploadStepAttachment oDoc, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
             If nativeExportPdf Then UploadPdfAttachment oDoc, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
         End If

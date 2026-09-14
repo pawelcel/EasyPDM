@@ -66,6 +66,13 @@ All notable changes to EasyPDM are documented in this file.
   on the first real run.
 
 ### Fixed
+- All three CAD macros (SolidWorks, Inventor, FreeCAD): uploading to an item already
+  linked to PDM asked "export STEP?"/"export PDF?" before checking whether the item's
+  status even allows the upload to proceed — a "wydany" item's own "create a new
+  revision?" confirmation (or a "sprawdzany" item's hard block) came AFTER those export
+  questions, so answering them was wasted whenever the user then declined the revision or
+  the upload turned out to be blocked. The export questions now come last, only once the
+  status/revision check has actually passed.
 - Item properties: the CAD and drawing attachment lists (each accumulates one entry per
   revision) now show the newest revision at the top, with a small visual gap before the
   older revisions below, instead of listing them in upload order (oldest first) with no
