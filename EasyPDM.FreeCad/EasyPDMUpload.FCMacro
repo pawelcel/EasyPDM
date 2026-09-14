@@ -236,6 +236,7 @@ TRANSLATIONS = {
         "no_connection": "Brak połączenia z {url}: {reason}",
         "login_failed_no_session": "Logowanie nie powiodło się — serwer nie zwrócił sesji.",
         "pdm_title": "PDM",
+        "unnamed_fallback": "bez_nazwy",
         "login_dialog_title": "Logowanie do PDM",
         "api_address_label": "Adres API:",
         "username_label": "Nazwa użytkownika:",
@@ -344,6 +345,7 @@ TRANSLATIONS = {
         "no_connection": "Could not connect to {url}: {reason}",
         "login_failed_no_session": "Login failed — the server did not return a session.",
         "pdm_title": "PDM",
+        "unnamed_fallback": "unnamed",
         "login_dialog_title": "Log in to PDM",
         "api_address_label": "API address:",
         "username_label": "Username:",
@@ -452,6 +454,7 @@ TRANSLATIONS = {
         "no_connection": "Keine Verbindung zu {url}: {reason}",
         "login_failed_no_session": "Anmeldung fehlgeschlagen — der Server hat keine Sitzung zurückgegeben.",
         "pdm_title": "PDM",
+        "unnamed_fallback": "unbenannt",
         "login_dialog_title": "Anmeldung bei PDM",
         "api_address_label": "API-Adresse:",
         "username_label": "Benutzername:",
@@ -820,7 +823,7 @@ def ensure_logged_in():
 
 def sanitize_filename(name):
     cleaned = re.sub(r'[\\/:*?"<>|]+', "_", name).strip()
-    return cleaned or "bez_nazwy"
+    return cleaned or t("unnamed_fallback")
 
 
 def revision_label(n):
@@ -992,6 +995,28 @@ def match_existing_item(doc, existing_items):
     for it in existing_items:
         if it.get("itemNumber") == item_number and it.get("fileName", "").strip().lower() == label_name:
             return it
+    return None
+
+
+def match_existing_item_single(doc):
+    """Same check as match_existing_item, for a SINGLE document -- looks the parsed item
+    number up directly via GET /items/by-number/{itemNumber} (the same targeted endpoint
+    EasyPDM.SolidWorks/EasyPDM.Inventor use for their drawing-to-item matching) instead of
+    downloading the WHOLE item table just to check one document's label. Only worth it here
+    because there is exactly one document to check -- process_assembly_tree below still
+    fetches the full list once and reuses it across all of an assembly's components, which
+    stays cheaper than one targeted request per component for a non-trivial assembly."""
+    m = _REVISION_NAME_PATTERN.match(doc.Label)
+    if not m:
+        return None
+    item_number = int(m.group(1))
+    label_name = m.group(2).strip().lower()
+    try:
+        it = api_get(f"/items/by-number/{item_number}")
+    except Exception:
+        return None
+    if it and it.get("fileName", "").strip().lower() == label_name:
+        return it
     return None
 
 
@@ -1346,6 +1371,14 @@ def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None
     item = api_get(f"/items/{item_id}")
     revision = item.get("revisionNumber") or 1
     current_status = item.get("status")
+    # Serwer wysyła gotowe "isLocked" obok "status" (zob. ItemEndpoints.IsLocked -- ta sama
+    # reguła, którą backend sam egzekwuje) -- wolimy je od odtwarzania "które statusy
+    # blokują dogrywanie" lokalnie z surowego stringa, fallback na lokalne porównanie tylko
+    # dla starszego serwera bez tego pola. "wydany" ma własną gałąź niżej niezależnie (jest
+    # zablokowany też, ale oferuje nową rewizję zamiast twardej blokady).
+    locked = item.get("isLocked")
+    if locked is None:
+        locked = current_status is not None and current_status != "w_pracy"
 
     if current_status == "wydany":
         comment = confirm_new_revision()
@@ -1356,7 +1389,7 @@ def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None
         )
         revision = (status_result or {}).get("revisionNumber") or (revision + 1)
         status_changed = True
-    elif current_status is not None and current_status != "w_pracy":
+    elif locked:
         # Każdy status poza "w_pracy" blokuje dogrywanie plików po stronie backendu
         # (zob. ItemEndpoints.IsLocked) — jedynym innym realnym stanem tutaj jest
         # "sprawdzany" ("wydany" ma własną gałąź wyżej). W przeciwieństwie do "wydany"
@@ -1663,11 +1696,7 @@ def submit_via_browser(doc, target_folder):
     Zwraca to samo co _rename_and_upload/push_to_existing_item, albo None jeśli
     anulowano/upłynął czas oczekiwania — ten sam sygnał "nic nie zostało wysłane", który
     run() już rozumie."""
-    try:
-        existing_items = api_get("/items") or []
-    except Exception:
-        existing_items = []
-    matched = match_existing_item(doc, existing_items)
+    matched = match_existing_item_single(doc)
 
     # Etykieta dokumentu wygląda jak "numer (nazwa).REWIZJA" i taki numer+nazwa istnieją w
     # PDM (zob. match_existing_item) -- pytamy WPROST, natywnie, czy podpiąć bieżącą wersję

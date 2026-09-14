@@ -74,6 +74,20 @@ All notable changes to EasyPDM are documented in this file.
   fallback for attachments uploaded before this change. This closes the same category of
   bug fixed earlier in this release (a PDF export attachment being picked instead of the
   real CAD file) at the source, rather than only patching around it.
+- Item responses now carry two more server-computed fields the CAD macros (and, for
+  `isLocked`, the web frontend) previously each recomputed on their own:
+  `sanitizedFileName`/`sanitizedName` (the Windows-illegal-character stripping every macro
+  used to do independently before building a target filename, with a previously-diverging
+  fallback for an empty name — now one shared implementation) and `isLocked` (the "does
+  attaching a file to this item require a new revision" rule, now read from the server
+  instead of re-derived from the raw status string in three separate macro files).
+- FreeCAD: matching the active document against an already-existing PDM item (the
+  "this file looks like it was already sent before" check on upload) no longer downloads
+  the entire item table just to check one document — it now looks the parsed item number
+  up directly, the same targeted endpoint SolidWorks/Inventor already use for their
+  drawing-to-item matching. The assembly-tree scan (checking many components at once)
+  still fetches the full list once and reuses it, since that stays cheaper than one
+  request per component for a non-trivial assembly.
 - SolidWorks: downloading an item whose name contains characters outside the Windows
   machine's current ANSI code page — e.g. Polish diacritics on a non-Polish system — could
   fail outright with "Bad file name or number", since VBA's legacy file I/O statements

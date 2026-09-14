@@ -212,6 +212,7 @@ Private Function T_PL(ByVal key As String) As String
         Case "PromptPassword": T_PL = "Haslo (UWAGA: to pole nie maskuje wpisywanych znakow):"
         Case "LoggedInAsPrefix": T_PL = "Zalogowano jako "
         Case "AppTitle": T_PL = "EasyPDM"
+        Case "UnnamedFallback": T_PL = "bez_nazwy"
         Case "LoginFailedPrefix": T_PL = "Logowanie nie powiodlo sie: "
         Case "LoginFailedNoSession": T_PL = "Logowanie nie powiodlo sie -- serwer nie zwrocil sesji."
         Case "TitleNewRevision": T_PL = "Nowa rewizja"
@@ -288,6 +289,7 @@ Private Function T_EN(ByVal key As String) As String
         Case "PromptPassword": T_EN = "Password (NOTE: this field does not mask typed characters):"
         Case "LoggedInAsPrefix": T_EN = "Logged in as "
         Case "AppTitle": T_EN = "EasyPDM"
+        Case "UnnamedFallback": T_EN = "unnamed"
         Case "LoginFailedPrefix": T_EN = "Login failed: "
         Case "LoginFailedNoSession": T_EN = "Login failed -- the server did not return a session."
         Case "TitleNewRevision": T_EN = "New revision"
@@ -364,6 +366,7 @@ Private Function T_DE(ByVal key As String) As String
         Case "PromptPassword": T_DE = "Passwort (HINWEIS: Dieses Feld maskiert die eingegebenen Zeichen nicht):"
         Case "LoggedInAsPrefix": T_DE = "Angemeldet als "
         Case "AppTitle": T_DE = "EasyPDM"
+        Case "UnnamedFallback": T_DE = "unbenannt"
         Case "LoginFailedPrefix": T_DE = "Anmeldung fehlgeschlagen: "
         Case "LoginFailedNoSession": T_DE = "Anmeldung fehlgeschlagen -- der Server hat keine Sitzung zurueckgegeben."
         Case "TitleNewRevision": T_DE = "Neue Revision"
@@ -1434,7 +1437,7 @@ Function SanitizeFilename(ByVal name As String) As String
         result = Replace(result, Mid(badChars, i, 1), "_")
     Next i
     result = Trim(result)
-    If result = "" Then result = "unnamed"
+    If result = "" Then result = T("UnnamedFallback")
     SanitizeFilename = result
 End Function
 
@@ -2234,6 +2237,19 @@ Function PushToExistingItem(ByVal oDoc As Object, ByVal itemId As String, ByVal 
     fileName = JsonGetString(item, "fileName", "")
     LogLine "Attaching to existing item #" & itemNumber & " (id " & itemId & "), status """ & currentStatus & """, current revision " & revision
 
+    ' Server sends "isLocked" pre-computed alongside "status" (see ItemEndpoints.IsLocked,
+    ' the same rule the backend itself enforces) -- prefer it over re-deriving the "which
+    ' statuses block attaching" rule from the raw string locally, falls back to the local
+    ' comparison only against an older server that doesn't send the field yet. "wydany" gets
+    ' its own branch below regardless (it is locked too, but offers a revision bump instead
+    ' of a hard block).
+    Dim locked As Boolean
+    If item.Exists("isLocked") And Not IsNull(item.Item("isLocked")) Then
+        locked = CBool(item.Item("isLocked"))
+    Else
+        locked = (currentStatus <> "" And currentStatus <> "w_pracy")
+    End If
+
     Dim statusChanged As Boolean
     statusChanged = False
 
@@ -2267,7 +2283,7 @@ Function PushToExistingItem(ByVal oDoc As Object, ByVal itemId As String, ByVal 
             revisionLabelStr = "" ' no server-sent label matches this guessed value
         End If
         statusChanged = True
-    ElseIf currentStatus <> "" And currentStatus <> "w_pracy" Then
+    ElseIf locked Then
         ' Any status other than "w_pracy" (in progress) blocks attaching files on the
         ' backend -- the only other real state here is "sprawdzany" (under review), since
         ' "wydany" has its own branch above. Unlike "wydany" (where going back to "w_pracy"

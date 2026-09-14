@@ -132,6 +132,7 @@ TRANSLATIONS = {
         "no_connection": "Brak połączenia z {url}: {reason}",
         "login_failed_no_session": "Logowanie nie powiodło się — serwer nie zwrócił sesji.",
         "pdm_title": "PDM",
+        "unnamed_fallback": "bez_nazwy",
         "easypdm_title": "EasyPDM",
         "easypdm_error_title": "EasyPDM — błąd",
         "login_dialog_title": "Logowanie do PDM",
@@ -188,6 +189,7 @@ TRANSLATIONS = {
         "no_connection": "Could not connect to {url}: {reason}",
         "login_failed_no_session": "Login failed — the server did not return a session.",
         "pdm_title": "PDM",
+        "unnamed_fallback": "unnamed",
         "easypdm_title": "EasyPDM",
         "easypdm_error_title": "EasyPDM — Error",
         "login_dialog_title": "Log in to PDM",
@@ -244,6 +246,7 @@ TRANSLATIONS = {
         "no_connection": "Keine Verbindung zu {url}: {reason}",
         "login_failed_no_session": "Anmeldung fehlgeschlagen — der Server hat keine Sitzung zurückgegeben.",
         "pdm_title": "PDM",
+        "unnamed_fallback": "unbenannt",
         "easypdm_title": "EasyPDM",
         "easypdm_error_title": "EasyPDM — Fehler",
         "login_dialog_title": "Anmeldung bei PDM",
@@ -500,7 +503,7 @@ def ensure_logged_in():
 
 def sanitize_filename(name):
     cleaned = re.sub(r'[\\/:*?"<>|]+', "_", name).strip()
-    return cleaned or "bez_nazwy"
+    return cleaned or t("unnamed_fallback")
 
 
 def revision_label(n):
