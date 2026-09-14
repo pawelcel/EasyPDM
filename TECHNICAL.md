@@ -9,8 +9,9 @@ designing) is in [README.md](README.md).
 ## Status
 
 Projects and items are created manually through the web application (uploading a file
-straight into the API's storage) or through the FreeCAD (`EasyPDM.FreeCad/`) or
-SolidWorks (`EasyPDM.SolidWorks/`) macro, which call the same API.
+straight into the API's storage) or through the FreeCAD (`EasyPDM.FreeCad/`), SolidWorks
+(`EasyPDM.SolidWorks/`) or Autodesk Inventor (`EasyPDM.Inventor/`) macro, which call the
+same API.
 The earlier disk-scanning approach (`EasyPDM.Core`, `EasyPDM.Indexer`) has been removed
 from the repo — it was incompatible with the schema since migration `002` and was never
 used by `Api`.
@@ -71,6 +72,11 @@ PostgreSQL 18.
   `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), with the same browser-based flow, STEP
   export, and automatic assembly-tree detection. **Unverified on live SolidWorks** — see
   `EasyPDM.SolidWorks/README.md` for details and known risks.
+- **`EasyPDM.Inventor/`** — the Autodesk Inventor counterpart of the above (VBA macros
+  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), ported from `EasyPDM.SolidWorks/` with the
+  same browser-based flow, STEP/PDF export, and automatic assembly-tree detection.
+  **Unverified on live Inventor** — see `EasyPDM.Inventor/README.md` for details and
+  known risks.
 - **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** and **`packaging/windows/`**
   (the `.exe` installer, Inno Setup) — three deployment paths without manually assembling

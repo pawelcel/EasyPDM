@@ -1,0 +1,3291 @@
+Attribute VB_Name = "EasyPDMUpload"
+Option Explicit
+
+' ============================================================================
+' EasyPDMUpload -- Autodesk Inventor macro that uploads the active document to EasyPDM.
+'
+' All comments/strings are in plain English (ASCII only) on purpose -- VBA's file import
+' does not reliably handle UTF-8, confirmed in practice while building the SolidWorks
+' counterpart of this file (EasyPDM.SolidWorks/EasyPDMUpload.bas).
+'
+' This is the INVENTOR PORT of EasyPDM.SolidWorks/EasyPDMUpload.bas -- same architecture,
+' same Sub/Function names wherever Inventor's own API allows it (so the two files stay easy
+' to compare side by side), only the actual CAD API calls differ. See
+' EasyPDM.Inventor/README.md ("Differences from the SolidWorks macros") for the full list of
+' what changed and why, and for everything marked UNVERIFIED below -- this file was written
+' without access to a live Inventor install, from documented Inventor Automation API
+' behavior; confirm those specific points on the first real run.
+'   - JSON: own minimal parser/builder (below), good enough for this specific API's
+'     response shapes -- NOT general purpose.
+'   - Dialogs: plain InputBox/MsgBox instead of dropdowns/custom forms -- a plain InputBox
+'     cannot mask a typed password with asterisks. NO UserForm anywhere in this file --
+'     see the "browser ticket flow" section below for how the wait-for-browser step works
+'     without one.
+'   - Recognizing an "already uploaded" document: NOT via label/filename -- via document
+'     iProperties (EasyPDM_ItemId/EasyPDM_ItemNumber, in the "Inventor User Defined
+'     Properties" property set), written into the file itself after a successful upload.
+'     More durable than a filename convention alone -- also works in a brand NEW Inventor
+'     session, no need to manually save after any in-memory-only change. CAVEAT (same as the
+'     SolidWorks version, no code-level defense possible): Inventor's own native "Save Copy
+'     As" (done manually by the user, outside this macro) COPIES iProperties along with
+'     everything else -- Save-Copy-As'ing an already-linked part to start a genuinely
+'     DIFFERENT part silently inherits the old EasyPDM_ItemId/EasyPDM_ItemNumber, so the
+'     macro would otherwise "recognize" the new part as the OLD item and overwrite its
+'     content on the next upload. The "already linked, attach as new revision?" confirmation
+'     (see "What it does" below) shows the linked item's own number/name specifically so the
+'     user has a chance to notice a mismatch before confirming -- if this ever happens,
+'     decline (No) and link the new part to the CORRECT item manually via the browser's
+'     "Attach to existing" instead of "already linked".
+'
+' What it does (top-level document, Sub "main"):
+'   - Document ALREADY linked to a PDM item (iProperty present): asks locally whether to
+'     attach the current version as a new revision, then uploads -- exactly like before. No
+'     browser involved: Inventor already knows the target with certainty, a browser
+'     round-trip would add nothing.
+'   - Document NOT yet linked: opens the SAME web browser flow as
+'     EasyPDM.SolidWorks/EasyPDMUpload.bas and the FreeCAD/EasyPDMUpload.FCMacro (already
+'     logged in via a one-time login-bridge ticket, see "Logowanie"/"Login" below) on the
+'     "pending request from a CAD macro" popup -- "New item" / "Duplicate" / "Attach to
+'     existing" all decided THERE, not locally. The macro waits (WaitForTicket, polling
+'     GET /create-tickets/{ticket}; Escape cancels, no UserForm needed) and then finishes the
+'     job: rename+upload the file, and (see below) export+upload a STEP and/or PDF
+'     attachment.
+'   - STEP/PDF export: for any ticket path (top-level document OR an auto-detected assembly
+'     component, see next point), whether to export EACH of STEP and PDF is its OWN,
+'     independent checkbox in the browser (STEP defaults to on, PDF defaults to off) -- see
+'     UploadStepAttachment/UploadPdfAttachment. For the "already linked" native path (top-
+'     level document only), where there is no browser round-trip to host a checkbox in, the
+'     SAME two choices are instead asked as plain native Yes/No questions right after the
+'     "attach as new revision?" confirmation. Components already in PDM discovered while
+'     walking an assembly tree are never re-uploaded at all, so this question does not apply
+'     to them.
+'   - Assembly components: if the active document is an Assembly, the macro first walks its
+'     component tree (AssemblyDocument.ComponentDefinition.Occurrences, recursively) and
+'     offers to send any component NOT yet linked to a PDM item, leaves-first. Each new
+'     component gets the SAME browser ticket flow as the top-level document above -- opened
+'     ONE TAB AT A TIME, one component after another, never several at once; cancelling any
+'     single ticket aborts the whole remaining walk. Each new component gets linked via
+'     iProperties too, so re-running the macro on it later (alone or as part of another
+'     assembly) recognizes it as done. Declining ("No") skips creating/uploading new
+'     components, but components ALREADY in PDM are still attached into the BOM structure --
+'     "No" is not "send nothing at all".
+'   - Local "Save As" under the PDM name: every document actually uploaded (the top-level
+'     one AND every new assembly component) is also locally SAVED AS "number (name).
+'     REVISION.ext" in a target folder asked for ONCE at the very start of the run (see
+'     RenameAndUpload/GetDownloadFolder -- same shared folder as EasyPDMDownload.bas's
+'     download folder). Components are processed leaves-first, so by the time an assembly
+'     itself gets saved, its references to any just-processed component already point at the
+'     new path.
+'
+' Installation:
+'   Autodesk Inventor -> Tools tab -> Macro panel -> Visual Basic Editor (or Alt+F11), then
+'   in the VBA editor: File -> Import File... -> pick EasyPDMUpload.bas (import it into any
+'   VBA project -- the "global" project shared across all documents is usually the right
+'   choice so the macro is available regardless of which document is active). Run via
+'   Tools tab -> Macro panel -> Macros... -> select "main" -> Run (or F5 inside the VBA
+'   editor with the cursor inside Sub "main"). A separate Sub "Logout" logs out and can be
+'   bound to your own toolbar button/shortcut.
+'
+' The API address (default http://localhost:5000/api) and session token are stored in the
+' Windows registry via SaveSetting/GetSetting (branch "HKEY_CURRENT_USER\Software\VB and
+' VBA Program Settings\EasyPDM\Connection") -- the SAME registry keys as
+' EasyPDM.SolidWorks/EasyPDMUpload.bas on purpose, so logging in from either macro family
+' (whichever CAD program happens to be installed) is enough for both; this is just a login/
+' preferences store, nothing about it is SolidWorks- or Inventor-specific.
+' ============================================================================
+
+Private Const APP_SETTINGS_NAME As String = "EasyPDM"
+Private Const SETTINGS_SECTION As String = "Connection"
+Private Const DEFAULT_BASE_URL As String = "http://localhost:5000/api"
+Private Const SESSION_COOKIE_NAME As String = "pdm_session"
+
+' Names of the document iProperties (custom/user-defined properties) used to store the PDM
+' link -- see module header.
+Private Const CUSTPROP_ITEM_ID As String = "EasyPDM_ItemId"
+Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_ItemNumber"
+
+' Own error numbers (Err.Raise) -- distinguish "missing/expired session" (ERR_AUTH, should
+' trigger a fresh login) from a plain API error (ERR_API, just show the message).
+Private Const ERR_AUTH As Long = vbObjectError + 1001
+Private Const ERR_API As Long = vbObjectError + 1002
+
+' Inventor application object -- NOT assumed to be automatically visible via "ThisApplication"
+' in this module (that global is only guaranteed inside the VBA project's own "host"
+' context in some configurations) -- obtained explicitly at the start of main() via
+' GetObject(, "Inventor.Application"), the standard, documented way to bind to an ALREADY
+' RUNNING Automation server instance. Mirrors EasyPDM.SolidWorks/EasyPDMUpload.bas's own
+' "swApp" declaration and its documented reason (that file's "Variable not defined" lesson
+' learned the hard way on a live SolidWorks install) -- same defensive choice made here
+' up front instead of waiting to hit the same class of problem on a live Inventor install.
+Private InvApp As Object
+
+' CLSIDs of Inventor's built-in translator add-ins, used by UploadStepAttachment/
+' UploadPdfAttachment for format-converting export (Inventor has no single "Save As in a
+' different format" call the way SolidWorks's Extension.SaveAs does -- format conversion
+' goes through the TranslatorAddIn mechanism instead, see those two Subs). Values from
+' publicly documented Autodesk sample code -- UNVERIFIED against a live Inventor install in
+' this environment (no Inventor available here); confirm on the first real run and adjust if
+' Inventor reports these add-ins are not registered under these exact CLSIDs on your
+' installed version.
+Private Const STEP_TRANSLATOR_CLSID As String = "{90AF7F40-0C01-11D5-8E83-0010B541CD80}"
+Private Const PDF_TRANSLATOR_CLSID As String = "{0AC6FD96-2F4D-42CE-8BE0-8AEA580399E4}"
+
+' Win32 API used ONLY by WaitForTicket (below) to poll the ticket endpoint while keeping
+' Inventor responsive and letting the user cancel with Escape -- this module has no
+' UserForm (see file header), so there is no button to click during the wait; Escape is
+' the only available cancel gesture without one. "#If VBA7" is the standard compatibility
+' guard for 32/64-bit host installs.
+#If VBA7 Then
+    Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Private Declare PtrSafe Function GetAsyncKeyState Lib "user32" (ByVal vKey As Long) As Integer
+#Else
+    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Private Declare Function GetAsyncKeyState Lib "user32" (ByVal vKey As Long) As Integer
+#End If
+Private Const VK_ESCAPE As Long = &H1B
+
+' Auto-detect the Windows UI language (not just the regional locale) via the Win32 API
+' GetUserDefaultUILanguage -- returns a LANGID (WORD); the low 10 bits are the Primary
+' Language ID (from winnt.h: LANG_POLISH=&H15, LANG_GERMAN=&H07, LANG_ENGLISH=&H09).
+' Falls back to English for any other language or a failed call.
+#If VBA7 Then
+    Private Declare PtrSafe Function GetUserDefaultUILanguage Lib "kernel32" () As Integer
+#Else
+    Private Declare Function GetUserDefaultUILanguage Lib "kernel32" () As Integer
+#End If
+
+Private g_Lang As String
+
+Private Function DetectLanguage() As String
+    Dim langId As Integer
+    Dim primaryLang As Integer
+    On Error GoTo Fallback
+    langId = GetUserDefaultUILanguage()
+    primaryLang = langId And &H3FF
+    Select Case primaryLang
+        Case &H15
+            DetectLanguage = "pl"
+        Case &H7
+            DetectLanguage = "de"
+        Case Else
+            DetectLanguage = "en"
+    End Select
+    Exit Function
+Fallback:
+    DetectLanguage = "en"
+End Function
+
+Private Function GetLang() As String
+    If g_Lang = "" Then g_Lang = DetectLanguage()
+    GetLang = g_Lang
+End Function
+
+
+' ============================================================================
+' Translations (PL/EN/DE) -- every user-facing string literal (MsgBox/InputBox text and
+' titles, status bar text) goes through T(key), dispatching to T_PL/T_EN/T_DE based on the
+' auto-detected Windows UI language (see DetectLanguage above). Internal LogLine messages
+' stay hardcoded/untranslated on purpose -- only what the user actually sees in a dialog goes
+' through this layer. Strings needing a dynamic value (an item number, a file name, an error
+' description, ...) keep only their static part here; the call site concatenates the dynamic
+' value with "&" exactly like before.
+'
+' T_PL/T_DE MUST stay plain ASCII (transliterate diacritics: a/c/e/l/n/o/s/z/z for Polish,
+' ae/oe/ue/ss for German) -- same "Input past end of file" VBA-import lesson learned while
+' building the SolidWorks counterpart of this file.
+' ============================================================================
+
+Private Function T(ByVal key As String) As String
+    Select Case GetLang()
+        Case "pl": T = T_PL(key)
+        Case "de": T = T_DE(key)
+        Case Else: T = T_EN(key)
+    End Select
+End Function
+
+Private Function T_PL(ByVal key As String) As String
+    Select Case key
+        Case "StatusWaitingForBrowser": T_PL = "EasyPDM: oczekiwanie na przegladarke... (Esc anuluje)"
+        Case "TitleLoginToPdm": T_PL = "Logowanie do PDM"
+        Case "PromptApiAddress": T_PL = "Adres API EasyPDM:"
+        Case "PromptUsername": T_PL = "Nazwa uzytkownika:"
+        Case "PromptPassword": T_PL = "Haslo (UWAGA: to pole nie maskuje wpisywanych znakow):"
+        Case "LoggedInAsPrefix": T_PL = "Zalogowano jako "
+        Case "AppTitle": T_PL = "EasyPDM"
+        Case "LoginFailedPrefix": T_PL = "Logowanie nie powiodlo sie: "
+        Case "LoginFailedNoSession": T_PL = "Logowanie nie powiodlo sie -- serwer nie zwrocil sesji."
+        Case "TitleNewRevision": T_PL = "Nowa rewizja"
+        Case "ItemStatusReleasedPrefix": T_PL = "Element nr "
+        Case "ItemStatusReleasedSuffix": T_PL = " ma status ""Wydany"" -- podpiecie pliku wymaga nowej rewizji. Utworzyc nowa rewizje?"
+        Case "TitleUploadBlocked": T_PL = "Wysylka zablokowana"
+        Case "UploadBlockedReviewPrefix": T_PL = "Nie mozna wyslac -- element nr "
+        Case "UploadBlockedReviewSuffix": T_PL = " ma status ""Sprawdzany"". Poczekaj, az recenzja sie zakonczy (element wroci do statusu ""W pracy""), albo zmien status recznie w aplikacji webowej."
+        Case "StatusLabelSprawdzany": T_PL = "Sprawdzany"
+        Case "StatusLabelWydany": T_PL = "Wydany"
+        Case "LockedComponentsTailPrefix": T_PL = "Uwaga: "
+        Case "LockedComponentsTailSuffix": T_PL = " juz podlinkowany(-e) komponent(y) w zlozeniu ma zablokowany status -- NIE zostaly zaktualizowane (drzewo zlozenia nigdy nie dosyla ponownie juz-istniejacych komponentow, ale te akurat sa dodatkowo zablokowane statusem -- jesli je zmieniales lokalnie, wyslij je osobno po cofnieciu statusu do ""W pracy""):"
+        Case "StaleChildrenConfirmPrefix": T_PL = "Podelementow tego elementu: "
+        Case "StaleChildrenConfirmSuffix": T_PL = " istnieje w PDM, ale nie ma ich juz w lokalnej strukturze zlozenia (usuniete z drzewa od poprzedniej wysylki). Usunac te powiazania z PDM? (Same elementy NIE zostana skasowane, tylko ich podpiecie pod to zlozenie.)"
+        Case "PromptRevisionComment": T_PL = "Komentarz do nowej rewizji (opcjonalnie):"
+        Case "PromptTargetFolder": T_PL = "Folder docelowy na lokalne kopie (nazwane pod numerem PDM):"
+        Case "TitleTargetFolder": T_PL = "Folder docelowy"
+        Case "AssemblyDetectedTitle": T_PL = "Wykryto zlozenie"
+        Case "AlreadyInPdmAsPrefix": T_PL = " -> JUZ w PDM jako #"
+        Case "NewComponentBrowserPromptPrefix": T_PL = "Nowy element w drzewie: "
+        Case "NewComponentBrowserPromptSuffix": T_PL = ". Kliknij OK, aby otworzyc przegladarke i go wprowadzic (moze otworzyc sie w tle -- sprawdz pasek zadan)."
+        Case "AssemblyLinksPart1": T_PL = "To zlozenie odwoluje sie do "
+        Case "AssemblyLinksPart2": T_PL = " innego(-ych) pliku(-ow) (czesci/podzespoly):"
+        Case "AssemblyLinksPart3": T_PL = "Wyslac je automatycznie razem z tym dokumentem (najpierw liscie drzewa, ten dokument na koncu)?"
+        Case "AssemblyLinksPart4": T_PL = "'Nie' nie wysle/nie utworzy ZADNYCH nowych komponentow -- ale komponenty JUZ istniejace w PDM i tak zostana podpiete do struktury tego zlozenia."
+        Case "CreatedButFailedAttachPart1": T_PL = "Utworzono "
+        Case "CreatedButFailedAttachPart2": T_PL = ", ale nie udalo sie podpiac go pod "
+        Case "CreatedButFailedAttachPart3": T_PL = ": "
+        Case "FailedToSaveDocument": T_PL = "Nie udalo sie zapisac dokumentu -- zapisz go recznie (Ctrl+S) i uruchom makro ponownie."
+        Case "UnsavedDocumentPrompt": T_PL = "Ten dokument nie zostal jeszcze zapisany. Zapisac go teraz jako nowy element w EasyPDM (nazwe i rewizje ustalisz w przegladarce) i kontynuowac?"
+        Case "UnsavedComponentsWarningPrefix": T_PL = "W zlozeniu znaleziono "
+        Case "UnsavedComponentsWarningSuffix": T_PL = " komponent(-ow) bez zapisanego pliku (wirtualny/nieosadzony) -- NIE zostana wyslane. Zapisz je najpierw recznie w Inventorze (Plik -> Zapisz), a potem uruchom makro ponownie:"
+        Case "MustRunInsideInventor": T_PL = "To makro musi byc uruchomione z poziomu Autodesk Inventor."
+        Case "NoActiveSavedDocument": T_PL = "Brak aktywnego, zapisanego dokumentu."
+        Case "ExportStepPrompt": T_PL = "Wyeksportowac i wyslac model STEP (podglad 3D)?"
+        Case "ExportPdfPrompt": T_PL = "Wyeksportowac i wyslac plik PDF?"
+        Case "Dwg_CannotIdentifyItem": T_PL = "Nie udalo sie rozpoznac, do ktorego elementu PDM nalezy ten rysunek -- zapisz najpierw czesc/zlozenie przez EasyPDM (zeby dostalo nazwe w formacie 'numer (nazwa)'), a potem zapisz rysunek z tego pliku."
+        Case "Dwg_ReferencedPartNotLinkedPrompt": T_PL = "Ten rysunek dokumentuje czesc/zlozenie, ktore nie zostalo jeszcze wyslane do EasyPDM. Wyslac je teraz jako nowy element (numer/nazwe/rewizje ustalisz w przegladarce), a potem ten rysunek?"
+        Case "Dwg_UnlinkedReferencesBlockedPrefix": T_PL = "Ten rysunek dokumentuje wiecej niz jeden element, a "
+        Case "Dwg_UnlinkedReferencesBlockedSuffix": T_PL = " z nich nie jest jeszcze w EasyPDM -- rysunek NIE zostal wyslany (podpiecie go teraz utworzyloby powiazanie z czescia bez wlasnego rekordu w PDM, ktora nie sciagnie sie poprawnie gdzie indziej). Wyslij najpierw brakujace czesci/zlozenia osobno przez EasyPDM, a potem zapisz ten rysunek ponownie:"
+        Case "Dwg_ItemNotFoundPrefix": T_PL = "Nie znaleziono w EasyPDM elementu nr "
+        Case "Dwg_ItemNotFoundSuffix": T_PL = "."
+        Case "Dwg_NotPartOrAssembly": T_PL = "Znaleziony element nie jest Czescia ani Zlozeniem -- rysunki mozna podpinac tylko do nich."
+        Case "Dwg_UploadedPrefix": T_PL = "Rysunek przeslany i podpiety do elementu nr "
+        Case "Dwg_UploadedSuffix": T_PL = "."
+        Case "AlreadyLinkedConfirm": T_PL = "Ten dokument jest juz powiazany z elementem PDM. Podpiac biezaca wersje jako nowa rewizje/aktualizacje?"
+        Case "AlreadyLinkedConfirmPrefix": T_PL = "Ten dokument jest juz powiazany z elementem PDM nr "
+        Case "AlreadyLinkedConfirmSuffix": T_PL = ". Jesli to NIE jest ta sama czesc (np. zrobiles 'Zapisz kopie jako' z innej, juz podpietej czesci) -- kliknij Nie i podepnij ten plik recznie do wlasciwego elementu. Podpiac biezaca wersje jako nowa rewizje/aktualizacje TEGO elementu?"
+        Case "StaleLinkCleared": T_PL = "Element PDM, z ktorym ten dokument byl powiazany, juz nie istnieje (zostal usuniety) -- stary link zostal wyczyszczony, dokument zostanie potraktowany jako jeszcze niewyslany."
+        Case "CancelledNothingSent": T_PL = "Anulowano -- nic nie zostalo wyslane."
+        Case "FailedToAttachSubComponent": T_PL = "Nie udalo sie podpiac jednego z podkomponentow pod element glowny: "
+        Case "UploadedSuccessPart1": T_PL = "Przeslano do EasyPDM: element nr "
+        Case "UploadedSuccessPart2": T_PL = " (rewizja "
+        Case "RunLogPrefix": T_PL = "Log przebiegu: "
+        Case "SessionExpiredPrompt": T_PL = "Sesja wygasla -- uruchom makro ponownie, aby sie zalogowac."
+        Case "ErrorPrefix": T_PL = "Blad: "
+        Case "LoggedOutMessage": T_PL = "Wylogowano z EasyPDM."
+        Case "ServerErrorPrefix": T_PL = "Blad serwera ("
+        Case "NoConnectionPrefix": T_PL = "Brak polaczenia z "
+        Case "AttachmentRegistrationFailedPrefix": T_PL = "Rejestracja zalacznika nie powiodla sie: "
+        Case "ItemAlreadyChangedPart1": T_PL = "Status/rewizja elementu nr "
+        Case "ItemAlreadyChangedPart2": T_PL = " zostaly juz zmienione na serwerze (rewizja "
+        Case "ItemAlreadyChangedPart3": T_PL = ", status 'w_pracy'), ale podpiecie pliku nie powiodlo sie: "
+        Case "ItemAlreadyChangedPart4": T_PL = "Element w PDM ma teraz nowa rewizje, ale nadal plik z poprzedniej wersji -- popraw to recznie w aplikacji webowej (podepnij plik ponownie) albo sprobuj ponownie z tego makra."
+    End Select
+End Function
+
+Private Function T_EN(ByVal key As String) As String
+    Select Case key
+        Case "StatusWaitingForBrowser": T_EN = "EasyPDM: waiting for the browser... (Esc to cancel)"
+        Case "TitleLoginToPdm": T_EN = "Log in to PDM"
+        Case "PromptApiAddress": T_EN = "EasyPDM API address:"
+        Case "PromptUsername": T_EN = "Username:"
+        Case "PromptPassword": T_EN = "Password (NOTE: this field does not mask typed characters):"
+        Case "LoggedInAsPrefix": T_EN = "Logged in as "
+        Case "AppTitle": T_EN = "EasyPDM"
+        Case "LoginFailedPrefix": T_EN = "Login failed: "
+        Case "LoginFailedNoSession": T_EN = "Login failed -- the server did not return a session."
+        Case "TitleNewRevision": T_EN = "New revision"
+        Case "ItemStatusReleasedPrefix": T_EN = "Item #"
+        Case "ItemStatusReleasedSuffix": T_EN = " is in status ""Released"" -- attaching a file requires a new revision. Create a new revision?"
+        Case "TitleUploadBlocked": T_EN = "Upload blocked"
+        Case "UploadBlockedReviewPrefix": T_EN = "Cannot upload -- item #"
+        Case "UploadBlockedReviewSuffix": T_EN = " has status ""Under review"". Wait until the review finishes (the item returns to ""In progress""), or change the status manually in the web application."
+        Case "StatusLabelSprawdzany": T_EN = "Under review"
+        Case "StatusLabelWydany": T_EN = "Released"
+        Case "LockedComponentsTailPrefix": T_EN = "Note: "
+        Case "LockedComponentsTailSuffix": T_EN = " already-linked component(s) in the assembly have a locked status -- they were NOT updated (the assembly tree never re-sends already-existing components, but these are additionally locked by status -- if you changed them locally, upload them separately after moving the status back to ""In progress""):"
+        Case "StaleChildrenConfirmPrefix": T_EN = "Sub-item(s) of this item: "
+        Case "StaleChildrenConfirmSuffix": T_EN = " exist in PDM, but are no longer in the local assembly structure (removed from the tree since the last upload). Remove these links from PDM? (The items themselves will NOT be deleted, only their attachment under this assembly.)"
+        Case "PromptRevisionComment": T_EN = "New revision comment (optional):"
+        Case "PromptTargetFolder": T_EN = "Target folder for local copies (named under the PDM number):"
+        Case "TitleTargetFolder": T_EN = "Target folder"
+        Case "AssemblyDetectedTitle": T_EN = "Assembly detected"
+        Case "AlreadyInPdmAsPrefix": T_EN = " -> ALREADY in PDM as #"
+        Case "NewComponentBrowserPromptPrefix": T_EN = "New component in the tree: "
+        Case "NewComponentBrowserPromptSuffix": T_EN = ". Click OK to open the browser and fill it in (it may open in the background -- check the taskbar)."
+        Case "AssemblyLinksPart1": T_EN = "This assembly links to "
+        Case "AssemblyLinksPart2": T_EN = " other file(s) (parts/sub-assemblies):"
+        Case "AssemblyLinksPart3": T_EN = "Send them automatically together with this document (leaves first, this document last)?"
+        Case "AssemblyLinksPart4": T_EN = "'No' will not send/create any NEW components -- but components ALREADY in PDM will still be attached to this assembly's structure."
+        Case "CreatedButFailedAttachPart1": T_EN = "Created "
+        Case "CreatedButFailedAttachPart2": T_EN = ", but failed to attach it under "
+        Case "CreatedButFailedAttachPart3": T_EN = ": "
+        Case "FailedToSaveDocument": T_EN = "Failed to save the document -- save it manually (Ctrl+S) and run the macro again."
+        Case "UnsavedDocumentPrompt": T_EN = "This document hasn't been saved yet. Save it now as a new item in EasyPDM (you'll pick the name and revision in the browser) and continue?"
+        Case "UnsavedComponentsWarningPrefix": T_EN = "Found "
+        Case "UnsavedComponentsWarningSuffix": T_EN = " component(s) in the assembly with no saved file (virtual/embedded) -- they will NOT be uploaded. Save them manually in Inventor first (File -> Save), then run the macro again:"
+        Case "MustRunInsideInventor": T_EN = "This macro must be run from inside Autodesk Inventor."
+        Case "NoActiveSavedDocument": T_EN = "No active, saved document."
+        Case "ExportStepPrompt": T_EN = "Export and upload STEP model (3D preview)?"
+        Case "ExportPdfPrompt": T_EN = "Export and upload a PDF file?"
+        Case "Dwg_CannotIdentifyItem": T_EN = "Could not identify which PDM item this drawing belongs to -- save the Part/Assembly through EasyPDM first (so it gets a filename in the 'number (name)' format), then save the drawing from that file."
+        Case "Dwg_ReferencedPartNotLinkedPrompt": T_EN = "This drawing documents a Part/Assembly that hasn't been uploaded to EasyPDM yet. Upload it now as a new item (you'll pick the number/name/revision in the browser), then this drawing?"
+        Case "Dwg_UnlinkedReferencesBlockedPrefix": T_EN = "This drawing documents more than one element, and "
+        Case "Dwg_UnlinkedReferencesBlockedSuffix": T_EN = " of them isn't in EasyPDM yet -- the drawing was NOT uploaded (linking it now would create a link to a part with no PDM record of its own, which wouldn't download correctly elsewhere). Upload the missing Part(s)/Assembly(-ies) through EasyPDM first, then save this drawing again:"
+        Case "Dwg_ItemNotFoundPrefix": T_EN = "Could not find EasyPDM item number "
+        Case "Dwg_ItemNotFoundSuffix": T_EN = "."
+        Case "Dwg_NotPartOrAssembly": T_EN = "The found item is not a Part or an Assembly -- drawings can only be attached to those."
+        Case "Dwg_UploadedPrefix": T_EN = "Drawing uploaded and attached to item number "
+        Case "Dwg_UploadedSuffix": T_EN = "."
+        Case "AlreadyLinkedConfirm": T_EN = "This document is already linked to a PDM item. Attach the current version as a new revision/update?"
+        Case "AlreadyLinkedConfirmPrefix": T_EN = "This document is already linked to PDM item #"
+        Case "AlreadyLinkedConfirmSuffix": T_EN = ". If this is NOT the same part (e.g. you did a Save Copy As from a different, already-linked part) -- click No and link this file manually to the correct item instead. Attach the current version as a new revision/update to THIS item?"
+        Case "StaleLinkCleared": T_EN = "The PDM item this document was linked to no longer exists (it was deleted) -- the stale link has been cleared, this document will be treated as not yet sent."
+        Case "CancelledNothingSent": T_EN = "Cancelled -- nothing was sent."
+        Case "FailedToAttachSubComponent": T_EN = "Failed to attach one of the sub-components under the main element: "
+        Case "UploadedSuccessPart1": T_EN = "Uploaded to EasyPDM: item #"
+        Case "UploadedSuccessPart2": T_EN = " (revision "
+        Case "RunLogPrefix": T_EN = "Run log: "
+        Case "SessionExpiredPrompt": T_EN = "Session expired -- run the macro again to log in."
+        Case "ErrorPrefix": T_EN = "Error: "
+        Case "LoggedOutMessage": T_EN = "Logged out of EasyPDM."
+        Case "ServerErrorPrefix": T_EN = "Server error ("
+        Case "NoConnectionPrefix": T_EN = "No connection to "
+        Case "AttachmentRegistrationFailedPrefix": T_EN = "Attachment registration failed: "
+        Case "ItemAlreadyChangedPart1": T_EN = "The status/revision of item #"
+        Case "ItemAlreadyChangedPart2": T_EN = " have already been changed on the server (revision "
+        Case "ItemAlreadyChangedPart3": T_EN = ", status 'w_pracy'), but attaching the file failed: "
+        Case "ItemAlreadyChangedPart4": T_EN = "The item in PDM now has a new revision, but still the file of the previous version -- fix this manually in the web app (attach the file again) or retry from this macro."
+    End Select
+End Function
+
+Private Function T_DE(ByVal key As String) As String
+    Select Case key
+        Case "StatusWaitingForBrowser": T_DE = "EasyPDM: Warten auf den Browser... (Esc zum Abbrechen)"
+        Case "TitleLoginToPdm": T_DE = "Anmeldung bei PDM"
+        Case "PromptApiAddress": T_DE = "EasyPDM-API-Adresse:"
+        Case "PromptUsername": T_DE = "Benutzername:"
+        Case "PromptPassword": T_DE = "Passwort (HINWEIS: Dieses Feld maskiert die eingegebenen Zeichen nicht):"
+        Case "LoggedInAsPrefix": T_DE = "Angemeldet als "
+        Case "AppTitle": T_DE = "EasyPDM"
+        Case "LoginFailedPrefix": T_DE = "Anmeldung fehlgeschlagen: "
+        Case "LoginFailedNoSession": T_DE = "Anmeldung fehlgeschlagen -- der Server hat keine Sitzung zurueckgegeben."
+        Case "TitleNewRevision": T_DE = "Neue Revision"
+        Case "ItemStatusReleasedPrefix": T_DE = "Element Nr. "
+        Case "ItemStatusReleasedSuffix": T_DE = " hat den Status ""Freigegeben"" -- das Anhaengen einer Datei erfordert eine neue Revision. Neue Revision erstellen?"
+        Case "TitleUploadBlocked": T_DE = "Hochladen blockiert"
+        Case "UploadBlockedReviewPrefix": T_DE = "Hochladen nicht moeglich -- Element Nr. "
+        Case "UploadBlockedReviewSuffix": T_DE = " hat den Status ""In Pruefung"". Warten Sie, bis die Pruefung abgeschlossen ist (das Element kehrt zu ""In Bearbeitung"" zurueck), oder aendern Sie den Status manuell in der Web-Anwendung."
+        Case "StatusLabelSprawdzany": T_DE = "In Pruefung"
+        Case "StatusLabelWydany": T_DE = "Freigegeben"
+        Case "LockedComponentsTailPrefix": T_DE = "Hinweis: "
+        Case "LockedComponentsTailSuffix": T_DE = " bereits verknuepfte Komponente(n) in der Baugruppe haben einen gesperrten Status -- sie wurden NICHT aktualisiert (der Baugruppenbaum sendet bereits vorhandene Komponenten nie erneut, aber diese sind zusaetzlich durch ihren Status gesperrt -- falls Sie sie lokal geaendert haben, laden Sie sie separat hoch, nachdem der Status wieder auf ""In Bearbeitung"" gesetzt wurde):"
+        Case "StaleChildrenConfirmPrefix": T_DE = "Unterelement(e) dieses Elements: "
+        Case "StaleChildrenConfirmSuffix": T_DE = " existieren im PDM, sind aber nicht mehr in der lokalen Baugruppenstruktur (seit dem letzten Hochladen aus dem Baum entfernt). Diese Verknuepfungen aus dem PDM entfernen? (Die Elemente selbst werden NICHT geloescht, nur ihre Zuordnung zu dieser Baugruppe.)"
+        Case "PromptRevisionComment": T_DE = "Kommentar zur neuen Revision (optional):"
+        Case "PromptTargetFolder": T_DE = "Zielordner fuer lokale Kopien (benannt nach der PDM-Nummer):"
+        Case "TitleTargetFolder": T_DE = "Zielordner"
+        Case "AssemblyDetectedTitle": T_DE = "Baugruppe erkannt"
+        Case "AlreadyInPdmAsPrefix": T_DE = " -> BEREITS in PDM als #"
+        Case "NewComponentBrowserPromptPrefix": T_DE = "Neue Komponente im Baum: "
+        Case "NewComponentBrowserPromptSuffix": T_DE = ". Klicken Sie OK, um den Browser zu oeffnen und sie einzugeben (er kann im Hintergrund geoeffnet werden -- pruefen Sie die Taskleiste)."
+        Case "AssemblyLinksPart1": T_DE = "Diese Baugruppe verweist auf "
+        Case "AssemblyLinksPart2": T_DE = " weitere Datei(en) (Teile/Unterbaugruppen):"
+        Case "AssemblyLinksPart3": T_DE = "Sollen sie automatisch zusammen mit diesem Dokument gesendet werden (zuerst die Blaetter, dieses Dokument zuletzt)?"
+        Case "AssemblyLinksPart4": T_DE = "'Nein' sendet/erstellt KEINE neuen Komponenten -- aber bereits in PDM vorhandene Komponenten werden trotzdem in die Struktur dieser Baugruppe eingebunden."
+        Case "CreatedButFailedAttachPart1": T_DE = "Erstellt "
+        Case "CreatedButFailedAttachPart2": T_DE = ", aber die Zuordnung unter "
+        Case "CreatedButFailedAttachPart3": T_DE = " ist fehlgeschlagen: "
+        Case "FailedToSaveDocument": T_DE = "Speichern des Dokuments fehlgeschlagen -- speichern Sie es manuell (Strg+S) und starten Sie das Makro erneut."
+        Case "UnsavedDocumentPrompt": T_DE = "Dieses Dokument wurde noch nicht gespeichert. Jetzt als neues Element in EasyPDM speichern (Name und Revision legen Sie im Browser fest) und fortfahren?"
+        Case "UnsavedComponentsWarningPrefix": T_DE = "In der Baugruppe wurden "
+        Case "UnsavedComponentsWarningSuffix": T_DE = " Komponente(n) ohne gespeicherte Datei gefunden (virtuell/eingebettet) -- sie werden NICHT hochgeladen. Speichern Sie sie zuerst manuell in Inventor (Datei -> Speichern), und starten Sie das Makro dann erneut:"
+        Case "MustRunInsideInventor": T_DE = "Dieses Makro muss innerhalb von Autodesk Inventor ausgefuehrt werden."
+        Case "NoActiveSavedDocument": T_DE = "Kein aktives, gespeichertes Dokument."
+        Case "ExportStepPrompt": T_DE = "STEP-Modell exportieren und hochladen (3D-Vorschau)?"
+        Case "ExportPdfPrompt": T_DE = "PDF-Datei exportieren und hochladen?"
+        Case "Dwg_CannotIdentifyItem": T_DE = "Es konnte nicht ermittelt werden, zu welchem PDM-Element diese Zeichnung gehoert -- speichern Sie zuerst das Teil/die Baugruppe ueber EasyPDM (damit es einen Dateinamen im Format 'Nummer (Name)' erhaelt), und speichern Sie dann die Zeichnung aus dieser Datei."
+        Case "Dwg_ReferencedPartNotLinkedPrompt": T_DE = "Diese Zeichnung dokumentiert ein Teil/eine Baugruppe, das/die noch nicht zu EasyPDM hochgeladen wurde. Jetzt als neues Element hochladen (Nummer/Name/Revision legen Sie im Browser fest) und dann diese Zeichnung?"
+        Case "Dwg_UnlinkedReferencesBlockedPrefix": T_DE = "Diese Zeichnung dokumentiert mehr als ein Element, und "
+        Case "Dwg_UnlinkedReferencesBlockedSuffix": T_DE = " davon sind noch nicht in EasyPDM -- die Zeichnung wurde NICHT hochgeladen (eine Verknuepfung jetzt wuerde ein Teil ohne eigenen PDM-Datensatz verknuepfen, das sich anderswo nicht korrekt herunterladen liesse). Laden Sie die fehlenden Teile/Baugruppen zuerst einzeln ueber EasyPDM hoch und speichern Sie diese Zeichnung dann erneut:"
+        Case "Dwg_ItemNotFoundPrefix": T_DE = "EasyPDM-Element Nr. "
+        Case "Dwg_ItemNotFoundSuffix": T_DE = " wurde nicht gefunden."
+        Case "Dwg_NotPartOrAssembly": T_DE = "Das gefundene Element ist weder ein Teil noch eine Baugruppe -- Zeichnungen koennen nur daran angehaengt werden."
+        Case "Dwg_UploadedPrefix": T_DE = "Zeichnung hochgeladen und an Element Nr. "
+        Case "Dwg_UploadedSuffix": T_DE = " angehaengt."
+        Case "AlreadyLinkedConfirm": T_DE = "Dieses Dokument ist bereits mit einem PDM-Element verknuepft. Die aktuelle Version als neue Revision/Aktualisierung anhaengen?"
+        Case "AlreadyLinkedConfirmPrefix": T_DE = "Dieses Dokument ist bereits mit PDM-Element Nr. "
+        Case "AlreadyLinkedConfirmSuffix": T_DE = " verknuepft. Falls dies NICHT dasselbe Teil ist (z. B. haben Sie ein 'Kopie speichern unter' von einem anderen, bereits verknuepften Teil gemacht) -- klicken Sie Nein und verknuepfen Sie diese Datei stattdessen manuell mit dem richtigen Element. Die aktuelle Version als neue Revision/Aktualisierung DIESES Elements anhaengen?"
+        Case "StaleLinkCleared": T_DE = "Das PDM-Element, mit dem dieses Dokument verknuepft war, existiert nicht mehr (wurde geloescht) -- die veraltete Verknuepfung wurde entfernt, dieses Dokument wird als noch nicht gesendet behandelt."
+        Case "CancelledNothingSent": T_DE = "Abgebrochen -- es wurde nichts gesendet."
+        Case "FailedToAttachSubComponent": T_DE = "Eine der Unterkomponenten konnte nicht unter dem Hauptelement angehaengt werden: "
+        Case "UploadedSuccessPart1": T_DE = "Zu EasyPDM hochgeladen: Element Nr. "
+        Case "UploadedSuccessPart2": T_DE = " (Revision "
+        Case "RunLogPrefix": T_DE = "Ausfuehrungsprotokoll: "
+        Case "SessionExpiredPrompt": T_DE = "Sitzung abgelaufen -- fuehren Sie das Makro erneut aus, um sich anzumelden."
+        Case "ErrorPrefix": T_DE = "Fehler: "
+        Case "LoggedOutMessage": T_DE = "Von EasyPDM abgemeldet."
+        Case "ServerErrorPrefix": T_DE = "Serverfehler ("
+        Case "NoConnectionPrefix": T_DE = "Keine Verbindung zu "
+        Case "AttachmentRegistrationFailedPrefix": T_DE = "Registrierung des Anhangs fehlgeschlagen: "
+        Case "ItemAlreadyChangedPart1": T_DE = "Der Status/die Revision von Element Nr. "
+        Case "ItemAlreadyChangedPart2": T_DE = " wurden auf dem Server bereits geaendert (Revision "
+        Case "ItemAlreadyChangedPart3": T_DE = ", Status 'w_pracy'), aber das Anhaengen der Datei ist fehlgeschlagen: "
+        Case "ItemAlreadyChangedPart4": T_DE = "Das Element in PDM hat jetzt eine neue Revision, aber immer noch die Datei der vorherigen Version -- beheben Sie dies manuell in der Web-App (Datei erneut anhaengen) oder versuchen Sie es erneut ueber dieses Makro."
+    End Select
+End Function
+
+
+' ============================================================================
+' Log -- the only way to see step by step what the macro actually did (and exactly where it
+' failed), since there is no console here like in FreeCAD/the browser. A plain text file in
+' %TEMP%, appended to (not overwritten) on every run -- open it with Notepad. The path is
+' also shown in the summary dialog at the end of "main". Named distinctly from
+' EasyPDM.SolidWorks/EasyPDMUpload.bas's own log file, in case a user somehow has both
+' installed on the same machine.
+' ============================================================================
+
+Function LogFilePath() As String
+    LogFilePath = Environ$("TEMP") & "\EasyPDM_inventor_macro.log"
+End Function
+
+Sub LogLine(ByVal message As String)
+    On Error Resume Next
+    Dim fileNum As Integer
+    fileNum = FreeFile
+    Open LogFilePath() For Append As #fileNum
+    Print #fileNum, Format(Now, "yyyy-mm-dd hh:nn:ss") & "  " & message
+    Close #fileNum
+    On Error GoTo 0
+End Sub
+
+
+' ============================================================================
+' Settings (API address / session token / saved display name) -- Windows registry via
+' SaveSetting/GetSetting, VBA's standard built-in mechanism for this purpose.
+' ============================================================================
+
+Function GetBaseUrl() As String
+    Dim url As String
+    url = GetSetting(APP_SETTINGS_NAME, SETTINGS_SECTION, "ApiBaseUrl", DEFAULT_BASE_URL)
+    If Right(url, 1) = "/" Then url = Left(url, Len(url) - 1)
+    GetBaseUrl = url
+End Function
+
+Sub SetBaseUrl(ByVal url As String)
+    If Right(url, 1) = "/" Then url = Left(url, Len(url) - 1)
+    SaveSetting APP_SETTINGS_NAME, SETTINGS_SECTION, "ApiBaseUrl", url
+End Sub
+
+Function GetSessionToken() As String
+    GetSessionToken = GetSetting(APP_SETTINGS_NAME, SETTINGS_SECTION, "SessionToken", "")
+End Function
+
+Sub SetSessionToken(ByVal token As String)
+    SaveSetting APP_SETTINGS_NAME, SETTINGS_SECTION, "SessionToken", token
+End Sub
+
+Function GetSavedDisplayName() As String
+    GetSavedDisplayName = GetSetting(APP_SETTINGS_NAME, SETTINGS_SECTION, "DisplayName", "")
+End Function
+
+Sub SetSavedDisplayName(ByVal displayName As String)
+    SaveSetting APP_SETTINGS_NAME, SETTINGS_SECTION, "DisplayName", displayName
+End Sub
+
+' Same registry key as the download folder in EasyPDMDownload.bas -- deliberately shared,
+' so uploaded (locally re-saved under the PDM name) and downloaded files land in the same
+' place by default.
+Function GetDownloadFolder() As String
+    GetDownloadFolder = GetSetting(APP_SETTINGS_NAME, SETTINGS_SECTION, "DownloadFolder", "")
+End Function
+
+Sub SetDownloadFolder(ByVal folder As String)
+    SaveSetting APP_SETTINGS_NAME, SETTINGS_SECTION, "DownloadFolder", folder
+End Sub
+
+' Recursively creates path and all missing parent directories -- identical to
+' EasyPDMDownload.bas's own copy (duplicated per this module's no-shared-import
+' convention, see file header).
+Sub EnsureDirectory(ByVal path As String)
+    If path = "" Then Exit Sub
+    If Dir(path, vbDirectory) <> "" Then Exit Sub
+
+    Dim parent As String
+    Dim sepPos As Long
+    Dim trimmed As String
+    trimmed = path
+    If Right(trimmed, 1) = "\" Then trimmed = Left(trimmed, Len(trimmed) - 1)
+    sepPos = InStrRev(trimmed, "\")
+    If sepPos > 0 Then
+        parent = Left(trimmed, sepPos - 1)
+        ' Stop recursing once we hit a drive root ("C:") or UNC root -- Dir()/MkDir cannot
+        ' go any higher than that anyway.
+        If Len(parent) > 2 And Right(parent, 1) <> ":" Then
+            EnsureDirectory parent
+        End If
+    End If
+
+    On Error Resume Next
+    MkDir trimmed
+    On Error GoTo 0
+End Sub
+
+
+' ============================================================================
+' Minimal JSON -- own parser/builder, good enough for THIS API's response shapes (plain
+' objects/arrays/strings/numbers/bool/null), NOT general purpose.
+' JSON object -> Scripting.Dictionary, JSON array -> Collection.
+' ============================================================================
+
+Function JsonStringEscape(ByVal s As String) As String
+    Dim result As String
+    result = s
+    result = Replace(result, "\", "\\")
+    result = Replace(result, """", "\""")
+    result = Replace(result, vbCrLf, "\n")
+    result = Replace(result, vbCr, "\n")
+    result = Replace(result, vbLf, "\n")
+    result = Replace(result, vbTab, "\t")
+    JsonStringEscape = result
+End Function
+
+Function JsonStr(ByVal s As String) As String
+    JsonStr = """" & JsonStringEscape(s) & """"
+End Function
+
+Function JsonParse(ByVal jsonText As String) As Object
+    Dim pos As Long
+    pos = 1
+    Dim ch As String
+    JsonSkipWhitespace jsonText, pos
+    ch = Mid(jsonText, pos, 1)
+    If ch = "[" Then
+        Set JsonParse = JsonParseArray(jsonText, pos)
+    Else
+        Set JsonParse = JsonParseObject(jsonText, pos)
+    End If
+End Function
+
+Private Sub JsonSkipWhitespace(ByVal s As String, ByRef pos As Long)
+    Dim ch As String
+    Do While pos <= Len(s)
+        ch = Mid(s, pos, 1)
+        If ch <> " " And ch <> vbTab And ch <> vbCr And ch <> vbLf Then Exit Do
+        pos = pos + 1
+    Loop
+End Sub
+
+Private Function JsonParseValue(ByVal s As String, ByRef pos As Long) As Variant
+    JsonSkipWhitespace s, pos
+    Dim ch As String
+    ch = Mid(s, pos, 1)
+    If ch = "{" Then
+        Set JsonParseValue = JsonParseObject(s, pos)
+    ElseIf ch = "[" Then
+        Set JsonParseValue = JsonParseArray(s, pos)
+    ElseIf ch = """" Then
+        JsonParseValue = JsonParseString(s, pos)
+    ElseIf ch = "t" Then
+        pos = pos + 4 ' "true"
+        JsonParseValue = True
+    ElseIf ch = "f" Then
+        pos = pos + 5 ' "false"
+        JsonParseValue = False
+    ElseIf ch = "n" Then
+        pos = pos + 4 ' "null"
+        JsonParseValue = Null
+    Else
+        JsonParseValue = JsonParseNumber(s, pos)
+    End If
+End Function
+
+Private Function JsonParseObject(ByVal s As String, ByRef pos As Long) As Object
+    Dim dict As Object
+    Set dict = CreateObject("Scripting.Dictionary")
+
+    JsonSkipWhitespace s, pos
+    If Mid(s, pos, 1) <> "{" Then
+        Set JsonParseObject = dict
+        Exit Function
+    End If
+    pos = pos + 1 ' "{"
+    JsonSkipWhitespace s, pos
+    If Mid(s, pos, 1) = "}" Then
+        pos = pos + 1
+        Set JsonParseObject = dict
+        Exit Function
+    End If
+
+    Dim key As String
+    Do
+        JsonSkipWhitespace s, pos
+        key = JsonParseString(s, pos)
+        JsonSkipWhitespace s, pos
+        pos = pos + 1 ' ":"
+        dict.Add key, JsonParseValue(s, pos)
+        JsonSkipWhitespace s, pos
+        If Mid(s, pos, 1) = "," Then
+            pos = pos + 1
+        Else
+            Exit Do
+        End If
+    Loop
+    JsonSkipWhitespace s, pos
+    pos = pos + 1 ' "}"
+    Set JsonParseObject = dict
+End Function
+
+Private Function JsonParseArray(ByVal s As String, ByRef pos As Long) As Object
+    Dim coll As New Collection
+    pos = pos + 1 ' "["
+    JsonSkipWhitespace s, pos
+    If Mid(s, pos, 1) = "]" Then
+        pos = pos + 1
+        Set JsonParseArray = coll
+        Exit Function
+    End If
+    Do
+        coll.Add JsonParseValue(s, pos)
+        JsonSkipWhitespace s, pos
+        If Mid(s, pos, 1) = "," Then
+            pos = pos + 1
+        Else
+            Exit Do
+        End If
+    Loop
+    JsonSkipWhitespace s, pos
+    pos = pos + 1 ' "]"
+    Set JsonParseArray = coll
+End Function
+
+Private Function JsonParseString(ByVal s As String, ByRef pos As Long) As String
+    Dim result As String
+    Dim ch As String
+    Dim nextCh As String
+    Dim hexCode As String
+    result = ""
+    If Mid(s, pos, 1) = """" Then pos = pos + 1 ' skip opening "
+    Do While pos <= Len(s)
+        ch = Mid(s, pos, 1)
+        If ch = """" Then
+            pos = pos + 1
+            Exit Do
+        ElseIf ch = "\" Then
+            nextCh = Mid(s, pos + 1, 1)
+            Select Case nextCh
+                Case """": result = result & """"
+                Case "\": result = result & "\"
+                Case "/": result = result & "/"
+                Case "n": result = result & vbLf
+                Case "r": result = result & vbCr
+                Case "t": result = result & vbTab
+                Case "u"
+                    hexCode = Mid(s, pos + 2, 4)
+                    result = result & ChrW(Val("&H" & hexCode))
+                    pos = pos + 4
+                Case Else
+                    result = result & nextCh
+            End Select
+            pos = pos + 2
+        Else
+            result = result & ch
+            pos = pos + 1
+        End If
+    Loop
+    JsonParseString = result
+End Function
+
+Private Function JsonParseNumber(ByVal s As String, ByRef pos As Long) As Double
+    Dim startPos As Long
+    startPos = pos
+    Do While pos <= Len(s) And InStr("0123456789+-.eE", Mid(s, pos, 1)) > 0
+        pos = pos + 1
+    Loop
+    ' Val() (not CDbl!) -- CDbl depends on the current system locale's decimal separator
+    ' (e.g. a comma on Polish Windows), which would misinterpret "0.1" from JSON; Val()
+    ' always expects a dot, regardless of locale.
+    JsonParseNumber = Val(Mid(s, startPos, pos - startPos))
+End Function
+
+' Safe read of a string field from a parsed object (Dictionary) -- returns defaultValue if
+' the object is Nothing, the field does not exist, or it is a JSON null.
+Function JsonGetString(ByVal obj As Object, ByVal key As String, Optional ByVal defaultValue As String = "") As String
+    If obj Is Nothing Then
+        JsonGetString = defaultValue
+        Exit Function
+    End If
+    If Not obj.Exists(key) Then
+        JsonGetString = defaultValue
+        Exit Function
+    End If
+    If IsNull(obj.Item(key)) Then
+        JsonGetString = defaultValue
+    Else
+        JsonGetString = CStr(obj.Item(key))
+    End If
+End Function
+
+Function JsonGetLong(ByVal obj As Object, ByVal key As String, Optional ByVal defaultValue As Long = 0) As Long
+    If obj Is Nothing Then
+        JsonGetLong = defaultValue
+        Exit Function
+    End If
+    If Not obj.Exists(key) Then
+        JsonGetLong = defaultValue
+        Exit Function
+    End If
+    If IsNull(obj.Item(key)) Then
+        JsonGetLong = defaultValue
+    Else
+        JsonGetLong = CLng(obj.Item(key))
+    End If
+End Function
+
+
+' ============================================================================
+' HTTP -- MSXML2.XMLHTTP (synchronous), with the session cookie attached MANUALLY to every
+' request (we don't rely on automatic cookie handling by the COM component).
+' ============================================================================
+
+Private Function NewHttpRequest() As Object
+    Set NewHttpRequest = CreateObject("MSXML2.XMLHTTP.6.0")
+End Function
+
+' Used ONLY by ApiUploadFile (binary/multipart body) -- see the comment there for why plain
+' MSXML2.XMLHTTP is not used for that one call. WinHttpRequest is a standard, universally
+' available Windows component (WinHTTP, present since Windows XP SP2/Server 2003).
+Private Function NewBinaryHttpRequest() As Object
+    Set NewBinaryHttpRequest = CreateObject("WinHttp.WinHttpRequest.5.1")
+End Function
+
+Private Function AuthCookieHeader() As String
+    Dim token As String
+    token = GetSessionToken()
+    If token <> "" Then
+        AuthCookieHeader = SESSION_COOKIE_NAME & "=" & token
+    Else
+        AuthCookieHeader = ""
+    End If
+End Function
+
+Private Sub RaiseForStatus(ByVal status As Long, ByVal responseText As String)
+    If status = 401 Then
+        Err.Raise ERR_AUTH, "EasyPDM", responseText
+    ElseIf status < 200 Or status >= 300 Then
+        Err.Raise ERR_API, "EasyPDM", T("ServerErrorPrefix") & status & "): " & responseText
+    End If
+End Sub
+
+Function ApiGet(ByVal path As String) As Object
+    Dim http As Object
+    Set http = NewHttpRequest()
+    ' MSXML2.XMLHTTP.6.0 GETs can be served from Windows' local HTTP cache -- confirmed in
+    ' practice on the SolidWorks counterpart of this macro: after a status/revision change on
+    ' the server, a later GET for the SAME URL kept returning the response from the VERY
+    ' FIRST time this URL was ever fetched, making the macro believe an item was permanently
+    ' stuck at its original status/revision. The Cache-Control/Pragma headers below are the
+    ' standard way to ask for a fresh response, but the query-string cache-buster guarantees
+    ' one regardless of whether those headers are actually honored (a different URL can never
+    ' hit an old cache entry).
+    Dim cacheBuster As String
+    cacheBuster = IIf(InStr(path, "?") > 0, "&", "?") & "_ts=" & Format(Now, "yyyymmddhhnnss") & CStr(Timer)
+    http.Open "GET", GetBaseUrl() & path & cacheBuster, False
+    http.setRequestHeader "Cache-Control", "no-cache, no-store"
+    http.setRequestHeader "Pragma", "no-cache"
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+
+    On Error GoTo NetErr
+    http.send
+    On Error GoTo 0
+
+    LogLine "GET " & path & " -> " & http.Status
+    RaiseForStatus http.Status, http.responseText
+    If Trim(http.responseText) = "" Then
+        Set ApiGet = Nothing
+    Else
+        Set ApiGet = JsonParse(http.responseText)
+    End If
+    Exit Function
+NetErr:
+    LogLine "GET " & path & " -> NO CONNECTION: " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
+End Function
+
+Function ApiPostJson(ByVal path As String, ByVal bodyJson As String) As Object
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open "POST", GetBaseUrl() & path, False
+    http.setRequestHeader "Content-Type", "application/json"
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+
+    On Error GoTo NetErr
+    http.send bodyJson
+    On Error GoTo 0
+
+    LogLine "POST " & path & " -> " & http.Status
+    RaiseForStatus http.Status, http.responseText
+    If Trim(http.responseText) = "" Then
+        Set ApiPostJson = Nothing
+    Else
+        Set ApiPostJson = JsonParse(http.responseText)
+    End If
+    Exit Function
+NetErr:
+    LogLine "POST " & path & " -> NO CONNECTION: " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
+End Function
+
+Function ApiPatchJson(ByVal path As String, ByVal bodyJson As String) As Object
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open "PATCH", GetBaseUrl() & path, False
+    http.setRequestHeader "Content-Type", "application/json"
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+
+    On Error GoTo NetErr
+    http.send bodyJson
+    On Error GoTo 0
+
+    LogLine "PATCH " & path & " -> " & http.Status
+    RaiseForStatus http.Status, http.responseText
+    If Trim(http.responseText) = "" Then
+        Set ApiPatchJson = Nothing
+    Else
+        Set ApiPatchJson = JsonParse(http.responseText)
+    End If
+    Exit Function
+NetErr:
+    LogLine "PATCH " & path & " -> NO CONNECTION: " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
+End Function
+
+Function ApiRegisterAttachment(ByVal itemId As String, ByVal filePath As String, Optional ByVal role As String = "") As Object
+    Dim bodyJson As String
+    bodyJson = "{""filePath"":" & JsonStr(filePath)
+    If role <> "" Then bodyJson = bodyJson & ",""role"":" & JsonStr(role)
+    bodyJson = bodyJson & "}"
+    Set ApiRegisterAttachment = ApiPostJson("/items/" & itemId & "/attachments/register", bodyJson)
+End Function
+
+' Reads the whole file as a byte array -- used for the plain HTTP upload (when the PDM
+' storage is not visible in this machine's file system). Deliberately the plain legacy
+' Open/Get/Close statements, NOT ADODB.Stream -- see EasyPDM.SolidWorks/EasyPDMUpload.bas's
+' own comment on this exact function: an ADODB.Stream rewrite there, tried as a preemptive
+' fix for a Unicode-path concern, turned out to be unnecessary for READING and caused two
+' different new failures instead ("Cannot open file", then "Permission denied") -- reverted.
+' Same reasoning applies here; kept as the plain, already-proven form from the start.
+Private Function ReadFileBytes(ByVal filePath As String) As Byte()
+    Dim fileNum As Integer
+    Dim buffer() As Byte
+    fileNum = FreeFile
+    Open filePath For Binary Access Read As #fileNum
+    If LOF(fileNum) > 0 Then
+        ReDim buffer(1 To LOF(fileNum))
+        Get #fileNum, , buffer
+    Else
+        ReDim buffer(0 To -1) ' empty array
+    End If
+    Close #fileNum
+    ReadFileBytes = buffer
+End Function
+
+Private Sub CopyBytesInto(ByRef dest() As Byte, ByRef destOffset As Long, ByRef src() As Byte)
+    Dim n As Long
+    n = UBound(src) - LBound(src) + 1
+    If n <= 0 Then Exit Sub
+    Dim i As Long
+    For i = 0 To n - 1
+        dest(destOffset + i) = src(LBound(src) + i)
+    Next i
+    destOffset = destOffset + n
+End Sub
+
+' Converts a VBA (Unicode) string to its UTF-8 byte representation -- NOT StrConv(s,
+' vbFromUnicode), which goes through the Windows machine's current ANSI code page instead
+' and silently mangles any character outside it (confirmed in practice on the SolidWorks
+' counterpart of this file: a Polish item name sent this way through a multipart
+' Content-Disposition header arrived at the server, which assumes UTF-8 throughout, as
+' invalid byte sequences -- shown as literal replacement characters in the web app).
+Function Utf8EncodeBytes(ByVal s As String) As Byte()
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+    stream.Type = 2 ' adTypeText
+    stream.Charset = "utf-8"
+    stream.Open
+    stream.WriteText s
+    stream.Position = 0
+    stream.Type = 1 ' adTypeBinary
+    Dim bytes() As Byte
+    bytes = stream.Read
+    stream.Close
+
+    ' ADODB.Stream prepends a UTF-8 BOM (EF BB BF) when converting text->binary this way
+    ' (confirmed in practice) -- must be stripped, or it corrupts the very first encoded
+    ' character.
+    If UBound(bytes) >= 2 Then
+        If bytes(0) = &HEF And bytes(1) = &HBB And bytes(2) = &HBF Then
+            Dim trimmed() As Byte
+            ReDim trimmed(0 To UBound(bytes) - 3)
+            Dim k As Long
+            For k = 3 To UBound(bytes)
+                trimmed(k - 3) = bytes(k)
+            Next k
+            bytes = trimmed
+        End If
+    End If
+
+    Utf8EncodeBytes = bytes
+End Function
+
+Function UrlEncode(ByVal s As String) As String
+    If Len(s) = 0 Then
+        UrlEncode = ""
+        Exit Function
+    End If
+
+    Dim bytes() As Byte
+    bytes = Utf8EncodeBytes(s)
+
+    Dim result As String
+    Dim i As Long, b As Byte
+    result = ""
+    For i = LBound(bytes) To UBound(bytes)
+        b = bytes(i)
+        If (b >= 65 And b <= 90) Or (b >= 97 And b <= 122) Or (b >= 48 And b <= 57) _
+           Or b = 45 Or b = 95 Or b = 46 Or b = 126 Then ' A-Z a-z 0-9 - _ . ~
+            result = result & Chr(b)
+        Else
+            result = result & "%" & Right("0" & Hex(b), 2)
+        End If
+    Next i
+    UrlEncode = result
+End Function
+
+' Plain HTTP upload (multipart/form-data), used as a fallback when the PDM storage is not
+' visible in this machine's file system -- the same mechanism as attaching CAD files from
+' the properties panel in the web app.
+Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional ByVal overrideFilename As String = "", Optional ByVal extraFieldName As String = "", Optional ByVal extraFieldValue As String = "") As Object
+    Dim boundary As String
+    boundary = "----EasyPDMBoundary" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000))
+
+    Dim fileName As String
+    If overrideFilename <> "" Then
+        fileName = overrideFilename
+    Else
+        fileName = Mid(filePath, InStrRev(filePath, "\") + 1)
+    End If
+
+    ' Extra plain form field BEFORE the file part -- "role=step" (see UploadStepAttachment)
+    ' or "role=cad" (see RenameAndUpload, tags the actual uploaded CAD file so the web app
+    ' can show it separately from ordinary, manually-added attachments).
+    Dim head As String
+    head = ""
+    If extraFieldName <> "" Then
+        head = head & "--" & boundary & vbCrLf & _
+               "Content-Disposition: form-data; name=""" & extraFieldName & """" & vbCrLf & vbCrLf & _
+               extraFieldValue & vbCrLf
+    End If
+    head = head & "--" & boundary & vbCrLf & _
+           "Content-Disposition: form-data; name=""file""; filename=""" & fileName & """" & vbCrLf & _
+           "Content-Type: application/octet-stream" & vbCrLf & vbCrLf
+
+    Dim tail As String
+    tail = vbCrLf & "--" & boundary & "--" & vbCrLf
+
+    Dim headBytes() As Byte, tailBytes() As Byte, fileBytes() As Byte
+    headBytes = Utf8EncodeBytes(head)
+    tailBytes = Utf8EncodeBytes(tail)
+    fileBytes = ReadFileBytes(filePath)
+
+    Dim totalLen As Long
+    totalLen = (UBound(headBytes) - LBound(headBytes) + 1) + _
+               (UBound(fileBytes) - LBound(fileBytes) + 1) + _
+               (UBound(tailBytes) - LBound(tailBytes) + 1)
+
+    Dim body() As Byte
+    ReDim body(0 To totalLen - 1)
+    Dim offset As Long
+    offset = 0
+    CopyBytesInto body, offset, headBytes
+    CopyBytesInto body, offset, fileBytes
+    CopyBytesInto body, offset, tailBytes
+
+    ' WinHttp.WinHttpRequest.5.1 (NOT MSXML2.XMLHTTP) for this one call -- same reasoning as
+    ' the SolidWorks counterpart of this file: MSXML2.XMLHTTP.send() rejects a raw Byte()
+    ' array, and wrapping it in an ADODB.Stream instead was itself unreliable in practice
+    ' there. WinHttpRequest accepts a Byte() array directly via .Send and handles
+    ' Content-Length for it reliably -- standard, well-documented approach for binary/
+    ' multipart POST bodies from VBA.
+    Dim http As Object
+    Set http = NewBinaryHttpRequest()
+    http.Open "POST", GetBaseUrl() & path, False
+    http.SetRequestHeader "Content-Type", "multipart/form-data; boundary=" & boundary
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.SetRequestHeader "Cookie", cookie
+
+    On Error GoTo NetErr
+    If totalLen > 0 Then
+        http.Send body
+    Else
+        http.Send
+    End If
+    On Error GoTo 0
+
+    LogLine "POST (upload, " & totalLen & " B) " & path & " -> " & http.Status
+    RaiseForStatus http.Status, http.ResponseText
+    If Trim(http.ResponseText) = "" Then
+        Set ApiUploadFile = Nothing
+    Else
+        Set ApiUploadFile = JsonParse(http.ResponseText)
+    End If
+    Exit Function
+NetErr:
+    LogLine "POST (upload) " & path & " -> NO CONNECTION: " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
+End Function
+
+Sub ApiDeleteRequest(ByVal path As String)
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open "DELETE", GetBaseUrl() & path, False
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+
+    On Error GoTo NetErr
+    http.send
+    On Error GoTo 0
+
+    LogLine "DELETE " & path & " -> " & http.Status
+    RaiseForStatus http.Status, http.responseText
+    Exit Sub
+NetErr:
+    LogLine "DELETE " & path & " -> NO CONNECTION: " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
+End Sub
+
+
+' ============================================================================
+' Browser ticket flow -- lets the web app (already running, same backend) decide "new item
+' vs duplicate vs attach to existing" instead of a native dialog. The macro: generates a
+' GUID ticket, opens the browser on the login bridge (GET /api/auth/browser-login) with
+' a deep-link to "?ticket=...", waits (WaitForTicket) while the user resolves it in the
+' "pending request from a CAD macro" popup, then reads back what happened via
+' GET /api/create-tickets/{ticket}.
+' ============================================================================
+
+' A v4-ish GUID good enough for a short-lived, purely correlational ticket (never stored
+' anywhere persistent) -- VBA has no built-in GUID generator, this is the standard
+' workaround. Scriptlet.TypeLib.Guid returns "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}";
+' strip the braces defensively via InStr rather than assuming fixed positions, in case a
+' particular Windows/VBA combination pads it differently.
+Function NewGuid() As String
+    Dim raw As String
+    raw = CreateObject("Scriptlet.TypeLib").Guid
+
+    Dim openBrace As Long, closeBrace As Long
+    openBrace = InStr(raw, "{")
+    closeBrace = InStr(raw, "}")
+    If openBrace > 0 And closeBrace > openBrace Then
+        raw = Mid(raw, openBrace + 1, closeBrace - openBrace - 1)
+    End If
+    If Len(raw) > 36 Then raw = Left(raw, 36)
+    NewGuid = LCase(raw)
+End Function
+
+Sub OpenUrlInBrowser(ByVal url As String)
+    CreateObject("WScript.Shell").Run """" & url & """", 1, False
+End Sub
+
+' Address that logs the browser in and deep-links straight to the "pending request from a
+' CAD macro" popup for THIS ticket -- see pending-create-ticket.ts/PendingTicketBanner in
+' the web app. Deliberately WITHOUT a suggested item number hint: this macro already has a
+' MORE reliable way to recognize "already uploaded" via iProperties (see GetLinkedItemId),
+' so there is nothing useful to suggest here.
+' NOTE: "ticket" in the /auth/browser-login query string below (the login bridge ticket,
+' minted fresh by POST /auth/browser-bridge-ticket) is a DIFFERENT thing from the "ticket"
+' parameter of THIS function (the create-correlation ticket, embedded inside the encoded
+' "redirect"). The login bridge ticket is one-time and short-lived -- the macro's actual,
+' long-lived session token never appears in the URL, so it can't leak via browser history.
+Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String) As String
+    Dim redirectPath As String
+    redirectPath = "/?ticket=" & UrlEncode(ticket)
+    If name <> "" Then redirectPath = redirectPath & "&name=" & UrlEncode(name)
+
+    Dim loginTicketResponse As Object
+    Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
+    Dim loginTicket As String
+    loginTicket = JsonGetString(loginTicketResponse, "ticket")
+
+    BuildBrowserCreateUrl = GetBaseUrl() & "/auth/browser-login?ticket=" & UrlEncode(loginTicket) & "&redirect=" & UrlEncode(redirectPath)
+End Function
+
+' Same two-ticket nesting as BuildBrowserCreateUrl above (login-bridge ticket wrapping the
+' real redirect), but for the "pick which item this drawing belongs to" popup -- used when
+' the drawing's own views reference MULTIPLE different already-linked items (see
+' UploadDrawingForActiveDoc) and this macro can't disambiguate on its own. candidateItemIds
+' is a Collection of item id strings (guids) -- passed straight through in the URL,
+' comma-separated; the browser side fetches each one's own display details itself
+' (GET /items/{id}, same as everywhere else in the web app), so nothing but the bare ids
+' needs to travel here.
+Function BuildBrowserDrawingUrl(ByVal ticket As String, ByVal candidateItemIds As Collection) As String
+    Dim candidatesParam As String
+    candidatesParam = ""
+    Dim id As Variant
+    For Each id In candidateItemIds
+        If candidatesParam <> "" Then candidatesParam = candidatesParam & ","
+        candidatesParam = candidatesParam & id
+    Next id
+
+    Dim redirectPath As String
+    redirectPath = "/?drawingTicket=" & UrlEncode(ticket) & "&candidates=" & UrlEncode(candidatesParam)
+
+    Dim loginTicketResponse As Object
+    Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
+    Dim loginTicket As String
+    loginTicket = JsonGetString(loginTicketResponse, "ticket")
+
+    BuildBrowserDrawingUrl = GetBaseUrl() & "/auth/browser-login?ticket=" & UrlEncode(loginTicket) & "&redirect=" & UrlEncode(redirectPath)
+End Function
+
+' Polls GET {endpointPath}{ticket} until the user resolves it in the browser, the wait times
+' out (10 minutes), or the user presses Escape. Returns the parsed ticket data (Dictionary
+' with itemId plus whatever else that endpoint returns -- itemNumber/name/exportStep/existing
+' for a create-ticket, or exportPdf for a drawing-ticket, see DrawingTicketStore.cs) on
+' success, or Nothing on cancel/timeout -- the caller treats both the same way ("nothing was
+' sent"). endpointPath defaults to the create-ticket namespace; pass "/drawing-tickets/" for
+' the "pick which item this drawing belongs to" flow (BuildBrowserDrawingUrl) -- both
+' endpoints share the same two-state shape (pending vs. non-empty "itemId"), so nothing else
+' here needs to change per ticket kind.
+'
+' No UserForm exists in this file (see file header) to host a visible "Cancel" button, so
+' Escape (checked every tick via GetAsyncKeyState) is the only available cancel gesture;
+' progress is shown in Inventor's own status bar instead of a dialog. Uses tick/poll
+' COUNTERS rather than Timer()/Now() on purpose -- Timer() resets at midnight, which would
+' misfire the 10-minute timeout for a wait that happens to straddle it.
+Function WaitForTicket(ByVal ticket As String, Optional ByVal endpointPath As String = "/create-tickets/") As Object
+    Const TICK_MS As Long = 400
+    Const POLL_EVERY_MS As Long = 2000
+    Const TIMEOUT_MS As Long = 600000 ' 10 minutes, same as every other CAD macro in this project
+
+    Dim elapsedMs As Long, sincePollMs As Long
+    elapsedMs = 0
+    sincePollMs = POLL_EVERY_MS ' poll right away on the very first tick
+
+    ' UNVERIFIED against a live Inventor install: Application.StatusBarText as a settable
+    ' property -- written from documented Inventor Automation API behavior, not tested here
+    ' (no Inventor in this environment). Wrapped in On Error Resume Next regardless, so a
+    ' wrong assumption here degrades to "no status bar text", not a crash.
+    On Error Resume Next
+    InvApp.StatusBarText = T("StatusWaitingForBrowser")
+    On Error GoTo 0
+
+    Do While elapsedMs < TIMEOUT_MS
+        Sleep TICK_MS
+        DoEvents
+        elapsedMs = elapsedMs + TICK_MS
+        sincePollMs = sincePollMs + TICK_MS
+
+        If (GetAsyncKeyState(VK_ESCAPE) And &H8000) <> 0 Then
+            LogLine "WaitForTicket: cancelled by Escape."
+            GoTo TimedOutOrCancelled
+        End If
+
+        If sincePollMs >= POLL_EVERY_MS Then
+            sincePollMs = 0
+            Dim data As Object
+            Set data = Nothing
+            On Error Resume Next
+            Set data = ApiGet(endpointPath & ticket)
+            On Error GoTo 0
+            If Not data Is Nothing Then
+                If JsonGetString(data, "itemId", "") <> "" Then
+                    Set WaitForTicket = data
+                    GoTo Cleanup
+                End If
+            End If
+        End If
+    Loop
+    LogLine "WaitForTicket: timed out after " & (TIMEOUT_MS \ 1000) & "s."
+
+TimedOutOrCancelled:
+    Set WaitForTicket = Nothing
+Cleanup:
+    On Error Resume Next
+    InvApp.StatusBarText = ""
+    On Error GoTo 0
+End Function
+
+
+' ============================================================================
+' Login / session
+' ============================================================================
+
+Function ApiLogin(ByVal username As String, ByVal password As String) As Object
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open "POST", GetBaseUrl() & "/auth/login", False
+    http.setRequestHeader "Content-Type", "application/json"
+
+    Dim bodyJson As String
+    bodyJson = "{""username"":" & JsonStr(username) & ",""password"":" & JsonStr(password) & "}"
+
+    On Error GoTo NetErr
+    http.send bodyJson
+    On Error GoTo 0
+
+    LogLine "POST /auth/login -> " & http.Status & " (user: " & username & ")"
+    If http.Status = 401 Or http.Status < 200 Or http.Status >= 300 Then
+        LogLine "Login failed: " & http.responseText
+        Err.Raise ERR_API, "EasyPDM", T("LoginFailedPrefix") & http.responseText
+    End If
+
+    Dim user As Object
+    Set user = JsonParse(http.responseText)
+
+    ' Token read FIRST from the JSON response body ("sessionToken") -- MSXML2.XMLHTTP.6.0
+    ' does not reliably expose the Set-Cookie header (known limitation of COM/WinHTTP
+    ' components), so the server also puts the token there specifically for this reason.
+    ' The cookie stays as a fallback source (older server versions, in case the API was
+    ' not updated).
+    Dim token As String
+    token = JsonGetString(user, "sessionToken", "")
+    If token = "" Then token = ExtractSessionCookie(http)
+    If token = "" Then
+        LogLine "Login: server responded 2xx, but no session token was found either in the response body or in the headers."
+        Err.Raise ERR_API, "EasyPDM", T("LoginFailedNoSession")
+    End If
+
+    SetSessionToken token
+    Dim displayName As String
+    displayName = JsonGetString(user, "displayName", "")
+    If displayName = "" Then displayName = JsonGetString(user, "username", username)
+    SetSavedDisplayName displayName
+    LogLine "Logged in as " & displayName & "."
+
+    Set ApiLogin = user
+    Exit Function
+NetErr:
+    LogLine "POST /auth/login -> NO CONNECTION: " & Err.Description
+    Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
+End Function
+
+' getResponseHeader("Set-Cookie") is sometimes filtered out by MSXML/WinINet security
+' measures -- as a fallback we search for the same header in the FULL header list, if the
+' first attempt returns nothing. Kept as a secondary source now that the token is normally
+' read from the JSON response body instead (see ApiLogin).
+Private Function ExtractSessionCookie(ByVal http As Object) As String
+    Dim raw As String
+    Dim result As String
+
+    On Error Resume Next
+    raw = http.getResponseHeader("Set-Cookie")
+    On Error GoTo 0
+    result = FindCookieInText(raw)
+    If result <> "" Then
+        ExtractSessionCookie = result
+        Exit Function
+    End If
+
+    On Error Resume Next
+    raw = http.getAllResponseHeaders()
+    On Error GoTo 0
+    ExtractSessionCookie = FindCookieInText(raw)
+End Function
+
+Private Function FindCookieInText(ByVal text As String) As String
+    Dim normalized As String
+    normalized = Replace(text, vbCrLf, vbLf)
+    normalized = Replace(normalized, vbCr, vbLf)
+
+    Dim marker As String
+    marker = SESSION_COOKIE_NAME & "="
+    Dim startPos As Long
+    startPos = InStr(1, normalized, marker, vbTextCompare)
+    If startPos = 0 Then
+        FindCookieInText = ""
+        Exit Function
+    End If
+
+    Dim rest As String
+    rest = Mid(normalized, startPos + Len(marker))
+    Dim semiPos As Long, linePos As Long, endPos As Long
+    semiPos = InStr(1, rest, ";")
+    linePos = InStr(1, rest, vbLf)
+    If linePos > 0 And (semiPos = 0 Or linePos < semiPos) Then
+        endPos = linePos
+    Else
+        endPos = semiPos
+    End If
+
+    If endPos = 0 Then
+        FindCookieInText = Trim(rest)
+    Else
+        FindCookieInText = Trim(Left(rest, endPos - 1))
+    End If
+End Function
+
+Sub ApiLogout()
+    Dim token As String
+    token = GetSessionToken()
+    If token <> "" Then
+        On Error Resume Next
+        Dim http As Object
+        Set http = NewHttpRequest()
+        http.Open "POST", GetBaseUrl() & "/auth/logout", False
+        http.setRequestHeader "Cookie", SESSION_COOKIE_NAME & "=" & token
+        http.send
+        On Error GoTo 0
+    End If
+    SetSessionToken ""
+    SetSavedDisplayName ""
+End Sub
+
+' Checks whether the saved session is still valid (GET /auth/me); if there is none, or it
+' expired/was revoked, shows the login dialog. Returns True if there is an active session
+' after this call (can continue), False if the user cancelled the login.
+Function EnsureLoggedIn() As Boolean
+    If GetSessionToken() <> "" Then
+        Dim result As Object
+        On Error Resume Next
+        Err.Clear
+        Set result = ApiGet("/auth/me")
+        Dim errNum As Long
+        errNum = Err.Number
+        On Error GoTo 0
+
+        If errNum = 0 Then
+            EnsureLoggedIn = True
+            Exit Function
+        ElseIf errNum = ERR_AUTH Then
+            SetSessionToken "" ' token expired/invalid -- don't try it again
+        Else
+            ' E.g. no connection -- don't block with a login prompt at this check stage;
+            ' the error will surface clearly at the first real API call anyway.
+            EnsureLoggedIn = True
+            Exit Function
+        End If
+    End If
+
+    EnsureLoggedIn = PromptLogin()
+End Function
+
+Private Function PromptLogin() As Boolean
+    Dim serverUrl As String
+    serverUrl = InputBox(T("PromptApiAddress"), T("TitleLoginToPdm"), GetBaseUrl())
+    If Trim(serverUrl) = "" Then
+        PromptLogin = False
+        Exit Function
+    End If
+    SetBaseUrl serverUrl
+
+    Dim attempt As Integer
+    For attempt = 1 To 3
+        Dim username As String, password As String
+        username = InputBox(T("PromptUsername"), T("TitleLoginToPdm"))
+        If Trim(username) = "" Then
+            PromptLogin = False
+            Exit Function
+        End If
+        ' A plain InputBox does not mask typed text with asterisks -- a limitation of this
+        ' simplified macro (no custom UserForm with a password field).
+        password = InputBox(T("PromptPassword"), T("TitleLoginToPdm"))
+        If password = "" Then
+            PromptLogin = False
+            Exit Function
+        End If
+
+        Dim user As Object
+        Dim loginErrNum As Long, loginErrDesc As String
+        On Error Resume Next
+        Err.Clear
+        Set user = ApiLogin(username, password)
+        loginErrNum = Err.Number
+        loginErrDesc = Err.Description
+        On Error GoTo 0
+
+        If loginErrNum = 0 Then
+            MsgBox T("LoggedInAsPrefix") & JsonGetString(user, "displayName", username) & ".", vbInformation, T("AppTitle")
+            PromptLogin = True
+            Exit Function
+        Else
+            MsgBox T("LoginFailedPrefix") & loginErrDesc, vbExclamation, T("AppTitle")
+        End If
+    Next attempt
+    PromptLogin = False
+End Function
+
+
+' ============================================================================
+' Helpers -- filename sanitization, revision label formatting.
+' ============================================================================
+
+Function SanitizeFilename(ByVal name As String) As String
+    Dim result As String
+    result = name
+    Dim badChars As String
+    badChars = "\/:*?""<>|"
+    Dim i As Long
+    For i = 1 To Len(badChars)
+        result = Replace(result, Mid(badChars, i, 1), "_")
+    Next i
+    result = Trim(result)
+    If result = "" Then result = "unnamed"
+    SanitizeFilename = result
+End Function
+
+' Revisions as uppercase letters instead of digits: 1->A, 2->B, ..., 26->Z, 27->AA... (like
+' spreadsheet column numbering) -- the same conversion as revisionLabel() in the web
+' frontend and in the FreeCAD/SolidWorks macros. The actual number in the database
+' (revisionNumber) does not change.
+Function RevisionLabel(ByVal n As Long) As String
+    Dim label As String
+    Dim remainder As Long
+    label = ""
+    Do While n > 0
+        remainder = (n - 1) Mod 26
+        label = Chr(65 + remainder) & label
+        n = (n - 1) \ 26
+    Loop
+    If label = "" Then label = "A"
+    RevisionLabel = label
+End Function
+
+
+' ============================================================================
+' Inventor document-type detection.
+'
+' Deliberately NOT a hardcoded DocumentTypeEnum integer (the pattern
+' EasyPDM.SolidWorks/EasyPDMUpload.bas uses for swDocumentTypes_e, declared explicitly
+' because late binding + Option Explicit cannot resolve the bare enum constant names without
+' a type library reference) -- this file has no live Inventor install to confirm the exact
+' enum values against, and guessing a wrong integer here would misclassify documents
+' silently. TypeName() instead reads the actual COM class name of the object (works
+' regardless of early/late binding, needs no enum knowledge at all) -- "PartDocument",
+' "AssemblyDocument", "DrawingDocument" are the well-documented, stable class names Inventor
+' uses for these three document types; HIGH confidence in these specific strings even
+' without a live install to check against.
+' ============================================================================
+
+Function DocKind(ByVal oDoc As Object) As String
+    Select Case TypeName(oDoc)
+        Case "PartDocument": DocKind = "part"
+        Case "AssemblyDocument": DocKind = "assembly"
+        Case "DrawingDocument": DocKind = "drawing"
+        Case Else: DocKind = "other"
+    End Select
+End Function
+
+
+' ============================================================================
+' PDM file storage -- if visible in this machine's file system (client and server on the
+' same disk), the copy goes directly there and is REGISTERED without a second HTTP
+' upload; otherwise a plain upload (see ApiUploadFile).
+' ============================================================================
+
+Function GetStorageRoot() As String
+    Dim result As String
+    result = ""
+    On Error Resume Next
+    Dim config As Object
+    Set config = ApiGet("/config")
+    If Not config Is Nothing Then result = JsonGetString(config, "storageRoot", "")
+    On Error GoTo 0
+    GetStorageRoot = result
+End Function
+
+' Shared ending of both modes: locally SAVES AS the current document under the name
+' "number (name).REVISION.extension" in targetFolder (same convention as itemDisplayLabel
+' in the frontend and the FreeCAD/SolidWorks macros' own local Save As -- so that an
+' assembly referencing this document, saved AFTER it in the same or a later macro run,
+' picks up the new file path automatically instead of reporting a broken link), then
+' uploads THAT (possibly just-renamed) file into PDM. Skips the Save As if the file is
+' ALREADY at the target path (re-uploading the same revision without a new one -- a no-op
+' Save As onto the document's own current path). The ORIGINAL file at its old path/name, if
+' different, is left on disk untouched -- neither moved nor deleted. Every upload is tagged
+' role="cad" (both the storage-copy register path and the plain HTTP upload path below), so
+' the web app can show it under its "CAD attachments" section, separately from ordinary
+' attachments -- one per revision (unique filename per revision means these ACCUMULATE,
+' unlike the single-slot "pdf"/"step" roles which replace the previous attachment).
+Function RenameAndUpload(ByVal oDoc As Object, ByVal filePath As String, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long, ByVal targetFolder As String, Optional ByVal role As String = "cad") As Boolean
+    Dim ext As String
+    Dim dotPos As Long
+    dotPos = InStrRev(filePath, ".")
+    If dotPos > 0 Then
+        ext = Mid(filePath, dotPos)
+    Else
+        ' filePath has no extension to read -- true for a never-saved document
+        ' (GetActiveDocInfo/GetDocInfo left it as "" on purpose, see their own comment),
+        ' where this SaveAs call below is what gives the document its VERY FIRST location on
+        ' disk. Derive the extension from the document's own type instead.
+        Select Case DocKind(oDoc)
+            Case "part": ext = ".ipt"
+            Case "assembly": ext = ".iam"
+            Case Else: ext = ""
+        End Select
+    End If
+
+    Dim newFilename As String
+    newFilename = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ext
+
+    ' UNVERIFIED against a live Inventor install for this SPECIFIC use (same-format Save As,
+    ' as opposed to UploadStepAttachment's format-CONVERTING export) -- written from
+    ' documented Inventor Document.SaveAs behavior (updates the open document's own identity/
+    ' path, same as File -> Save Copy As but WITHOUT the "Copy" -- SaveCopyAs:=False keeps
+    ' working on the renamed file itself, matching SolidWorks's Extension.SaveAs semantics
+    ' for this same call). Unlike SolidWorks's ByRef error/warning output params, Inventor
+    ' surfaces a failure as a COM error -- caught via On Error the same tolerant way: a
+    ' failure here is logged but NOT fatal, the upload below still proceeds from the
+    ' original path.
+    Dim newLocalPath As String
+    newLocalPath = targetFolder & "\" & newFilename
+    If LCase(newLocalPath) <> LCase(filePath) Then
+        Dim saveAsErrNum As Long, saveAsErrDesc As String
+        On Error Resume Next
+        Err.Clear
+        oDoc.SaveAs newLocalPath, False
+        saveAsErrNum = Err.Number
+        saveAsErrDesc = Err.Description
+        On Error GoTo 0
+        If saveAsErrNum = 0 Then
+            LogLine "Saved local copy under PDM name: " & newLocalPath
+            filePath = newLocalPath
+        Else
+            LogLine "Local Save As to """ & newLocalPath & """ failed (err=" & saveAsErrNum & ": " & saveAsErrDesc & ") -- uploading from the original path instead."
+        End If
+    End If
+
+    ' Unlike every other caller, a never-saved document (see GetDocInfo) arrives here with
+    ' filePath = "" -- if the SaveAs above also failed, there is no "original path" to fall
+    ' back to at all (the tolerant fallback in the Else branch just above assumes one always
+    ' exists). Uploading from an empty path would fail deep inside the HTTP/file-read code
+    ' with a confusing error, so stop here with a clear one instead.
+    If filePath = "" Then
+        MsgBox T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
+        LogLine "RenameAndUpload: never-saved document still has no local path after a failed Save As -- aborting."
+        RenameAndUpload = False
+        Exit Function
+    End If
+
+    ' Embed the PDM link into the file itself BEFORE uploading -- setting the iProperty
+    ' alone only changes the in-memory document; Inventor only writes it to disk on the NEXT
+    ' save, so without this extra save (even when no SaveAs happened above) the copy of the
+    ' file that lands on the server -- and therefore any later download of this item via
+    ' EasyPDMDownload.bas -- would never carry the link. A failure here is logged but NOT
+    ' fatal, matching this function's existing tolerant style -- the upload still proceeds
+    ' even if the file ends up missing the embedded link.
+    SetLinkedItemOn oDoc, itemId, CStr(itemNumber)
+    On Error Resume Next
+    Err.Clear
+    oDoc.Save
+    If Err.Number <> 0 Then
+        LogLine "Warning: could not re-save after setting the PDM link iProperty (" & Err.Description & ") -- the uploaded copy may be missing it."
+    End If
+    On Error GoTo 0
+
+    LogLine "RenameAndUpload: item #" & itemNumber & ", local file """ & filePath & """, new name """ & newFilename & """"
+
+    Dim storageRoot As String
+    storageRoot = GetStorageRoot()
+    If storageRoot <> "" Then
+        LogLine "PDM storage visible locally: " & storageRoot
+    Else
+        LogLine "PDM storage not visible from this machine (GET /config failed or empty response) -- will use plain HTTP upload."
+    End If
+
+    Dim targetPath As String
+    targetPath = ""
+    If storageRoot <> "" Then
+        Dim componentsDir As String
+        componentsDir = storageRoot & "\components"
+        On Error Resume Next
+        If Dir(componentsDir, vbDirectory) = "" Then MkDir componentsDir
+        On Error GoTo 0
+
+        If Dir(componentsDir, vbDirectory) <> "" Then
+            Dim candidate As String
+            candidate = componentsDir & "\" & newFilename
+            Dim copyErrNum As Long
+            On Error Resume Next
+            Err.Clear
+            FileCopy filePath, candidate
+            copyErrNum = Err.Number
+            On Error GoTo 0
+            If copyErrNum = 0 Then
+                targetPath = candidate
+                LogLine "Copied file to: " & candidate
+            Else
+                LogLine "Copying to storage failed (error " & copyErrNum & ") -- falling back to plain HTTP upload."
+            End If
+        End If
+    End If
+
+    If targetPath <> "" Then
+        ' If a copy of THE SAME revision (exact same name) is already registered, there is
+        ' nothing to do -- the fresh bytes are already there (FileCopy overwrote in place),
+        ' and registering the same path a second time would fail anyway (unique file_path
+        ' in the database). Attachments of other revisions (different letter) stay
+        ' untouched.
+        Dim alreadyRegistered As Boolean
+        alreadyRegistered = False
+        On Error Resume Next
+        Dim existingAttachments As Object
+        Set existingAttachments = ApiGet("/items/" & itemId & "/attachments")
+        On Error GoTo 0
+        If Not existingAttachments Is Nothing Then
+            Dim a As Variant
+            For Each a In existingAttachments
+                If JsonGetString(a, "fileName", "") = newFilename Then
+                    alreadyRegistered = True
+                    Exit For
+                End If
+            Next a
+        End If
+
+        If alreadyRegistered Then
+            LogLine "Attachment """ & newFilename & """ already registered -- storage copy overwritten with fresh bytes, no re-registration."
+        Else
+            Dim registerErrNum As Long, registerErrDesc As String
+            On Error Resume Next
+            Err.Clear
+            ApiRegisterAttachment itemId, targetPath, role
+            registerErrNum = Err.Number
+            registerErrDesc = Err.Description
+            On Error GoTo 0
+
+            If registerErrNum <> 0 Then
+                ' Registration failed -- without cleanup the copy in storage/components/
+                ' would be orphaned: never registered as an attachment, taking up space on
+                ' the server disk with no matching database entry.
+                LogLine "Attachment registration failed: " & registerErrDesc & " -- deleting orphaned copy " & targetPath
+                On Error Resume Next
+                Kill targetPath
+                On Error GoTo 0
+                Err.Raise ERR_API, "EasyPDM", T("AttachmentRegistrationFailedPrefix") & registerErrDesc
+            End If
+            LogLine "Registered attachment: " & targetPath
+        End If
+
+        RenameAndUpload = True
+        Exit Function
+    End If
+
+    ' Unlike the register path above (which overwrites the SAME physical file in place via
+    ' FileCopy, so re-registering an unchanged name is correctly a no-op), a plain HTTP
+    ' upload always lands at a BRAND NEW server-generated path with no relation to
+    ' "newFilename" -- without this check, repeated uploads while the revision letter stays
+    ' the same (e.g. several saves in a row while still "w_pracy", no status change) would
+    ' each add ANOTHER "cad" attachment instead of replacing the one for THIS revision,
+    ' accumulating indefinitely. Delete any previous attachment with the exact same name
+    ' first, so re-uploading the same revision replaces it instead.
+    Dim existingCadAttachments As Object
+    On Error Resume Next
+    Set existingCadAttachments = ApiGet("/items/" & itemId & "/attachments")
+    On Error GoTo 0
+    If Not existingCadAttachments Is Nothing Then
+        Dim existingCad As Variant
+        For Each existingCad In existingCadAttachments
+            If JsonGetString(existingCad, "fileName", "") = newFilename Then
+                On Error Resume Next
+                ApiDeleteRequest "/attachments/" & JsonGetString(existingCad, "id", "")
+                On Error GoTo 0
+                Exit For
+            End If
+        Next existingCad
+    End If
+
+    LogLine "Plain HTTP upload: /items/" & itemId & "/attachments as """ & newFilename & """"
+    ApiUploadFile "/items/" & itemId & "/attachments", filePath, newFilename, "role", role
+    RenameAndUpload = True
+End Function
+
+
+' Entry point for an active Drawing (.idw/.dwg) document -- see the "drawing" branch in
+' main(). A drawing is never itself a PDM item; it documents an existing Part/Assembly.
+' Matched two ways, tried in order:
+'   1) Read directly off the drawing's own views (FindLinkedCandidatesInDrawingViews below):
+'      each view (on any sheet) has a referenced document -- the actual Part/Assembly model
+'      it's showing. If that model is CURRENTLY OPEN in this Inventor session and was
+'      already linked to EasyPDM (has the EasyPDM_ItemId iProperty, same as
+'      GetLinkedItemIdOn already reads for assembly components), that's a far more reliable
+'      signal than the drawing's own filename -- doesn't depend on any naming convention at
+'      all. A drawing can reference MORE THAN ONE distinct item this way (e.g. an assembly
+'      drawing with a detail view of one specific part) -- if so, this macro can't guess
+'      which one is right, so it opens the browser with the found candidates instead
+'      (AskBrowserWhichItemForDrawing) rather than picking one blindly.
+'   2) If NO linked model could be found this way (referenced model closed, or never sent
+'      through EasyPDM before), falls back to parsing the leading "<itemNumber> (" that
+'      RenameAndUpload already gives every Part/Assembly file it saves (Inventor proposes
+'      this exact base filename by default when a drawing is created FROM an already-renamed
+'      model, so this still holds in the common case where (1) doesn't apply).
+' Either way, uploads through the SAME RenameAndUpload used for the model itself -- identical
+' Save-As/embed-link/accumulate-per-revision mechanics -- just with role="drawing" instead of
+' the default "cad" -- and, on confirmation, exports the drawing sheet itself to PDF via
+' UploadPdfAttachment (see UploadDrawingToItem below).
+'
+' UNVERIFIED against a live Inventor install: the exact property path for a drawing view's
+' referenced document (DrawingView.ReferencedDocumentDescriptor.ReferencedDocument below) --
+' written from documented Inventor Automation API behavior, especially that
+' ReferencedDocument only resolves when the referenced model is actually open (mirroring the
+' same documented limitation on the SolidWorks side of this macro family).
+Sub UploadDrawingForActiveDoc(ByVal oDoc As Object, ByVal filePath As String)
+    Dim candidateIds As Collection
+    Set candidateIds = FindLinkedCandidatesInDrawingViews(oDoc)
+
+    Dim refDocs As Collection
+    Set refDocs = FindReferencedDocsInDrawingViews(oDoc)
+
+    LogLine "Drawing upload: view walk found " & candidateIds.Count & " linked candidate(s) and " & refDocs.Count & " total distinct referenced document(s) (see per-view lines above)."
+
+    ' The drawing's views can reference MORE distinct documents than are linked to a PDM
+    ' item -- e.g. an assembly drawing with an extra detail view of one of the assembly's
+    ' own components that was never itself uploaded. Letting the upload proceed anyway
+    ' (attached to whichever item IS linked, silently ignoring the rest) would create a PDM
+    ' drawing that documents a part with no PDM record of its own -- downloading that item
+    ' elsewhere later would be missing it. Block outright rather than guessing/dropping it.
+    ' The one exception (exactly one reference total, and it's not linked at all) is offered
+    ' an automatic upload below instead of being blocked here.
+    If refDocs.Count > candidateIds.Count And Not (refDocs.Count = 1 And candidateIds.Count = 0) Then
+        Dim unlinkedNames As New Collection
+        Dim refDocForCheck As Variant
+        For Each refDocForCheck In refDocs
+            If GetLinkedItemIdOn(refDocForCheck) = "" Then
+                Dim refTitle As String
+                refTitle = refDocForCheck.FullFileName
+                If refTitle = "" Then
+                    refTitle = refDocForCheck.DisplayName
+                Else
+                    refTitle = BaseNameFromPath(refTitle)
+                End If
+                unlinkedNames.Add refTitle
+            End If
+        Next refDocForCheck
+
+        Dim unlinkedList As String
+        Dim unlinkedNameVariant As Variant
+        For Each unlinkedNameVariant In unlinkedNames
+            unlinkedList = unlinkedList & "- " & unlinkedNameVariant & vbCrLf
+        Next unlinkedNameVariant
+
+        MsgBox T("Dwg_UnlinkedReferencesBlockedPrefix") & unlinkedNames.Count & T("Dwg_UnlinkedReferencesBlockedSuffix") & vbCrLf & vbCrLf & unlinkedList, _
+               vbExclamation, T("AppTitle")
+        LogLine "Drawing upload: blocked -- " & unlinkedNames.Count & " referenced document(s) not linked to any PDM item (alongside " & candidateIds.Count & " that are)."
+        Exit Sub
+    End If
+
+    If candidateIds.Count = 1 Then
+        Dim singleItem As Object
+        Set singleItem = FetchItemById(CStr(candidateIds(1)))
+        If Not singleItem Is Nothing Then
+            UploadDrawingToItemNatively oDoc, filePath, singleItem
+            Exit Sub
+        End If
+        ' Stale/deleted link -- fall through to the filename-based fallback below instead of
+        ' failing outright, same tolerant spirit as the rest of this macro.
+    ElseIf candidateIds.Count > 1 Then
+        AskBrowserWhichItemForDrawing oDoc, filePath, candidateIds
+        Exit Sub
+    End If
+
+    ' No already-linked candidate found via the view tree -- at this point the drawing
+    ' references either no (resolvable) documents at all, or exactly one, entirely unlinked
+    ' one. If it's the latter and it's a Part/Assembly, offer to upload it first (full flow,
+    ' incl. the browser round-trip for its own number/name/revision) and then continue
+    ' straight into the drawing upload, instead of forcing a separate, manual macro run on
+    ' the part first.
+    If candidateIds.Count = 0 And refDocs.Count = 1 Then
+        Dim onlyRefDoc As Object
+        Set onlyRefDoc = refDocs(1)
+        If DocKind(onlyRefDoc) = "part" Or DocKind(onlyRefDoc) = "assembly" Then
+            If MsgBox(T("Dwg_ReferencedPartNotLinkedPrompt"), vbYesNo + vbQuestion, T("AppTitle")) = vbYes Then
+                Dim refFilePath As String, refItemTypeGuess As String, refDefaultName As String
+                If GetDocInfo(onlyRefDoc, refFilePath, refItemTypeGuess, refDefaultName) Then
+                    Dim refResult As Object
+                    Set refResult = UploadPartOrAssemblyDoc(onlyRefDoc, refFilePath, refItemTypeGuess, refDefaultName)
+                    If Not refResult Is Nothing Then
+                        Dim linkedItem As Object
+                        Set linkedItem = FetchItemById(CStr(refResult.Item("itemId")))
+                        If Not linkedItem Is Nothing Then
+                            UploadDrawingToItemNatively oDoc, filePath, linkedItem
+                            Exit Sub
+                        End If
+                    End If
+                End If
+                ' Cancelled or failed partway through the referenced part's own upload
+                ' (already messaged by UploadPartOrAssemblyDoc/GetDocInfo themselves) --
+                ' stop here rather than confusingly falling through to the filename
+                ' fallback for a part we just tried to upload.
+                LogLine "Drawing upload: referenced part/assembly auto-upload did not complete -- done."
+                Exit Sub
+            End If
+        End If
+    End If
+
+    Dim fname As String
+    fname = Mid(filePath, InStrRev(filePath, "\") + 1)
+
+    Dim re As Object
+    Set re = CreateObject("VBScript.RegExp")
+    re.Pattern = "^(\d+)\s*\("
+    If Not re.Test(fname) Then
+        MsgBox T("Dwg_CannotIdentifyItem"), vbExclamation, T("AppTitle")
+        LogLine "Drawing upload: could not parse an item number out of """ & fname & """ -- done."
+        Exit Sub
+    End If
+
+    Dim m As Object
+    Set m = re.Execute(fname)
+    Dim itemNumber As Long
+    itemNumber = CLng(m(0).SubMatches(0))
+
+    Dim item As Object
+    On Error Resume Next
+    Err.Clear
+    Set item = ApiGet("/items/by-number/" & itemNumber)
+    Dim lookupErrNum As Long
+    lookupErrNum = Err.Number
+    On Error GoTo 0
+    If item Is Nothing Or lookupErrNum <> 0 Then
+        If lookupErrNum = ERR_AUTH Then
+            MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+            SetSessionToken ""
+        Else
+            MsgBox T("Dwg_ItemNotFoundPrefix") & itemNumber & T("Dwg_ItemNotFoundSuffix"), vbExclamation, T("AppTitle")
+        End If
+        LogLine "Drawing upload: item #" & itemNumber & " lookup failed (err=" & lookupErrNum & ")."
+        Exit Sub
+    End If
+
+    UploadDrawingToItemNatively oDoc, filePath, item
+End Sub
+
+' Collects the DISTINCT item ids (guids) of already-EasyPDM-linked models referenced by any
+' of the active drawing's views (on any sheet) -- see UploadDrawingForActiveDoc's header
+' comment. Skips views whose referenced document cannot be resolved (model not currently
+' open) and models with no EasyPDM_ItemId iProperty set (never linked). Returns an empty
+' Collection if nothing was found (caller falls back to filename parsing).
+Function FindLinkedCandidatesInDrawingViews(ByVal oDrawDoc As Object) As Collection
+    Dim result As New Collection
+    Dim seen As Object
+    Set seen = CreateObject("Scripting.Dictionary")
+
+    Dim oSheet As Variant
+    Dim oView As Variant
+    For Each oSheet In oDrawDoc.Sheets
+        For Each oView In oSheet.DrawingViews
+            Dim refDoc As Object
+            On Error Resume Next
+            Set refDoc = oView.ReferencedDocumentDescriptor.ReferencedDocument
+            On Error GoTo 0
+            If Not refDoc Is Nothing Then
+                Dim linkedId As String
+                linkedId = GetLinkedItemIdOn(refDoc)
+                If linkedId <> "" And Not seen.Exists(linkedId) Then
+                    seen.Add linkedId, True
+                    ' The iProperty is only local evidence of a PAST link -- the PDM item it
+                    ' points at may have since been deleted server-side (stale link, same
+                    ' concept as ItemStillExists/StaleLinkCleared for the active document
+                    ' itself, see UploadPartOrAssemblyDoc). Clear the local property and do
+                    ' NOT treat this document as a linked candidate instead -- mirrors a real
+                    ' bug found and fixed on the SolidWorks side of this macro family.
+                    If ItemStillExists(linkedId) Then
+                        result.Add linkedId
+                    Else
+                        LogLine "Drawing upload: view's referenced document had a stale link to deleted item " & linkedId & " -- clearing it, treating as unlinked."
+                        SetLinkedItemOn refDoc, "", ""
+                    End If
+                End If
+            End If
+        Next oView
+    Next oSheet
+
+    Set FindLinkedCandidatesInDrawingViews = result
+End Function
+
+' Same view-walk as FindLinkedCandidatesInDrawingViews above, but collects every DISTINCT
+' referenced document OBJECT regardless of link status (used to offer auto-uploading a
+' still-unlinked Part/Assembly the drawing documents -- see UploadDrawingForActiveDoc).
+' Deduplicates by path; a never-saved document has no path (FullFileName = ""), so those
+' fall back to an in-memory identity key (ObjPtr) instead, so two different unsaved
+' documents are never merged into one.
+' Logs one line per view it walks (sheet name, view name, referenced document path/title or
+' "Nothing", and linked-item-id status) -- diagnostic output only (no MsgBox), kept
+' permanently since the view-walking behavior here is UNVERIFIED against a live Inventor
+' install and this is the only way to see what it actually found without attaching a
+' debugger.
+Function FindReferencedDocsInDrawingViews(ByVal oDrawDoc As Object) As Collection
+    Dim result As New Collection
+    Dim seen As Object
+    Set seen = CreateObject("Scripting.Dictionary")
+
+    Dim viewIndex As Long
+    viewIndex = 0
+
+    Dim oSheet As Variant
+    Dim oView As Variant
+    For Each oSheet In oDrawDoc.Sheets
+        For Each oView In oSheet.DrawingViews
+            viewIndex = viewIndex + 1
+            Dim viewName As String
+            viewName = ""
+            On Error Resume Next
+            viewName = oSheet.Name & "/" & oView.Name
+            On Error GoTo 0
+
+            Dim refDoc As Object
+            On Error Resume Next
+            Set refDoc = oView.ReferencedDocumentDescriptor.ReferencedDocument
+            On Error GoTo 0
+            If refDoc Is Nothing Then
+                LogLine "Drawing upload: view #" & viewIndex & " (""" & viewName & """) -- referenced document is Nothing (not currently open)."
+            Else
+                Dim refKey As String
+                refKey = refDoc.FullFileName
+                Dim refDisplayName As String
+                refDisplayName = refKey
+                If refKey = "" Then
+                    refKey = "objptr:" & ObjPtr(refDoc)
+                    Dim refTitleDiag As String
+                    refTitleDiag = ""
+                    On Error Resume Next
+                    refTitleDiag = refDoc.DisplayName
+                    On Error GoTo 0
+                    refDisplayName = "(unsaved: " & refTitleDiag & ")"
+                End If
+                LogLine "Drawing upload: view #" & viewIndex & " (""" & viewName & """) -- referenced document """ & refDisplayName & """, linked item id = """ & GetLinkedItemIdOn(refDoc) & """."
+                If Not seen.Exists(refKey) Then
+                    seen.Add refKey, True
+                    result.Add refDoc
+                End If
+            End If
+        Next oView
+    Next oSheet
+
+    Set FindReferencedDocsInDrawingViews = result
+End Function
+
+' GET /items/{id} -- Nothing (rather than raising) on any failure, including auth expiry --
+' callers of this helper treat "couldn't resolve" as "fall back to the filename-based path"
+' rather than a hard error, so a stale/expired link here should never abort the whole upload.
+Function FetchItemById(ByVal itemId As String) As Object
+    Dim result As Object
+    Set result = Nothing
+    On Error Resume Next
+    Set result = ApiGet("/items/" & itemId)
+    On Error GoTo 0
+    Set FetchItemById = result
+End Function
+
+' Opens the browser for the "pick which item this drawing belongs to" popup (multiple
+' distinct candidates found, see FindLinkedCandidatesInDrawingViews) and waits for the
+' resolution -- same wait/cancel/timeout mechanics as the ordinary create-ticket flow
+' (WaitForTicket), just against the /drawing-tickets/ namespace, and the PDF export choice is
+' asked THERE (as a checkbox alongside the item picker) instead of a separate native MsgBox.
+Sub AskBrowserWhichItemForDrawing(ByVal oDoc As Object, ByVal filePath As String, ByVal candidateIds As Collection)
+    On Error GoTo Failed
+
+    Dim ticket As String
+    ticket = NewGuid()
+
+    Dim url As String
+    url = BuildBrowserDrawingUrl(ticket, candidateIds)
+    OpenUrlInBrowser url
+
+    Dim ticketData As Object
+    Set ticketData = WaitForTicket(ticket, "/drawing-tickets/")
+    If ticketData Is Nothing Then
+        MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
+        LogLine "Drawing upload: browser disambiguation cancelled/timed out -- done."
+        Exit Sub
+    End If
+
+    Dim chosenItem As Object
+    Set chosenItem = ApiGet("/items/" & JsonGetString(ticketData, "itemId", ""))
+    Dim exportPdfChoice As Boolean
+    exportPdfChoice = ticketData.Exists("exportPdf") And CBool(ticketData.Item("exportPdf"))
+
+    UploadDrawingToItem oDoc, filePath, chosenItem, exportPdfChoice
+    Exit Sub
+
+Failed:
+    LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
+    If Err.Number = ERR_AUTH Then
+        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+        SetSessionToken ""
+    Else
+        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
+    End If
+End Sub
+
+' Fast, fully native path (single unambiguous match, either via the drawing's own views or
+' the filename fallback) -- asks ExportPdfPrompt exactly like the top-level document upload
+' flow does (off by default via vbDefaultButton2), then delegates to UploadDrawingToItem.
+Sub UploadDrawingToItemNatively(ByVal oDoc As Object, ByVal filePath As String, ByVal item As Object)
+    Dim nativeExportPdf As Boolean
+    nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
+    UploadDrawingToItem oDoc, filePath, item, nativeExportPdf
+End Sub
+
+' Shared tail end for all three drawing-upload paths above (single view-match, filename
+' fallback, browser-resolved) -- validates item type, uploads the drawing itself via
+' RenameAndUpload(role="drawing"), and optionally the drawing's own PDF export via
+' UploadPdfAttachment (replacing the item's single "pdf" slot with a real, print-quality
+' drawing sheet instead of the rendered 3D-view snapshot it might hold today).
+Sub UploadDrawingToItem(ByVal oDoc As Object, ByVal filePath As String, ByVal item As Object, ByVal exportPdf As Boolean)
+    Dim itemNumber As Long
+    itemNumber = JsonGetLong(item, "itemNumber", 0)
+
+    Dim itemType As String
+    itemType = JsonGetString(item, "itemType", "")
+    If itemType <> "part" And itemType <> "assembly" Then
+        MsgBox T("Dwg_NotPartOrAssembly"), vbExclamation, T("AppTitle")
+        LogLine "Drawing upload: item #" & itemNumber & " is a '" & itemType & "', not part/assembly -- done."
+        Exit Sub
+    End If
+
+    Dim itemId As String, name As String, revision As Long
+    itemId = JsonGetString(item, "id", "")
+    name = JsonGetString(item, "fileName", "")
+    revision = JsonGetLong(item, "revisionNumber", 1)
+
+    LogLine "Drawing upload: matched item #" & itemNumber & " (" & name & "), uploading as role=drawing."
+
+    On Error GoTo Failed
+    Dim uploadOk As Boolean
+    uploadOk = RenameAndUpload(oDoc, filePath, itemId, itemNumber, name, revision, GetDownloadFolder(), "drawing")
+    If uploadOk And exportPdf Then
+        UploadPdfAttachment oDoc, itemId, itemNumber, name, revision
+    End If
+    MsgBox T("Dwg_UploadedPrefix") & itemNumber & T("Dwg_UploadedSuffix"), vbInformation, T("AppTitle")
+    Exit Sub
+
+Failed:
+    LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
+    If Err.Number = ERR_AUTH Then
+        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+        SetSessionToken ""
+    Else
+        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
+    End If
+End Sub
+
+
+' ============================================================================
+' STEP/PDF export -- Inventor has no single "Save As in a different format" call the way
+' SolidWorks's Extension.SaveAs does (that one call handles both same-format renames AND
+' format-converting exports). Format conversion in Inventor goes through the documented
+' TranslatorAddIn mechanism instead: look up the add-in by its CLSID, build a
+' TranslationContext/NameValueMap/DataMedium trio (all obtained from
+' InvApp.TransientObjects, Inventor's standard factory for these short-lived helper
+' objects), then call SaveCopyAs on the add-in itself (NOT on the document).
+'
+' UNVERIFIED against a live Inventor install, all of it -- written from documented Inventor
+' Automation API samples, not tested here (no Inventor in this environment). Specifically
+' worth checking on the first real run, in rough order of how likely each is to need
+' adjusting:
+'   1) STEP_TRANSLATOR_CLSID/PDF_TRANSLATOR_CLSID (top of file) -- if ApplicationAddIns.
+'      ItemById raises an error or returns Nothing, the add-in is not registered under this
+'      exact CLSID on your installed Inventor version; open Tools -> Add-Ins in Inventor to
+'      find the correct one (look for "STEP" / "PDF" in the add-in list) and update the
+'      CLSID constant.
+'   2) oContext.Type = 2 below (meant to be kFileBrowseIOMechanism, so the translator writes
+'      straight to a file instead of popping its own interactive dialog) -- if export hangs
+'      waiting for a dialog no one can see, this enum value is the first thing to check.
+' ============================================================================
+
+Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid As String, ByVal outputPath As String) As Boolean
+    ExportViaTranslator = False
+    On Error Resume Next
+    Err.Clear
+
+    Dim oAddIn As Object
+    Set oAddIn = InvApp.ApplicationAddIns.ItemById(translatorClsid)
+    If oAddIn Is Nothing Or Err.Number <> 0 Then
+        LogLine "ExportViaTranslator: translator add-in """ & translatorClsid & """ not found (err=" & Err.Number & ": " & Err.Description & ")."
+        Exit Function
+    End If
+
+    ' Activate() before first use is the documented, safe way to ensure the add-in is
+    ' actually loaded -- calling SaveCopyAs on an inactive add-in is a common source of
+    ' silent failures in Inventor automation samples.
+    oAddIn.Activate
+
+    Dim oContext As Object
+    Set oContext = InvApp.TransientObjects.CreateTranslationContext
+    oContext.Type = 2 ' kFileBrowseIOMechanism -- see UNVERIFIED note above
+
+    Dim oOptions As Object
+    Set oOptions = InvApp.TransientObjects.CreateNameValueMap
+
+    Dim oDataMedium As Object
+    Set oDataMedium = InvApp.TransientObjects.CreateDataMedium
+    oDataMedium.FileName = outputPath
+
+    oAddIn.SaveCopyAs oDoc, oContext, oOptions, oDataMedium
+    If Err.Number <> 0 Then
+        LogLine "ExportViaTranslator: SaveCopyAs to """ & outputPath & """ via """ & translatorClsid & """ failed (err=" & Err.Number & ": " & Err.Description & ")."
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    On Error GoTo 0
+
+    ExportViaTranslator = (Dir(outputPath) <> "")
+End Function
+
+' Exports oDoc's visible geometry to a temporary .step file (via the STEP TranslatorAddIn,
+' see ExportViaTranslator above) and uploads it as an attachment tagged role="step" --
+' feeds the item's 2D/3D preview in the web app, same purpose as the SolidWorks/FreeCAD
+' counterparts of this Sub. Deliberately swallows ALL errors (On Error Resume Next for the
+' whole body): by the time this is called, the real upload (the .ipt/.iam file itself) has
+' already succeeded, so a failed STEP export (e.g. no visible geometry) must not look like
+' the whole operation failed.
+Sub UploadStepAttachment(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long)
+    On Error Resume Next
+
+    Dim tempPath As String
+    tempPath = Environ$("TEMP") & "\EasyPDM_step_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".step"
+
+    If Not ExportViaTranslator(oDoc, STEP_TRANSLATOR_CLSID, tempPath) Then
+        LogLine "STEP export failed for item " & itemId & "."
+        Exit Sub
+    End If
+
+    ' Uploaded under the SAME "number (name).REVISION.ext" convention as RenameAndUpload's
+    ' local Save As, so the STEP attachment shown/downloaded from the web app is immediately
+    ' recognizable instead of a meaningless temp filename. "One file per role" (a new STEP
+    ' replaces any previous one, physically deleted from disk too) is enforced server-side
+    ' (see ReplaceExistingRoleAttachmentAsync in AttachmentEndpoints.cs) -- no need to
+    ' fetch/delete the old one from here.
+    Dim stepDisplayName As String
+    stepDisplayName = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".step"
+
+    ApiUploadFile "/items/" & itemId & "/attachments", tempPath, stepDisplayName, "role", "step"
+    LogLine "Uploaded STEP attachment for item " & itemId & " as """ & stepDisplayName & """ (from " & tempPath & ")."
+
+    Kill tempPath
+    On Error GoTo 0
+End Sub
+
+' Same idea as UploadStepAttachment, but exports to PDF instead of STEP and tags the
+' attachment role="pdf" -- an independent opt-in choice from the browser ticket form, NOT
+' tied to whether STEP export was also requested. Works for both a Drawing (renders the
+' sheet) and a Part/Assembly (renders the current view) -- same tolerant, error-swallowing
+' style as UploadStepAttachment: a failed PDF export must not look like the whole upload
+' failed.
+Sub UploadPdfAttachment(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long)
+    On Error Resume Next
+
+    Dim tempPath As String
+    tempPath = Environ$("TEMP") & "\EasyPDM_pdf_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".pdf"
+
+    If Not ExportViaTranslator(oDoc, PDF_TRANSLATOR_CLSID, tempPath) Then
+        LogLine "PDF export failed for item " & itemId & "."
+        Exit Sub
+    End If
+
+    ' Same "number (name).REVISION.pdf" naming convention as the STEP attachment -- see
+    ' UploadStepAttachment's comment for why, and ReplaceExistingRoleAttachmentAsync for
+    ' why no manual pre-delete of the previous "pdf" attachment is needed here.
+    Dim pdfDisplayName As String
+    pdfDisplayName = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".pdf"
+
+    ApiUploadFile "/items/" & itemId & "/attachments", tempPath, pdfDisplayName, "role", "pdf"
+    LogLine "Uploaded PDF attachment for item " & itemId & " as """ & pdfDisplayName & """ (from " & tempPath & ")."
+
+    Kill tempPath
+    On Error GoTo 0
+End Sub
+
+
+' ============================================================================
+' PDM core: new item / attach to an existing item (with revision handling).
+' ============================================================================
+
+' Attaches the current document as the current file of an ALREADY EXISTING Part/Assembly --
+' without creating a new record. If the item's status is "wydany" (released -- PDM does not
+' allow attaching files in that status), asks for consent to create a new revision plus an
+' optional comment -- the exact same mechanism as in the web app (PATCH /items/{id}/status
+' bumps the revision number). Returns Nothing if the user declined the new revision.
+Function PushToExistingItem(ByVal oDoc As Object, ByVal itemId As String, ByVal filePath As String, ByVal targetFolder As String) As Object
+    Dim item As Object
+    Set item = ApiGet("/items/" & itemId)
+
+    Dim revision As Long
+    revision = JsonGetLong(item, "revisionNumber", 1)
+    If revision = 0 Then revision = 1
+    Dim currentStatus As String
+    currentStatus = JsonGetString(item, "status", "")
+    Dim itemNumber As Long
+    itemNumber = JsonGetLong(item, "itemNumber", 0)
+    Dim fileName As String
+    fileName = JsonGetString(item, "fileName", "")
+    LogLine "Attaching to existing item #" & itemNumber & " (id " & itemId & "), status """ & currentStatus & """, current revision " & revision
+
+    Dim statusChanged As Boolean
+    statusChanged = False
+
+    If currentStatus = "wydany" Then
+        Dim proceed As VbMsgBoxResult
+        proceed = MsgBox(T("ItemStatusReleasedPrefix") & itemNumber & T("ItemStatusReleasedSuffix"), vbYesNo + vbQuestion, T("TitleNewRevision"))
+        If proceed <> vbYes Then
+            Set PushToExistingItem = Nothing
+            Exit Function
+        End If
+
+        Dim comment As String
+        comment = InputBox(T("PromptRevisionComment"), T("TitleNewRevision"))
+
+        Dim statusBody As String
+        If Trim(comment) <> "" Then
+            statusBody = "{""status"":""w_pracy"",""comment"":" & JsonStr(comment) & "}"
+        Else
+            statusBody = "{""status"":""w_pracy"",""comment"":null}"
+        End If
+
+        Dim statusResult As Object
+        Set statusResult = ApiPatchJson("/items/" & itemId & "/status", statusBody)
+        Dim newRevision As Long
+        newRevision = JsonGetLong(statusResult, "revisionNumber", 0)
+        If newRevision > 0 Then
+            revision = newRevision
+        Else
+            revision = revision + 1
+        End If
+        statusChanged = True
+    ElseIf currentStatus <> "" And currentStatus <> "w_pracy" Then
+        ' Any status other than "w_pracy" (in progress) blocks attaching files on the
+        ' backend -- the only other real state here is "sprawdzany" (under review), since
+        ' "wydany" has its own branch above. Unlike "wydany" (where going back to "w_pracy"
+        ' is a deliberate, wanted "new revision" action), "sprawdzany" means someone is
+        ' actively reviewing this item -- silently reverting to "w_pracy" and uploading a
+        ' new file would silently blow away a review in progress, without asking anyone.
+        ' Hard-block instead, with a message.
+        MsgBox T("UploadBlockedReviewPrefix") & itemNumber & T("UploadBlockedReviewSuffix"), vbExclamation, T("TitleUploadBlocked")
+        Set PushToExistingItem = Nothing
+        Exit Function
+    End If
+
+    Dim uploadErrNum As Long, uploadErrDesc As String
+    On Error Resume Next
+    Err.Clear
+    RenameAndUpload oDoc, filePath, itemId, itemNumber, fileName, revision, targetFolder
+    uploadErrNum = Err.Number
+    uploadErrDesc = Err.Description
+    On Error GoTo 0
+
+    If uploadErrNum <> 0 Then
+        If statusChanged Then
+            ' Status/revision were already bumped on the server (they had to be, for
+            ' attaching a file to be allowed at all) -- since the file copy/registration
+            ' itself failed, the PDM item is now in an inconsistent state: new
+            ' revision/status in the database, but still the file of the previous
+            ' revision. Rolling back is NOT safely possible here -- the backend does not
+            ' allow a direct "w_pracy" -> "wydany" transition -- so instead of a silent/
+            ' confusing rollback attempt, we state loudly exactly what happened.
+            Err.Raise ERR_API, "EasyPDM", _
+                T("ItemAlreadyChangedPart1") & itemNumber & T("ItemAlreadyChangedPart2") & _
+                revision & T("ItemAlreadyChangedPart3") & _
+                uploadErrDesc & vbCrLf & vbCrLf & _
+                T("ItemAlreadyChangedPart4")
+        Else
+            Err.Raise ERR_API, "EasyPDM", uploadErrDesc
+        End If
+    End If
+
+    Dim result As Object
+    Set result = CreateObject("Scripting.Dictionary")
+    result.Add "itemId", itemId
+    result.Add "itemNumber", itemNumber
+    result.Add "name", fileName
+    result.Add "revision", revision
+    Set PushToExistingItem = result
+End Function
+
+
+' ============================================================================
+' Assembly tree auto-detection -- walks an Assembly's components
+' (AssemblyDocument.ComponentDefinition.Occurrences, top-level only) and offers to send any
+' component not yet linked to a PDM item, leaves-first, exactly like the FreeCAD/SolidWorks
+' counterparts of this macro family -- each new component gets the SAME browser ticket flow
+' as the top-level document (one tab at a time, never several at once -- see file header and
+' ProcessAssemblyTree below).
+'
+' Declining to send new components (MsgBox "No") does NOT skip the tree entirely -- see
+' "sendNewComponents" below: components ALREADY linked to PDM still get attached into the
+' BOM structure (no upload needed, nothing about them changed); only not-yet-linked ones
+' are skipped, and any relation involving one of those (as parent or child) is skipped too.
+'
+' UNVERIFIED against a live Inventor install: this whole section, especially
+' ComponentOccurrence.Suppressed (used below to skip suppressed components) and whether
+' .Definition.Document reliably raises/returns Nothing for a component whose document isn't
+' resolvable for some other reason (a broken reference, a missing file) -- confirm on first
+' real run. NOTE: unlike EasyPDM.SolidWorks/EasyPDMUpload.bas, there is deliberately NO
+' "resolve lightweight components" step here -- Inventor does not have the same per-assembly
+' "Lightweight" component concept SolidWorks does (its closest equivalents, Level of Detail
+' representations and Express mode, work differently and are not walked/forced here); if a
+' component's Document does not resolve because of some Inventor-side performance/loading
+' mode, that is a real gap versus the SolidWorks version, to be revisited once this can
+' actually be tested live.
+' ============================================================================
+
+' Recursively visits DIRECT children of parentDoc (if it is itself an Assembly), THEN
+' recurses into any child that is itself an Assembly, appending to "order" only AFTER
+' recursing -- this is what makes "order" come out leaves-first. "qty" for an edge is the
+' number of sibling instances of the SAME referenced file directly under THIS parent
+' (Inventor allows the same part to appear multiple times in one assembly, e.g. 4 identical
+' bolts) -- mirrors the FreeCAD/SolidWorks ElementCount/qty aggregation. Suppressed/
+' unresolved/virtual (no file) components are skipped.
+Private Sub VisitAssemblyComponents(ByVal parentDoc As Object, ByVal parentPath As String, ByRef order As Collection, ByRef models As Object, ByRef edges As Collection, ByRef visited As Object, ByRef unsavedComponentNames As Collection)
+    If parentDoc Is Nothing Then Exit Sub
+    If DocKind(parentDoc) <> "assembly" Then Exit Sub
+
+    Dim occs As Object
+    Set occs = parentDoc.ComponentDefinition.Occurrences ' top-level occurrences of THIS assembly only
+
+    LogLine "VisitAssemblyComponents: Occurrences on """ & parentPath & """ returned " & occs.Count & " component(s)."
+
+    ' Group by referenced file path first, so a part used several times under the same
+    ' parent becomes ONE edge with qty>1 instead of several qty=1 edges.
+    Dim qtyByPath As Object
+    Set qtyByPath = CreateObject("Scripting.Dictionary")
+    Dim modelByPath As Object
+    Set modelByPath = CreateObject("Scripting.Dictionary")
+
+    Dim occ As Variant
+    For Each occ In occs
+        If occ Is Nothing Then GoTo NextOcc
+
+        Dim occSuppressed As Boolean
+        occSuppressed = False
+        On Error Resume Next
+        occSuppressed = occ.Suppressed
+        On Error GoTo 0
+        If occSuppressed Then
+            LogLine "Skipping suppressed component: " & occ.Name
+            GoTo NextOcc
+        End If
+
+        Dim childModel As Object
+        Set childModel = Nothing
+        On Error Resume Next
+        Set childModel = occ.Definition.Document
+        On Error GoTo 0
+        If childModel Is Nothing Then
+            LogLine "Skipping component with no resolvable document: " & occ.Name
+            GoTo NextOcc
+        End If
+
+        Dim childPath As String
+        childPath = childModel.FullFileName
+        If childPath = "" Then
+            LogLine "Skipping component with no file on disk (virtual/embedded): " & occ.Name
+            unsavedComponentNames.Add occ.Name
+            GoTo NextOcc
+        End If
+
+        If qtyByPath.Exists(childPath) Then
+            qtyByPath(childPath) = qtyByPath(childPath) + 1
+        Else
+            qtyByPath.Add childPath, 1
+            Set modelByPath(childPath) = childModel
+        End If
+NextOcc:
+    Next occ
+
+    Dim pathKey As Variant
+    For Each pathKey In qtyByPath.Keys
+        Dim childModel2 As Object
+        Set childModel2 = modelByPath(pathKey)
+
+        If Not visited.Exists(pathKey) Then
+            visited.Add pathKey, True
+            VisitAssemblyComponents childModel2, CStr(pathKey), order, models, edges, visited, unsavedComponentNames
+            If Not models.Exists(pathKey) Then
+                Set models(pathKey) = childModel2
+                order.Add pathKey
+            End If
+        End If
+
+        Dim edge As Object
+        Set edge = CreateObject("Scripting.Dictionary")
+        edge.Add "parent", parentPath
+        edge.Add "child", pathKey
+        edge.Add "qty", qtyByPath(pathKey)
+        edges.Add edge
+    Next pathKey
+End Sub
+
+' Returns a Dictionary with "order" (Collection of file paths, leaves-first, EXCLUDING
+' topDoc itself), "models" (Dictionary path->Document) and "edges" (Collection of
+' Dictionary{parent,child,qty} for every parent-child pair in the tree, INCLUDING edges
+' where the parent is topDoc -- the caller attaches those separately once topDoc has its
+' own item id, see ProcessAssemblyTree/main()).
+Function DiscoverComponentTree(ByVal topDoc As Object) As Object
+    Dim order As New Collection
+    Dim models As Object
+    Set models = CreateObject("Scripting.Dictionary")
+    Dim edges As New Collection
+    Dim visited As Object
+    Set visited = CreateObject("Scripting.Dictionary")
+    Dim unsavedComponentNames As New Collection
+
+    Dim topPath As String
+    topPath = topDoc.FullFileName
+    visited.Add topPath, True
+    VisitAssemblyComponents topDoc, topPath, order, models, edges, visited, unsavedComponentNames
+
+    Dim result As Object
+    Set result = CreateObject("Scripting.Dictionary")
+    result.Add "order", order
+    result.Add "models", models
+    result.Add "edges", edges
+    result.Add "unsavedComponentNames", unsavedComponentNames
+    Set DiscoverComponentTree = result
+End Function
+
+Function StatusLabel(ByVal status As String) As String
+    Select Case status
+        Case "sprawdzany": StatusLabel = T("StatusLabelSprawdzany")
+        Case "wydany": StatusLabel = T("StatusLabelWydany")
+        Case Else: StatusLabel = status
+    End Select
+End Function
+
+' Detects children of "parentItemId" that exist in PDM but are no longer among
+' "localChildIds" (a Scripting.Dictionary used as a set, keyed by item id -- children
+' just discovered in the local assembly/component structure) -- removed from the tree
+' since the last upload. Asks natively for confirmation before removing anything (the
+' relation may have been added manually in the web app for an unrelated reason) --
+' declining, or a failed fetch of the current children, removes nothing. Each successful
+' removal also unassigns the removed child from ANY project (PATCH .../project
+' {projectId:null}) instead of dumping it into the current project's root -- the item stays
+' fully visible and findable via the global search ("Cala baza"/"Whole database"), it just
+' stops cluttering the structure of a project it no longer has anything to do with. The
+' exact same mechanism as the web application's own "Remove from structure".
+Sub SyncStaleChildren(ByVal parentItemId As String, ByVal localChildIds As Object)
+    Dim rows As Object
+    On Error Resume Next
+    Err.Clear
+    Set rows = ApiGet("/items/" & parentItemId & "/children")
+    On Error GoTo 0
+    If rows Is Nothing Then Exit Sub
+
+    Dim staleList As New Collection
+    Dim row As Variant
+    For Each row In rows
+        If row.Exists("item") Then
+            Dim childItem As Object
+            Set childItem = row("item")
+            Dim childId As String
+            childId = JsonGetString(childItem, "id", "")
+            If childId <> "" Then
+                If Not localChildIds.Exists(childId) Then
+                    staleList.Add childItem
+                End If
+            End If
+        End If
+    Next row
+
+    If staleList.Count = 0 Then Exit Sub
+
+    Dim lines As String
+    Dim c As Variant
+    For Each c In staleList
+        lines = lines & "- " & JsonGetLong(c, "itemNumber", 0) & " (" & JsonGetString(c, "fileName", "") & ")" & vbCrLf
+    Next c
+
+    Dim choice As VbMsgBoxResult
+    choice = MsgBox(T("StaleChildrenConfirmPrefix") & staleList.Count & T("StaleChildrenConfirmSuffix") & vbCrLf & vbCrLf & lines, _
+                     vbYesNo + vbQuestion, T("AppTitle"))
+    If choice <> vbYes Then Exit Sub
+
+    For Each c In staleList
+        Dim cid As String
+        cid = JsonGetString(c, "id", "")
+        On Error Resume Next
+        ApiDeleteRequest "/items/" & parentItemId & "/children/" & cid
+        ApiPatchJson "/items/" & cid & "/project", "{""projectId"":null}"
+        On Error GoTo 0
+    Next c
+End Sub
+
+Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collection, ByVal targetFolder As String, ByRef lockedComponents As Collection) As Boolean
+    ProcessAssemblyTree = False
+    If DocKind(topDoc) <> "assembly" Then Exit Function
+
+    ' No "resolve lightweight components" step here -- see this section's own header
+    ' comment for why (Inventor has no direct equivalent of SolidWorks's per-assembly
+    ' Lightweight resolution, and guessing a nonexistent API call is worse than simply not
+    ' calling one).
+
+    Dim tree As Object
+    Set tree = DiscoverComponentTree(topDoc)
+
+    ' Components with no file on disk yet (virtual/embedded, never individually saved) are
+    ' silently excluded from "order" by VisitAssemblyComponents -- surfaced here as one
+    ' explicit warning instead, so the user knows some of what they see in the Inventor tree
+    ' won't show up in EasyPDM, rather than wondering why the BOM looks incomplete.
+    Dim unsavedComponentNames As Collection
+    Set unsavedComponentNames = tree("unsavedComponentNames")
+    If unsavedComponentNames.Count > 0 Then
+        Dim unsavedList As String
+        Dim unsavedName As Variant
+        For Each unsavedName In unsavedComponentNames
+            unsavedList = unsavedList & "- " & unsavedName & vbCrLf
+        Next unsavedName
+        MsgBox T("UnsavedComponentsWarningPrefix") & unsavedComponentNames.Count & T("UnsavedComponentsWarningSuffix") & vbCrLf & vbCrLf & unsavedList, _
+               vbExclamation, T("AppTitle")
+        LogLine "ProcessAssemblyTree: " & unsavedComponentNames.Count & " component(s) skipped (no file on disk)."
+    End If
+
+    Dim order As Collection
+    Set order = tree("order")
+    LogLine "ProcessAssemblyTree: discovered " & order.Count & " component(s) in the tree (excluding the top-level document itself)."
+    If order.Count = 0 Then Exit Function
+
+    Dim models As Object
+    Set models = tree("models")
+
+    ' Shows the TARGET item number/name for every ALREADY-linked component, not just its
+    ' filename -- the only chance the user gets to notice a stale link before anything is
+    ' touched. Inventor's own native "Save Copy As" (done manually, outside this macro)
+    ' COPIES iProperties along with everything else: Save-Copy-As'ing an already-linked part
+    ' to start a genuinely DIFFERENT part silently inherits the old EasyPDM_ItemId, so
+    ' without this the macro would otherwise "recognize" the new part as the OLD item and
+    ' attach it into the BOM as a duplicate of something else, instead of creating it -- see
+    ' the same caveat in the file header for the top-level document's own version of this
+    ' warning.
+    Dim summary As String
+    Dim p As Variant
+    For Each p In order
+        Dim summaryLine As String
+        summaryLine = "- " & Mid(p, InStrRev(p, "\") + 1)
+
+        Dim summaryLinkedId As String
+        summaryLinkedId = GetLinkedItemIdOn(models(p))
+        If summaryLinkedId <> "" Then
+            Dim summaryLinkedInfo As Object
+            On Error Resume Next
+            Set summaryLinkedInfo = ApiGet("/items/" & summaryLinkedId)
+            On Error GoTo 0
+            If Not summaryLinkedInfo Is Nothing Then
+                summaryLine = summaryLine & T("AlreadyInPdmAsPrefix") & JsonGetLong(summaryLinkedInfo, "itemNumber", 0) & _
+                              " (" & JsonGetString(summaryLinkedInfo, "fileName", "") & ")"
+
+                ' Already-linked components are ONLY ever referenced, never re-uploaded,
+                ' regardless of status (the assembly tree never updates already-existing
+                ' components) -- but if status is "sprawdzany"/"wydany", flag it here so the
+                ' final summary in main() can tell the user which linked components did NOT
+                ' get updated, in case they changed one of them locally.
+                Dim summaryStatus As String
+                summaryStatus = JsonGetString(summaryLinkedInfo, "status", "")
+                If summaryStatus = "sprawdzany" Or summaryStatus = "wydany" Then
+                    lockedComponents.Add JsonGetLong(summaryLinkedInfo, "itemNumber", 0) & " (" & _
+                                         JsonGetString(summaryLinkedInfo, "fileName", "") & ") -- " & StatusLabel(summaryStatus)
+                End If
+            End If
+        End If
+
+        summary = summary & summaryLine & vbCrLf
+    Next p
+
+    Dim choice As VbMsgBoxResult
+    choice = MsgBox(T("AssemblyLinksPart1") & order.Count & T("AssemblyLinksPart2") & vbCrLf & vbCrLf & _
+                     summary & vbCrLf & _
+                     T("AssemblyLinksPart3") & vbCrLf & vbCrLf & _
+                     T("AssemblyLinksPart4"), _
+                     vbYesNoCancel + vbQuestion, T("AssemblyDetectedTitle"))
+    If choice = vbCancel Then
+        ProcessAssemblyTree = True
+        Exit Function
+    End If
+    ' "No" does NOT skip the whole tree -- it only skips CREATING/UPLOADING components not
+    ' yet in PDM. Components already linked still get attached into the BOM structure below
+    ' (no file upload needed for those, since nothing about them changed); a not-yet-linked
+    ' component with sendNewComponents=False is skipped entirely (never added to
+    ' pathToItemId below), so any relation involving it as parent or child is naturally
+    ' skipped too by the existing pathToItemId.Exists(...) guards further down.
+    Dim sendNewComponents As Boolean
+    sendNewComponents = (choice = vbYes)
+
+    Dim edges As Collection
+    Set edges = tree("edges")
+
+    ' path -> item id, for components processed so far in this run (existing OR
+    ' newly created) -- needed to resolve child ids when attaching parent-child relations.
+    Dim pathToItemId As Object
+    Set pathToItemId = CreateObject("Scripting.Dictionary")
+
+    ' Paths CREATED in this run (as opposed to already-linked components merely being
+    ' referenced) -- once such an item's relation to its real parent is attached below, it
+    ' gets hidden from the project root (show_in_tree=false). It was never an independent
+    ' item; its creation here is purely a side effect of the leaves-first upload order
+    ' (create the leaf, THEN attach it under its actual parent). An ALREADY-linked component
+    ' is a pre-existing, possibly intentionally independent catalog item -- attaching it here
+    ' must NOT touch its existing root visibility.
+    Dim newlyCreatedPaths As Object
+    Set newlyCreatedPaths = CreateObject("Scripting.Dictionary")
+
+    Dim filePath As Variant
+    For Each filePath In order
+        Dim childModel As Object
+        Set childModel = models(filePath)
+
+        Dim existingItemId As String
+        existingItemId = GetLinkedItemIdOn(childModel)
+        If existingItemId <> "" Then
+            If Not ItemStillExists(existingItemId) Then
+                LogLine "Component's linked PDM item " & existingItemId & " no longer exists (deleted?) -- clearing stale link: " & filePath
+                SetLinkedItemOn childModel, "", ""
+                existingItemId = ""
+            End If
+        End If
+
+        If existingItemId <> "" Then
+            pathToItemId.Add filePath, existingItemId
+            LogLine "Component already linked to PDM item " & existingItemId & ": " & filePath
+        ElseIf sendNewComponents Then
+            ' Same "let the browser decide new/duplicate/attach-existing" flow as the
+            ' top-level document (BuildBrowserCreateUrl/WaitForTicket, see file header) --
+            ' opened ONE TAB AT A TIME, one component after another in the same
+            ' leaves-first order as everything else here (never several tabs at once --
+            ' confusing to juggle). Cancelling any single ticket aborts the whole
+            ' remaining tree walk, same as every other hiccup in this loop.
+            ' A native MsgBox right before opening each browser tab -- confirmed necessary
+            ' in practice on the SolidWorks side of this macro family: Windows' foreground-
+            ' stealing protection lets the FIRST programmatic browser-open of a run take
+            ' focus, but silently opens the SECOND one (and later) in a background tab with
+            ' no visible cue, leaving WaitForTicket polling forever with nothing for the
+            ' user to see or fill in. Clicking OK here counts as fresh user input, which lets
+            ' the immediately-following browser-open take focus reliably.
+            Dim compSuggestedName As String
+            compSuggestedName = BaseNameFromPath(CStr(filePath))
+            MsgBox T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
+
+            Dim compTicket As String
+            compTicket = NewGuid()
+            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName)
+
+            Dim compTicketData As Object
+            Set compTicketData = WaitForTicket(compTicket)
+            If compTicketData Is Nothing Then
+                ProcessAssemblyTree = True
+                Exit Function
+            End If
+
+            Dim compExportStep As Boolean
+            compExportStep = True
+            If compTicketData.Exists("exportStep") Then
+                If Not IsNull(compTicketData.Item("exportStep")) Then compExportStep = CBool(compTicketData.Item("exportStep"))
+            End If
+
+            Dim compExportPdf As Boolean
+            compExportPdf = False
+            If compTicketData.Exists("exportPdf") Then
+                If Not IsNull(compTicketData.Item("exportPdf")) Then compExportPdf = CBool(compTicketData.Item("exportPdf"))
+            End If
+
+            Dim compIsExisting As Boolean
+            compIsExisting = False
+            If compTicketData.Exists("existing") Then
+                If compTicketData.Item("existing") = True Then compIsExisting = True
+            End If
+
+            Dim compTicketItemId As String
+            compTicketItemId = JsonGetString(compTicketData, "itemId", "")
+
+            Dim created As Object
+            If compIsExisting Then
+                Set created = PushToExistingItem(childModel, compTicketItemId, CStr(filePath), targetFolder)
+                If created Is Nothing Then
+                    ' Existing item is "wydany" and the user declined a new revision --
+                    ' treat like any other cancellation here (see comment above).
+                    ProcessAssemblyTree = True
+                    Exit Function
+                End If
+            Else
+                ' New item -- it already exists server-side (the browser called POST
+                ' /nodes with this ticket), so finish DIRECTLY with the file upload;
+                ' creating another item here through the API would create a SECOND item --
+                ' same reasoning as the top-level document's own ticket handling in main().
+                Dim compTicketItemNumber As Long
+                compTicketItemNumber = JsonGetLong(compTicketData, "itemNumber", 0)
+                Dim compTicketName As String
+                compTicketName = JsonGetString(compTicketData, "name", compSuggestedName)
+
+                RenameAndUpload childModel, CStr(filePath), compTicketItemId, compTicketItemNumber, compTicketName, 1, targetFolder
+                Set created = CreateObject("Scripting.Dictionary")
+                created.Add "itemId", compTicketItemId
+                created.Add "itemNumber", compTicketItemNumber
+                created.Add "name", compTicketName
+                created.Add "revision", 1
+            End If
+
+            Dim newItemId As String
+            newItemId = JsonGetString(created, "itemId", "")
+            If compExportStep Then UploadStepAttachment childModel, newItemId, JsonGetLong(created, "itemNumber", 0), JsonGetString(created, "name", ""), JsonGetLong(created, "revision", 1)
+            If compExportPdf Then UploadPdfAttachment childModel, newItemId, JsonGetLong(created, "itemNumber", 0), JsonGetString(created, "name", ""), JsonGetLong(created, "revision", 1)
+            ' Redundant final refresh -- RenameAndUpload/PushToExistingItem's own upload
+            ' path already set (and saved) this same iProperty BEFORE uploading, so the
+            ' file actually sent to the server already carries it. Kept here as cheap
+            ' insurance.
+            SetLinkedItemOn childModel, newItemId, CStr(JsonGetLong(created, "itemNumber", 0))
+            pathToItemId.Add filePath, newItemId
+            newlyCreatedPaths.Add filePath, True
+        Else
+            ' Not yet linked and the user declined sending new components -- skip it
+            ' entirely (never added to pathToItemId), so it simply cannot take part in any
+            ' relation below, neither as parent nor as child.
+            LogLine "Component not yet linked, skipping (user declined sending new components): " & filePath
+        End If
+
+        ' Attach relations where THIS file is the parent, now that it has an item id --
+        ' every child in "edges" at this point already has one too, since "order" is
+        ' leaves-first (children were processed in earlier iterations of this same loop).
+        ' Guarded by pathToItemId.Exists(filePath): a component skipped just above (declined
+        ' new component) never got an item id, so it cannot be a relation parent either.
+        If pathToItemId.Exists(filePath) Then
+            ' Before attaching CURRENT relations below, check whether PDM still has relations
+            ' to children that are no longer in this sub-assembly's local structure (removed
+            ' from the Inventor tree since the last upload) -- see SyncStaleChildren.
+            Dim localChildIdsHere As Object
+            Set localChildIdsHere = CreateObject("Scripting.Dictionary")
+            Dim edgePre As Variant
+            For Each edgePre In edges
+                If edgePre("parent") = filePath And pathToItemId.Exists(edgePre("child")) Then
+                    If Not localChildIdsHere.Exists(pathToItemId(edgePre("child"))) Then
+                        localChildIdsHere.Add pathToItemId(edgePre("child")), True
+                    End If
+                End If
+            Next edgePre
+            SyncStaleChildren pathToItemId(filePath), localChildIdsHere
+
+            Dim edge2 As Variant
+            For Each edge2 In edges
+                If edge2("parent") = filePath Then
+                    If pathToItemId.Exists(edge2("child")) Then
+                        Dim relErr As String
+                        relErr = ""
+                        On Error Resume Next
+                        Err.Clear
+                        ApiPostJson "/items/" & pathToItemId(filePath) & "/children", "{""childId"":" & JsonStr(pathToItemId(edge2("child"))) & ",""quantity"":" & edge2("qty") & "}"
+                        If Err.Number <> 0 Then relErr = Err.Description
+                        On Error GoTo 0
+                        If relErr <> "" Then
+                            MsgBox T("CreatedButFailedAttachPart1") & Mid(CStr(edge2("child")), InStrRev(CStr(edge2("child")), "\") + 1) & _
+                                   T("CreatedButFailedAttachPart2") & Mid(filePath, InStrRev(filePath, "\") + 1) & T("CreatedButFailedAttachPart3") & relErr, vbExclamation, T("AppTitle")
+                        ElseIf newlyCreatedPaths.Exists(edge2("child")) Then
+                            ' Now properly nested under its real parent -- hide it from the
+                            ' project root (see "newlyCreatedPaths" comment above). Left
+                            ' visible at root if the attach above failed, so it can still be
+                            ' found and fixed manually.
+                            On Error Resume Next
+                            ApiPatchJson "/items/" & pathToItemId(edge2("child")) & "/visibility", "{""showInTree"":false}"
+                            On Error GoTo 0
+                        End If
+                    End If
+                End If
+            Next edge2
+        End If
+    Next filePath
+
+    ' Relations where topDoc itself is the parent could not be attached above (topDoc does
+    ' not have an item id yet -- that is decided by the rest of main()) -- return them for
+    ' the caller to attach once it does.
+    Dim topPath As String
+    topPath = topDoc.FullFileName
+    Dim edge3 As Variant
+    For Each edge3 In edges
+        If edge3("parent") = topPath Then
+            If pathToItemId.Exists(edge3("child")) Then
+                edgesForTop.Add Array(pathToItemId(edge3("child")), edge3("qty"), newlyCreatedPaths.Exists(edge3("child")))
+            End If
+        End If
+    Next edge3
+End Function
+
+
+' ============================================================================
+' Inventor -- active document, save, iProperties (PDM link).
+' "InvApp" is declared and assigned at the start of Sub main() (see module header) -- we do
+' NOT rely on Inventor providing it automatically in an imported module.
+' ============================================================================
+
+' Strips the directory and extension from a full file path -- "C:\...\a.ipt" -> "a". Used
+' for the suggested/default name shown to the user: Inventor's own DisplayName and a raw
+' path both include the extension, which does not belong in a PDM item name.
+Function BaseNameFromPath(ByVal path As String) As String
+    Dim baseName As String
+    baseName = Mid(path, InStrRev(path, "\") + 1)
+    Dim dotPos As Long
+    dotPos = InStrRev(baseName, ".")
+    If dotPos > 0 Then baseName = Left(baseName, dotPos - 1)
+    BaseNameFromPath = baseName
+End Function
+
+' A never-saved (untitled) active document is handled differently from one that already has
+' a path on disk but unsaved CHANGES pending:
+'   - Already has a path -- Save is the right call (writes to that same path, no dialog
+'     needed) and a failure there is a real, unexpected problem worth stopping for.
+'   - No path at all (FullFileName = "") -- Save CANNOT succeed silently (there is nowhere
+'     to write yet). Rather than forcing the user out to a manual Ctrl+S first, ask once
+'     and, on confirmation, let the REST of the normal flow give it a location for the first
+'     time -- RenameAndUpload's own SaveAs (once the browser round-trip has resolved a real
+'     item number/name/revision) works fine on a document with no existing path.
+'     filePath stays "" through this branch on purpose; RenameAndUpload derives the file
+'     extension from the document's own type in that case instead of from filePath.
+' Parametrized by document (not just the active document) so UploadDrawingForActiveDoc can
+' run the exact same "unsaved? ask to save; else Save" logic on a drawing's still-unlinked
+' referenced Part/Assembly, not only on InvApp.ActiveDocument -- same wrapper pattern as
+' GetLinkedItemId/GetLinkedItemIdOn and SetLinkedItem/SetLinkedItemOn below.
+Function GetDocInfo(ByVal oDoc As Object, ByRef filePath As String, ByRef itemTypeGuess As String, ByRef defaultName As String) As Boolean
+    filePath = oDoc.FullFileName
+
+    If filePath = "" Then
+        If MsgBox(T("UnsavedDocumentPrompt"), vbYesNo + vbQuestion, T("AppTitle")) <> vbYes Then
+            GetDocInfo = False
+            Exit Function
+        End If
+    Else
+        Dim saveErrNum As Long
+        On Error Resume Next
+        Err.Clear
+        oDoc.Save
+        saveErrNum = Err.Number
+        On Error GoTo 0
+        If saveErrNum <> 0 Then
+            MsgBox T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
+            GetDocInfo = False
+            Exit Function
+        End If
+        filePath = oDoc.FullFileName
+        If filePath = "" Then
+            GetDocInfo = False
+            Exit Function
+        End If
+    End If
+
+    Select Case DocKind(oDoc)
+        Case "part"
+            itemTypeGuess = "part"
+        Case "assembly"
+            itemTypeGuess = "assembly"
+        Case Else
+            itemTypeGuess = "file"
+    End Select
+
+    defaultName = BaseNameFromPath(filePath)
+
+    GetDocInfo = True
+End Function
+
+Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As String, ByRef defaultName As String) As Boolean
+    If InvApp.ActiveDocument Is Nothing Then
+        GetActiveDocInfo = False
+        Exit Function
+    End If
+    GetActiveDocInfo = GetDocInfo(InvApp.ActiveDocument, filePath, itemTypeGuess, defaultName)
+End Function
+
+' iProperties live in named PropertySets -- "Inventor User Defined Properties" is the
+' standard set for custom/user-defined properties added by code or by the user (distinct
+' from the built-in "Design Tracking Properties"/"Summary Information" sets Inventor also
+' exposes). UNVERIFIED against a live Inventor install: this exact set name -- older
+' Inventor versions, or certain document types, might expose it as plain
+' "User Defined Properties" instead (without the "Inventor " prefix); confirm on first real
+' run and adjust PROPSET_NAME below if PropertySets.Item(...) raises "item not found".
+Private Const PROPSET_NAME As String = "Inventor User Defined Properties"
+
+Private Function GetCustPropSetOn(ByVal oDoc As Object) As Object
+    Set GetCustPropSetOn = oDoc.PropertySets.Item(PROPSET_NAME)
+End Function
+
+' Reads the PDM item id saved in ANY document's iProperties (if it was already uploaded via
+' this macro before) -- empty string if not yet linked to any PDM item. Parametrized by
+' document (not just the active document) so ProcessAssemblyTree can check this on each
+' COMPONENT's own document, not only on whatever is active in Inventor.
+Function GetLinkedItemIdOn(ByVal oDoc As Object) As String
+    Dim valOut As String
+    valOut = ""
+    On Error Resume Next
+    valOut = GetCustPropSetOn(oDoc).Item(CUSTPROP_ITEM_ID).Value
+    On Error GoTo 0
+    GetLinkedItemIdOn = valOut
+End Function
+
+' Saves the document-to-PDM-item link as iProperties on ANY document -- this works
+' reliably in a brand NEW Inventor session too, since properties are part of the file
+' itself. Tries setting .Value on an existing property FIRST (the common case, on the
+' second-and-later call for the same document); if that fails (property does not exist
+' yet), adds it fresh instead -- the standard get-or-create idiom for Inventor iProperties,
+' since there is no single "add or replace" call the way SolidWorks's Add3 (with a REPLACE
+' option) provides.
+Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumberText As String)
+    Dim oPropSet As Object
+    Set oPropSet = GetCustPropSetOn(oDoc)
+
+    On Error Resume Next
+    Err.Clear
+    oPropSet.Item(CUSTPROP_ITEM_ID).Value = itemId
+    If Err.Number <> 0 Then
+        Err.Clear
+        oPropSet.Add itemId, CUSTPROP_ITEM_ID
+    End If
+    On Error GoTo 0
+
+    On Error Resume Next
+    Err.Clear
+    oPropSet.Item(CUSTPROP_ITEM_NUMBER).Value = itemNumberText
+    If Err.Number <> 0 Then
+        Err.Clear
+        oPropSet.Add itemNumberText, CUSTPROP_ITEM_NUMBER
+    End If
+    On Error GoTo 0
+End Sub
+
+' Thin wrappers over the active document -- kept so the rest of the file (Sub main, which
+' always deals with InvApp.ActiveDocument) does not need to pass it explicitly everywhere.
+Function GetLinkedItemId() As String
+    GetLinkedItemId = GetLinkedItemIdOn(InvApp.ActiveDocument)
+End Function
+
+Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String)
+    SetLinkedItemOn InvApp.ActiveDocument, itemId, itemNumberText
+End Sub
+
+' Checks whether a linked PDM item still exists on the server -- recovers from a STALE
+' iProperty link (e.g. the item was deleted in the web app after this document was linked
+' to it; deleting server-side does not touch the document's own iProperty, so the macro
+' would otherwise keep "believing" the link is good and fail with a raw 404 the moment it
+' tries to use it). Only a genuine 404 counts as "gone" -- any other outcome (200, a
+' different error, no connection) is treated as "still there", so a transient network
+' hiccup can never be misread as "deleted" and silently start a brand new item instead of
+' updating the real one.
+Function ItemStillExists(ByVal itemId As String) As Boolean
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open "GET", GetBaseUrl() & "/items/" & itemId, False
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+
+    On Error Resume Next
+    Err.Clear
+    http.send
+    If Err.Number <> 0 Then
+        ItemStillExists = True ' network error -- assume still there, don't guess
+        Exit Function
+    End If
+    On Error GoTo 0
+
+    ItemStillExists = (http.Status <> 404)
+End Function
+
+
+' ============================================================================
+' Entry point -- run via Tools tab -> Macro panel -> Macros... -> "main" -> Run (or F5 in
+' the VBA editor).
+' ============================================================================
+
+Sub main()
+    LogLine "=== EasyPDM Inventor macro started ==="
+
+    On Error Resume Next
+    Set InvApp = GetObject(, "Inventor.Application")
+    On Error GoTo 0
+
+    If InvApp Is Nothing Then
+        MsgBox T("MustRunInsideInventor"), vbCritical, T("AppTitle")
+        Exit Sub
+    End If
+
+    If Not EnsureLoggedIn() Then
+        LogLine "Login cancelled -- done."
+        Exit Sub
+    End If
+
+    Dim filePath As String, itemTypeGuess As String, defaultName As String
+    If Not GetActiveDocInfo(filePath, itemTypeGuess, defaultName) Then
+        MsgBox T("NoActiveSavedDocument"), vbExclamation, T("AppTitle")
+        LogLine "No active/saved document -- done."
+        Exit Sub
+    End If
+    LogLine "Active document: """ & filePath & """, detected type: " & itemTypeGuess
+
+    ' A Drawing (.idw/.dwg) is never itself a PDM item -- it's documentation FOR an existing
+    ' Part/Assembly, uploaded as a "drawing"-role attachment on that item instead. Never
+    ' linked via the EasyPDM_ItemId iProperty (nothing above ever sets it on a Drawing), so
+    ' this is handled as its own early, separate path -- entirely before (and instead of)
+    ' the itemTypeGuess-based Part/Assembly dispatch below, which assumes the active
+    ' document itself becomes/updates a top-level item.
+    If DocKind(InvApp.ActiveDocument) = "drawing" Then
+        UploadDrawingForActiveDoc InvApp.ActiveDocument, filePath
+        Exit Sub
+    End If
+
+    UploadPartOrAssemblyDoc InvApp.ActiveDocument, filePath, itemTypeGuess, defaultName
+End Sub
+
+' Runs the full "upload this Part/Assembly document to EasyPDM" flow -- target folder
+' prompt, assembly component tree (Step 1), already-linked-vs-new-item-in-browser decision
+' (Step 2), attaching Step 1's components under the result (Step 3), and the final
+' success/error messaging -- against an ARBITRARY document, not necessarily
+' InvApp.ActiveDocument. Extracted out of Sub main() so UploadDrawingForActiveDoc can run
+' this same flow on a drawing's still-unlinked referenced Part/Assembly before continuing
+' with the drawing itself (see its own comment) -- ordinary use from main() on the active
+' document is unchanged, just routed through this function instead of being inlined.
+' Returns the resultInfo Dictionary (keys: itemId/itemNumber/name/revision) on success,
+' Nothing if cancelled or failed at any point (messaging for every such case happens here,
+' same as it always has -- callers don't need to show anything more themselves).
+Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String, ByVal itemTypeGuess As String, ByVal defaultName As String) As Object
+    ' Target folder for local "Save As under the PDM name" copies -- asked ONCE, up front,
+    ' before Step 1, so it covers BOTH the auto-detected assembly components (leaves-first,
+    ' see ProcessAssemblyTree) AND the top-level document itself. Same registry key as
+    ' EasyPDMDownload.bas's download folder (see GetDownloadFolder) -- shared on purpose, so
+    ' uploaded and downloaded files land together by default, same as the FreeCAD/SolidWorks
+    ' macros.
+    Dim targetFolder As String
+    targetFolder = Trim(InputBox(T("PromptTargetFolder"), T("TitleTargetFolder"), GetDownloadFolder()))
+    If targetFolder = "" Then
+        LogLine "Target folder prompt cancelled -- done."
+        Exit Function
+    End If
+    If Right(targetFolder, 1) = "\" Then targetFolder = Left(targetFolder, Len(targetFolder) - 1)
+    EnsureDirectory targetFolder
+    SetDownloadFolder targetFolder
+
+    On Error GoTo Failed
+
+    ' Step 1: assembly component tree -- offer to auto-detect/send new components first
+    ' (leaves-first), before deciding anything about the top-level document itself. See
+    ' file header / ProcessAssemblyTree for the one-browser-tab-at-a-time ticket flow used
+    ' for each new component. Each new component gets its own local Save As (see
+    ' RenameAndUpload) BEFORE this function returns, so by the time the top-level document
+    ' below is itself saved, any of its references to a just-processed component already
+    ' point at the new, PDM-named path.
+    Dim edgesForTop As New Collection
+    Dim lockedComponents As New Collection
+    If itemTypeGuess = "assembly" Then
+        If ProcessAssemblyTree(oDoc, edgesForTop, targetFolder, lockedComponents) Then
+            LogLine "Cancelled during assembly tree processing -- done."
+            Exit Function
+        End If
+    End If
+
+    Dim linkedItemId As String
+    linkedItemId = GetLinkedItemIdOn(oDoc)
+
+    If linkedItemId <> "" Then
+        If Not ItemStillExists(linkedItemId) Then
+            LogLine "Linked PDM item " & linkedItemId & " no longer exists on the server (deleted?) -- clearing the stale local link, treating this document as not yet linked."
+            SetLinkedItemOn oDoc, "", ""
+            MsgBox T("StaleLinkCleared"), vbInformation, T("AppTitle")
+            linkedItemId = ""
+        End If
+    End If
+
+    Dim resultInfo As Object
+
+    If linkedItemId <> "" Then
+        ' Already linked -- Inventor knows the target with certainty (iProperty), no
+        ' browser round-trip needed. Whether to export STEP/PDF is asked here as two plain
+        ' native Yes/No questions instead -- unlike the per-component assembly tree walk
+        ' (see file header), this happens ONCE per run for a single document, so a couple of
+        ' native prompts is not the "opening N popups" problem that drove the assembly
+        ' components over to the browser ticket flow.
+        '
+        ' Shows the LINKED ITEM'S OWN number/name in the confirmation, not just a generic
+        ' "already linked?" question -- Inventor's native "Save Copy As" (done manually by
+        ' the user, not through this macro) COPIES iProperties along with everything else:
+        ' Save-Copy-As'ing an already-linked part to start a genuinely DIFFERENT part would
+        ' silently inherit the old EasyPDM_ItemId, and without this the user would have no
+        ' way to notice before overwriting the WRONG item's content with the new part's
+        ' file. Falls back to the generic wording if this lookup itself fails (a transient
+        ' error) -- the item's own existence was already confirmed moments ago above via
+        ' ItemStillExists.
+        Dim linkedItemInfo As Object
+        On Error Resume Next
+        Set linkedItemInfo = ApiGet("/items/" & linkedItemId)
+        On Error GoTo 0
+
+        Dim confirmText As String
+        If Not linkedItemInfo Is Nothing Then
+            confirmText = T("AlreadyLinkedConfirmPrefix") & JsonGetLong(linkedItemInfo, "itemNumber", 0) & _
+                          " (" & JsonGetString(linkedItemInfo, "fileName", "") & ")" & T("AlreadyLinkedConfirmSuffix")
+        Else
+            confirmText = T("AlreadyLinkedConfirm")
+        End If
+
+        Dim confirmUpdate As VbMsgBoxResult
+        confirmUpdate = MsgBox(confirmText, vbYesNo + vbQuestion, T("AppTitle"))
+        If confirmUpdate <> vbYes Then Exit Function
+
+        ' Defaults match the browser checkboxes' own defaults (STEP on, PDF off) via
+        ' vbDefaultButton1/2 -- Enter alone picks the same answer the browser form would
+        ' start with.
+        Dim nativeExportStep As Boolean
+        nativeExportStep = (MsgBox(T("ExportStepPrompt"), vbYesNo + vbQuestion + vbDefaultButton1, T("AppTitle")) = vbYes)
+        Dim nativeExportPdf As Boolean
+        nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
+
+        Set resultInfo = PushToExistingItem(oDoc, linkedItemId, filePath, targetFolder)
+        If Not resultInfo Is Nothing Then
+            If nativeExportStep Then UploadStepAttachment oDoc, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+            If nativeExportPdf Then UploadPdfAttachment oDoc, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+        End If
+    Else
+        ' Not yet linked -- "new item vs duplicate vs attach to existing" is decided in
+        ' the browser, not locally, exactly like the FreeCAD/SolidWorks counterparts of
+        ' this macro family. See BuildBrowserCreateUrl/WaitForTicket above.
+        Dim ticket As String
+        ticket = NewGuid()
+        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName)
+
+        Dim ticketData As Object
+        Set ticketData = WaitForTicket(ticket)
+        If ticketData Is Nothing Then
+            MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
+            LogLine "=== Finished: browser ticket cancelled/timed out ==="
+            Exit Function
+        End If
+
+        Dim exportStep As Boolean
+        exportStep = True
+        If ticketData.Exists("exportStep") Then
+            If Not IsNull(ticketData.Item("exportStep")) Then exportStep = CBool(ticketData.Item("exportStep"))
+        End If
+
+        Dim exportPdf As Boolean
+        exportPdf = False
+        If ticketData.Exists("exportPdf") Then
+            If Not IsNull(ticketData.Item("exportPdf")) Then exportPdf = CBool(ticketData.Item("exportPdf"))
+        End If
+
+        Dim ticketItemId As String
+        ticketItemId = JsonGetString(ticketData, "itemId", "")
+
+        Dim isExisting As Boolean
+        isExisting = False
+        If ticketData.Exists("existing") Then
+            If ticketData.Item("existing") = True Then isExisting = True
+        End If
+
+        If isExisting Then
+            Set resultInfo = PushToExistingItem(oDoc, ticketItemId, filePath, targetFolder)
+            If resultInfo Is Nothing Then
+                MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
+                LogLine "=== Finished: existing item declined a new revision ==="
+                Exit Function
+            End If
+            linkedItemId = ticketItemId
+            If exportStep Then UploadStepAttachment oDoc, ticketItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+            If exportPdf Then UploadPdfAttachment oDoc, ticketItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
+        Else
+            ' New item -- it already exists server-side (the browser called POST /nodes
+            ' with this ticket), so finish DIRECTLY with the file upload; creating another
+            ' item here through the API would create a SECOND item.
+            Dim ticketItemNumber As Long
+            ticketItemNumber = JsonGetLong(ticketData, "itemNumber", 0)
+            Dim ticketName As String
+            ticketName = JsonGetString(ticketData, "name", defaultName)
+
+            RenameAndUpload oDoc, filePath, ticketItemId, ticketItemNumber, ticketName, 1, targetFolder
+            linkedItemId = ticketItemId
+            Set resultInfo = CreateObject("Scripting.Dictionary")
+            resultInfo.Add "itemId", ticketItemId
+            resultInfo.Add "itemNumber", ticketItemNumber
+            resultInfo.Add "name", ticketName
+            resultInfo.Add "revision", 1
+            If exportStep Then UploadStepAttachment oDoc, ticketItemId, ticketItemNumber, ticketName, 1
+            If exportPdf Then UploadPdfAttachment oDoc, ticketItemId, ticketItemNumber, ticketName, 1
+        End If
+    End If
+
+    ' Step 3: attach components discovered in step 1 under THIS element, now that it has
+    ' an item id -- regardless of whether it was brand new or already existing.
+    If Not resultInfo Is Nothing Then
+        ' Before attaching CURRENT relations below, check whether PDM still has relations to
+        ' children no longer in the local assembly structure (removed from the tree since
+        ' the last upload) -- see SyncStaleChildren.
+        Dim localTopChildIds As Object
+        Set localTopChildIds = CreateObject("Scripting.Dictionary")
+        Dim edgeTopPre As Variant
+        For Each edgeTopPre In edgesForTop
+            If Not localTopChildIds.Exists(edgeTopPre(0)) Then localTopChildIds.Add edgeTopPre(0), True
+        Next edgeTopPre
+        SyncStaleChildren linkedItemId, localTopChildIds
+
+        Dim edgeVariant As Variant
+        For Each edgeVariant In edgesForTop
+            Dim topRelErr As String
+            topRelErr = ""
+            On Error Resume Next
+            Err.Clear
+            ApiPostJson "/items/" & linkedItemId & "/children", "{""childId"":" & JsonStr(edgeVariant(0)) & ",""quantity"":" & edgeVariant(1) & "}"
+            If Err.Number <> 0 Then topRelErr = Err.Description
+            On Error GoTo 0
+            If topRelErr <> "" Then
+                MsgBox T("FailedToAttachSubComponent") & topRelErr, vbExclamation, T("AppTitle")
+            ElseIf edgeVariant(2) Then
+                ' Newly created purely as a leaves-first side effect of this upload (see
+                ' ProcessAssemblyTree's "newlyCreatedPaths") -- now properly nested under
+                ' THIS document, hide it from the project root. Left visible if the attach
+                ' above failed, so it can still be found and fixed manually.
+                On Error Resume Next
+                ApiPatchJson "/items/" & edgeVariant(0) & "/visibility", "{""showInTree"":false}"
+                On Error GoTo 0
+            End If
+        Next edgeVariant
+    End If
+
+    If Not resultInfo Is Nothing Then
+        ' Redundant final refresh -- RenameAndUpload (called by whichever path produced
+        ' resultInfo above) already set and saved this same iProperty BEFORE uploading, so
+        ' the file actually sent to the server already carries it. Kept here as cheap
+        ' insurance for the top-level document specifically.
+        SetLinkedItemOn oDoc, linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0))
+        LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
+                ", revision " & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & " ==="
+
+        Dim lockedTail As String
+        lockedTail = ""
+        If lockedComponents.Count > 0 Then
+            Dim lockedLine As Variant
+            For Each lockedLine In lockedComponents
+                lockedTail = lockedTail & "- " & lockedLine & vbCrLf
+            Next lockedLine
+            lockedTail = vbCrLf & vbCrLf & T("LockedComponentsTailPrefix") & lockedComponents.Count & _
+                         T("LockedComponentsTailSuffix") & vbCrLf & lockedTail
+        End If
+
+        MsgBox T("UploadedSuccessPart1") & JsonGetLong(resultInfo, "itemNumber", 0) & _
+               T("UploadedSuccessPart2") & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & ")." & vbCrLf & vbCrLf & _
+               T("RunLogPrefix") & LogFilePath() & lockedTail, vbInformation, T("AppTitle")
+    Else
+        LogLine "=== Finished without uploading (cancelled or no new revision) ==="
+    End If
+    Set UploadPartOrAssemblyDoc = resultInfo
+    Exit Function
+
+Failed:
+    LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
+    If Err.Number = ERR_AUTH Then
+        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & _
+               T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+        SetSessionToken ""
+    Else
+        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
+    End If
+End Function
+
+' Separate Sub -- can be bound to your own toolbar button/shortcut to log out of EasyPDM
+' without running the whole upload flow (the next run of "main" will ask to log in again).
+Sub Logout()
+    ApiLogout
+    MsgBox T("LoggedOutMessage"), vbInformation, T("AppTitle")
+End Sub

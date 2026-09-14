@@ -58,6 +58,12 @@ All notable changes to EasyPDM are documented in this file.
   through "Whole database", and the button flips it back open at any time. The project list
   everywhere is also now sorted by client name, then the client's Name 2, then the project's
   own name, instead of just alphabetically by project name.
+- New CAD integration: `EasyPDM.Inventor/EasyPDMUpload.bas` and `EasyPDMDownload.bas`, VBA
+  macros for Autodesk Inventor, ported from `EasyPDM.SolidWorks/` with the same
+  browser-based upload/download flow, STEP/PDF export, and automatic assembly-tree
+  detection. **Unverified on live Inventor** (no Inventor install available to test
+  against) — see `EasyPDM.Inventor/README.md` for the full list of known risks to check
+  on the first real run.
 
 ### Fixed
 - SolidWorks: downloading an item whose name contains characters outside the Windows

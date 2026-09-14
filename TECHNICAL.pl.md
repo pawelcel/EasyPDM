@@ -9,8 +9,9 @@ projektowaniu) jest w [README.pl.md](README.pl.md).
 ## Status
 
 Ręczne tworzenie projektów i elementów przez aplikację webową (upload pliku wprost do
-magazynu API) albo przez makro FreeCAD (`EasyPDM.FreeCad/`) lub SolidWorks
-(`EasyPDM.SolidWorks/`), które wołają to samo API.
+magazynu API) albo przez makro FreeCAD (`EasyPDM.FreeCad/`), SolidWorks
+(`EasyPDM.SolidWorks/`) lub Autodesk Inventor (`EasyPDM.Inventor/`), które wołają to samo
+API.
 Wcześniejsze podejście ze skanowaniem dysku (`EasyPDM.Core`, `EasyPDM.Indexer`) zostało
 usunięte z repo — było niezgodne ze schematem od migracji `002` i nigdy nieużywane przez
 `Api`.
@@ -68,6 +69,11 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), z tym samym przepływem przez przeglądarkę,
   eksportem STEP i automatycznym wykrywaniem drzewa złożenia. **Niezweryfikowane na żywym
   SolidWorks** — zob. `EasyPDM.SolidWorks/README.md` po szczegóły i znane ryzyka.
+- **`EasyPDM.Inventor/`** — odpowiednik powyższego dla Autodesk Inventor (makra VBA
+  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), port z `EasyPDM.SolidWorks/` z tym samym
+  przepływem przez przeglądarkę, eksportem STEP/PDF i automatycznym wykrywaniem drzewa
+  złożenia. **Niezweryfikowane na żywym Inventorze** — zob. `EasyPDM.Inventor/README.md`
+  po szczegóły i znane ryzyka.
 - **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i **`packaging/windows/`**
   (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez ręcznego składania z osobna
