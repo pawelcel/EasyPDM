@@ -2132,19 +2132,15 @@ End Sub
 ' turns out wrong.
 ' ============================================================================
 
-' Picks a directory for the STEP/PDF translator's temp output file. Deliberately prefers
-' oDoc's OWN folder over Environ$("TEMP"): on the machine this was first live-tested on,
-' Environ$("TEMP") resolved to an 8.3 short path (e.g. "C:\Users\PAWEL~1.CEL\AppData\Local\
-' Temp", because the Windows account name itself contains a period) and SaveCopyAs failed
-' there with a generic COM error (-2147418113 / E_UNEXPECTED) that it does NOT produce when
-' given a normal long path -- consistent with known reports of Inventor's translators being
-' fussy about export destinations (Autodesk forum reports of SaveCopyAs failing to
-' permission-/policy-restricted or otherwise unusual paths, resolved by exporting elsewhere).
-' oDoc's folder is already proven writable at this point (the .ipt/.iam itself was just saved
-' there) and is always a normal, un-mangled long path, so it sidesteps the whole class of
-' problem regardless of which exact mechanism caused it. Falls back to Environ$("TEMP") only
-' for a document with no FullFileName (should not happen this late in the upload flow, but
-' cheap to guard).
+' Picks a directory for the STEP/PDF translator's temp output file. Prefers oDoc's OWN
+' folder over Environ$("TEMP") -- originally on the theory that Environ$("TEMP") resolving
+' to an 8.3 short path (account name containing a period, e.g. "PAWEL~1.CEL") was tripping
+' up SaveCopyAs. A live retest DISPROVED that specific theory: SaveCopyAs (err=-2147418113 /
+' E_UNEXPECTED) failed identically even against oDoc's own normal, long, non-mangled folder
+' path -- so the short path was NOT the cause. Kept anyway since exporting next to a file
+' Inventor just proved it can write to is still strictly safer than an arbitrary %TEMP%, but
+' the real cause of the SaveCopyAs failure is still open; see Err.Source now logged alongside
+' it in ExportViaTranslator for the next diagnosis attempt.
 Private Function ExportTempDirFor(ByVal oDoc As Object) As String
     Dim docPath As String
     docPath = ""
@@ -2209,7 +2205,7 @@ Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid
 
     oAddIn.SaveCopyAs oDoc, oContext, oOptions, oDataMedium
     If Err.Number <> 0 Then
-        LogLine "ExportViaTranslator: SaveCopyAs to """ & outputPath & """ via """ & translatorClsid & """ failed (err=" & Err.Number & ": " & Err.Description & ")."
+        LogLine "ExportViaTranslator: SaveCopyAs to """ & outputPath & """ via """ & translatorClsid & """ failed (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)."
         Err.Clear
         On Error GoTo 0
         Exit Function
@@ -3055,9 +3051,13 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
     ' and the document would need to be reopened read-write). Logged so a failure below can
     ' be told apart from the OS-attribute case already handled above.
     On Error Resume Next
+    Err.Clear
     Dim docReadOnly As String
-    docReadOnly = "?"
     docReadOnly = CStr(oDoc.ReadOnly)
+    If Err.Number <> 0 Then
+        docReadOnly = "? (reading oDoc.ReadOnly itself failed: err=" & Err.Number & ": " & Err.Description & ")"
+        Err.Clear
+    End If
     On Error GoTo 0
     LogLine "SetLinkedItemOn: oDoc.ReadOnly = " & docReadOnly & " for """ & oDoc.FullFileName & """."
 
@@ -3096,7 +3096,7 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
         Err.Clear
         oPropSet.Add itemId, CUSTPROP_ITEM_ID
         If Err.Number <> 0 Then
-            idState = "FAILED (err=" & Err.Number & ": " & Err.Description & ")"
+            idState = "FAILED (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)"
         Else
             idState = "added"
         End If
@@ -3112,7 +3112,7 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
         Err.Clear
         oPropSet.Add itemNumberText, CUSTPROP_ITEM_NUMBER
         If Err.Number <> 0 Then
-            numberState = "FAILED (err=" & Err.Number & ": " & Err.Description & ")"
+            numberState = "FAILED (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)"
         Else
             numberState = "added"
         End If
@@ -3125,12 +3125,16 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
             CUSTPROP_ITEM_NUMBER & "=""" & itemNumberText & """ -> " & numberState & "; on """ & oDoc.FullFileName & """."
 
     ' Diagnostic only, runs ONLY when at least one write above failed outright (both the
-    ' update AND the add-fallback failed) -- lists every property CURRENTLY in the set, by
-    ' name, so a mismatch (e.g. the property already exists under a name that differs from
-    ' CUSTPROP_ITEM_ID/CUSTPROP_ITEM_NUMBER only in case or whitespace -- which would make
-    ' .Item() fail to find it AND .Add() fail as a "duplicate name" at the same time,
-    ' confirmed in practice as a genuine cause of this exact failure pattern) shows up
-    ' directly in the log instead of staying a mystery.
+    ' update AND the add-fallback failed). The duplicate-name hypothesis (property already
+    ' existing under a name differing only in case/whitespace) is now RULED OUT -- a live
+    ' log showed the enumeration below coming back completely EMPTY on both failing runs,
+    ' meaning .Add is failing on a genuinely empty, reachable property set. Kept anyway (in
+    ' case a future run shows something different) and extended with oDoc identity/version
+    ' checks aimed at two other hypotheses: (a) oDoc is a stale/different object than the
+    ' Document Inventor currently considers active (could explain a COM call behaving oddly
+    ' despite simpler property reads on the same object working fine), and (b) some other
+    ' automation/security software on the machine is intercepting the call (Err.Source above
+    ' would name a non-Inventor component if so).
     If InStr(idState, "FAILED") > 0 Or InStr(numberState, "FAILED") > 0 Then
         Dim propNames As String
         propNames = ""
@@ -3141,6 +3145,14 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
         Next oExistingProp
         On Error GoTo 0
         LogLine "SetLinkedItemOn diagnostic: current properties in """ & PROPSET_NAME & """: " & propNames
+
+        On Error Resume Next
+        Dim activeDocPath As String, sameAsActive As String
+        activeDocPath = "?"
+        activeDocPath = InvApp.ActiveDocument.FullFileName
+        sameAsActive = CStr(LCase(activeDocPath) = LCase(oDoc.FullFileName))
+        On Error GoTo 0
+        LogLine "SetLinkedItemOn diagnostic: InvApp.ActiveDocument.FullFileName=""" & activeDocPath & """, same object as oDoc? " & sameAsActive & "."
     End If
 End Sub
 
@@ -3199,6 +3211,15 @@ Sub main()
         MsgBox T("MustRunInsideInventor"), vbCritical, T("AppTitle")
         Exit Sub
     End If
+
+    ' Logged once per run purely for diagnosis -- two DIFFERENT automation calls
+    ' (PropertySet.Add and TranslatorAddIn.SaveCopyAs) have been seen failing with generic,
+    ' uninformative COM errors on one real install; knowing the exact Inventor build/edition
+    ' is needed to check this against version-specific API behavior (e.g. the 2018+
+    ' write-protected-document restriction) rather than guessing blind.
+    On Error Resume Next
+    LogLine "Inventor version: " & InvApp.SoftwareVersion.DisplayVersion & " (build " & InvApp.SoftwareVersion.BuildIdentifier & ")"
+    On Error GoTo 0
 
     If Not EnsureLoggedIn() Then
         LogLine "Login cancelled -- done."

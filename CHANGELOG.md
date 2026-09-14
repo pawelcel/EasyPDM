@@ -65,6 +65,19 @@ All notable changes to EasyPDM are documented in this file.
   against) — see `EasyPDM.Inventor/README.md` for the full list of known risks to check
   on the first real run.
 
+### Diagnosing
+- `EasyPDM.Inventor/EasyPDMUpload.bas`: a retest showed the previous round's fixes for STEP
+  export and the PDM-link iProperty write did NOT resolve either issue — `SaveCopyAs` still
+  fails with the same `err=-2147418113`, now confirmed to happen even against oDoc's own
+  normal (non-8.3, non-mangled) folder, ruling out the short-path theory; `SetLinkedItemOn`'s
+  `.Add` still fails with `err=-2147467259` on both properties even though the property set
+  is confirmed empty and reachable, ruling out the duplicate-name theory too. Both fixes are
+  kept (harmless, still generally more correct) but neither was the true root cause. Added
+  `Err.Source` to both failure log lines (to tell apart "Inventor itself" from some other
+  automation/security software intercepting the call), an Inventor version/build log line,
+  and an `InvApp.ActiveDocument` identity check — aimed at gathering enough evidence from the
+  next live run to find the actual cause instead of guessing again.
+
 ### Fixed
 - `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,
   both still present after the `HasSaveCopyAsOptions` fix below. (1) STEP export now failed
