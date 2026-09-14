@@ -103,6 +103,24 @@ All notable changes to EasyPDM are documented in this file.
   this Inventor 2027.1 install (test a manual File → Export → STEP from Inventor's own UI,
   no automation involved) — not yet done.
 
+  **Both isolation tests came back clean**, which was the real breakthrough: a manual STEP
+  export from Inventor's own UI (File → Export) worked, and `PropertySets.Item("Inventor
+  User Defined Properties").Add "hello", "EasyPDM_Test"` typed directly into the VBA
+  Immediate Window (same document, same session) also worked and persisted. So the
+  install/translator/property-set machinery is fine — this is specific to our own macro's
+  calls. A follow-up Immediate Window test isolated it further: `.Add someValue,
+  "EasyPDM_ItemId"` (the EXACT name/value our macro uses) typed manually **also failed**,
+  on a brand-new never-before-touched document, ruling out both a call-context/nesting
+  theory and a "this one test file got corrupted by repeated failed attempts" theory. The
+  common thread across both failing names (`EasyPDM_ItemId`, `EasyPDM_ItemNumber`) is the
+  substring "Item"; an unrelated name (`EasyPDM_Test`) worked every time. **Fix**: renamed
+  the two properties to `EasyPDM_LinkId`/`EasyPDM_LinkNumber` (no "Item" substring) to
+  sidestep whatever Inventor 2027 reserves/intercepts there — the exact underlying
+  mechanism was never confirmed, but the rename resolves the symptom regardless.
+  `GetLinkedItemIdOn` still reads the old `EasyPDM_ItemId` name as a fallback, in case an
+  older Inventor version somewhere did manage to write it successfully. Not yet confirmed
+  live with the new names — pending the user's next test.
+
 ### Fixed
 - `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,
   both still present after the `HasSaveCopyAsOptions` fix below. (1) STEP export now failed

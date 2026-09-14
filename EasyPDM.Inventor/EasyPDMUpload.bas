@@ -22,14 +22,14 @@ Option Explicit
 '     see the "browser ticket flow" section below for how the wait-for-browser step works
 '     without one.
 '   - Recognizing an "already uploaded" document: NOT via label/filename -- via document
-'     iProperties (EasyPDM_ItemId/EasyPDM_ItemNumber, in the "Inventor User Defined
+'     iProperties (EasyPDM_LinkId/EasyPDM_LinkNumber, in the "Inventor User Defined
 '     Properties" property set), written into the file itself after a successful upload.
 '     More durable than a filename convention alone -- also works in a brand NEW Inventor
 '     session, no need to manually save after any in-memory-only change. CAVEAT (same as the
 '     SolidWorks version, no code-level defense possible): Inventor's own native "Save Copy
 '     As" (done manually by the user, outside this macro) COPIES iProperties along with
 '     everything else -- Save-Copy-As'ing an already-linked part to start a genuinely
-'     DIFFERENT part silently inherits the old EasyPDM_ItemId/EasyPDM_ItemNumber, so the
+'     DIFFERENT part silently inherits the old EasyPDM_LinkId/EasyPDM_LinkNumber, so the
 '     macro would otherwise "recognize" the new part as the OLD item and overwrite its
 '     content on the next upload. The "already linked, attach as new revision?" confirmation
 '     (see "What it does" below) shows the linked item's own number/name specifically so the
@@ -100,9 +100,21 @@ Private Const DEFAULT_BASE_URL As String = "http://localhost:5000/api"
 Private Const SESSION_COOKIE_NAME As String = "pdm_session"
 
 ' Names of the document iProperties (custom/user-defined properties) used to store the PDM
-' link -- see module header.
-Private Const CUSTPROP_ITEM_ID As String = "EasyPDM_ItemId"
-Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_ItemNumber"
+' link -- see module header. Deliberately avoid the substring "Item" in the name: on a live
+' Inventor 2027.1 install, PropertySet.Add on a brand-new, never-before-touched document
+' reproducibly failed (generic COM error) for "EasyPDM_ItemId"/"EasyPDM_ItemNumber" while an
+' otherwise-identical Add for an unrelated name (no "Item" in it) succeeded immediately, on
+' the SAME document, in the SAME session -- isolated via the VBA Immediate Window, completely
+' outside this macro, so not something in our own call chain. Whatever Inventor 2027
+' introduced under the hood (most likely some new reserved/managed use of "Item", matching
+' Autodesk's broader push toward a cloud "Item" concept), renaming sidesteps it entirely.
+' CUSTPROP_ITEM_ID_LEGACY/CUSTPROP_ITEM_NUMBER_LEGACY (old names, kept read-only below in
+' GetLinkedItemIdOn) are there only in case an older Inventor version somewhere DID manage to
+' write the old names successfully before this was diagnosed -- cheap insurance, not expected
+' to ever actually be hit given every write attempt logged so far failed.
+Private Const CUSTPROP_ITEM_ID As String = "EasyPDM_LinkId"
+Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_LinkNumber"
+Private Const CUSTPROP_ITEM_ID_LEGACY As String = "EasyPDM_ItemId"
 
 ' iProperties live in named PropertySets -- "Inventor User Defined Properties" is the
 ' standard set for custom/user-defined properties added by code or by the user (distinct
@@ -1737,7 +1749,7 @@ End Function
 '   1) Read directly off the drawing's own views (FindLinkedCandidatesInDrawingViews below):
 '      each view (on any sheet) has a referenced document -- the actual Part/Assembly model
 '      it's showing. If that model is CURRENTLY OPEN in this Inventor session and was
-'      already linked to EasyPDM (has the EasyPDM_ItemId iProperty, same as
+'      already linked to EasyPDM (has the EasyPDM_LinkId iProperty, same as
 '      GetLinkedItemIdOn already reads for assembly components), that's a far more reliable
 '      signal than the drawing's own filename -- doesn't depend on any naming convention at
 '      all. A drawing can reference MORE THAN ONE distinct item this way (e.g. an assembly
@@ -1893,7 +1905,7 @@ End Sub
 ' Collects the DISTINCT item ids (guids) of already-EasyPDM-linked models referenced by any
 ' of the active drawing's views (on any sheet) -- see UploadDrawingForActiveDoc's header
 ' comment. Skips views whose referenced document cannot be resolved (model not currently
-' open) and models with no EasyPDM_ItemId iProperty set (never linked). Returns an empty
+' open) and models with no EasyPDM_LinkId iProperty set (never linked). Returns an empty
 ' Collection if nothing was found (caller falls back to filename parsing).
 Function FindLinkedCandidatesInDrawingViews(ByVal oDrawDoc As Object) As Collection
     Dim result As New Collection
@@ -2658,7 +2670,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
     ' filename -- the only chance the user gets to notice a stale link before anything is
     ' touched. Inventor's own native "Save Copy As" (done manually, outside this macro)
     ' COPIES iProperties along with everything else: Save-Copy-As'ing an already-linked part
-    ' to start a genuinely DIFFERENT part silently inherits the old EasyPDM_ItemId, so
+    ' to start a genuinely DIFFERENT part silently inherits the old EasyPDM_LinkId, so
     ' without this the macro would otherwise "recognize" the new part as the OLD item and
     ' attach it into the BOM as a duplicate of something else, instead of creating it -- see
     ' the same caveat in the file header for the top-level document's own version of this
@@ -3008,6 +3020,14 @@ Function GetLinkedItemIdOn(ByVal oDoc As Object) As String
     valOut = ""
     On Error Resume Next
     valOut = GetCustPropSetOn(oDoc).Item(CUSTPROP_ITEM_ID).Value
+    If valOut = "" Then
+        ' Fallback to the pre-rename property name -- see CUSTPROP_ITEM_ID's own comment.
+        ' Nothing has ever been confirmed to successfully write this legacy name (every write
+        ' attempt logged so far failed), but reading it costs nothing and protects any file
+        ' from an older Inventor version where it might have actually worked.
+        Err.Clear
+        valOut = GetCustPropSetOn(oDoc).Item(CUSTPROP_ITEM_ID_LEGACY).Value
+    End If
     On Error GoTo 0
     GetLinkedItemIdOn = valOut
 End Function
@@ -3236,7 +3256,7 @@ Sub main()
 
     ' A Drawing (.idw/.dwg) is never itself a PDM item -- it's documentation FOR an existing
     ' Part/Assembly, uploaded as a "drawing"-role attachment on that item instead. Never
-    ' linked via the EasyPDM_ItemId iProperty (nothing above ever sets it on a Drawing), so
+    ' linked via the EasyPDM_LinkId iProperty (nothing above ever sets it on a Drawing), so
     ' this is handled as its own early, separate path -- entirely before (and instead of)
     ' the itemTypeGuess-based Part/Assembly dispatch below, which assumes the active
     ' document itself becomes/updates a top-level item.
@@ -3320,7 +3340,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         ' "already linked?" question -- Inventor's native "Save Copy As" (done manually by
         ' the user, not through this macro) COPIES iProperties along with everything else:
         ' Save-Copy-As'ing an already-linked part to start a genuinely DIFFERENT part would
-        ' silently inherit the old EasyPDM_ItemId, and without this the user would have no
+        ' silently inherit the old EasyPDM_LinkId, and without this the user would have no
         ' way to notice before overwriting the WRONG item's content with the new part's
         ' file. Falls back to the generic wording if this lookup itself fails (a transient
         ' error) -- the item's own existence was already confirmed moments ago above via

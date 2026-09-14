@@ -95,7 +95,7 @@ Verhaltensbeschreibung in deren eigenem README gilt hier identisch.
    vor jedem weiteren Tab, da nur ein programmatisch geöffneter Browser-Tab pro
    Makrolauf zuverlässig den Windows-Vordergrundfokus erhalten kann). Neu erstellte
    Komponenten erhalten ihren eigenen STEP/PDF-Export (gemäß der eigenen
-   Kontrollkästchen-Wahl dieser Komponente im Browser) und eine `EasyPDM_ItemId`-
+   Kontrollkästchen-Wahl dieser Komponente im Browser) und eine `EasyPDM_LinkId`-
    iProperty und werden automatisch unter ihrem übergeordneten Element in der
    Stücklistenstruktur angehängt. Bereits verknüpfte Komponenten werden nur referenziert,
    nie erneut hochgeladen, unabhängig vom Status. Seit dem letzten Upload aus der
@@ -103,7 +103,7 @@ Verhaltensbeschreibung in deren eigenem README gilt hier identisch.
    dem Entfernen ihrer PDM-Verknüpfung (die Elemente selbst werden nie gelöscht, nur ihre
    Zuordnung unter diesem speziellen übergeordneten Element).
 4. Prüft die **iProperties** des Hauptdokuments:
-   - **Bereits verknüpft** (hat eine gespeicherte `EasyPDM_ItemId`) — fragt lokal nach
+   - **Bereits verknüpft** (hat eine gespeicherte `EasyPDM_LinkId`) — fragt lokal nach
      Zustimmung, die aktuelle Version als neue Revision anzuhängen, ohne den Browser zu
      öffnen, gefolgt von zwei weiteren nativen Ja/Nein-Abfragen für STEP-Export
      (Standard: Ja) und PDF-Export (Standard: Nein).
@@ -128,7 +128,7 @@ Verhaltensbeschreibung in deren eigenem README gilt hier identisch.
    Mechanismus in eine temporäre `.step`/`.pdf`-Datei und lädt sie als Anhang mit der
    Rolle `"step"`/`"pdf"` hoch, wobei der vorherige Anhang derselben Rolle ersetzt wird.
    Ein Exportfehler bricht den Rest der Operation NICHT ab.
-7. Speichert `EasyPDM_ItemId`/`EasyPDM_ItemNumber` in den iProperties des Dokuments und
+7. Speichert `EasyPDM_LinkId`/`EasyPDM_LinkNumber` in den iProperties des Dokuments und
    zeigt eine Bestätigung an.
 
 ## Was `EasyPDMDownload.bas` tut
@@ -184,15 +184,12 @@ VBA-Projekte. `.bas` ist das Standard-Export-/Importformat für ein VBA-**Modul*
    zeigt für jedes geöffnete Dokument einen eigenen Eintrag (ein **Dokumentprojekt**, in
    genau dieser einen Datei eingebettet) sowie ein separates **externes/globales
    Projekt**, das von allen Dokumenten gemeinsam genutzt wird, unabhängig davon, welches
-   gerade aktiv ist. **In das externe/globale Projekt importieren, niemals in das
-   eingebettete Projekt eines Dokuments.** Ein Live-Test unter Inventor 2027.1 zeigte,
-   dass sowohl das Schreiben eigener iProperties als auch der STEP/PDF-Export gegen ein
-   Dokument fehlschlugen, sobald das Makro in das in DIESEM SELBEN Dokument eingebettete
-   Projekt importiert wurde (allgemeiner COM-Fehler mit `Err.Source = "DocumentProject"`)
-   — passend zu einer fehlerhaften Behandlung durch Inventor, wenn ein Dokument durch sein
-   eigenes eingebettetes Makro verändert wird. Der Import in das externe/globale Projekt
-   ist zudem schlicht die richtige Wahl für ein Makro für den allgemeinen Gebrauch wie
-   dieses — so bleibt es unabhängig vom aktiven Dokument verfügbar.
+   gerade aktiv ist. **In das externe/globale Projekt importieren**, nicht in das
+   eingebettete Projekt eines Dokuments — das ist schlicht die richtige Wahl für ein Makro
+   für den allgemeinen Gebrauch wie dieses, damit es unabhängig vom aktiven Dokument
+   verfügbar bleibt. (Eine frühere Theorie, wonach die Wahl eingebettet-vs-extern einen
+   bestimmten STEP-Export-/iProperty-Fehler unter Inventor 2027.1 erklärt, wurde getestet
+   und widerlegt — die tatsächlich gefundene Ursache steht unten unter "Bekannte Risiken".)
 3. **Datei → Datei importieren...** → `EasyPDMUpload.bas` oder `EasyPDMDownload.bas`
    auswählen, während im Projekt-Explorer das externe/globale Projekt ausgewählt ist.
 4. Ausführen über Register **Extras** → Bereich **Makro** → **Makros...** →
@@ -240,6 +237,18 @@ man prüft, wenn beim ersten echten Lauf etwas schiefgeht:
    (siehe "Unterschiede zu den SolidWorks-Makros"); sollte sich herausstellen, dass
    Inventor eine eigene Falle bei leichten Komponenten hat, müsste sie hier ergänzt
    werden.
+8. **Custom-iProperty-Namen mit "Item" ließen sich auf einer echten Inventor-2027.1-
+   Installation reproduzierbar nicht schreiben** — `PropertySets.Item("Inventor User
+   Defined Properties").Add` schlug (allgemeiner COM-Fehler) konsequent für Namen wie
+   `EasyPDM_ItemId`/`EasyPDM_ItemNumber` fehl, auf mehreren Dokumenten, in mehreren
+   Sitzungen, während ein ansonsten identischer `Add`-Aufruf für einen nicht verwandten
+   Namen sofort gelang — über das VBA-Immediate-Fenster, völlig außerhalb dieses Makros,
+   auf den Eigenschaftsnamen selbst eingegrenzt. Die Eigenschaften heißen jetzt
+   `EasyPDM_LinkId`/`EasyPDM_LinkNumber` (ohne den Bestandteil "Item"), um zu umgehen,
+   was auch immer Inventor 2027 dort reserviert/abfängt — der genaue Mechanismus wurde
+   nie bestätigt. `GetLinkedItemIdOn` liest den alten Namen `EasyPDM_ItemId` weiterhin
+   als Rückfalloption, falls ihn eine ältere Inventor-Version doch einmal erfolgreich
+   geschrieben hat.
 
 ## Einschränkungen (bewusst außerhalb des Umfangs dieser Version)
 

@@ -88,14 +88,14 @@ applies here identically.
    browser tab at a time, a native "click OK to continue" `MsgBox` before each subsequent
    tab, since only one program-initiated browser tab per macro run can reliably grab
    Windows' foreground focus). Newly created components get their own STEP/PDF export
-   (per that component's own checkbox choice in the browser) and an `EasyPDM_ItemId`
+   (per that component's own checkbox choice in the browser) and an `EasyPDM_LinkId`
    iProperty, and are automatically attached under their parent in the BOM structure.
    Already-linked components are only ever referenced, never re-uploaded, regardless of
    status. Components removed from the assembly since the last upload are flagged too,
    with a confirmation before removing their PDM link (the items themselves are never
    deleted, only their attachment under this specific parent).
 4. Checks the main document's **iProperties**:
-   - **Already linked** (has a saved `EasyPDM_ItemId`) — asks locally for consent to
+   - **Already linked** (has a saved `EasyPDM_LinkId`) — asks locally for consent to
      attach the current version as a new revision, without opening the browser, followed
      by two more native Yes/No prompts for STEP export (default Yes) and PDF export
      (default No).
@@ -119,7 +119,7 @@ applies here identically.
    to a temporary `.step`/`.pdf` file and uploads it as an attachment with the role
    `"step"`/`"pdf"`, replacing the previous attachment of that same role. An export error
    does NOT abort the rest of the operation.
-7. Saves `EasyPDM_ItemId`/`EasyPDM_ItemNumber` into the document's iProperties and shows
+7. Saves `EasyPDM_LinkId`/`EasyPDM_LinkNumber` into the document's iProperties and shows
    a confirmation.
 
 ## What `EasyPDMDownload.bas` does
@@ -172,14 +172,12 @@ Like SolidWorks, Inventor has no plain-text macro format — macros are VBA proj
 2. In the VBA editor, open the Project Explorer (Ctrl+R if it isn't visible). Inventor
    shows one entry per currently open document (a **Document project**, embedded inside
    that one file) plus a separate **External/global project**, shared across all documents
-   regardless of which one is active. **Import into the external/global project, never into
-   a document's own embedded project.** A live test on Inventor 2027.1 found custom
-   iProperty writes and STEP/PDF export both failing against a document whenever the macro
-   was imported into *that same document's* own embedded project (generic COM error, with
-   `Err.Source = "DocumentProject"`) — consistent with Inventor mishandling a document being
-   modified by its own embedded macro. Importing into the external/global project instead
-   is also simply the right choice for a general-purpose macro like this one, so it stays
-   available no matter which document is active.
+   regardless of which one is active. **Import into the external/global project**, not a
+   document's own embedded one — this is simply the right choice for a general-purpose
+   macro like this one, so it stays available no matter which document is active. (An
+   earlier theory that the embedded-vs-external choice explained a specific STEP-export/
+   iProperty failure on Inventor 2027.1 was tested and disproven — see "Known risks" below
+   for the actual cause that was found instead.)
 3. **File → Import File...** → pick `EasyPDMUpload.bas` or `EasyPDMDownload.bas`, with the
    external/global project selected in the Project Explorer.
 4. Run via **Tools** tab → **Macro** panel → **Macros...** → select `main` → Run (or F5
@@ -222,6 +220,17 @@ and should be the first place to look if something goes wrong on the first real 
 7. **No equivalent of `ResolveAllLightWeightComponents`** — deliberately omitted (see
    "Differences from the SolidWorks macros"); if Inventor turns out to have its own
    lightweight-component gotcha, this is where it would need to be added.
+8. **Custom iProperty names containing "Item" reproducibly failed to write on a live
+   Inventor 2027.1 install** — `PropertySets.Item("Inventor User Defined Properties").Add`
+   consistently failed (generic COM error) for names like `EasyPDM_ItemId`/
+   `EasyPDM_ItemNumber`, on multiple documents, in multiple sessions, while an otherwise
+   identical `Add` call for an unrelated name succeeded immediately — isolated down to the
+   property name itself via the VBA Immediate Window, completely outside this macro. The
+   properties are now named `EasyPDM_LinkId`/`EasyPDM_LinkNumber` instead (no "Item"
+   substring) to sidestep whatever Inventor 2027 reserves/intercepts there; the exact
+   mechanism was never confirmed. `GetLinkedItemIdOn` still reads the old
+   `EasyPDM_ItemId` name as a fallback in case an older Inventor version ever wrote it
+   successfully.
 
 ## Limitations (deliberately out of scope for this version)
 
