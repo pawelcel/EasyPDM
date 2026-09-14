@@ -1267,12 +1267,12 @@ static class ItemEndpoints
         _ => false
     };
 
-    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked, Guid? ProjectId, string FileName, int? ItemNumber, string? ItemNumberPrefix, Guid? CreatedBy)?> GetItemTypeAndStatus(string connectionString, Guid id)
+    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked, Guid? ProjectId, string FileName, int? ItemNumber, string? ItemNumberPrefix, Guid? CreatedBy, int? RevisionNumber)?> GetItemTypeAndStatus(string connectionString, Guid id)
     {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync();
 
-        const string sql = "SELECT item_type, status, owner_id, owner_locked, project_id, file_name, item_number, item_number_prefix, created_by FROM items WHERE id = @id;";
+        const string sql = "SELECT item_type, status, owner_id, owner_locked, project_id, file_name, item_number, item_number_prefix, created_by, revision_number FROM items WHERE id = @id;";
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("id", id);
 
@@ -1289,7 +1289,8 @@ static class ItemEndpoints
             reader.GetString(5),
             reader.IsDBNull(6) ? null : reader.GetInt32(6),
             reader.IsDBNull(7) ? null : reader.GetString(7),
-            reader.IsDBNull(8) ? null : reader.GetGuid(8)
+            reader.IsDBNull(8) ? null : reader.GetGuid(8),
+            reader.IsDBNull(9) ? null : reader.GetInt32(9)
         );
     }
 

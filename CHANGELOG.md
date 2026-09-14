@@ -66,6 +66,14 @@ All notable changes to EasyPDM are documented in this file.
   on the first real run.
 
 ### Fixed
+- Every CAD macro's download flow (SolidWorks, Inventor, FreeCAD) now asks the server
+  directly which attachment matches an item's current revision, instead of guessing it by
+  parsing attachment filenames against the macros' own naming convention. Attachments now
+  carry the item's revision number from the moment they're uploaded
+  (`item_attachments.revision_number`); the old filename-parsing guess stays only as a
+  fallback for attachments uploaded before this change. This closes the same category of
+  bug fixed earlier in this release (a PDF export attachment being picked instead of the
+  real CAD file) at the source, rather than only patching around it.
 - SolidWorks: downloading an item whose name contains characters outside the Windows
   machine's current ANSI code page — e.g. Polish diacritics on a non-Polish system — could
   fail outright with "Bad file name or number", since VBA's legacy file I/O statements

@@ -25,7 +25,7 @@ static class AttachmentEndpoints
             await conn.OpenAsync();
 
             const string sql = """
-                SELECT id, file_name, file_size, uploaded_at, preview_role
+                SELECT id, file_name, file_size, uploaded_at, preview_role, revision_number
                 FROM item_attachments
                 WHERE item_id = @itemId
                 ORDER BY uploaded_at;
@@ -43,7 +43,8 @@ static class AttachmentEndpoints
                     fileName = reader.GetString(1),
                     fileSize = reader.IsDBNull(2) ? (long?)null : reader.GetInt64(2),
                     uploadedAt = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3),
-                    role = reader.IsDBNull(4) ? null : reader.GetString(4)
+                    role = reader.IsDBNull(4) ? null : reader.GetString(4),
+                    revisionNumber = reader.IsDBNull(5) ? (int?)null : reader.GetInt32(5)
                 });
             }
 
@@ -103,8 +104,8 @@ static class AttachmentEndpoints
             }
 
             const string insertSql = """
-                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, preview_role)
-                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @role);
+                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, preview_role, revision_number)
+                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @role, @revisionNumber);
                 """;
             try
             {
@@ -118,6 +119,7 @@ static class AttachmentEndpoints
                 insertCmd.Parameters.AddWithValue("hash", hash);
                 insertCmd.Parameters.AddWithValue("size", file.Length);
                 insertCmd.Parameters.AddWithValue("role", (object?)role ?? DBNull.Value);
+                insertCmd.Parameters.AddWithValue("revisionNumber", (object?)info.Value.RevisionNumber ?? DBNull.Value);
                 await insertCmd.ExecuteNonQueryAsync();
             }
             catch
@@ -193,8 +195,8 @@ static class AttachmentEndpoints
             await ReplaceExistingRoleAttachmentAsync(conn, itemId, body.Role, user.Id);
 
             const string insertSql = """
-                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, preview_role)
-                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @role);
+                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, preview_role, revision_number)
+                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @role, @revisionNumber);
                 """;
             await using var insertCmd = new NpgsqlCommand(insertSql, conn);
             insertCmd.Parameters.AddWithValue("id", attachmentId);
@@ -204,6 +206,7 @@ static class AttachmentEndpoints
             insertCmd.Parameters.AddWithValue("hash", hash);
             insertCmd.Parameters.AddWithValue("size", fileSize);
             insertCmd.Parameters.AddWithValue("role", (object?)body.Role ?? DBNull.Value);
+            insertCmd.Parameters.AddWithValue("revisionNumber", (object?)info.Value.RevisionNumber ?? DBNull.Value);
             await insertCmd.ExecuteNonQueryAsync();
 
             await LogAttachmentHistoryAsync(conn, itemId, fileName, "added", user.Id);

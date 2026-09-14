@@ -1142,10 +1142,13 @@ End Sub
 ' ============================================================================
 
 ' Picks the attachment matching the item's CURRENT revision for a given role (default
-' "cad", the file to actually open -- see roleFilter param). If none match this macro
-' family's naming convention (e.g. the item was only ever attached manually in the web
-' app), falls back to the most recently uploaded attachment of that role (the list is
-' already sorted ascending by upload date) as the best approximation.
+' "cad", the file to actually open -- see roleFilter param). Preferred path: an exact match
+' on item_attachments.revision_number (server-tagged at upload time, migration 049) --
+' authoritative, no filename parsing involved. Legacy fallback, for attachments uploaded
+' before that column existed: this macro family's own naming convention
+' ("number (name).REVISION.ext"); if even that finds nothing (e.g. the item was only ever
+' attached manually in the web app), falls back to the most recently uploaded attachment of
+' that role (the list is already sorted ascending by upload date) as the best approximation.
 Private Function FindCurrentAttachment(ByVal item As Object, ByVal attachments As Object, Optional ByVal roleFilter As String = "cad") As Object
     If attachments Is Nothing Or attachments.Count = 0 Then Exit Function
 
@@ -1167,18 +1170,36 @@ Private Function FindCurrentAttachment(ByVal item As Object, ByVal attachments A
     Next rawAttachment
     If cadAttachments.Count = 0 Then Exit Function
 
+    Dim wantedRevision As Long
+    wantedRevision = JsonGetLong(item, "revisionNumber", 0)
+
+    ' Preferred: the server tags each "cad"/"drawing" attachment with the item's revision
+    ' number at the moment it was uploaded (item_attachments.revision_number, added in
+    ' migration 049) -- an exact match here is authoritative, no guessing from the filename
+    ' needed. Falls back to the naming-convention heuristic below only for attachments
+    ' uploaded BEFORE that column existed (revisionNumber missing/0 on every candidate).
+    If wantedRevision > 0 Then
+        Dim byRevision As Variant
+        For Each byRevision In cadAttachments
+            If JsonGetLong(byRevision, "revisionNumber", 0) = wantedRevision Then
+                Set FindCurrentAttachment = byRevision
+                Exit Function
+            End If
+        Next byRevision
+    End If
+
     Dim number As Long
     number = JsonGetLong(item, "itemNumber", 0)
     Dim name As String
     name = JsonGetString(item, "fileName", "")
     Dim wantedLabel As String
     wantedLabel = ""
-    If JsonGetLong(item, "revisionNumber", 0) > 0 Then
+    If wantedRevision > 0 Then
         ' Server sends "revisionLabel" pre-computed alongside "revisionNumber" (see
         ' RevisionLabeling.cs) -- prefer it over recomputing locally, falls back to the
         ' local RevisionLabel() below only against an older server that doesn't send it yet.
         wantedLabel = UCase(JsonGetString(item, "revisionLabel", ""))
-        If wantedLabel = "" Then wantedLabel = UCase(RevisionLabel(JsonGetLong(item, "revisionNumber", 1)))
+        If wantedLabel = "" Then wantedLabel = UCase(RevisionLabel(wantedRevision))
     End If
 
     Dim re As Object

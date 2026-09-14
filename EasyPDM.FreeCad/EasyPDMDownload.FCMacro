@@ -525,10 +525,15 @@ def _revision_attachment_pattern(item_number, name):
 
 
 def _find_current_attachment(item, attachments):
-    """Wybiera załącznik odpowiadający AKTUALNEJ rewizji elementu. Jeśli żaden załącznik
-    nie pasuje do konwencji nazw makr PDM (np. element dograny ręcznie w aplikacji webowej),
-    bierze po prostu najnowiej wgrany załącznik (lista jest posortowana rosnąco po dacie)
-    jako najlepsze przybliżenie.
+    """Wybiera załącznik odpowiadający AKTUALNEJ rewizji elementu.
+
+    Preferowana ścieżka: dokładne dopasowanie po item_attachments.revision_number --
+    serwer oznacza nim każdy załącznik "cad"/"drawing" numerem rewizji elementu z chwili
+    wgrania (migracja 049), więc to jest autorytatywne, bez zgadywania z nazwy pliku.
+    Fallback (dla załączników wgranych PRZED istnieniem tej kolumny): dopasowanie po
+    konwencji nazw makr PDM. Jeśli i to nie znajdzie nic (np. element dograny ręcznie w
+    aplikacji webowej), bierze po prostu najnowiej wgrany załącznik (lista jest posortowana
+    rosnąco po dacie) jako najlepsze przybliżenie.
 
     Rozważane są TYLKO załączniki z rolą "cad" (albo bez roli w ogóle -- starsze/ręcznie
     dograne pliki sprzed wprowadzenia ról, traktowane jako CAD dla wstecznej zgodności).
@@ -539,6 +544,13 @@ def _find_current_attachment(item, attachments):
     attachments = [a for a in attachments if a.get("role") in (None, "cad")]
     if not attachments:
         return None
+
+    wanted_revision = item.get("revisionNumber")
+    if wanted_revision:
+        for a in attachments:
+            if a.get("revisionNumber") == wanted_revision:
+                return a
+
     number = item.get("itemNumber")
     name = item.get("fileName", "")
     if number is not None:
