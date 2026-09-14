@@ -462,6 +462,14 @@ function AddNodeDialog({
           <DialogTitle>{lockMode === "file" ? t("item.uploadFile") : t("addNode.title")}</DialogTitle>
         </DialogHeader>
 
+        {/* Widoczne tylko gdy ten dialog obsługuje bilet z makra CAD (ticket podany) --
+            makro może przetwarzać CAŁE drzewo złożenia, jeden nowy komponent na bilet, więc
+            bez tego przypomnienia łatwo stracić orientację, KTÓREGO lokalnego pliku dotyczy
+            akurat wypełniany formularz (zgłoszone jako mylące przy wyborze rodzaju elementu). */}
+        {ticket && initialName && (
+          <Hint>{t("addNode.currentFileHint", { name: initialName })}</Hint>
+        )}
+
         {needsProjectPicker && (
           <div className="flex flex-col gap-2">
             <Label>{t("addNode.projectLabel")}</Label>

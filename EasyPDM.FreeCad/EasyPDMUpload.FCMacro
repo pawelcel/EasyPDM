@@ -1896,8 +1896,16 @@ def process_assembly_tree(top_doc, target_folder=None):
     )
     if choice == QtWidgets.QMessageBox.Cancel:
         return [], True, []
-    if choice == QtWidgets.QMessageBox.No:
-        return [], False, []
+    # "No" pomija WYŁĄCZNIE tworzenie/wysyłanie komponentów jeszcze nie podlinkowanych do
+    # PDM (zob. send_new_components w pętli niżej) -- już-podlinkowane komponenty i tak
+    # trzeba podpiąć do struktury, bo nic w nich się nie zmienia (żaden plik nie jest
+    # wysyłany, tylko relacja BOM) -- dokładnie ten sam podział co
+    # EasyPDM.SolidWorks/EasyPDMUpload.bas ProcessAssemblyTree (sendNewComponents), i zgodny
+    # z opisem `locked_matches` w docstringu wyżej ("drzewo złożenia w ogóle nie aktualizuje
+    # już-istniejących komponentów, tylko podpina nowe"). Wcześniej "No" tutaj przez pomyłkę
+    # porzucało też WSZYSTKIE już-podlinkowane komponenty (return [] zamiast kontynuować z
+    # pustą listą nowych) -- prawdziwy błąd, zgłoszony w praktyce.
+    send_new_components = choice == QtWidgets.QMessageBox.Yes
 
     # Ścieżki UTWORZONE w tym biegu (w odróżnieniu od już-istniejących komponentów, tylko
     # podpinanych) -- gdy taki element zostanie podpięty pod swojego prawdziwego rodzica
@@ -1921,6 +1929,12 @@ def process_assembly_tree(top_doc, target_folder=None):
             matched_status = matched.get("status")
             if matched_status in ("sprawdzany", "wydany"):
                 locked_matches.append((matched.get("itemNumber"), matched.get("fileName"), matched_status))
+        elif not send_new_components:
+            # Nie tworzymy nowych komponentów w tym biegu ("No" wyżej) -- pomiń, bez dodania
+            # do doc_to_item_id. Każda relacja z udziałem tego pliku (jako rodzic lub
+            # dziecko) zostanie naturalnie pominięta niżej (child_item_id is None / plik nie
+            # w doc_to_item_id) zamiast rzucić błędem.
+            continue
         else:
             # Ten sam bilet przeglądarki co główny dokument (submit_via_browser) --
             # otwierany JEDEN NA RAZ. Natywny popup tuż przed każdym otwarciem karty:

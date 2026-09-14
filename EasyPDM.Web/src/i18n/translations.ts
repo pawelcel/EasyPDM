@@ -102,6 +102,7 @@ const pl = {
   "database.empty": "Brak rekordów pasujących do wybranych filtrów.",
 
   "addNode.title": "Dodaj element",
+  "addNode.currentFileHint": "Zapisywany plik: {name}",
   "addNode.triggerButton": "+ Element",
   "addNode.addToProjectAria": "Dodaj element w projekcie",
   "addNode.addSubitemAria": "Dodaj podelement",
@@ -766,6 +767,7 @@ const en: Record<TranslationKey, string> = {
   "database.empty": "No records match the selected filters.",
 
   "addNode.title": "Add item",
+  "addNode.currentFileHint": "File being saved: {name}",
   "addNode.triggerButton": "+ Item",
   "addNode.addToProjectAria": "Add item to project",
   "addNode.addSubitemAria": "Add sub-item",
@@ -1428,6 +1430,7 @@ const de: Record<TranslationKey, string> = {
   "database.empty": "Keine Datensätze entsprechen den ausgewählten Filtern.",
 
   "addNode.title": "Element hinzufügen",
+  "addNode.currentFileHint": "Gespeicherte Datei: {name}",
   "addNode.triggerButton": "+ Element",
   "addNode.addToProjectAria": "Element zum Projekt hinzufügen",
   "addNode.addSubitemAria": "Unterelement hinzufügen",

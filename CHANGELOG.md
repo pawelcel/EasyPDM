@@ -66,6 +66,16 @@ All notable changes to EasyPDM are documented in this file.
   on the first real run.
 
 ### Fixed
+- FreeCAD: declining to create new components while sending an assembly ("No" on the
+  "N new components detected" prompt) used to drop the ENTIRE component tree, including
+  components already linked to PDM that only needed a BOM relation, not a new upload.
+  "No" now does what it always said it did — skips creating/uploading not-yet-linked
+  components only; already-linked ones (regardless of their status) still get attached to
+  the structure, matching the SolidWorks/Inventor macros' existing, correct behavior.
+- The "pending request from a CAD macro" new-item dialog now shows which local file it's
+  currently for (`Zapisywany plik: …`) — an assembly upload can pop this dialog once per
+  newly-discovered component, and without a reminder of which file is currently open it was
+  easy to lose track partway through picking the item kind.
 - Every CAD macro's download flow (SolidWorks, Inventor, FreeCAD) now asks the server
   directly which attachment matches an item's current revision, instead of guessing it by
   parsing attachment filenames against the macros' own naming convention. Attachments now
