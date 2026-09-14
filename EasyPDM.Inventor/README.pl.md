@@ -170,13 +170,24 @@ projekty VBA. `.bas` to standardowy format eksportu/importu **modułu** VBA:
 
 1. Autodesk Inventor → zakładka **Narzędzia** → panel **Makro** → **Edytor Visual
    Basic** (albo Alt+F11).
-2. W edytorze VBA: **Plik → Importuj plik...** → wskaż `EasyPDMUpload.bas` albo
-   `EasyPDMDownload.bas`. Importuj do dowolnego projektu VBA — projekt "globalny",
-   współdzielony między wszystkimi dokumentami, to zwykle dobry wybór, żeby makro było
-   dostępne niezależnie od tego, który dokument jest aktywny.
-3. Uruchamiaj przez zakładkę **Narzędzia** → panel **Makro** → **Makra...** → wybierz
+2. W edytorze VBA otwórz Eksplorator projektów (Ctrl+R, jeśli niewidoczny). Inventor
+   pokazuje osobny wpis dla każdego otwartego dokumentu (**projekt dokumentu**, osadzony
+   wewnątrz tego jednego pliku) oraz oddzielny **projekt zewnętrzny/globalny**,
+   współdzielony między wszystkimi dokumentami niezależnie od tego, który jest aktywny.
+   **Importuj do projektu zewnętrznego/globalnego, nigdy do własnego projektu
+   dokumentu.** Test na żywym Inventorze 2027.1 pokazał, że zapis własnych iProperty
+   oraz eksport STEP/PDF zawodzą wobec dokumentu za każdym razem, gdy makro zaimportowano
+   do projektu osadzonego w TYM SAMYM dokumencie (ogólny błąd COM z `Err.Source =
+   "DocumentProject"`) — co pasuje do sytuacji, gdy Inventor nieprawidłowo obsługuje
+   dokument modyfikowany przez własne, osadzone w nim makro. Import do projektu
+   zewnętrznego/globalnego to też po prostu właściwy wybór dla makra ogólnego
+   przeznaczenia jak to — dzięki temu jest dostępne niezależnie od tego, który dokument
+   jest aktywny.
+3. **Plik → Importuj plik...** → wskaż `EasyPDMUpload.bas` albo `EasyPDMDownload.bas`,
+   mając w Eksploratorze projektów zaznaczony projekt zewnętrzny/globalny.
+4. Uruchamiaj przez zakładkę **Narzędzia** → panel **Makro** → **Makra...** → wybierz
    `main` → Uruchom (albo F5 w edytorze VBA, **z kursorem wewnątrz `Sub main()`**).
-4. Osobny `Sub Logout` (w obu modułach) wylogowuje z EasyPDM — można go przypiąć do
+5. Osobny `Sub Logout` (w obu modułach) wylogowuje z EasyPDM — można go przypiąć do
    własnego przycisku/skrótu na pasku narzędzi.
 
 Adres API (domyślnie `http://localhost:5000/api`) jest zapisywany automatycznie po

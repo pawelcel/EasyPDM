@@ -76,7 +76,16 @@ All notable changes to EasyPDM are documented in this file.
   `Err.Source` to both failure log lines (to tell apart "Inventor itself" from some other
   automation/security software intercepting the call), an Inventor version/build log line,
   and an `InvApp.ActiveDocument` identity check — aimed at gathering enough evidence from the
-  next live run to find the actual cause instead of guessing again.
+  next live run to find the actual cause instead of guessing again. That evidence arrived:
+  both failures log `Err.Source = "DocumentProject"` (Inventor is running on version 2027.1).
+  Inventor VBA has two distinct kinds of project — an external/global one, shared across all
+  documents, versus a **Document project**, embedded inside one specific file — and
+  `"DocumentProject"` is exactly the term Inventor uses for the latter. Leading hypothesis:
+  the macro was imported into the active *document's own* embedded VBA project rather than
+  the external/global one, and Inventor 2027.1 fails to let a document modify itself (custom
+  iProperty write, translator export) from its own embedded macro. `EasyPDM.Inventor/README*`
+  installation steps rewritten to make this distinction explicit and to warn against it —
+  not yet confirmed live, pending the user checking where the macro is currently imported.
 
 ### Fixed
 - `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,

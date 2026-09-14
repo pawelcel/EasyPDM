@@ -180,14 +180,25 @@ VBA-Projekte. `.bas` ist das Standard-Export-/Importformat für ein VBA-**Modul*
 
 1. Autodesk Inventor → Register **Extras** → Bereich **Makro** → **Visual-Basic-
    Editor** (oder Alt+F11).
-2. Im VBA-Editor: **Datei → Datei importieren...** → `EasyPDMUpload.bas` oder
-   `EasyPDMDownload.bas` auswählen. In ein beliebiges VBA-Projekt importieren — das
-   "globale" Projekt, das von allen Dokumenten gemeinsam genutzt wird, ist meist die
-   richtige Wahl, damit das Makro unabhängig vom aktiven Dokument verfügbar ist.
-3. Ausführen über Register **Extras** → Bereich **Makro** → **Makros...** →
+2. Im VBA-Editor den Projekt-Explorer öffnen (Strg+R, falls nicht sichtbar). Inventor
+   zeigt für jedes geöffnete Dokument einen eigenen Eintrag (ein **Dokumentprojekt**, in
+   genau dieser einen Datei eingebettet) sowie ein separates **externes/globales
+   Projekt**, das von allen Dokumenten gemeinsam genutzt wird, unabhängig davon, welches
+   gerade aktiv ist. **In das externe/globale Projekt importieren, niemals in das
+   eingebettete Projekt eines Dokuments.** Ein Live-Test unter Inventor 2027.1 zeigte,
+   dass sowohl das Schreiben eigener iProperties als auch der STEP/PDF-Export gegen ein
+   Dokument fehlschlugen, sobald das Makro in das in DIESEM SELBEN Dokument eingebettete
+   Projekt importiert wurde (allgemeiner COM-Fehler mit `Err.Source = "DocumentProject"`)
+   — passend zu einer fehlerhaften Behandlung durch Inventor, wenn ein Dokument durch sein
+   eigenes eingebettetes Makro verändert wird. Der Import in das externe/globale Projekt
+   ist zudem schlicht die richtige Wahl für ein Makro für den allgemeinen Gebrauch wie
+   dieses — so bleibt es unabhängig vom aktiven Dokument verfügbar.
+3. **Datei → Datei importieren...** → `EasyPDMUpload.bas` oder `EasyPDMDownload.bas`
+   auswählen, während im Projekt-Explorer das externe/globale Projekt ausgewählt ist.
+4. Ausführen über Register **Extras** → Bereich **Makro** → **Makros...** →
    `main` auswählen → Ausführen (oder F5 im VBA-Editor, **mit dem Cursor innerhalb von
    `Sub main()`**).
-4. Ein separates `Sub Logout` (in beiden Modulen) meldet von EasyPDM ab — es kann an
+5. Ein separates `Sub Logout` (in beiden Modulen) meldet von EasyPDM ab — es kann an
    eine eigene Symbolleisten-Schaltfläche/Tastenkombination gebunden werden.
 
 Die API-Adresse (Standard `http://localhost:5000/api`) wird nach einmaliger Eingabe bei

@@ -169,13 +169,22 @@ Like SolidWorks, Inventor has no plain-text macro format — macros are VBA proj
 
 1. Autodesk Inventor → **Tools** tab → **Macro** panel → **Visual Basic Editor** (or
    Alt+F11).
-2. In the VBA editor: **File → Import File...** → pick `EasyPDMUpload.bas` or
-   `EasyPDMDownload.bas`. Import into any VBA project — the "global" project shared
-   across all documents is usually the right choice so the macro is available regardless
-   of which document is active.
-3. Run via **Tools** tab → **Macro** panel → **Macros...** → select `main` → Run (or F5
+2. In the VBA editor, open the Project Explorer (Ctrl+R if it isn't visible). Inventor
+   shows one entry per currently open document (a **Document project**, embedded inside
+   that one file) plus a separate **External/global project**, shared across all documents
+   regardless of which one is active. **Import into the external/global project, never into
+   a document's own embedded project.** A live test on Inventor 2027.1 found custom
+   iProperty writes and STEP/PDF export both failing against a document whenever the macro
+   was imported into *that same document's* own embedded project (generic COM error, with
+   `Err.Source = "DocumentProject"`) — consistent with Inventor mishandling a document being
+   modified by its own embedded macro. Importing into the external/global project instead
+   is also simply the right choice for a general-purpose macro like this one, so it stays
+   available no matter which document is active.
+3. **File → Import File...** → pick `EasyPDMUpload.bas` or `EasyPDMDownload.bas`, with the
+   external/global project selected in the Project Explorer.
+4. Run via **Tools** tab → **Macro** panel → **Macros...** → select `main` → Run (or F5
    inside the VBA editor, **with the cursor inside `Sub main()`**).
-4. A separate `Sub Logout` (in each of the modules) logs out of EasyPDM — it can be bound
+5. A separate `Sub Logout` (in each of the modules) logs out of EasyPDM — it can be bound
    to your own toolbar button/shortcut.
 
 The API address (default `http://localhost:5000/api`) is saved automatically after being
