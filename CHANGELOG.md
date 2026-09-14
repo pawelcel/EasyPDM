@@ -118,8 +118,26 @@ All notable changes to EasyPDM are documented in this file.
   sidestep whatever Inventor 2027 reserves/intercepts there — the exact underlying
   mechanism was never confirmed, but the rename resolves the symptom regardless.
   `GetLinkedItemIdOn` still reads the old `EasyPDM_ItemId` name as a fallback, in case an
-  older Inventor version somewhere did manage to write it successfully. Not yet confirmed
-  live with the new names — pending the user's next test.
+  older Inventor version somewhere did manage to write it successfully.
+
+  **The rename did NOT fix it either** — `EasyPDM_LinkId`/`EasyPDM_LinkNumber` failed
+  identically. Further bisection (typing `EasyPDM_FooId`, `EasyPDM_FooNumber`, and finally
+  the exact production name `EasyPDM_LinkId` itself as flat `.Add` statements in the
+  Immediate Window) found every one of them succeeding manually, which ruled out the
+  property name entirely — including the name previously suspected. Calling
+  `SetLinkedItemOn` directly via `Call` from the Immediate Window (bypassing the entire
+  ticket/HTTP call chain) still failed identically to the full macro run, ruling out
+  timing/call-context theories too. The decisive test: once `EasyPDM_LinkId` existed
+  (added manually), re-running `SetLinkedItemOn` updated it successfully via `.Value=`,
+  while `EasyPDM_LinkNumber` (still new) failed on `.Add` in the very same call. So `.Add`
+  specifically — not `.Value=`, not any property name or value — fails every time it runs
+  from inside a compiled VBA procedure on this Inventor 2027.1 install, while the identical
+  call typed as a flat statement in the Immediate Window always succeeds. **Mitigation**:
+  added `TryWriteCustomProperty`, which retries the `Add` step up to 5 times with `DoEvents`
+  and a short pause between attempts (the standard VBA workaround for this class of
+  reentrancy/message-pump-state COM symptom) before giving up and logging FAILED as before.
+  Not yet confirmed whether the retry actually clears the condition — pending the next live
+  test.
 
 ### Fixed
 - `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,

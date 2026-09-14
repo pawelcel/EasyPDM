@@ -3032,6 +3032,62 @@ Function GetLinkedItemIdOn(ByVal oDoc As Object) As String
     GetLinkedItemIdOn = valOut
 End Function
 
+' Writes ONE custom property (update if it already exists, else add), retrying the Add step
+' a few times with DoEvents in between. Isolated via extensive live testing on a real
+' Inventor 2027.1 install: PropertySet.Add reproducibly FAILS (generic COM error) every time
+' it is called from inside ANY compiled VBA procedure (Sub/Function) -- confirmed with a
+' minimal, otherwise-empty test Sub containing nothing but this exact call -- while the
+' IDENTICAL call typed as a flat statement directly in the VBA Immediate Window, or a plain
+' .Value= update on an ALREADY-existing property even from inside a procedure, succeeds every
+' time. Neither the property name nor its value matters (tested extensively: generic control
+' names succeeded manually, the actual production names failed identically to each other
+' regardless of content). This points to some kind of reentrancy/message-pump state Inventor
+' needs to catch up on before Add succeeds when called synchronously from deep in a procedure
+' call stack, rather than anything about what is being added. DoEvents plus a short retry
+' loop is the standard, safe VBA workaround for exactly this class of COM automation symptom;
+' each attempt is cheap and the loop is capped so a genuine failure still surfaces promptly.
+' UNVERIFIED whether this retry actually clears the condition (not yet confirmed live) --
+' if it doesn't, the FAILED-after-N-attempts state is still logged exactly as before.
+Private Function TryWriteCustomProperty(ByVal oPropSet As Object, ByVal value As String, ByVal name As String) As String
+    On Error Resume Next
+    Err.Clear
+    oPropSet.Item(name).Value = value
+    If Err.Number = 0 Then
+        TryWriteCustomProperty = "updated"
+        On Error GoTo 0
+        Exit Function
+    End If
+
+    Const MAX_ATTEMPTS As Long = 5
+    Dim attempt As Long
+    Dim lastErrNum As Long, lastErrDesc As String, lastErrSource As String
+    For attempt = 1 To MAX_ATTEMPTS
+        Err.Clear
+        DoEvents
+        oPropSet.Add value, name
+        If Err.Number = 0 Then
+            TryWriteCustomProperty = "added (attempt " & attempt & " of " & MAX_ATTEMPTS & ")"
+            On Error GoTo 0
+            Exit Function
+        End If
+        lastErrNum = Err.Number
+        lastErrDesc = Err.Description
+        lastErrSource = Err.Source
+
+        ' Short pause between attempts (no Sleep in plain VBA without a Declare -- a bounded
+        ' Timer-based busy-wait combined with DoEvents achieves the same effect without
+        ' needing a Win32 API declaration).
+        Dim waitUntil As Single
+        waitUntil = Timer + 0.2
+        Do While Timer < waitUntil
+            DoEvents
+        Loop
+    Next attempt
+
+    TryWriteCustomProperty = "FAILED after " & MAX_ATTEMPTS & " attempts (err=" & lastErrNum & ": " & lastErrDesc & "; source=""" & lastErrSource & """)"
+    On Error GoTo 0
+End Function
+
 ' Saves the document-to-PDM-item link as iProperties on ANY document -- this works
 ' reliably in a brand NEW Inventor session too, since properties are part of the file
 ' itself. Tries setting .Value on an existing property FIRST (the common case, on the
@@ -3108,38 +3164,8 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
     ' in practice: the log showed "(updated existing)" on the very same line right after
     ' logging that both attempts had just failed.
     Dim idState As String, numberState As String
-
-    On Error Resume Next
-    Err.Clear
-    oPropSet.Item(CUSTPROP_ITEM_ID).Value = itemId
-    If Err.Number <> 0 Then
-        Err.Clear
-        oPropSet.Add itemId, CUSTPROP_ITEM_ID
-        If Err.Number <> 0 Then
-            idState = "FAILED (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)"
-        Else
-            idState = "added"
-        End If
-    Else
-        idState = "updated"
-    End If
-    On Error GoTo 0
-
-    On Error Resume Next
-    Err.Clear
-    oPropSet.Item(CUSTPROP_ITEM_NUMBER).Value = itemNumberText
-    If Err.Number <> 0 Then
-        Err.Clear
-        oPropSet.Add itemNumberText, CUSTPROP_ITEM_NUMBER
-        If Err.Number <> 0 Then
-            numberState = "FAILED (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)"
-        Else
-            numberState = "added"
-        End If
-    Else
-        numberState = "updated"
-    End If
-    On Error GoTo 0
+    idState = TryWriteCustomProperty(oPropSet, itemId, CUSTPROP_ITEM_ID)
+    numberState = TryWriteCustomProperty(oPropSet, itemNumberText, CUSTPROP_ITEM_NUMBER)
 
     LogLine "SetLinkedItemOn: " & CUSTPROP_ITEM_ID & "=""" & itemId & """ -> " & idState & "; " & _
             CUSTPROP_ITEM_NUMBER & "=""" & itemNumberText & """ -> " & numberState & "; on """ & oDoc.FullFileName & """."
