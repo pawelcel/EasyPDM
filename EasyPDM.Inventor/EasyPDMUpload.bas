@@ -3017,8 +3017,15 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
     End If
     On Error GoTo 0
 
-    Dim addedId As Boolean
-    addedId = False
+    ' "state" is one of "updated" / "added" / "FAILED" -- kept as a real 3rd state
+    ' (distinct from a plain Boolean) because an earlier version of this Sub's own final
+    ' log line used IIf(added, "added new", "updated existing"), which silently mislabeled
+    ' a genuine total failure (neither the .Value= update NOR the .Add fallback worked) as
+    ' "updated existing" -- since "added" just defaulted to False in that case too. Caught
+    ' in practice: the log showed "(updated existing)" on the very same line right after
+    ' logging that both attempts had just failed.
+    Dim idState As String, numberState As String
+
     On Error Resume Next
     Err.Clear
     oPropSet.Item(CUSTPROP_ITEM_ID).Value = itemId
@@ -3026,15 +3033,15 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
         Err.Clear
         oPropSet.Add itemId, CUSTPROP_ITEM_ID
         If Err.Number <> 0 Then
-            LogLine "SetLinkedItemOn: failed to set OR add """ & CUSTPROP_ITEM_ID & """ (err=" & Err.Number & ": " & Err.Description & ")."
+            idState = "FAILED (err=" & Err.Number & ": " & Err.Description & ")"
         Else
-            addedId = True
+            idState = "added"
         End If
+    Else
+        idState = "updated"
     End If
     On Error GoTo 0
 
-    Dim addedNumber As Boolean
-    addedNumber = False
     On Error Resume Next
     Err.Clear
     oPropSet.Item(CUSTPROP_ITEM_NUMBER).Value = itemNumberText
@@ -3042,15 +3049,36 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
         Err.Clear
         oPropSet.Add itemNumberText, CUSTPROP_ITEM_NUMBER
         If Err.Number <> 0 Then
-            LogLine "SetLinkedItemOn: failed to set OR add """ & CUSTPROP_ITEM_NUMBER & """ (err=" & Err.Number & ": " & Err.Description & ")."
+            numberState = "FAILED (err=" & Err.Number & ": " & Err.Description & ")"
         Else
-            addedNumber = True
+            numberState = "added"
         End If
+    Else
+        numberState = "updated"
     End If
     On Error GoTo 0
 
-    LogLine "SetLinkedItemOn: set " & CUSTPROP_ITEM_ID & "=""" & itemId & """ (" & IIf(addedId, "added new", "updated existing") & "), " & _
-            CUSTPROP_ITEM_NUMBER & "=""" & itemNumberText & """ (" & IIf(addedNumber, "added new", "updated existing") & ") on """ & oDoc.FullFileName & """."
+    LogLine "SetLinkedItemOn: " & CUSTPROP_ITEM_ID & "=""" & itemId & """ -> " & idState & "; " & _
+            CUSTPROP_ITEM_NUMBER & "=""" & itemNumberText & """ -> " & numberState & "; on """ & oDoc.FullFileName & """."
+
+    ' Diagnostic only, runs ONLY when at least one write above failed outright (both the
+    ' update AND the add-fallback failed) -- lists every property CURRENTLY in the set, by
+    ' name, so a mismatch (e.g. the property already exists under a name that differs from
+    ' CUSTPROP_ITEM_ID/CUSTPROP_ITEM_NUMBER only in case or whitespace -- which would make
+    ' .Item() fail to find it AND .Add() fail as a "duplicate name" at the same time,
+    ' confirmed in practice as a genuine cause of this exact failure pattern) shows up
+    ' directly in the log instead of staying a mystery.
+    If InStr(idState, "FAILED") > 0 Or InStr(numberState, "FAILED") > 0 Then
+        Dim propNames As String
+        propNames = ""
+        On Error Resume Next
+        Dim oExistingProp As Object
+        For Each oExistingProp In oPropSet
+            propNames = propNames & "[" & oExistingProp.Name & "=""" & CStr(oExistingProp.Value) & """] "
+        Next oExistingProp
+        On Error GoTo 0
+        LogLine "SetLinkedItemOn diagnostic: current properties in """ & PROPSET_NAME & """: " & propNames
+    End If
 End Sub
 
 ' Thin wrappers over the active document -- kept so the rest of the file (Sub main, which
