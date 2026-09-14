@@ -136,8 +136,25 @@ All notable changes to EasyPDM are documented in this file.
   added `TryWriteCustomProperty`, which retries the `Add` step up to 5 times with `DoEvents`
   and a short pause between attempts (the standard VBA workaround for this class of
   reentrancy/message-pump-state COM symptom) before giving up and logging FAILED as before.
-  Not yet confirmed whether the retry actually clears the condition — pending the next live
-  test.
+
+  **The retry did NOT help either** — failed identically after all 5 attempts, proving the
+  failure is deterministic, not transient. This forced a proper root-cause hunt: a series of
+  minimal test `Sub`s typed directly into the VBA module and run one at a time from the
+  Immediate Window, each replicating one more piece of `SetLinkedItemOn`'s actual structure,
+  isolated it completely. Confirmed to work fine, every time: a bare `.Add` in a plain `Sub`;
+  the full `.Item().Value=`-then-`.Add` fallback pattern in a plain `Sub`; the document
+  passed in as a `ByVal Object` parameter instead of using `ThisApplication.ActiveDocument`
+  directly; obtaining the property set through a separate helper **Function that returns an
+  Object**. The ONE test that reproduced the failure: wrapping the exact same
+  `.Item().Value=`-then-`.Add` logic inside a separate helper **Function that returns a
+  String** — on this Inventor 2027.1 install, `PropertySet.Add` reproducibly fails with the
+  same generic COM error specifically when called from inside a Function with a String
+  return value, regardless of the property name, its value, or anything else. That is
+  exactly the shape the `TryWriteCustomProperty` Function above had. **Fix**: changed
+  `TryWriteCustomProperty` from a Function returning the state string to a `Sub` with a
+  `ByRef state As String` output parameter instead — matching the confirmed-working shape.
+  The now-pointless DoEvents retry loop (the failure was never transient) was removed at the
+  same time. Not yet confirmed live with this exact change — pending the next test.
 
 ### Fixed
 - `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,
