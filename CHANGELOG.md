@@ -66,6 +66,10 @@ All notable changes to EasyPDM are documented in this file.
   on the first real run.
 
 ### Fixed
+- Item properties: the CAD and drawing attachment lists (each accumulates one entry per
+  revision) now show the newest revision at the top, with a small visual gap before the
+  older revisions below, instead of listing them in upload order (oldest first) with no
+  distinction between the current file and its history.
 - FreeCAD: declining to create new components while sending an assembly ("No" on the
   "N new components detected" prompt) used to drop the ENTIRE component tree, including
   components already linked to PDM that only needed a BOM relation, not a new upload.

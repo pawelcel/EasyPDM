@@ -204,8 +204,13 @@ function AttachmentsPanel({
 
   const pdfAttachment = attachments.find((a) => a.role === "pdf")
   const stepAttachment = attachments.find((a) => a.role === "step")
-  const cadAttachments = attachments.filter((a) => a.role === "cad")
-  const drawingAttachments = attachments.filter((a) => a.role === "drawing")
+  // Najnowszy na górze -- serwer zwraca załączniki rosnąco po dacie wysłania (ORDER BY
+  // uploaded_at w AttachmentEndpoints.cs), więc dla "cad"/"drawing" (jedyne role z WIELOMA
+  // załącznikami naraz, po jednym na rewizję) trzeba odwrócić kolejność.
+  const byNewestFirst = (a: Attachment, b: Attachment) =>
+    (b.uploadedAt ?? "").localeCompare(a.uploadedAt ?? "")
+  const cadAttachments = attachments.filter((a) => a.role === "cad").sort(byNewestFirst)
+  const drawingAttachments = attachments.filter((a) => a.role === "drawing").sort(byNewestFirst)
   const genericAttachments = attachments.filter((a) => !a.role)
   // FreeCAD nigdy nie wgra osobnego załącznika "drawing" -- trzyma rysunek TechDraw
   // WEWNĄTRZ tego samego pliku .FCStd co model (w odróżnieniu od SolidWorks, gdzie .SLDDRW
@@ -246,10 +251,13 @@ function AttachmentsPanel({
 
           {cadAttachments.length > 0 ? (
             <ul className="flex flex-col gap-1">
-              {cadAttachments.map((attachment) => (
+              {cadAttachments.map((attachment, index) => (
                 <li
                   key={attachment.id}
-                  className="flex items-center justify-between gap-2 text-[13px]"
+                  // Odstęp przed pierwszą STARSZĄ rewizją (index 1) -- oddziela aktualny
+                  // plik (na górze, po sortowaniu byNewestFirst) od historii poniżej,
+                  // zamiast jednolitej listy bez wizualnego rozróżnienia "aktualny"/"stare".
+                  className={`flex items-center justify-between gap-2 text-[13px] ${index === 1 ? "mt-2" : ""}`}
                 >
                   <a
                     className="truncate text-primary hover:underline"
@@ -316,10 +324,10 @@ function AttachmentsPanel({
 
           {drawingAttachments.length > 0 ? (
             <ul className="flex flex-col gap-1">
-              {drawingAttachments.map((attachment) => (
+              {drawingAttachments.map((attachment, index) => (
                 <li
                   key={attachment.id}
-                  className="flex items-center justify-between gap-2 text-[13px]"
+                  className={`flex items-center justify-between gap-2 text-[13px] ${index === 1 ? "mt-2" : ""}`}
                 >
                   <a
                     className="truncate text-primary hover:underline"
