@@ -66,6 +66,17 @@ All notable changes to EasyPDM are documented in this file.
   on the first real run.
 
 ### Fixed
+- `EasyPDM.Inventor/EasyPDMUpload.bas` exported an empty/nothing STEP attachment even
+  when requested — `ExportViaTranslator` never called `TranslatorAddIn.HasSaveCopyAsOptions`
+  before `SaveCopyAs`, a required setup step confirmed against Autodesk's own official
+  "Export to STEP"/"Export to PDF" VBA samples (both call it, even with no specific option
+  to set through it). No crash resulted since this whole path tolerates export failures on
+  purpose — it just silently produced nothing. Also hardened `SetLinkedItemOn` (an
+  unguarded `PropertySets.Item(...)` call there could previously abort the entire upload,
+  including the STEP/PDF export calls that come after it, with zero log trace) and added
+  logging throughout both it and the local Save-As rename step, so a future occurrence of
+  "re-upload doesn't recognize an already-linked file" shows up clearly in the macro's log
+  file instead of failing silently.
 - `EasyPDM.Inventor/EasyPDMUpload.bas` failed to compile at all in a live Inventor VBA
   project ("Only comments may appear after End Sub, End Function, or End Property") —
   `PROPSET_NAME` was declared as a module-level `Const` in the middle of the file, right

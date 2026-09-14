@@ -1570,6 +1570,17 @@ Function RenameAndUpload(ByVal oDoc As Object, ByVal filePath As String, ByVal i
         If saveAsErrNum = 0 Then
             LogLine "Saved local copy under PDM name: " & newLocalPath
             filePath = newLocalPath
+            ' Diagnostic only, UNVERIFIED behavior of SaveAs(path, SaveCopyAs:=False) on an
+            ' ALREADY-saved document being renamed (as opposed to a brand new document's
+            ' very first save, which this same call also handles -- see caller). Autodesk's
+            ' own guidance elsewhere suggests SaveCopyAs:=False might not always update the
+            ' document's own identity the way a real "Save As" from the UI does (unlike
+            ' SolidWorks's Extension.SaveAs, which this call was modeled after) -- logged
+            ' here so a mismatch shows up directly in the log file instead of only
+            ' surfacing later as "re-upload doesn't recognize this file".
+            If LCase(oDoc.FullFileName) <> LCase(newLocalPath) Then
+                LogLine "WARNING: after SaveAs, oDoc.FullFileName is """ & oDoc.FullFileName & """ -- does NOT match the target path """ & newLocalPath & """. The PDM link iProperty may be getting saved to the WRONG file."
+            End If
         Else
             LogLine "Local Save As to """ & newLocalPath & """ failed (err=" & saveAsErrNum & ": " & saveAsErrDesc & ") -- uploading from the original path instead."
         End If
@@ -2099,18 +2110,26 @@ End Sub
 ' InvApp.TransientObjects, Inventor's standard factory for these short-lived helper
 ' objects), then call SaveCopyAs on the add-in itself (NOT on the document).
 '
-' UNVERIFIED against a live Inventor install, all of it -- written from documented Inventor
-' Automation API samples, not tested here (no Inventor in this environment). Specifically
-' worth checking on the first real run, in rough order of how likely each is to need
-' adjusting:
-'   1) STEP_TRANSLATOR_CLSID/PDF_TRANSLATOR_CLSID (top of file) -- if ApplicationAddIns.
-'      ItemById raises an error or returns Nothing, the add-in is not registered under this
-'      exact CLSID on your installed Inventor version; open Tools -> Add-Ins in Inventor to
-'      find the correct one (look for "STEP" / "PDF" in the add-in list) and update the
-'      CLSID constant.
-'   2) oContext.Type = 2 below (meant to be kFileBrowseIOMechanism, so the translator writes
-'      straight to a file instead of popping its own interactive dialog) -- if export hangs
-'      waiting for a dialog no one can see, this enum value is the first thing to check.
+' STEP_TRANSLATOR_CLSID/PDF_TRANSLATOR_CLSID (top of file) confirmed correct against
+' Autodesk's own official "Export to STEP"/"Export to PDF" VBA samples (help.autodesk.com,
+' Inventor-API/files/TranslatorAddIn5_Sample.htm and TranslatorAddIn6_Sample.htm) --
+' PDF_TRANSLATOR_CLSID looking one hex digit off from the DWF translator's CLSID
+' ({0AC6FD95-...} vs PDF's {0AC6FD96-...}) is genuinely correct, not a typo -- Autodesk
+' simply assigned these two translators adjacent GUIDs.
+'
+' HasSaveCopyAsOptions (see ExportViaTranslator below) was MISSING entirely in an earlier
+' version of this file -- both official samples call it before SaveCopyAs, even when
+' there is no specific option to set through it; confirmed via those same two samples as
+' the actual cause of STEP export silently producing nothing on a live Inventor install
+' (no crash, since this whole path tolerates errors -- just an empty result).
+'
+' Still UNVERIFIED against a live Inventor install: oContext.Type = 2 below (meant to be
+' kFileBrowseIOMechanism, so the translator writes straight to a file instead of popping
+' its own interactive dialog) -- both official samples use the symbolic constant
+' (unavailable here under late binding, no type library reference), and no authoritative
+' source for its underlying integer value was found. If export hangs waiting for a dialog
+' no one can see, this is the first thing to check -- try the next few small integers if 2
+' turns out wrong.
 ' ============================================================================
 
 Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid As String, ByVal outputPath As String) As Boolean
@@ -2136,6 +2155,27 @@ Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid
 
     Dim oOptions As Object
     Set oOptions = InvApp.TransientObjects.CreateNameValueMap
+
+    ' REQUIRED before SaveCopyAs -- confirmed against Autodesk's own official STEP/PDF
+    ' SaveCopyAs samples, both of which call this first (it populates oOptions/oContext
+    ' with whatever the translator itself expects, even when the caller has no specific
+    ' option of its own to set through it). Previously missing entirely here -- this was
+    ' the confirmed cause of STEP export silently producing nothing on a live Inventor
+    ' install (no crash, since the whole Sub tolerates errors, just an empty output file
+    ' that the Dir() check below correctly reported as "failed", but with no clear reason
+    ' logged). SaveCopyAs is still attempted even if this returns False (the official PDF
+    ' sample calls SaveCopyAs unconditionally; only the official STEP sample gates it --
+    ' this shared helper serves both, so it takes the more permissive of the two and just
+    ' logs when the translator claims it has no options, rather than skipping the export
+    ' outright on a translator-reported False that may not actually mean "cannot export").
+    Dim hasOptions As Boolean
+    hasOptions = oAddIn.HasSaveCopyAsOptions(oDoc, oContext, oOptions)
+    If Err.Number <> 0 Then
+        LogLine "ExportViaTranslator: HasSaveCopyAsOptions for """ & translatorClsid & """ failed (err=" & Err.Number & ": " & Err.Description & ") -- attempting SaveCopyAs anyway."
+        Err.Clear
+    ElseIf Not hasOptions Then
+        LogLine "ExportViaTranslator: HasSaveCopyAsOptions for """ & translatorClsid & """ returned False -- attempting SaveCopyAs anyway."
+    End If
 
     Dim oDataMedium As Object
     Set oDataMedium = InvApp.TransientObjects.CreateDataMedium
@@ -2959,25 +2999,58 @@ End Function
 ' option) provides.
 Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumberText As String)
     Dim oPropSet As Object
+    ' GetCustPropSetOn itself was previously called with NO error handling here -- if
+    ' PropertySets.Item(PROPSET_NAME) throws for any reason, that would abort this WHOLE
+    ' Sub with an unhandled error, silently skipping both property writes below with zero
+    ' log trace (the caller, RenameAndUpload, has its own "On Error GoTo Failed" active by
+    ' this point -- see UploadPartOrAssemblyDoc -- so the error would propagate all the way
+    ' up and abort the entire upload, including the STEP/PDF export calls that come after
+    ' it in main()). Guarded now, with logging, so a failure here is visible in the log
+    ' file and degrades to "link not saved" instead of aborting everything silently.
+    On Error Resume Next
+    Err.Clear
     Set oPropSet = GetCustPropSetOn(oDoc)
+    If oPropSet Is Nothing Or Err.Number <> 0 Then
+        LogLine "SetLinkedItemOn: could not access the """ & PROPSET_NAME & """ property set (err=" & Err.Number & ": " & Err.Description & ") -- PDM link NOT saved to this document's iProperties."
+        On Error GoTo 0
+        Exit Sub
+    End If
+    On Error GoTo 0
 
+    Dim addedId As Boolean
+    addedId = False
     On Error Resume Next
     Err.Clear
     oPropSet.Item(CUSTPROP_ITEM_ID).Value = itemId
     If Err.Number <> 0 Then
         Err.Clear
         oPropSet.Add itemId, CUSTPROP_ITEM_ID
+        If Err.Number <> 0 Then
+            LogLine "SetLinkedItemOn: failed to set OR add """ & CUSTPROP_ITEM_ID & """ (err=" & Err.Number & ": " & Err.Description & ")."
+        Else
+            addedId = True
+        End If
     End If
     On Error GoTo 0
 
+    Dim addedNumber As Boolean
+    addedNumber = False
     On Error Resume Next
     Err.Clear
     oPropSet.Item(CUSTPROP_ITEM_NUMBER).Value = itemNumberText
     If Err.Number <> 0 Then
         Err.Clear
         oPropSet.Add itemNumberText, CUSTPROP_ITEM_NUMBER
+        If Err.Number <> 0 Then
+            LogLine "SetLinkedItemOn: failed to set OR add """ & CUSTPROP_ITEM_NUMBER & """ (err=" & Err.Number & ": " & Err.Description & ")."
+        Else
+            addedNumber = True
+        End If
     End If
     On Error GoTo 0
+
+    LogLine "SetLinkedItemOn: set " & CUSTPROP_ITEM_ID & "=""" & itemId & """ (" & IIf(addedId, "added new", "updated existing") & "), " & _
+            CUSTPROP_ITEM_NUMBER & "=""" & itemNumberText & """ (" & IIf(addedNumber, "added new", "updated existing") & ") on """ & oDoc.FullFileName & """."
 End Sub
 
 ' Thin wrappers over the active document -- kept so the rest of the file (Sub main, which
