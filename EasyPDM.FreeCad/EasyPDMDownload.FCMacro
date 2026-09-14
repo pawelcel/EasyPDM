@@ -549,7 +549,10 @@ def _find_current_attachment(item, attachments):
             if m:
                 matches.append((m.group(1), a))
         if matches:
-            wanted = revision_label(item["revisionNumber"]).upper() if item.get("revisionNumber") else None
+            # Serwer wysyła gotowe "revisionLabel" obok "revisionNumber" (zob.
+            # RevisionLabeling.cs) -- wolimy je od lokalnego przeliczenia, revision_label()
+            # zostaje tylko jako fallback dla starszego serwera bez tego pola.
+            wanted = (item.get("revisionLabel") or revision_label(item["revisionNumber"])).upper() if item.get("revisionNumber") else None
             for label, a in matches:
                 if wanted and label.upper() == wanted:
                     return a
@@ -621,7 +624,7 @@ def _download_item(item, target_dir, log):
     ]
     if older:
         rev_list = ", ".join(sorted({rev for rev, _ in older}))
-        wanted = revision_label(item["revisionNumber"]) if item.get("revisionNumber") else "?"
+        wanted = (item.get("revisionLabel") or revision_label(item["revisionNumber"])) if item.get("revisionNumber") else "?"
         answer = QtWidgets.QMessageBox.question(
             None,
             t("newer_revision_title"),

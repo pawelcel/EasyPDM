@@ -78,6 +78,7 @@ static class HistoryEndpoints
                     fromStatus = reader.IsDBNull(3) ? null : reader.GetString(3),
                     toStatus = reader.IsDBNull(4) ? null : reader.GetString(4),
                     revisionNumber = reader.IsDBNull(5) ? (int?)null : reader.GetInt32(5),
+                    revisionLabel = reader.IsDBNull(5) ? null : RevisionLabeling.Label(reader.GetInt32(5)),
                     comment = reader.IsDBNull(6) ? null : reader.GetString(6),
                     fileName = reader.IsDBNull(7) ? null : reader.GetString(7),
                 });

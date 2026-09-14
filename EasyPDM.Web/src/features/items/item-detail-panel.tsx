@@ -20,7 +20,6 @@ import {
   isLocked,
   itemDisplayLabel,
   itemTypeLabelKey,
-  revisionLabel,
   type BomEntry,
   type Item,
 } from "@/api/types"
@@ -340,9 +339,9 @@ function ItemDetailPanel({
             <>
               <div className="flex items-baseline gap-2">
                 <span className="text-[15px] font-semibold">{itemDisplayLabel(item)}</span>
-                {item.revisionNumber !== null && (
+                {item.revisionLabel !== null && (
                   <span className="text-[12.5px] text-muted-foreground">
-                    rev. {revisionLabel(item.revisionNumber)}
+                    rev. {item.revisionLabel}
                   </span>
                 )}
               </div>
@@ -674,7 +673,7 @@ function SortableBomRow({
           </div>
         </TableCell>
         <TableCell>{itemDisplayLabel(child)}</TableCell>
-        <TableCell>{child.revisionNumber !== null ? revisionLabel(child.revisionNumber) : "—"}</TableCell>
+        <TableCell>{child.revisionLabel ?? "—"}</TableCell>
         <TableCell className="text-right">
           <BomQuantityCell
             parentId={parentId}
@@ -722,7 +721,7 @@ function SortableBomRow({
               ? `${entry.itemNumberPrefix ?? ""}${entry.itemNumber} (${entry.fileName})`
               : entry.fileName}
           </TableCell>
-          <TableCell>{entry.revisionNumber !== null ? revisionLabel(entry.revisionNumber) : "—"}</TableCell>
+          <TableCell>{entry.revisionLabel ?? "—"}</TableCell>
           <TableCell className="text-right">{entry.quantity}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "material")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "norm")}</TableCell>

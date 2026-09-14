@@ -95,7 +95,7 @@ function StatusControl({
         <div className="flex w-full flex-col gap-0.5 text-[12.5px] text-muted-foreground">
           {revisions.map((r) => (
             <div key={r.revisionNumber}>
-              <span className="font-medium">rev. {revisionLabel(r.revisionNumber)}:</span> {r.comment}
+              <span className="font-medium">rev. {r.revisionLabel}:</span> {r.comment}
             </div>
           ))}
         </div>
@@ -112,7 +112,9 @@ function StatusControl({
                   {t("item.revisionBumpNotice", {
                     statusFrom: t(STATUS_LABEL_KEYS[status]),
                     statusTo: t("status.w_pracy"),
-                    from: revisionLabel(current),
+                    // "to" nie może przyjść z serwera -- to podgląd PRZED faktycznym bumpem,
+                    // serwer jeszcze nic o tej rewizji nie wie.
+                    from: item.revisionLabel ?? "A",
                     to: revisionLabel(current + 1),
                   })}
                 </p>

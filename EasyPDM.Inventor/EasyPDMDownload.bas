@@ -1174,7 +1174,11 @@ Private Function FindCurrentAttachment(ByVal item As Object, ByVal attachments A
     Dim wantedLabel As String
     wantedLabel = ""
     If JsonGetLong(item, "revisionNumber", 0) > 0 Then
-        wantedLabel = UCase(RevisionLabel(JsonGetLong(item, "revisionNumber", 1)))
+        ' Server sends "revisionLabel" pre-computed alongside "revisionNumber" (see
+        ' RevisionLabeling.cs) -- prefer it over recomputing locally, falls back to the
+        ' local RevisionLabel() below only against an older server that doesn't send it yet.
+        wantedLabel = UCase(JsonGetString(item, "revisionLabel", ""))
+        If wantedLabel = "" Then wantedLabel = UCase(RevisionLabel(JsonGetLong(item, "revisionNumber", 1)))
     End If
 
     Dim re As Object
@@ -1336,7 +1340,10 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
         Next entry
         Dim wanted As String
         wanted = "?"
-        If JsonGetLong(item, "revisionNumber", 0) > 0 Then wanted = RevisionLabel(JsonGetLong(item, "revisionNumber", 1))
+        If JsonGetLong(item, "revisionNumber", 0) > 0 Then
+            wanted = JsonGetString(item, "revisionLabel", "")
+            If wanted = "" Then wanted = RevisionLabel(JsonGetLong(item, "revisionNumber", 1))
+        End If
 
         Dim answer As VbMsgBoxResult
         answer = MsgBox( _

@@ -34,6 +34,7 @@ static class BomEndpoints
                     itemNumberPrefix = r.ItemNumberPrefix,
                     fileName = r.FileName,
                     revisionNumber = r.RevisionNumber,
+                    revisionLabel = RevisionLabeling.Label(r.RevisionNumber),
                     properties = JsonDocument.Parse(r.PropertiesJson).RootElement
                 });
 
@@ -128,6 +129,7 @@ static class BomEndpoints
                     itemType = reader.GetString(4),
                     projectId = reader.IsDBNull(5) ? (Guid?)null : reader.GetGuid(5),
                     revisionNumber = reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
+                    revisionLabel = reader.IsDBNull(6) ? null : RevisionLabeling.Label(reader.GetInt32(6)),
                     projectName = reader.IsDBNull(7) ? null : reader.GetString(7),
                 });
             }

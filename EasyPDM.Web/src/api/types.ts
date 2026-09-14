@@ -115,6 +115,11 @@ export function projectLabel(
 
 // Rewizje wyświetlamy jako wielkie litery zamiast cyfr: 1->A, 2->B, ..., 26->Z, 27->AA...
 // (jak numeracja kolumn arkusza) — sama liczba w bazie (revision_number) się nie zmienia.
+// Backend liczy to samo (RevisionLabeling.cs) i dorzuca gotowe "revisionLabel" do każdej
+// odpowiedzi z "revisionNumber" -- UŻYWAJ TEGO POLA zamiast tej funkcji wszędzie, gdzie dane
+// już przyszły z serwera. Funkcja zostaje tylko na wypadek, gdy trzeba pokazać etykietę
+// rewizji, której serwer jeszcze nie potwierdził (np. podgląd "rev. A -> rev. B?" w dialogu
+// PRZED faktycznym bumpem rewizji, zob. status-control.tsx).
 export function revisionLabel(n: number): string {
   let value = n
   let label = ""
@@ -140,6 +145,7 @@ export interface Item {
   showInTree: boolean
   status: ItemStatus | null
   revisionNumber: number | null
+  revisionLabel: string | null
   rootPosition: number
   ownerId: string | null
   ownerLocked: boolean
@@ -167,6 +173,7 @@ export type Tag = string
 // nie każda rewizja go ma).
 export interface RevisionComment {
   revisionNumber: number
+  revisionLabel: string
   comment: string
   createdAt: string
 }
@@ -191,6 +198,7 @@ export interface HistoryEntry {
   fromStatus: ItemStatus | null
   toStatus: ItemStatus | null
   revisionNumber: number | null
+  revisionLabel: string | null
   comment: string | null
   fileName: string | null
 }
@@ -214,6 +222,7 @@ export interface BomEntry {
   itemNumberPrefix: string | null
   fileName: string
   revisionNumber: number | null
+  revisionLabel: string | null
   properties: Record<string, unknown>
 }
 
@@ -234,6 +243,7 @@ export interface UsedInEntry {
   projectId: string | null
   projectName: string | null
   revisionNumber: number | null
+  revisionLabel: string | null
 }
 
 export type NotificationType =

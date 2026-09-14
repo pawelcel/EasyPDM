@@ -57,6 +57,7 @@ static class StructureEndpoints
                         ["showInTree"] = reader.GetBoolean(10),
                         ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
                         ["revisionNumber"] = reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                        ["revisionLabel"] = reader.IsDBNull(12) ? null : RevisionLabeling.Label(reader.GetInt32(12)),
                         ["rootPosition"] = reader.GetInt32(13),
                         ["ownerId"] = reader.IsDBNull(14) ? null : reader.GetGuid(14),
                         ["ownerLocked"] = reader.GetBoolean(15),

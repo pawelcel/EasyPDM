@@ -564,6 +564,7 @@ static class ItemEndpoints
                         ["showInTree"] = reader.GetBoolean(10),
                         ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
                         ["revisionNumber"] = reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                        ["revisionLabel"] = reader.IsDBNull(12) ? null : RevisionLabeling.Label(reader.GetInt32(12)),
                         ["rootPosition"] = reader.GetInt32(13),
                         ["ownerId"] = reader.IsDBNull(14) ? null : reader.GetGuid(14),
                         ["ownerLocked"] = reader.GetBoolean(15),
@@ -636,6 +637,7 @@ static class ItemEndpoints
                     ["showInTree"] = reader.GetBoolean(10),
                     ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
                     ["revisionNumber"] = reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                    ["revisionLabel"] = reader.IsDBNull(12) ? null : RevisionLabeling.Label(reader.GetInt32(12)),
                     ["rootPosition"] = reader.GetInt32(13),
                     ["ownerId"] = reader.IsDBNull(14) ? null : reader.GetGuid(14),
                     ["ownerLocked"] = reader.GetBoolean(15),
@@ -690,6 +692,7 @@ static class ItemEndpoints
                     ["showInTree"] = reader.GetBoolean(10),
                     ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
                     ["revisionNumber"] = reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                    ["revisionLabel"] = reader.IsDBNull(12) ? null : RevisionLabeling.Label(reader.GetInt32(12)),
                     ["rootPosition"] = reader.GetInt32(13),
                     ["ownerId"] = reader.IsDBNull(14) ? null : reader.GetGuid(14),
                     ["ownerLocked"] = reader.GetBoolean(15),
@@ -917,7 +920,7 @@ static class ItemEndpoints
                     await Notifications.NotifyAsync(conn, app.Logger, recipientId.Value, "new_revision", notifyData, itemId: id);
             }
 
-            return Results.Ok(new { status = body.Status, revisionNumber });
+            return Results.Ok(new { status = body.Status, revisionNumber, revisionLabel = RevisionLabeling.Label(revisionNumber) });
         });
 
         // ============================================================
@@ -1059,6 +1062,7 @@ static class ItemEndpoints
                 result.Add(new
                 {
                     revisionNumber = reader.GetInt32(0),
+                    revisionLabel = RevisionLabeling.Label(reader.GetInt32(0)),
                     comment = reader.GetString(1),
                     createdAt = reader.GetDateTime(2)
                 });

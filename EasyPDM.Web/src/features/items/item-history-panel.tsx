@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { api } from "@/api/client"
-import { revisionLabel, STATUS_LABEL_KEYS, type HistoryEntry, type ItemStatus } from "@/api/types"
+import { STATUS_LABEL_KEYS, type HistoryEntry, type ItemStatus } from "@/api/types"
 import { Hint } from "@/components/ui/hint"
 import { SectionLabel } from "@/components/ui/section-label"
 import { useLanguage } from "@/i18n/use-language"
@@ -55,7 +55,7 @@ function ItemHistoryPanel({
           to: statusLabel(entry.toStatus),
         })
       case "revision": {
-        const label = entry.revisionNumber !== null ? revisionLabel(entry.revisionNumber) : "?"
+        const label = entry.revisionLabel ?? "?"
         return entry.comment
           ? t("history.revisionWithComment", { label, comment: entry.comment })
           : t("history.revision", { label })

@@ -2169,6 +2169,14 @@ Function PushToExistingItem(ByVal swModel As Object, ByVal itemId As String, ByV
     Dim revision As Long
     revision = JsonGetLong(item, "revisionNumber", 1)
     If revision = 0 Then revision = 1
+    ' Server sends "revisionLabel" pre-computed alongside "revisionNumber" (see
+    ' RevisionLabeling.cs) -- carried through resultInfo below so the final success message
+    ' doesn't need to recompute it locally. Left "" here (falls back to local RevisionLabel()
+    ' at the point of use) whenever the exact revision this function ends up returning has no
+    ' matching server-sent label (e.g. the "revision = revision + 1" guess below, when the
+    ' PATCH response didn't include revisionNumber).
+    Dim revisionLabelStr As String
+    revisionLabelStr = JsonGetString(item, "revisionLabel", "")
     Dim currentStatus As String
     currentStatus = JsonGetString(item, "status", "")
     Dim itemNumber As Long
@@ -2204,8 +2212,10 @@ Function PushToExistingItem(ByVal swModel As Object, ByVal itemId As String, ByV
         newRevision = JsonGetLong(statusResult, "revisionNumber", 0)
         If newRevision > 0 Then
             revision = newRevision
+            revisionLabelStr = JsonGetString(statusResult, "revisionLabel", "")
         Else
             revision = revision + 1
+            revisionLabelStr = "" ' no server-sent label matches this guessed value
         End If
         statusChanged = True
     ElseIf currentStatus <> "" And currentStatus <> "w_pracy" Then
@@ -2255,6 +2265,8 @@ Function PushToExistingItem(ByVal swModel As Object, ByVal itemId As String, ByV
     result.Add "itemNumber", itemNumber
     result.Add "name", fileName
     result.Add "revision", revision
+    If revisionLabelStr = "" Then revisionLabelStr = RevisionLabel(revision)
+    result.Add "revisionLabel", revisionLabelStr
     Set PushToExistingItem = result
 End Function
 
@@ -3179,6 +3191,7 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
             resultInfo.Add "itemNumber", ticketItemNumber
             resultInfo.Add "name", ticketName
             resultInfo.Add "revision", 1
+            resultInfo.Add "revisionLabel", "A" ' brand new item -- always revision 1
             If exportStep Then UploadStepAttachment swModel, ticketItemId, ticketItemNumber, ticketName, 1
             If exportPdf Then UploadPdfAttachment swModel, ticketItemId, ticketItemNumber, ticketName, 1
         End If
@@ -3228,7 +3241,7 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
         ' as cheap insurance for the top-level document specifically.
         SetLinkedItemOn swModel, linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0))
         LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
-                ", revision " & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & " ==="
+                ", revision " & JsonGetString(resultInfo, "revisionLabel", "A") & " ==="
 
         Dim lockedTail As String
         lockedTail = ""
@@ -3242,7 +3255,7 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
         End If
 
         MsgBox T("UploadedSuccessPart1") & JsonGetLong(resultInfo, "itemNumber", 0) & _
-               T("UploadedSuccessPart2") & RevisionLabel(JsonGetLong(resultInfo, "revision", 1)) & ")." & vbCrLf & vbCrLf & _
+               T("UploadedSuccessPart2") & JsonGetString(resultInfo, "revisionLabel", "A") & ")." & vbCrLf & vbCrLf & _
                T("RunLogPrefix") & LogFilePath() & lockedTail, vbInformation, T("AppTitle")
     Else
         LogLine "=== Finished without uploading (cancelled or no new revision) ==="
