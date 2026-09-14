@@ -154,7 +154,23 @@ All notable changes to EasyPDM are documented in this file.
   `TryWriteCustomProperty` from a Function returning the state string to a `Sub` with a
   `ByRef state As String` output parameter instead — matching the confirmed-working shape.
   The now-pointless DoEvents retry loop (the failure was never transient) was removed at the
-  same time. Not yet confirmed live with this exact change — pending the next test.
+  same time.
+
+  **Still failed after that change too.** The Sub-with-ByRef shape matched what worked in
+  isolated tests, but `TryWriteCustomProperty` was still called AS A SEPARATE PROCEDURE from
+  `SetLinkedItemOn` — a shape none of the isolated tests had actually covered (they all had
+  the `.Item()`/`.Add` code written directly inline in the SAME procedure, never delegated
+  to another one, Sub or Function). Also noticed: reverting to fully inline code alone would
+  not obviously help either, since that was the ORIGINAL shape (before any of this session's
+  fixes) and it already failed in every earlier test. The one remaining untested variable:
+  `SetLinkedItemOn` reads `oDoc.ReadOnly` as a diagnostic just before the property writes,
+  and this reliably throws error 438 (unsupported property) on every single call on this
+  Inventor 2027.1 install — a real, caught COM error occurring in the SAME procedure shortly
+  before `.Add`, which no isolated test had ever replicated. **Fix**: removed
+  `TryWriteCustomProperty` entirely and inlined the `.Item()`/`.Add` logic for both
+  properties directly back into `SetLinkedItemOn` (accepting the small duplication), AND
+  removed the `oDoc.ReadOnly` diagnostic block (it never produced a real answer anyway,
+  always failing with the same 438). Not yet confirmed live — pending the next test.
 
 ### Fixed
 - `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,

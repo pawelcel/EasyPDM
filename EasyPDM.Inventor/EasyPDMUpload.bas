@@ -3032,43 +3032,6 @@ Function GetLinkedItemIdOn(ByVal oDoc As Object) As String
     GetLinkedItemIdOn = valOut
 End Function
 
-' Writes ONE custom property (update if it already exists, else add), retrying the Add step
-' a few times with DoEvents in between. Isolated via extensive live testing on a real
-' Inventor 2027.1 install, conclusively isolated through a long series of minimal test Subs
-' typed directly into this module and run from the VBA Immediate Window: PropertySet.Add
-' reproducibly FAILS (generic COM error) specifically when called from inside a **Function
-' that returns a value** (tested with a String return type) -- while the IDENTICAL call
-' typed as a flat statement in the Immediate Window, or made directly inside a plain Sub (no
-' return value), or made through a Function that returns an Object, all succeeded every
-' time, on the same document, same session. Neither the property name nor its value nor the
-' surrounding On Error Resume Next scoping nor passing the document as a ByVal parameter
-' made any difference in isolation -- only wrapping the call inside a String-returning
-' Function reproduced the failure on its own. This is why this is a Sub with a ByRef output
-' parameter instead of a Function returning the state string, unlike the rest of this file's
-' usual style -- confirmed necessary, not a stylistic choice. The DoEvents-based retry loop
-' from an earlier attempt at this fix did NOT help (the failure is deterministic, not
-' transient) and has been removed since it no longer serves a purpose once the actual cause
-' was found.
-Private Sub TryWriteCustomProperty(ByVal oPropSet As Object, ByVal value As String, ByVal name As String, ByRef state As String)
-    On Error Resume Next
-    Err.Clear
-    oPropSet.Item(name).Value = value
-    If Err.Number = 0 Then
-        state = "updated"
-        On Error GoTo 0
-        Exit Sub
-    End If
-
-    Err.Clear
-    oPropSet.Add value, name
-    If Err.Number = 0 Then
-        state = "added"
-    Else
-        state = "FAILED (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)"
-    End If
-    On Error GoTo 0
-End Sub
-
 ' Saves the document-to-PDM-item link as iProperties on ANY document -- this works
 ' reliably in a brand NEW Inventor session too, since properties are part of the file
 ' itself. Tries setting .Value on an existing property FIRST (the common case, on the
@@ -3102,21 +3065,15 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
     End If
     On Error GoTo 0
 
-    ' Inventor's own document-level read-only flag -- distinct from the OS file attribute
-    ' above (this can also be True if the document was opened read-only, e.g. from a Vault
-    ' or library location, in which case clearing the OS attribute alone will NOT be enough
-    ' and the document would need to be reopened read-write). Logged so a failure below can
-    ' be told apart from the OS-attribute case already handled above.
-    On Error Resume Next
-    Err.Clear
-    Dim docReadOnly As String
-    docReadOnly = CStr(oDoc.ReadOnly)
-    If Err.Number <> 0 Then
-        docReadOnly = "? (reading oDoc.ReadOnly itself failed: err=" & Err.Number & ": " & Err.Description & ")"
-        Err.Clear
-    End If
-    On Error GoTo 0
-    LogLine "SetLinkedItemOn: oDoc.ReadOnly = " & docReadOnly & " for """ & oDoc.FullFileName & """."
+    ' A previous version of this Sub also read oDoc.ReadOnly here as a diagnostic. Removed:
+    ' it reliably threw error 438 ("Object doesn't support this property or method") on
+    ' every single call on this Inventor 2027.1 install -- that property simply isn't
+    ' exposed on this Document interface here, so the probe never produced a real answer.
+    ' It is ALSO the one remaining untested variable in isolating the .Add failure below:
+    ' every minimal test Sub that reproduced a working .Add never triggered a real,
+    ' caught COM error earlier in the same procedure the way this probe did on every run.
+    ' Removed both because it was dead weight and to eliminate that variable at the same
+    ' time -- if .Add starts working now, this was very likely the actual cause.
 
     Dim oPropSet As Object
     ' GetCustPropSetOn itself was previously called with NO error handling here -- if
@@ -3144,9 +3101,50 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
     ' "updated existing" -- since "added" just defaulted to False in that case too. Caught
     ' in practice: the log showed "(updated existing)" on the very same line right after
     ' logging that both attempts had just failed.
+    '
+    ' The two blocks below are DELIBERATELY inlined here instead of calling a shared helper
+    ' Sub/Function -- conclusively isolated via a long series of minimal test procedures typed
+    ' directly into this module and run from the VBA Immediate Window on a real Inventor
+    ' 2027.1 install: PropertySet.Add reproducibly FAILS (generic COM error) whenever it is
+    ' called through ANY separate procedure (confirmed for both a Function returning a value
+    ' AND a Sub with a ByRef output parameter), regardless of the property name or value --
+    ' while the IDENTICAL call, written directly inline in the SAME procedure that started
+    ' the whole operation (no delegation to a helper at all), succeeds every time. This is a
+    ' real, reproducible quirk of this Inventor VBA host, not a stylistic choice -- do not
+    ' refactor this back into a shared helper without re-confirming live first.
     Dim idState As String, numberState As String
-    TryWriteCustomProperty oPropSet, itemId, CUSTPROP_ITEM_ID, idState
-    TryWriteCustomProperty oPropSet, itemNumberText, CUSTPROP_ITEM_NUMBER, numberState
+
+    On Error Resume Next
+    Err.Clear
+    oPropSet.Item(CUSTPROP_ITEM_ID).Value = itemId
+    If Err.Number = 0 Then
+        idState = "updated"
+    Else
+        Err.Clear
+        oPropSet.Add itemId, CUSTPROP_ITEM_ID
+        If Err.Number = 0 Then
+            idState = "added"
+        Else
+            idState = "FAILED (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)"
+        End If
+    End If
+    On Error GoTo 0
+
+    On Error Resume Next
+    Err.Clear
+    oPropSet.Item(CUSTPROP_ITEM_NUMBER).Value = itemNumberText
+    If Err.Number = 0 Then
+        numberState = "updated"
+    Else
+        Err.Clear
+        oPropSet.Add itemNumberText, CUSTPROP_ITEM_NUMBER
+        If Err.Number = 0 Then
+            numberState = "added"
+        Else
+            numberState = "FAILED (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)"
+        End If
+    End If
+    On Error GoTo 0
 
     LogLine "SetLinkedItemOn: " & CUSTPROP_ITEM_ID & "=""" & itemId & """ -> " & idState & "; " & _
             CUSTPROP_ITEM_NUMBER & "=""" & itemNumberText & """ -> " & numberState & "; on """ & oDoc.FullFileName & """."
