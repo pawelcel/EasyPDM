@@ -2132,6 +2132,32 @@ End Sub
 ' turns out wrong.
 ' ============================================================================
 
+' Picks a directory for the STEP/PDF translator's temp output file. Deliberately prefers
+' oDoc's OWN folder over Environ$("TEMP"): on the machine this was first live-tested on,
+' Environ$("TEMP") resolved to an 8.3 short path (e.g. "C:\Users\PAWEL~1.CEL\AppData\Local\
+' Temp", because the Windows account name itself contains a period) and SaveCopyAs failed
+' there with a generic COM error (-2147418113 / E_UNEXPECTED) that it does NOT produce when
+' given a normal long path -- consistent with known reports of Inventor's translators being
+' fussy about export destinations (Autodesk forum reports of SaveCopyAs failing to
+' permission-/policy-restricted or otherwise unusual paths, resolved by exporting elsewhere).
+' oDoc's folder is already proven writable at this point (the .ipt/.iam itself was just saved
+' there) and is always a normal, un-mangled long path, so it sidesteps the whole class of
+' problem regardless of which exact mechanism caused it. Falls back to Environ$("TEMP") only
+' for a document with no FullFileName (should not happen this late in the upload flow, but
+' cheap to guard).
+Private Function ExportTempDirFor(ByVal oDoc As Object) As String
+    Dim docPath As String
+    docPath = ""
+    On Error Resume Next
+    docPath = oDoc.FullFileName
+    On Error GoTo 0
+    If docPath <> "" And InStrRev(docPath, "\") > 0 Then
+        ExportTempDirFor = Left(docPath, InStrRev(docPath, "\"))
+    Else
+        ExportTempDirFor = Environ$("TEMP") & "\"
+    End If
+End Function
+
 Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid As String, ByVal outputPath As String) As Boolean
     ExportViaTranslator = False
     On Error Resume Next
@@ -2204,7 +2230,7 @@ Sub UploadStepAttachment(ByVal oDoc As Object, ByVal itemId As String, ByVal ite
     On Error Resume Next
 
     Dim tempPath As String
-    tempPath = Environ$("TEMP") & "\EasyPDM_step_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".step"
+    tempPath = ExportTempDirFor(oDoc) & "EasyPDM_step_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".step"
 
     If Not ExportViaTranslator(oDoc, STEP_TRANSLATOR_CLSID, tempPath) Then
         LogLine "STEP export failed for item " & itemId & "."
@@ -2237,7 +2263,7 @@ Sub UploadPdfAttachment(ByVal oDoc As Object, ByVal itemId As String, ByVal item
     On Error Resume Next
 
     Dim tempPath As String
-    tempPath = Environ$("TEMP") & "\EasyPDM_pdf_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".pdf"
+    tempPath = ExportTempDirFor(oDoc) & "EasyPDM_pdf_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".pdf"
 
     If Not ExportViaTranslator(oDoc, PDF_TRANSLATOR_CLSID, tempPath) Then
         LogLine "PDF export failed for item " & itemId & "."
@@ -2998,6 +3024,43 @@ End Function
 ' since there is no single "add or replace" call the way SolidWorks's Add3 (with a REPLACE
 ' option) provides.
 Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumberText As String)
+    ' Diagnose/clear a likely root cause of "PropertySet.Add fails with generic E_FAIL even
+    ' though the property set itself is reachable and empty": Inventor 2018+ refuses to
+    ' modify iProperties (or anything else) on a document it treats as write-protected, which
+    ' happens whenever the underlying file has the Windows read-only attribute set (confirmed
+    ' via Autodesk's own support article on this exact behavior change, introduced to keep API
+    ' behavior consistent with the UI, which also refuses to edit read-only files). A file
+    ' being linked to an EXISTING PDM item is commonly one the user copied from a zip/share/
+    ' another machine, which can retain the read-only attribute on Windows even though the
+    ' user is actively uploading/linking it here -- so proactively clearing the attribute
+    ' matches their intent and is safe. Logged either way so the next log tells us definitely
+    ' whether this was the cause.
+    On Error Resume Next
+    Err.Clear
+    Dim fileAttr As Long
+    fileAttr = GetAttr(oDoc.FullFileName)
+    If Err.Number = 0 And (fileAttr And vbReadOnly) = vbReadOnly Then
+        LogLine "SetLinkedItemOn: """ & oDoc.FullFileName & """ has the Windows read-only file attribute set -- clearing it (Inventor 2018+ refuses to write iProperties to a write-protected file)."
+        SetAttr oDoc.FullFileName, fileAttr - vbReadOnly
+        If Err.Number <> 0 Then
+            LogLine "SetLinkedItemOn: failed to clear the read-only attribute (err=" & Err.Number & ": " & Err.Description & ")."
+            Err.Clear
+        End If
+    End If
+    On Error GoTo 0
+
+    ' Inventor's own document-level read-only flag -- distinct from the OS file attribute
+    ' above (this can also be True if the document was opened read-only, e.g. from a Vault
+    ' or library location, in which case clearing the OS attribute alone will NOT be enough
+    ' and the document would need to be reopened read-write). Logged so a failure below can
+    ' be told apart from the OS-attribute case already handled above.
+    On Error Resume Next
+    Dim docReadOnly As String
+    docReadOnly = "?"
+    docReadOnly = CStr(oDoc.ReadOnly)
+    On Error GoTo 0
+    LogLine "SetLinkedItemOn: oDoc.ReadOnly = " & docReadOnly & " for """ & oDoc.FullFileName & """."
+
     Dim oPropSet As Object
     ' GetCustPropSetOn itself was previously called with NO error handling here -- if
     ' PropertySets.Item(PROPSET_NAME) throws for any reason, that would abort this WHOLE

@@ -66,6 +66,24 @@ All notable changes to EasyPDM are documented in this file.
   on the first real run.
 
 ### Fixed
+- `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,
+  both still present after the `HasSaveCopyAsOptions` fix below. (1) STEP export now failed
+  with a specific `SaveCopyAs` COM error (`-2147418113`, `E_UNEXPECTED`) rather than silently
+  producing nothing — root-caused to the temp export path: `Environ$("TEMP")` resolved to an
+  8.3 short path (the Windows account name contains a period, e.g.
+  `C:\Users\PAWEL~1.CEL\AppData\Local\Temp`), and `SaveCopyAs` is evidently unreliable with
+  such paths. STEP/PDF exports now write their temp file into the document's own folder
+  (already proven writable — the document was just saved there) instead of `%TEMP%`. (2) The
+  PDM-link iProperty write (`SetLinkedItemOn`) reproducibly failed on both properties with a
+  generic COM error (`-2147467259`) even though the property set itself was reachable and
+  empty (ruling out a duplicate-name conflict) — matches a documented Inventor 2018+
+  behavior change where the API refuses to modify iProperties on a document it treats as
+  write-protected, most commonly because the underlying file has the Windows read-only
+  attribute set (e.g. after being copied from a zip/share). `SetLinkedItemOn` now checks for
+  and clears that attribute before writing, and logs `oDoc.ReadOnly` for further diagnosis if
+  the write still fails. Also fixed a bug in this window's own earlier logging fix: the final
+  summary line could report "(updated existing)" even when both the update and add-fallback
+  attempts had just failed.
 - `EasyPDM.Inventor/EasyPDMUpload.bas` exported an empty/nothing STEP attachment even
   when requested — `ExportViaTranslator` never called `TranslatorAddIn.HasSaveCopyAsOptions`
   before `SaveCopyAs`, a required setup step confirmed against Autodesk's own official
