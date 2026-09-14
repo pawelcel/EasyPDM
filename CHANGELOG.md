@@ -66,6 +66,13 @@ All notable changes to EasyPDM are documented in this file.
   on the first real run.
 
 ### Fixed
+- `EasyPDM.Inventor/EasyPDMUpload.bas` failed to compile at all in a live Inventor VBA
+  project ("Only comments may appear after End Sub, End Function, or End Property") —
+  `PROPSET_NAME` was declared as a module-level `Const` in the middle of the file, right
+  before the function that uses it, instead of with the module's other declarations at
+  the top before any `Sub`/`Function`. Moved it there; this is the same declaration-
+  placement rule the SolidWorks macro's own header comments already documented for
+  `swApp`, just not followed for this later Inventor-only constant.
 - All three CAD macros (SolidWorks, Inventor, FreeCAD): uploading to an item already
   linked to PDM asked "export STEP?"/"export PDF?" before checking whether the item's
   status even allows the upload to proceed — a "wydany" item's own "create a new

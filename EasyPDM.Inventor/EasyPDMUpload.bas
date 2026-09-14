@@ -104,6 +104,19 @@ Private Const SESSION_COOKIE_NAME As String = "pdm_session"
 Private Const CUSTPROP_ITEM_ID As String = "EasyPDM_ItemId"
 Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_ItemNumber"
 
+' iProperties live in named PropertySets -- "Inventor User Defined Properties" is the
+' standard set for custom/user-defined properties added by code or by the user (distinct
+' from the built-in "Design Tracking Properties"/"Summary Information" sets Inventor also
+' exposes). UNVERIFIED against a live Inventor install: this exact set name -- older
+' Inventor versions, or certain document types, might expose it as plain
+' "User Defined Properties" instead (without the "Inventor " prefix); confirm on first real
+' run and adjust PROPSET_NAME below if PropertySets.Item(...) raises "item not found".
+' Grouped here with the module's other Private/Const declarations, all BEFORE any
+' Sub/Function -- a Const declared mid-file (originally right before GetCustPropSetOn,
+' where it's used) is a compile error in VBA ("Only comments may appear after End Sub, End
+' Function, or End Property"), confirmed in practice on a live Inventor install.
+Private Const PROPSET_NAME As String = "Inventor User Defined Properties"
+
 ' Own error numbers (Err.Raise) -- distinguish "missing/expired session" (ERR_AUTH, should
 ' trigger a fresh login) from a plain API error (ERR_API, just show the message).
 Private Const ERR_AUTH As Long = vbObjectError + 1001
@@ -2919,15 +2932,6 @@ Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As Strin
     End If
     GetActiveDocInfo = GetDocInfo(InvApp.ActiveDocument, filePath, itemTypeGuess, defaultName)
 End Function
-
-' iProperties live in named PropertySets -- "Inventor User Defined Properties" is the
-' standard set for custom/user-defined properties added by code or by the user (distinct
-' from the built-in "Design Tracking Properties"/"Summary Information" sets Inventor also
-' exposes). UNVERIFIED against a live Inventor install: this exact set name -- older
-' Inventor versions, or certain document types, might expose it as plain
-' "User Defined Properties" instead (without the "Inventor " prefix); confirm on first real
-' run and adjust PROPSET_NAME below if PropertySets.Item(...) raises "item not found".
-Private Const PROPSET_NAME As String = "Inventor User Defined Properties"
 
 Private Function GetCustPropSetOn(ByVal oDoc As Object) As Object
     Set GetCustPropSetOn = oDoc.PropertySets.Item(PROPSET_NAME)
