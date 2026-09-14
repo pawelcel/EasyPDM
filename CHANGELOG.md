@@ -84,8 +84,24 @@ All notable changes to EasyPDM are documented in this file.
   the macro was imported into the active *document's own* embedded VBA project rather than
   the external/global one, and Inventor 2027.1 fails to let a document modify itself (custom
   iProperty write, translator export) from its own embedded macro. `EasyPDM.Inventor/README*`
-  installation steps rewritten to make this distinction explicit and to warn against it —
-  not yet confirmed live, pending the user checking where the macro is currently imported.
+  installation steps rewritten to make this distinction explicit and to warn against it.
+
+  **Disproven by the next retest.** The user confirmed via the VBA Project Explorer that
+  `EasyPDMUpload` was already correctly sitting in `ApplicationProject` (the external/global
+  project), not a document-embedded one. Retesting from there, both calls still failed
+  identically — but `Err.Source` now read `"ApplicationProject"` instead of
+  `"DocumentProject"`, simply tracking whichever project happens to be executing the failing
+  line. That means `Err.Source` was never naming an intercepting component at all — it's
+  VBA's generic fallback to the CALLER's own project name whenever a COM error arrives
+  without its own custom Source, so it carries no information about which underlying
+  component actually failed here. Retiring that diagnostic angle. Confirmed instead, from the
+  same logs: `oDoc.Save` (called moments earlier, same document, same run) succeeds every
+  time with no error — so *some* document-modifying API calls work fine on this document;
+  only `PropertySet.Add` and `TranslatorAddIn.SaveCopyAs` specifically do not. Next step is
+  isolating whether this is a macro/automation-specific problem (test the same calls from the
+  VBA Immediate Window, outside the macro entirely) or a broader install-level problem with
+  this Inventor 2027.1 install (test a manual File → Export → STEP from Inventor's own UI,
+  no automation involved) — not yet done.
 
 ### Fixed
 - `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,
