@@ -3089,17 +3089,14 @@ Sub SetLinkedItemOn(ByVal oDoc As Object)
     On Error GoTo 0
 
     Dim oPropSet As Object
-    ' GetCustPropSetOn itself was previously called with NO error handling here -- if
-    ' PropertySets.Item(PROPSET_NAME) throws for any reason, that would abort this WHOLE
-    ' Sub with an unhandled error, silently skipping both property writes below with zero
-    ' log trace (the caller, RenameAndUpload, has its own "On Error GoTo Failed" active by
-    ' this point -- see UploadPartOrAssemblyDoc -- so the error would propagate all the way
-    ' up and abort the entire upload, including the STEP/PDF export calls that come after
-    ' it in main()). Guarded now, with logging, so a failure here is visible in the log
-    ' file and degrades to "link not saved" instead of aborting everything silently.
+    ' Accessed directly here (NOT via the GetCustPropSetOn helper Function used elsewhere in
+    ' this file) -- untested combination otherwise: every live test that isolated a working
+    ' shape for the .Add calls below used direct inline access, never combined with routing
+    ' the property-set lookup itself through a separate Function in the SAME call. Cheap to
+    ' avoid, so avoided, pending confirmation either way.
     On Error Resume Next
     Err.Clear
-    Set oPropSet = GetCustPropSetOn(oDoc)
+    Set oPropSet = oDoc.PropertySets.Item(PROPSET_NAME)
     If oPropSet Is Nothing Or Err.Number <> 0 Then
         LogLine "SetLinkedItemOn: could not access the """ & PROPSET_NAME & """ property set (err=" & Err.Number & ": " & Err.Description & ") -- PDM link NOT saved to this document's iProperties."
         On Error GoTo 0
