@@ -2151,13 +2151,14 @@ End Sub
 ' the actual cause of STEP export silently producing nothing on a live Inventor install
 ' (no crash, since this whole path tolerates errors -- just an empty result).
 '
-' Still UNVERIFIED against a live Inventor install: oContext.Type = 2 below (meant to be
-' kFileBrowseIOMechanism, so the translator writes straight to a file instead of popping
-' its own interactive dialog) -- both official samples use the symbolic constant
-' (unavailable here under late binding, no type library reference), and no authoritative
-' source for its underlying integer value was found. If export hangs waiting for a dialog
-' no one can see, this is the first thing to check -- try the next few small integers if 2
-' turns out wrong.
+' oContext.Type -- CONFIRMED live: kFileBrowseIOMechanism = 13059 (read directly from
+' Inventor's own type library via the VBA Immediate Window: "?kFileBrowseIOMechanism").
+' The previous value here, 2, was a guess (no authoritative source for the raw integer was
+' ever found) and turned out completely wrong -- Inventor's enums are essentially never
+' small numbers, they're typically large, arbitrarily-assigned constants like this one, so a
+' guess of "2" was always a long shot. This was the actual cause of SaveCopyAs failing with
+' err=-2147418113 (E_UNEXPECTED): an invalid Type left the translator not knowing it should
+' write to the DataMedium.FileName path at all.
 ' ============================================================================
 
 ' Picks a directory for the STEP/PDF translator's temp output file. Prefers oDoc's OWN
@@ -2201,7 +2202,7 @@ Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid
 
     Dim oContext As Object
     Set oContext = InvApp.TransientObjects.CreateTranslationContext
-    oContext.Type = 2 ' kFileBrowseIOMechanism -- see UNVERIFIED note above
+    oContext.Type = 13059 ' kFileBrowseIOMechanism -- confirmed live, see note above
 
     Dim oOptions As Object
     Set oOptions = InvApp.TransientObjects.CreateNameValueMap
