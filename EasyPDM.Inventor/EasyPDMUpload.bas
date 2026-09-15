@@ -2219,19 +2219,19 @@ Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid
     ' this shared helper serves both, so it takes the more permissive of the two and just
     ' logs when the translator claims it has no options, rather than skipping the export
     ' outright on a translator-reported False that may not actually mean "cannot export").
-    ' Every argument below is wrapped in extra parentheses -- e.g. "(oDoc)" instead of
-    ' "oDoc" -- to force VBA to pass it BY VALUE instead of by reference. Confirmed live,
-    ' the hard way, on PropertySet.Add earlier in this file (see SetLinkedItemOn): a
-    ' late-bound call passes a bare variable as a by-reference Variant (VT_BYREF), and this
-    ' Inventor 2027.1 install rejects that with a generic COM error for at least one other
-    ' Automation call already (PropertySet.Add) -- SaveCopyAs failing identically
-    ' (err=-2147418113) with these same bare local Object variables is consistent with the
-    ' same underlying cause. Safe for Object arguments specifically: only the reference
-    ' "slot" is copied, not the object it points to, so HasSaveCopyAsOptions/SaveCopyAs can
-    ' still mutate oContext/oOptions/oDataMedium's own properties and the caller still sees
-    ' those mutations through its own (still-live) reference to the same object.
+    ' A previous attempt wrapped every argument below in extra parentheses -- e.g. "(oDoc)"
+    ' -- on the theory that this Inventor 2027.1 install rejects by-reference Variants in
+    ' late-bound calls the same way it did for PropertySet.Add elsewhere in this file. Live
+    ' testing DISPROVED that for THESE specific calls: wrapping introduced a NEW failure
+    ' (err=438, "Object doesn't support this property or method") that wasn't there before --
+    ' consistent with the classic VBA gotcha where redundant parentheses around an object
+    ' variable can force evaluation of that object's DEFAULT member instead of passing the
+    ' object reference itself, which is exactly the wrong outcome for TranslationContext/
+    ' NameValueMap/DataMedium arguments. Reverted to plain variables. The real fix for
+    ' SaveCopyAs turned out to be oContext.Type's value (see the module-level comment above
+    ' this Function) -- unrelated to by-ref/by-val at all.
     Dim hasOptions As Boolean
-    hasOptions = oAddIn.HasSaveCopyAsOptions((oDoc), (oContext), (oOptions))
+    hasOptions = oAddIn.HasSaveCopyAsOptions(oDoc, oContext, oOptions)
     If Err.Number <> 0 Then
         LogLine "ExportViaTranslator: HasSaveCopyAsOptions for """ & translatorClsid & """ failed (err=" & Err.Number & ": " & Err.Description & ") -- attempting SaveCopyAs anyway."
         Err.Clear
@@ -2243,7 +2243,7 @@ Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid
     Set oDataMedium = InvApp.TransientObjects.CreateDataMedium
     oDataMedium.FileName = outputPath
 
-    oAddIn.SaveCopyAs (oDoc), (oContext), (oOptions), (oDataMedium)
+    oAddIn.SaveCopyAs oDoc, oContext, oOptions, oDataMedium
     If Err.Number <> 0 Then
         LogLine "ExportViaTranslator: SaveCopyAs to """ & outputPath & """ via """ & translatorClsid & """ failed (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)."
         Err.Clear
