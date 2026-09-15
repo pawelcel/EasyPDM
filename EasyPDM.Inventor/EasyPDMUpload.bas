@@ -100,21 +100,32 @@ Private Const DEFAULT_BASE_URL As String = "http://localhost:5000/api"
 Private Const SESSION_COOKIE_NAME As String = "pdm_session"
 
 ' Names of the document iProperties (custom/user-defined properties) used to store the PDM
-' link -- see module header. Deliberately avoid the substring "Item" in the name: on a live
-' Inventor 2027.1 install, PropertySet.Add on a brand-new, never-before-touched document
-' reproducibly failed (generic COM error) for "EasyPDM_ItemId"/"EasyPDM_ItemNumber" while an
-' otherwise-identical Add for an unrelated name (no "Item" in it) succeeded immediately, on
-' the SAME document, in the SAME session -- isolated via the VBA Immediate Window, completely
-' outside this macro, so not something in our own call chain. Whatever Inventor 2027
-' introduced under the hood (most likely some new reserved/managed use of "Item", matching
-' Autodesk's broader push toward a cloud "Item" concept), renaming sidesteps it entirely.
-' CUSTPROP_ITEM_ID_LEGACY/CUSTPROP_ITEM_NUMBER_LEGACY (old names, kept read-only below in
-' GetLinkedItemIdOn) are there only in case an older Inventor version somewhere DID manage to
-' write the old names successfully before this was diagnosed -- cheap insurance, not expected
-' to ever actually be hit given every write attempt logged so far failed.
+' link -- see module header. Renamed once from EasyPDM_ItemId/EasyPDM_ItemNumber on a theory
+' (a reserved "Item" substring) that live testing later disproved -- kept under the new name
+' anyway since a rename was harmless and reverting served no purpose. CUSTPROP_ITEM_ID_LEGACY
+' (old name, read-only fallback in GetLinkedItemIdOn) is cheap insurance in case an older
+' Inventor version somewhere did manage to write it before any of this was diagnosed.
+'
+' The ACTUAL root cause of the .Add failures this whole session, found via an extremely long
+' bisection in the VBA Immediate Window on a live Inventor 2027.1 install: PropertySet.Add
+' reproducibly fails (generic COM error, -2147467259) whenever it is called from inside a
+' procedure whose signature takes an Object parameter PLUS one or more String parameters --
+' regardless of the property name, the value, the document, or anything else. A procedure
+' that takes ONLY an Object parameter (or none) works every time; adding even a single extra
+' String parameter to that same procedure's signature breaks it. This is why
+' SetLinkedItemOn below takes only oDoc now -- the values it needs travel through the
+' PendingLinkItemId/PendingLinkItemNumberText module variables just below instead of through
+' its own parameter list. Bizarre, but conclusively isolated through ~15 rounds of minimal
+' test Subs, each changing exactly one variable at a time.
 Private Const CUSTPROP_ITEM_ID As String = "EasyPDM_LinkId"
 Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_LinkNumber"
 Private Const CUSTPROP_ITEM_ID_LEGACY As String = "EasyPDM_ItemId"
+
+' Carry the values for the NEXT SetLinkedItemOn call -- see the long comment above for why
+' this can't just be two String parameters on SetLinkedItemOn itself. Set these immediately
+' before every call to SetLinkedItemOn oDoc (never left set across unrelated calls).
+Private PendingLinkItemId As String
+Private PendingLinkItemNumberText As String
 
 ' iProperties live in named PropertySets -- "Inventor User Defined Properties" is the
 ' standard set for custom/user-defined properties added by code or by the user (distinct
@@ -1617,7 +1628,9 @@ Function RenameAndUpload(ByVal oDoc As Object, ByVal filePath As String, ByVal i
     ' EasyPDMDownload.bas -- would never carry the link. A failure here is logged but NOT
     ' fatal, matching this function's existing tolerant style -- the upload still proceeds
     ' even if the file ends up missing the embedded link.
-    SetLinkedItemOn oDoc, itemId, CStr(itemNumber)
+    PendingLinkItemId = itemId
+    PendingLinkItemNumberText = CStr(itemNumber)
+    SetLinkedItemOn oDoc
     On Error Resume Next
     Err.Clear
     oDoc.Save
@@ -1935,7 +1948,9 @@ Function FindLinkedCandidatesInDrawingViews(ByVal oDrawDoc As Object) As Collect
                         result.Add linkedId
                     Else
                         LogLine "Drawing upload: view's referenced document had a stale link to deleted item " & linkedId & " -- clearing it, treating as unlinked."
-                        SetLinkedItemOn refDoc, "", ""
+                        PendingLinkItemId = ""
+                        PendingLinkItemNumberText = ""
+                        SetLinkedItemOn refDoc
                     End If
                 End If
             End If
@@ -2756,7 +2771,9 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
         If existingItemId <> "" Then
             If Not ItemStillExists(existingItemId) Then
                 LogLine "Component's linked PDM item " & existingItemId & " no longer exists (deleted?) -- clearing stale link: " & filePath
-                SetLinkedItemOn childModel, "", ""
+                PendingLinkItemId = ""
+                PendingLinkItemNumberText = ""
+                SetLinkedItemOn childModel
                 existingItemId = ""
             End If
         End If
@@ -2849,7 +2866,9 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
             ' path already set (and saved) this same iProperty BEFORE uploading, so the
             ' file actually sent to the server already carries it. Kept here as cheap
             ' insurance.
-            SetLinkedItemOn childModel, newItemId, CStr(JsonGetLong(created, "itemNumber", 0))
+            PendingLinkItemId = newItemId
+            PendingLinkItemNumberText = CStr(JsonGetLong(created, "itemNumber", 0))
+            SetLinkedItemOn childModel
             pathToItemId.Add filePath, newItemId
             newlyCreatedPaths.Add filePath, True
         Else
@@ -3039,18 +3058,22 @@ End Function
 ' yet), adds it fresh instead -- the standard get-or-create idiom for Inventor iProperties,
 ' since there is no single "add or replace" call the way SolidWorks's Add3 (with a REPLACE
 ' option) provides.
-Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumberText As String)
-    ' Diagnose/clear a likely root cause of "PropertySet.Add fails with generic E_FAIL even
-    ' though the property set itself is reachable and empty": Inventor 2018+ refuses to
-    ' modify iProperties (or anything else) on a document it treats as write-protected, which
-    ' happens whenever the underlying file has the Windows read-only attribute set (confirmed
-    ' via Autodesk's own support article on this exact behavior change, introduced to keep API
-    ' behavior consistent with the UI, which also refuses to edit read-only files). A file
-    ' being linked to an EXISTING PDM item is commonly one the user copied from a zip/share/
-    ' another machine, which can retain the read-only attribute on Windows even though the
-    ' user is actively uploading/linking it here -- so proactively clearing the attribute
-    ' matches their intent and is safe. Logged either way so the next log tells us definitely
-    ' whether this was the cause.
+' Takes only oDoc -- itemId/itemNumberText travel through PendingLinkItemId/
+' PendingLinkItemNumberText instead (see those module variables' own comment for why: a
+' procedure taking an Object parameter plus String parameters breaks PropertySet.Add on
+' this Inventor 2027.1 install, conclusively isolated through many rounds of live testing).
+' Every caller sets both module variables immediately before calling this.
+Sub SetLinkedItemOn(ByVal oDoc As Object)
+    ' Reads PendingLinkItemId/PendingLinkItemNumberText directly (NOT copied into local
+    ' variables first -- an earlier attempt at this fix copied a String PARAMETER into a
+    ' local variable before use and that ALSO still failed, so the values are used straight
+    ' from the module variables here, matching the one shape confirmed to work live).
+    '
+    ' Also proactively clears the Windows read-only file attribute if set (Inventor 2018+
+    ' refuses to modify iProperties on a document it treats as write-protected, confirmed via
+    ' Autodesk's own support article on this behavior change) -- a file linked to an existing
+    ' PDM item is commonly one copied from a zip/share, which can retain that attribute even
+    ' though the user is actively uploading/linking it here.
     On Error Resume Next
     Err.Clear
     Dim fileAttr As Long
@@ -3064,16 +3087,6 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
         End If
     End If
     On Error GoTo 0
-
-    ' A previous version of this Sub also read oDoc.ReadOnly here as a diagnostic. Removed:
-    ' it reliably threw error 438 ("Object doesn't support this property or method") on
-    ' every single call on this Inventor 2027.1 install -- that property simply isn't
-    ' exposed on this Document interface here, so the probe never produced a real answer.
-    ' It is ALSO the one remaining untested variable in isolating the .Add failure below:
-    ' every minimal test Sub that reproduced a working .Add never triggered a real,
-    ' caught COM error earlier in the same procedure the way this probe did on every run.
-    ' Removed both because it was dead weight and to eliminate that variable at the same
-    ' time -- if .Add starts working now, this was very likely the actual cause.
 
     Dim oPropSet As Object
     ' GetCustPropSetOn itself was previously called with NO error handling here -- if
@@ -3098,30 +3111,17 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
     ' (distinct from a plain Boolean) because an earlier version of this Sub's own final
     ' log line used IIf(added, "added new", "updated existing"), which silently mislabeled
     ' a genuine total failure (neither the .Value= update NOR the .Add fallback worked) as
-    ' "updated existing" -- since "added" just defaulted to False in that case too. Caught
-    ' in practice: the log showed "(updated existing)" on the very same line right after
-    ' logging that both attempts had just failed.
-    '
-    ' The two blocks below are DELIBERATELY inlined here instead of calling a shared helper
-    ' Sub/Function -- conclusively isolated via a long series of minimal test procedures typed
-    ' directly into this module and run from the VBA Immediate Window on a real Inventor
-    ' 2027.1 install: PropertySet.Add reproducibly FAILS (generic COM error) whenever it is
-    ' called through ANY separate procedure (confirmed for both a Function returning a value
-    ' AND a Sub with a ByRef output parameter), regardless of the property name or value --
-    ' while the IDENTICAL call, written directly inline in the SAME procedure that started
-    ' the whole operation (no delegation to a helper at all), succeeds every time. This is a
-    ' real, reproducible quirk of this Inventor VBA host, not a stylistic choice -- do not
-    ' refactor this back into a shared helper without re-confirming live first.
+    ' "updated existing" -- since "added" just defaulted to False in that case too.
     Dim idState As String, numberState As String
 
     On Error Resume Next
     Err.Clear
-    oPropSet.Item(CUSTPROP_ITEM_ID).Value = itemId
+    oPropSet.Item(CUSTPROP_ITEM_ID).Value = PendingLinkItemId
     If Err.Number = 0 Then
         idState = "updated"
     Else
         Err.Clear
-        oPropSet.Add itemId, CUSTPROP_ITEM_ID
+        oPropSet.Add PendingLinkItemId, CUSTPROP_ITEM_ID
         If Err.Number = 0 Then
             idState = "added"
         Else
@@ -3132,12 +3132,12 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
 
     On Error Resume Next
     Err.Clear
-    oPropSet.Item(CUSTPROP_ITEM_NUMBER).Value = itemNumberText
+    oPropSet.Item(CUSTPROP_ITEM_NUMBER).Value = PendingLinkItemNumberText
     If Err.Number = 0 Then
         numberState = "updated"
     Else
         Err.Clear
-        oPropSet.Add itemNumberText, CUSTPROP_ITEM_NUMBER
+        oPropSet.Add PendingLinkItemNumberText, CUSTPROP_ITEM_NUMBER
         If Err.Number = 0 Then
             numberState = "added"
         Else
@@ -3146,8 +3146,8 @@ Sub SetLinkedItemOn(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumb
     End If
     On Error GoTo 0
 
-    LogLine "SetLinkedItemOn: " & CUSTPROP_ITEM_ID & "=""" & itemId & """ -> " & idState & "; " & _
-            CUSTPROP_ITEM_NUMBER & "=""" & itemNumberText & """ -> " & numberState & "; on """ & oDoc.FullFileName & """."
+    LogLine "SetLinkedItemOn: " & CUSTPROP_ITEM_ID & "=""" & PendingLinkItemId & """ -> " & idState & "; " & _
+            CUSTPROP_ITEM_NUMBER & "=""" & PendingLinkItemNumberText & """ -> " & numberState & "; on """ & oDoc.FullFileName & """."
 
     ' Diagnostic only, runs ONLY when at least one write above failed outright (both the
     ' update AND the add-fallback failed). The duplicate-name hypothesis (property already
@@ -3188,7 +3188,9 @@ Function GetLinkedItemId() As String
 End Function
 
 Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String)
-    SetLinkedItemOn InvApp.ActiveDocument, itemId, itemNumberText
+    PendingLinkItemId = itemId
+    PendingLinkItemNumberText = itemNumberText
+    SetLinkedItemOn InvApp.ActiveDocument
 End Sub
 
 ' Checks whether a linked PDM item still exists on the server -- recovers from a STALE
@@ -3325,7 +3327,9 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
     If linkedItemId <> "" Then
         If Not ItemStillExists(linkedItemId) Then
             LogLine "Linked PDM item " & linkedItemId & " no longer exists on the server (deleted?) -- clearing the stale local link, treating this document as not yet linked."
-            SetLinkedItemOn oDoc, "", ""
+            PendingLinkItemId = ""
+            PendingLinkItemNumberText = ""
+            SetLinkedItemOn oDoc
             MsgBox T("StaleLinkCleared"), vbInformation, T("AppTitle")
             linkedItemId = ""
         End If
@@ -3498,7 +3502,9 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         ' resultInfo above) already set and saved this same iProperty BEFORE uploading, so
         ' the file actually sent to the server already carries it. Kept here as cheap
         ' insurance for the top-level document specifically.
-        SetLinkedItemOn oDoc, linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0))
+        PendingLinkItemId = linkedItemId
+        PendingLinkItemNumberText = CStr(JsonGetLong(resultInfo, "itemNumber", 0))
+        SetLinkedItemOn oDoc
         LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
                 ", revision " & JsonGetString(resultInfo, "revisionLabel", "A") & " ==="
 
