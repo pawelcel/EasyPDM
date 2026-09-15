@@ -106,24 +106,25 @@ Private Const SESSION_COOKIE_NAME As String = "pdm_session"
 ' (old name, read-only fallback in GetLinkedItemIdOn) is cheap insurance in case an older
 ' Inventor version somewhere did manage to write it before any of this was diagnosed.
 '
-' The ACTUAL root cause of the .Add failures this whole session, found via an extremely long
-' bisection in the VBA Immediate Window on a live Inventor 2027.1 install: PropertySet.Add
-' reproducibly fails (generic COM error, -2147467259) whenever it is called from inside a
-' procedure whose signature takes an Object parameter PLUS one or more String parameters --
-' regardless of the property name, the value, the document, or anything else. A procedure
-' that takes ONLY an Object parameter (or none) works every time; adding even a single extra
-' String parameter to that same procedure's signature breaks it. This is why
-' SetLinkedItemOn below takes only oDoc now -- the values it needs travel through the
-' PendingLinkItemId/PendingLinkItemNumberText module variables just below instead of through
-' its own parameter list. Bizarre, but conclusively isolated through ~15 rounds of minimal
-' test Subs, each changing exactly one variable at a time.
+' The ACTUAL root cause of the .Add failures this whole session: PropertySet.Add's value
+' parameter is a Variant, and a late-bound VBA call passes a bare VARIABLE by reference
+' (VT_BYREF) but a literal or expression result by value -- and Inventor 2027.1 rejects the
+' by-reference form with a generic COM error. See the comment on the .Add calls inside
+' SetLinkedItemOn for the full evidence and the "& """ fix that forces by-value.
+'
+' An earlier theory blamed the CALLING PROCEDURE'S SIGNATURE instead (String parameters
+' alongside the Object one), which is why the values still travel through the
+' PendingLinkItemId/PendingLinkItemNumberText module variables below rather than through
+' SetLinkedItemOn's own parameter list. That theory is disproven -- what actually mattered
+' was always the variable-vs-expression distinction at the call itself, not where the value
+' came from. These two module variables are now just harmless indirection and can be folded
+' back into plain parameters once the by-value fix is confirmed live.
 Private Const CUSTPROP_ITEM_ID As String = "EasyPDM_LinkId"
 Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_LinkNumber"
 Private Const CUSTPROP_ITEM_ID_LEGACY As String = "EasyPDM_ItemId"
 
-' Carry the values for the NEXT SetLinkedItemOn call -- see the long comment above for why
-' this can't just be two String parameters on SetLinkedItemOn itself. Set these immediately
-' before every call to SetLinkedItemOn oDoc (never left set across unrelated calls).
+' Carry the values for the NEXT SetLinkedItemOn call. Set these immediately before every
+' call to SetLinkedItemOn oDoc (never left set across unrelated calls).
 Private PendingLinkItemId As String
 Private PendingLinkItemNumberText As String
 
@@ -3059,17 +3060,11 @@ End Function
 ' since there is no single "add or replace" call the way SolidWorks's Add3 (with a REPLACE
 ' option) provides.
 ' Takes only oDoc -- itemId/itemNumberText travel through PendingLinkItemId/
-' PendingLinkItemNumberText instead (see those module variables' own comment for why: a
-' procedure taking an Object parameter plus String parameters breaks PropertySet.Add on
-' this Inventor 2027.1 install, conclusively isolated through many rounds of live testing).
-' Every caller sets both module variables immediately before calling this.
+' PendingLinkItemNumberText instead, a leftover of a disproven theory about parameter
+' signatures (see those module variables' own comment); harmless, and foldable back into
+' plain parameters. Every caller sets both module variables immediately before calling this.
 Sub SetLinkedItemOn(ByVal oDoc As Object)
-    ' Reads PendingLinkItemId/PendingLinkItemNumberText directly (NOT copied into local
-    ' variables first -- an earlier attempt at this fix copied a String PARAMETER into a
-    ' local variable before use and that ALSO still failed, so the values are used straight
-    ' from the module variables here, matching the one shape confirmed to work live).
-    '
-    ' Also proactively clears the Windows read-only file attribute if set (Inventor 2018+
+    ' Proactively clears the Windows read-only file attribute if set (Inventor 2018+
     ' refuses to modify iProperties on a document it treats as write-protected, confirmed via
     ' Autodesk's own support article on this behavior change) -- a file linked to an existing
     ' PDM item is commonly one copied from a zip/share, which can retain that attribute even
@@ -3111,6 +3106,18 @@ Sub SetLinkedItemOn(ByVal oDoc As Object)
     ' "updated existing" -- since "added" just defaulted to False in that case too.
     Dim idState As String, numberState As String
 
+    ' The "& """ on both .Add calls below is LOAD-BEARING, not a typo. PropertySet.Add's
+    ' first parameter (the value) is a Variant, and in a late-bound call VBA passes a bare
+    ' VARIABLE by reference (VT_BYREF) while it passes a LITERAL or any EXPRESSION result by
+    ' value. Inventor 2027.1 fails this call with a generic COM error (-2147467259) whenever
+    ' the value arrives as a by-reference Variant. Isolated over ~25 rounds of minimal test
+    ' procedures run from the VBA Immediate Window against a live install: every single test
+    ' that passed a string LITERAL succeeded, and every single test that passed a variable
+    ' (String parameter, local copy of one, or module-level variable) failed -- identically,
+    ' regardless of property name, value content, document, call depth, procedure signature,
+    ' or whether the call was inline or delegated to a helper. Concatenating an empty string
+    ' forces VBA to build a fresh temporary, which is passed by value and accepted.
+    ' ".Value = <variable>" (Property Let, used for the update path) was never affected.
     On Error Resume Next
     Err.Clear
     oPropSet.Item(CUSTPROP_ITEM_ID).Value = PendingLinkItemId
@@ -3118,7 +3125,7 @@ Sub SetLinkedItemOn(ByVal oDoc As Object)
         idState = "updated"
     Else
         Err.Clear
-        oPropSet.Add PendingLinkItemId, CUSTPROP_ITEM_ID
+        oPropSet.Add PendingLinkItemId & "", CUSTPROP_ITEM_ID
         If Err.Number = 0 Then
             idState = "added"
         Else
@@ -3134,7 +3141,7 @@ Sub SetLinkedItemOn(ByVal oDoc As Object)
         numberState = "updated"
     Else
         Err.Clear
-        oPropSet.Add PendingLinkItemNumberText, CUSTPROP_ITEM_NUMBER
+        oPropSet.Add PendingLinkItemNumberText & "", CUSTPROP_ITEM_NUMBER
         If Err.Number = 0 Then
             numberState = "added"
         Else
