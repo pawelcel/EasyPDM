@@ -167,6 +167,15 @@ Private InvApp As Object
 Private Const STEP_TRANSLATOR_CLSID As String = "{90AF7F40-0C01-11D5-8E83-0010B541CD80}"
 Private Const PDF_TRANSLATOR_CLSID As String = "{0AC6FD96-2F4D-42CE-8BE0-8AEA580399E4}"
 
+' IOMechanismEnum.kFileBrowseIOMechanism -- tells a translator to write straight to the file
+' named in DataMedium.FileName instead of using another delivery mechanism. Spelled as a raw
+' number because this file deliberately stays late-bound (plain Object variables, no type
+' library reference assumed), so the symbolic constant is not available. Value read directly
+' out of Inventor's own type library on a live 2027.1 install, via the VBA Immediate Window:
+'     ?kFileBrowseIOMechanism      -> 13059
+' For reference, a freshly created TranslationContext reports Type = 13057 by default.
+Private Const IO_MECHANISM_FILE_BROWSE As Long = 13059
+
 ' Win32 API used ONLY by WaitForTicket (below) to poll the ticket endpoint while keeping
 ' Inventor responsive and letting the user cancel with Escape -- this module has no
 ' UserForm (see file header), so there is no button to click during the wait; Escape is
@@ -2183,12 +2192,19 @@ Private Function ExportTempDirFor(ByVal oDoc As Object) As String
     End If
 End Function
 
+' EVERY step below clears Err first and checks it immediately afterwards. That is not
+' defensive noise -- without it this Function is genuinely undiagnosable: "On Error Resume
+' Next" is active throughout, Err keeps whatever the last failing statement left in it, and
+' the first check that happens to look at Err then reports an error raised several
+' statements earlier. A live run spent a whole round blaming HasSaveCopyAsOptions for an
+' err=438 that could equally have come from Activate, CreateTranslationContext, the
+' oContext.Type assignment, or CreateNameValueMap. Each step now names itself in the log.
 Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid As String, ByVal outputPath As String) As Boolean
     ExportViaTranslator = False
     On Error Resume Next
-    Err.Clear
 
     Dim oAddIn As Object
+    Err.Clear
     Set oAddIn = InvApp.ApplicationAddIns.ItemById(translatorClsid)
     If oAddIn Is Nothing Or Err.Number <> 0 Then
         LogLine "ExportViaTranslator: translator add-in """ & translatorClsid & """ not found (err=" & Err.Number & ": " & Err.Description & ")."
@@ -2197,15 +2213,39 @@ Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid
 
     ' Activate() before first use is the documented, safe way to ensure the add-in is
     ' actually loaded -- calling SaveCopyAs on an inactive add-in is a common source of
-    ' silent failures in Inventor automation samples.
+    ' silent failures in Inventor automation samples. An add-in that is already active may
+    ' report an error here; harmless, so it is logged but not treated as fatal.
+    Err.Clear
     oAddIn.Activate
+    If Err.Number <> 0 Then
+        LogLine "ExportViaTranslator: Activate failed (err=" & Err.Number & ": " & Err.Description & ") -- continuing anyway."
+        Err.Clear
+    End If
 
     Dim oContext As Object
+    Err.Clear
     Set oContext = InvApp.TransientObjects.CreateTranslationContext
-    oContext.Type = 13059 ' kFileBrowseIOMechanism -- confirmed live, see note above
+    If oContext Is Nothing Or Err.Number <> 0 Then
+        LogLine "ExportViaTranslator: CreateTranslationContext failed (err=" & Err.Number & ": " & Err.Description & ")."
+        On Error GoTo 0
+        Exit Function
+    End If
+
+    Err.Clear
+    oContext.Type = IO_MECHANISM_FILE_BROWSE
+    If Err.Number <> 0 Then
+        LogLine "ExportViaTranslator: setting oContext.Type = " & IO_MECHANISM_FILE_BROWSE & " failed (err=" & Err.Number & ": " & Err.Description & ")."
+        Err.Clear
+    End If
 
     Dim oOptions As Object
+    Err.Clear
     Set oOptions = InvApp.TransientObjects.CreateNameValueMap
+    If oOptions Is Nothing Or Err.Number <> 0 Then
+        LogLine "ExportViaTranslator: CreateNameValueMap failed (err=" & Err.Number & ": " & Err.Description & ")."
+        On Error GoTo 0
+        Exit Function
+    End If
 
     ' REQUIRED before SaveCopyAs -- confirmed against Autodesk's own official STEP/PDF
     ' SaveCopyAs samples, both of which call this first (it populates oOptions/oContext
@@ -2219,18 +2259,13 @@ Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid
     ' this shared helper serves both, so it takes the more permissive of the two and just
     ' logs when the translator claims it has no options, rather than skipping the export
     ' outright on a translator-reported False that may not actually mean "cannot export").
-    ' A previous attempt wrapped every argument below in extra parentheses -- e.g. "(oDoc)"
-    ' -- on the theory that this Inventor 2027.1 install rejects by-reference Variants in
-    ' late-bound calls the same way it did for PropertySet.Add elsewhere in this file. Live
-    ' testing DISPROVED that for THESE specific calls: wrapping introduced a NEW failure
-    ' (err=438, "Object doesn't support this property or method") that wasn't there before --
-    ' consistent with the classic VBA gotcha where redundant parentheses around an object
-    ' variable can force evaluation of that object's DEFAULT member instead of passing the
-    ' object reference itself, which is exactly the wrong outcome for TranslationContext/
-    ' NameValueMap/DataMedium arguments. Reverted to plain variables. The real fix for
-    ' SaveCopyAs turned out to be oContext.Type's value (see the module-level comment above
-    ' this Function) -- unrelated to by-ref/by-val at all.
+    ' Do NOT wrap these arguments in extra parentheses to force by-value passing, the way
+    ' PropertySet.Add's value argument needs elsewhere in this file: tried live, and it only
+    ' made things worse. Redundant parentheses around an object variable can make VBA
+    ' evaluate that object's DEFAULT member instead of passing the object itself, which is
+    ' exactly wrong for TranslationContext/NameValueMap/DataMedium.
     Dim hasOptions As Boolean
+    Err.Clear
     hasOptions = oAddIn.HasSaveCopyAsOptions(oDoc, oContext, oOptions)
     If Err.Number <> 0 Then
         LogLine "ExportViaTranslator: HasSaveCopyAsOptions for """ & translatorClsid & """ failed (err=" & Err.Number & ": " & Err.Description & ") -- attempting SaveCopyAs anyway."
@@ -2240,19 +2275,34 @@ Private Function ExportViaTranslator(ByVal oDoc As Object, ByVal translatorClsid
     End If
 
     Dim oDataMedium As Object
+    Err.Clear
     Set oDataMedium = InvApp.TransientObjects.CreateDataMedium
-    oDataMedium.FileName = outputPath
+    If oDataMedium Is Nothing Or Err.Number <> 0 Then
+        LogLine "ExportViaTranslator: CreateDataMedium failed (err=" & Err.Number & ": " & Err.Description & ")."
+        On Error GoTo 0
+        Exit Function
+    End If
 
+    Err.Clear
+    oDataMedium.FileName = outputPath
+    If Err.Number <> 0 Then
+        LogLine "ExportViaTranslator: setting oDataMedium.FileName failed (err=" & Err.Number & ": " & Err.Description & ")."
+        Err.Clear
+    End If
+
+    Err.Clear
     oAddIn.SaveCopyAs oDoc, oContext, oOptions, oDataMedium
     If Err.Number <> 0 Then
         LogLine "ExportViaTranslator: SaveCopyAs to """ & outputPath & """ via """ & translatorClsid & """ failed (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)."
-        Err.Clear
         On Error GoTo 0
         Exit Function
     End If
     On Error GoTo 0
 
     ExportViaTranslator = (Dir(outputPath) <> "")
+    If Not ExportViaTranslator Then
+        LogLine "ExportViaTranslator: SaveCopyAs reported no error but produced no file at """ & outputPath & """."
+    End If
 End Function
 
 ' Exports oDoc's visible geometry to a temporary .step file (via the STEP TranslatorAddIn,
