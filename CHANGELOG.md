@@ -65,112 +65,41 @@ All notable changes to EasyPDM are documented in this file.
   against) — see `EasyPDM.Inventor/README.md` for the full list of known risks to check
   on the first real run.
 
-### Diagnosing
-- `EasyPDM.Inventor/EasyPDMUpload.bas`: a retest showed the previous round's fixes for STEP
-  export and the PDM-link iProperty write did NOT resolve either issue — `SaveCopyAs` still
-  fails with the same `err=-2147418113`, now confirmed to happen even against oDoc's own
-  normal (non-8.3, non-mangled) folder, ruling out the short-path theory; `SetLinkedItemOn`'s
-  `.Add` still fails with `err=-2147467259` on both properties even though the property set
-  is confirmed empty and reachable, ruling out the duplicate-name theory too. Both fixes are
-  kept (harmless, still generally more correct) but neither was the true root cause. Added
-  `Err.Source` to both failure log lines (to tell apart "Inventor itself" from some other
-  automation/security software intercepting the call), an Inventor version/build log line,
-  and an `InvApp.ActiveDocument` identity check — aimed at gathering enough evidence from the
-  next live run to find the actual cause instead of guessing again. That evidence arrived:
-  both failures log `Err.Source = "DocumentProject"` (Inventor is running on version 2027.1).
-  Inventor VBA has two distinct kinds of project — an external/global one, shared across all
-  documents, versus a **Document project**, embedded inside one specific file — and
-  `"DocumentProject"` is exactly the term Inventor uses for the latter. Leading hypothesis:
-  the macro was imported into the active *document's own* embedded VBA project rather than
-  the external/global one, and Inventor 2027.1 fails to let a document modify itself (custom
-  iProperty write, translator export) from its own embedded macro. `EasyPDM.Inventor/README*`
-  installation steps rewritten to make this distinction explicit and to warn against it.
+### Fixed
+- `EasyPDM.Inventor/EasyPDMUpload.bas`: **PDM-link iProperty write and STEP/PDF export both
+  confirmed broken, then both confirmed fixed, on a live Inventor 2027.1 install.** Root
+  causes, found through an extensive live bisection session (many minimal test procedures
+  run one at a time from the VBA Immediate Window, each isolating one variable):
 
-  **Disproven by the next retest.** The user confirmed via the VBA Project Explorer that
-  `EasyPDMUpload` was already correctly sitting in `ApplicationProject` (the external/global
-  project), not a document-embedded one. Retesting from there, both calls still failed
-  identically — but `Err.Source` now read `"ApplicationProject"` instead of
-  `"DocumentProject"`, simply tracking whichever project happens to be executing the failing
-  line. That means `Err.Source` was never naming an intercepting component at all — it's
-  VBA's generic fallback to the CALLER's own project name whenever a COM error arrives
-  without its own custom Source, so it carries no information about which underlying
-  component actually failed here. Retiring that diagnostic angle. Confirmed instead, from the
-  same logs: `oDoc.Save` (called moments earlier, same document, same run) succeeds every
-  time with no error — so *some* document-modifying API calls work fine on this document;
-  only `PropertySet.Add` and `TranslatorAddIn.SaveCopyAs` specifically do not. Next step is
-  isolating whether this is a macro/automation-specific problem (test the same calls from the
-  VBA Immediate Window, outside the macro entirely) or a broader install-level problem with
-  this Inventor 2027.1 install (test a manual File → Export → STEP from Inventor's own UI,
-  no automation involved) — not yet done.
+  1. **`PropertySet.Add` reproducibly failed** (generic COM error, `-2147467259`) whenever
+     its value argument was a bare variable, while the identical call with a string
+     *literal* always succeeded. Mechanism: `Add`'s value parameter is a Variant, and a
+     late-bound VBA call passes a bare variable by reference (`VT_BYREF`) but a literal or
+     expression result by value — this Inventor install rejects the by-reference form.
+     `Property Let` (`.Value = <variable>`, the update path for an already-existing
+     property) was never affected, which is why re-uploads of an already-linked file always
+     worked while the very first link-creation on a new item never did. **Fix**:
+     concatenate an empty string onto the value at both `.Add` call sites
+     (`PendingLinkItemId & ""`) to force VBA to build a fresh temporary passed by value.
+     (Several earlier theories tested and ruled out along the way — a duplicate/reserved
+     property name, the calling procedure's parameter signature, call depth, Function vs.
+     Sub, inlining vs. a helper procedure — none of those were the actual cause; they're
+     preserved in git history for anyone retracing this.)
+  2. **`TranslatorAddIn.SaveCopyAs` reproducibly failed** (`err=-2147418113`,
+     `E_UNEXPECTED`) because `oContext.Type` was set to `2`, a guessed and always-
+     `UNVERIFIED` stand-in for `kFileBrowseIOMechanism` (no type library reference is used
+     in this file, so the symbolic constant was never available). The real value, read
+     directly out of Inventor's own type library via the VBA Immediate Window
+     (`?kFileBrowseIOMechanism`), is **`13059`**. Now a named constant,
+     `IO_MECHANISM_FILE_BROWSE`. (A by-value parentheses fix analogous to #1 was tried
+     first and reverted — wrapping an Object argument in redundant parentheses can force
+     evaluation of its default member instead of passing the reference, which made things
+     worse; the Type value was the actual and only fix needed here.)
 
-  **Both isolation tests came back clean**, which was the real breakthrough: a manual STEP
-  export from Inventor's own UI (File → Export) worked, and `PropertySets.Item("Inventor
-  User Defined Properties").Add "hello", "EasyPDM_Test"` typed directly into the VBA
-  Immediate Window (same document, same session) also worked and persisted. So the
-  install/translator/property-set machinery is fine — this is specific to our own macro's
-  calls. A follow-up Immediate Window test isolated it further: `.Add someValue,
-  "EasyPDM_ItemId"` (the EXACT name/value our macro uses) typed manually **also failed**,
-  on a brand-new never-before-touched document, ruling out both a call-context/nesting
-  theory and a "this one test file got corrupted by repeated failed attempts" theory. The
-  common thread across both failing names (`EasyPDM_ItemId`, `EasyPDM_ItemNumber`) is the
-  substring "Item"; an unrelated name (`EasyPDM_Test`) worked every time. **Fix**: renamed
-  the two properties to `EasyPDM_LinkId`/`EasyPDM_LinkNumber` (no "Item" substring) to
-  sidestep whatever Inventor 2027 reserves/intercepts there — the exact underlying
-  mechanism was never confirmed, but the rename resolves the symptom regardless.
-  `GetLinkedItemIdOn` still reads the old `EasyPDM_ItemId` name as a fallback, in case an
-  older Inventor version somewhere did manage to write it successfully.
-
-  **The rename did NOT fix it either** — `EasyPDM_LinkId`/`EasyPDM_LinkNumber` failed
-  identically. Further bisection (typing `EasyPDM_FooId`, `EasyPDM_FooNumber`, and finally
-  the exact production name `EasyPDM_LinkId` itself as flat `.Add` statements in the
-  Immediate Window) found every one of them succeeding manually, which ruled out the
-  property name entirely — including the name previously suspected. Calling
-  `SetLinkedItemOn` directly via `Call` from the Immediate Window (bypassing the entire
-  ticket/HTTP call chain) still failed identically to the full macro run, ruling out
-  timing/call-context theories too. The decisive test: once `EasyPDM_LinkId` existed
-  (added manually), re-running `SetLinkedItemOn` updated it successfully via `.Value=`,
-  while `EasyPDM_LinkNumber` (still new) failed on `.Add` in the very same call. So `.Add`
-  specifically — not `.Value=`, not any property name or value — fails every time it runs
-  from inside a compiled VBA procedure on this Inventor 2027.1 install, while the identical
-  call typed as a flat statement in the Immediate Window always succeeds. **Mitigation**:
-  added `TryWriteCustomProperty`, which retries the `Add` step up to 5 times with `DoEvents`
-  and a short pause between attempts (the standard VBA workaround for this class of
-  reentrancy/message-pump-state COM symptom) before giving up and logging FAILED as before.
-
-  **The retry did NOT help either** — failed identically after all 5 attempts, proving the
-  failure is deterministic, not transient. This forced a proper root-cause hunt: a series of
-  minimal test `Sub`s typed directly into the VBA module and run one at a time from the
-  Immediate Window, each replicating one more piece of `SetLinkedItemOn`'s actual structure,
-  isolated it completely. Confirmed to work fine, every time: a bare `.Add` in a plain `Sub`;
-  the full `.Item().Value=`-then-`.Add` fallback pattern in a plain `Sub`; the document
-  passed in as a `ByVal Object` parameter instead of using `ThisApplication.ActiveDocument`
-  directly; obtaining the property set through a separate helper **Function that returns an
-  Object**. The ONE test that reproduced the failure: wrapping the exact same
-  `.Item().Value=`-then-`.Add` logic inside a separate helper **Function that returns a
-  String** — on this Inventor 2027.1 install, `PropertySet.Add` reproducibly fails with the
-  same generic COM error specifically when called from inside a Function with a String
-  return value, regardless of the property name, its value, or anything else. That is
-  exactly the shape the `TryWriteCustomProperty` Function above had. **Fix**: changed
-  `TryWriteCustomProperty` from a Function returning the state string to a `Sub` with a
-  `ByRef state As String` output parameter instead — matching the confirmed-working shape.
-  The now-pointless DoEvents retry loop (the failure was never transient) was removed at the
-  same time.
-
-  **Still failed after that change too.** The Sub-with-ByRef shape matched what worked in
-  isolated tests, but `TryWriteCustomProperty` was still called AS A SEPARATE PROCEDURE from
-  `SetLinkedItemOn` — a shape none of the isolated tests had actually covered (they all had
-  the `.Item()`/`.Add` code written directly inline in the SAME procedure, never delegated
-  to another one, Sub or Function). Also noticed: reverting to fully inline code alone would
-  not obviously help either, since that was the ORIGINAL shape (before any of this session's
-  fixes) and it already failed in every earlier test. The one remaining untested variable:
-  `SetLinkedItemOn` reads `oDoc.ReadOnly` as a diagnostic just before the property writes,
-  and this reliably throws error 438 (unsupported property) on every single call on this
-  Inventor 2027.1 install — a real, caught COM error occurring in the SAME procedure shortly
-  before `.Add`, which no isolated test had ever replicated. **Fix**: removed
-  `TryWriteCustomProperty` entirely and inlined the `.Item()`/`.Add` logic for both
-  properties directly back into `SetLinkedItemOn` (accepting the small duplication), AND
-  removed the `oDoc.ReadOnly` diagnostic block (it never produced a real answer anyway,
-  always failing with the same 438). Not yet confirmed live — pending the next test.
+  `ExportViaTranslator` was also rewritten to clear and check `Err` after every individual
+  step instead of once at the top — with `On Error Resume Next` active for the whole
+  function, a single shared `Err` check was blaming the wrong call for several rounds
+  during this investigation.
 
 ### Fixed
 - `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,
