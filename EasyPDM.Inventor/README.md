@@ -17,16 +17,17 @@ session) — the Inventor counterparts of `EasyPDM.SolidWorks/EasyPDMUpload.bas`
 
 ## Status
 
-**NOT yet live-tested** — this environment has no Autodesk Inventor installation
-available, so unlike the SolidWorks macros (which went through several rounds of live
-testing and bug-fixing on real SolidWorks 2026), this port has only been verified
-statically: ASCII-only source, balanced `Sub`/`Function`/`If`/`For`/`Do`/`Select Case`
-blocks, no duplicate procedure names, correct CRLF line endings. The overall shape of the
-code — JSON parsing, HTTP, the browser ticket flow, login, revision naming — is identical
-to the already-verified SolidWorks macros and shares no Inventor-specific risk. The parts
-that genuinely need confirming on a real Inventor install are the narrow set of Inventor
-Automation API calls listed in "Known risks / places to check first" below — please read
-that section, and the macro's own log file, before relying on this in production.
+**Live-verified end-to-end on real Autodesk Inventor 2027.1**, across an extended round
+of live testing and bug-fixing (2026-09-14/15): login, the browser ticket flow (new
+item/duplicate/attach to existing), file upload, PDM-link tracking via custom iProperties,
+STEP/PDF attachment export, and the assembly-tree/status-revision flows shared with the
+already-verified SolidWorks macros — all confirmed working against a live server and a
+live Inventor install, not just reviewed statically. Two genuine Inventor 2027.1 COM
+automation quirks were found and fixed along the way; see "Known risks" below for what
+they were and why they matter if this code is ever touched again.
+
+A few narrow, low-traffic code paths remain genuinely untested in practice (marked
+`UNVERIFIED` inline in the source) — see "Known risks" below.
 
 ## Differences from the SolidWorks macros
 
@@ -56,8 +57,8 @@ compare side by side. Only the actual CAD API calls differ:
   `view.ReferencedDocument`.
 - **STEP/PDF export**: Inventor's `TranslatorAddIn` mechanism (`ApplicationAddIns.
   ItemById`, `TranslationContext`/`NameValueMap`/`DataMedium`, `SaveCopyAs`) instead of
-  SolidWorks' `IModelDocExtension.SaveAs` — see "Known risks" for the translator CLSIDs,
-  which are UNVERIFIED.
+  SolidWorks' `IModelDocExtension.SaveAs` — see "Known risks" for two confirmed,
+  Inventor-2027.1-specific quirks in this mechanism found during live testing.
 - **Opening a document**: `InvApp.Documents.Open(path, Visible:=True)` (simpler
   signature, errors via COM exception) instead of SolidWorks' `OpenDoc6` (which needs an
   explicit document-type argument and returns errors via `ByRef` parameters).
@@ -190,47 +191,50 @@ entered once at login — shared with the SolidWorks/FreeCAD macros too.
 
 ## Known risks / places to check first
 
-This port was written entirely from documented Inventor Automation API behavior, without
-access to a live install — everything below is marked `UNVERIFIED` inline in the source
-and should be the first place to look if something goes wrong on the first real run:
+Two genuine, confirmed bugs specific to this Inventor 2027.1 install were found and fixed
+during live testing — worth understanding if `SetLinkedItemOn` or `ExportViaTranslator`
+ever need touching again, since both symptoms are generic COM errors that give no hint of
+the real cause:
+
+1. **`PropertySet.Add`'s value argument must be passed by value, not by reference.** A
+   late-bound VBA call passes a bare variable as a by-reference Variant (`VT_BYREF`) but a
+   literal or expression result by value, and this Inventor install rejects the
+   by-reference form outright with a generic `-2147467259` COM error — while `Property Let`
+   (`.Value = <variable>`, the update path for an already-existing property) is completely
+   unaffected. `SetLinkedItemOn` forces by-value by concatenating an empty string onto the
+   value (`PendingLinkItemId & ""`) at both `.Add` call sites. If a future edit reintroduces
+   a bare-variable `.Add` call anywhere in this file, expect it to fail the exact same way.
+2. **`kFileBrowseIOMechanism` (used to set `oContext.Type` before `SaveCopyAs`) is
+   `13059`, not a small number.** No type library reference is used in this file (it stays
+   late-bound throughout), so the symbolic constant isn't available and has to be spelled
+   as a raw integer — now `IO_MECHANISM_FILE_BROWSE` in `EasyPDMUpload.bas`. An earlier
+   guess of `2` (the only plausible-looking small integer, and the value used in some
+   unrelated public code samples for a different enum) left `SaveCopyAs` failing with
+   `err=-2147418113` (`E_UNEXPECTED`) on every export. If you ever need another
+   `IOMechanismEnum` value, read it directly out of Inventor's own type library via the VBA
+   Immediate Window (e.g. `?kFileBrowseIOMechanism`) rather than guessing — Inventor's
+   enums are essentially never small numbers.
+
+Confirmed correct/working during the same testing, so no longer a risk: the STEP/PDF
+translator CLSIDs, the `"Inventor User Defined Properties"` property-set name (exact
+name, no prefix issue), and `oDoc.Save`/`oDoc.SaveAs(path, False)` (both observed
+succeeding repeatedly, including the local-rename case).
+
+Still genuinely untested in practice (no live exercise of these specific paths during this
+round), marked `UNVERIFIED` inline in the source:
 
 1. **`InvApp.StatusBarText`** as a settable property (used by `WaitForTicket` to show
    progress while waiting for the browser) — wrapped in `On Error Resume Next`, so a
    wrong assumption degrades to "no status bar text" instead of a crash, but worth
    confirming.
-2. **Translator CLSIDs** for STEP/PDF export
-   (`ExportViaTranslator`/`UploadStepAttachment`/`UploadPdfAttachment`) — publicly
-   documented values, not confirmed here:
-   - STEP: `{90AF7F40-0C01-11D5-8E83-0010B541CD80}`
-   - PDF: `{0AC6FD96-2F4D-42CE-8BE0-8AEA580399E4}`
-   Also `oContext.Type = 2` (intended as `kFileBrowseIOMechanism`) in the same export
-   path.
-3. **`PropertySets.Item("Inventor User Defined Properties")`** — the exact property-set
-   name; some Inventor versions may use a different name (e.g. without the "Inventor "
-   prefix). The write path already falls back from "set" to "add" when a property
-   doesn't exist yet, but a wrong set name would fail both.
-4. **`oDoc.Save`/`oDoc.SaveAs(path, False)`** exact behavior and error signaling (COM
-   exception, not `ByRef` output parameters like SolidWorks' `Save3`) — the general shape
-   is well documented, but not exercised against a real file yet.
-5. **`oDoc.DisplayName`** as the equivalent of SolidWorks' `GetTitle()`.
-6. **`view.ReferencedDocumentDescriptor.ReferencedDocument`** — the exact property path
+2. **`oDoc.DisplayName`** as the equivalent of SolidWorks' `GetTitle()`.
+3. **`view.ReferencedDocumentDescriptor.ReferencedDocument`** — the exact property path
    for resolving a drawing view's referenced model; expected to return `Nothing` when
    the model isn't currently open, same limitation as the SolidWorks macro's
    `view.ReferencedDocument`.
-7. **No equivalent of `ResolveAllLightWeightComponents`** — deliberately omitted (see
+4. **No equivalent of `ResolveAllLightWeightComponents`** — deliberately omitted (see
    "Differences from the SolidWorks macros"); if Inventor turns out to have its own
    lightweight-component gotcha, this is where it would need to be added.
-8. **Custom iProperty names containing "Item" reproducibly failed to write on a live
-   Inventor 2027.1 install** — `PropertySets.Item("Inventor User Defined Properties").Add`
-   consistently failed (generic COM error) for names like `EasyPDM_ItemId`/
-   `EasyPDM_ItemNumber`, on multiple documents, in multiple sessions, while an otherwise
-   identical `Add` call for an unrelated name succeeded immediately — isolated down to the
-   property name itself via the VBA Immediate Window, completely outside this macro. The
-   properties are now named `EasyPDM_LinkId`/`EasyPDM_LinkNumber` instead (no "Item"
-   substring) to sidestep whatever Inventor 2027 reserves/intercepts there; the exact
-   mechanism was never confirmed. `GetLinkedItemIdOn` still reads the old
-   `EasyPDM_ItemId` name as a fallback in case an older Inventor version ever wrote it
-   successfully.
 
 ## Limitations (deliberately out of scope for this version)
 

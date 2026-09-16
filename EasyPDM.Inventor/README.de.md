@@ -17,18 +17,20 @@ Windows-Registrierung für die Anmeldesitzung) — die Inventor-Gegenstücke zu
 
 ## Status
 
-**Noch NICHT live getestet** — in dieser Umgebung ist keine Autodesk-Inventor-
-Installation verfügbar. Im Gegensatz zu den SolidWorks-Makros (die mehrere Runden von
-Live-Tests auf echtem SolidWorks 2026 durchlaufen haben) wurde dieser Port daher nur
-statisch verifiziert: reiner ASCII-Quellcode, ausgeglichene `Sub`/`Function`/`If`/`For`/
-`Do`/`Select Case`-Blöcke, keine doppelten Prozedurnamen, korrekte CRLF-Zeilenenden. Die
-grundsätzliche Struktur des Codes — JSON-Parsing, HTTP, der Browser-Ticket-Ablauf,
-Anmeldung, Revisions-Namenskonvention — ist identisch mit den bereits verifizierten
-SolidWorks-Makros und birgt kein Inventor-spezifisches Risiko. Die Teile, die auf einer
-echten Inventor-Installation wirklich bestätigt werden müssen, sind der schmale Satz von
-Inventor-Automation-API-Aufrufen, die unten unter "Bekannte Risiken / zuerst zu prüfende
-Stellen" aufgeführt sind — bitte diesen Abschnitt sowie die Logdatei des Makros lesen,
-bevor Sie sich im produktiven Einsatz darauf verlassen.
+**Live end-to-end verifiziert auf echtem Autodesk Inventor 2027.1** — in einer
+längeren Runde von Live-Tests und Fehlerbehebungen (2026-09-14/15): Anmeldung, der
+Browser-Ticket-Ablauf (neues Element/Duplikat/an bestehendes anhängen), Datei-Upload,
+Nachverfolgung der PDM-Verknüpfung über eigene iProperties, STEP/PDF-Anhang-Export sowie
+die mit den bereits verifizierten SolidWorks-Makros geteilten Baugruppenbaum-/Status-
+Revisions-Abläufe — alles bestätigt funktionsfähig gegen einen echten Server und eine
+echte Inventor-Installation, nicht nur statisch geprüft. Dabei wurden zwei echte
+COM-Automatisierungs-Eigenheiten von Inventor 2027.1 gefunden und behoben — siehe
+"Bekannte Risiken" unten, was das war und warum es wichtig ist, falls dieser Code je
+wieder angefasst werden muss.
+
+Ein paar schmale, selten durchlaufene Codepfade bleiben in der Praxis tatsächlich
+ungetestet (im Quellcode direkt mit `UNVERIFIED` markiert) — siehe "Bekannte Risiken"
+unten.
 
 ## Unterschiede zu den SolidWorks-Makros
 
@@ -60,8 +62,8 @@ API-Aufrufe unterscheiden sich:
   `view.ReferencedDocument`.
 - **STEP/PDF-Export**: Inventors `TranslatorAddIn`-Mechanismus (`ApplicationAddIns.
   ItemById`, `TranslationContext`/`NameValueMap`/`DataMedium`, `SaveCopyAs`) statt
-  SolidWorks' `IModelDocExtension.SaveAs` — siehe "Bekannte Risiken" für die
-  Translator-CLSIDs, die UNBESTÄTIGT sind.
+  SolidWorks' `IModelDocExtension.SaveAs` — siehe "Bekannte Risiken" für zwei bestätigte,
+  Inventor-2027.1-spezifische Eigenheiten in diesem Mechanismus, gefunden bei Live-Tests.
 - **Dokument öffnen**: `InvApp.Documents.Open(path, Visible:=True)` (einfachere
   Signatur, Fehler über COM-Ausnahme) statt SolidWorks' `OpenDoc6` (das ein explizites
   Dokumenttyp-Argument benötigt und Fehler über `ByRef`-Parameter zurückgibt).
@@ -203,52 +205,56 @@ der Anmeldung automatisch gespeichert — auch mit den SolidWorks/FreeCAD-Makros
 
 ## Bekannte Risiken / zuerst zu prüfende Stellen
 
-Dieser Port wurde ausschließlich anhand dokumentierten Verhaltens der Inventor-
-Automation-API geschrieben, ohne Zugriff auf eine echte Installation — alles Folgende
-ist im Quellcode direkt mit `UNVERIFIED` markiert und sollte die erste Stelle sein, die
-man prüft, wenn beim ersten echten Lauf etwas schiefgeht:
+Zwei echte, bestätigte Bugs speziell in dieser Inventor-2027.1-Installation wurden bei
+Live-Tests gefunden und behoben — wichtig zu kennen, falls `SetLinkedItemOn` oder
+`ExportViaTranslator` je wieder angefasst werden müssen, denn beide Symptome sind
+allgemeine COM-Fehler, die für sich genommen nichts über die eigentliche Ursache verraten:
+
+1. **Der an `PropertySet.Add` übergebene Wert muss per Wert übergeben werden, nicht per
+   Referenz.** Ein spät gebundener VBA-Aufruf übergibt eine nackte Variable als Variant
+   per Referenz (`VT_BYREF`), ein Literal oder ein Ausdrucksergebnis dagegen per Wert —
+   und diese Inventor-Installation lehnt die Referenz-Form mit einem allgemeinen
+   COM-Fehler `-2147467259` rundweg ab, während `Property Let`
+   (`.Value = <Variable>`, der Aktualisierungspfad für eine bereits existierende
+   Eigenschaft) davon überhaupt nicht betroffen ist. `SetLinkedItemOn` erzwingt die
+   Wertübergabe, indem es an beiden `.Add`-Aufrufstellen einen leeren String anhängt
+   (`PendingLinkItemId & ""`). Sollte eine künftige Änderung irgendwo in dieser Datei
+   erneut einen `.Add`-Aufruf mit einer nackten Variable einführen, ist mit demselben
+   Fehler zu rechnen.
+2. **`kFileBrowseIOMechanism` (verwendet, um `oContext.Type` vor `SaveCopyAs` zu setzen)
+   ist `13059`, keine kleine Zahl.** In dieser Datei wird nirgends eine
+   Typbibliotheks-Referenz verwendet (durchgehend späte Bindung), daher ist die
+   symbolische Konstante nicht verfügbar und muss als rohe Ganzzahl geschrieben werden —
+   jetzt `IO_MECHANISM_FILE_BROWSE` in `EasyPDMUpload.bas`. Eine frühere Schätzung von
+   `2` (die einzige plausibel wirkende kleine Ganzzahl, auch in manchen unabhängigen
+   öffentlichen Codebeispielen für ein ganz anderes Enum verwendet) ließ `SaveCopyAs` bei
+   jedem Export mit `err=-2147418113` (`E_UNEXPECTED`) fehlschlagen. Wird je ein anderer
+   `IOMechanismEnum`-Wert benötigt, sollte er direkt aus Inventors eigener Typbibliothek
+   über das VBA-Immediate-Fenster gelesen werden (z. B. `?kFileBrowseIOMechanism`) statt
+   geraten zu werden — Inventors Enums sind so gut wie nie kleine Zahlen.
+
+Bei denselben Tests als korrekt/funktionierend bestätigt, also kein Risiko mehr: die
+STEP/PDF-Translator-CLSIDs, der Name des Eigenschaftssatzes `"Inventor User Defined
+Properties"` (exakter Name, kein Präfix-Problem) sowie `oDoc.Save`/
+`oDoc.SaveAs(path, False)` (beide wiederholt als funktionierend beobachtet, einschließlich
+des lokalen Umbenennungsfalls).
+
+Weiterhin in der Praxis tatsächlich ungetestet (kein Live-Durchlauf dieser konkreten Pfade
+in dieser Runde), im Quellcode direkt mit `UNVERIFIED` markiert:
 
 1. **`InvApp.StatusBarText`** als beschreibbare Eigenschaft (von `WaitForTicket`
    verwendet, um den Fortschritt beim Warten auf den Browser anzuzeigen) — in
    `On Error Resume Next` eingehüllt, sodass eine falsche Annahme zu "kein
    Statusleistentext" statt zu einem Absturz führt, aber eine Bestätigung ist sinnvoll.
-2. **Translator-CLSIDs** für den STEP/PDF-Export
-   (`ExportViaTranslator`/`UploadStepAttachment`/`UploadPdfAttachment`) — öffentlich
-   dokumentierte Werte, hier nicht bestätigt:
-   - STEP: `{90AF7F40-0C01-11D5-8E83-0010B541CD80}`
-   - PDF: `{0AC6FD96-2F4D-42CE-8BE0-8AEA580399E4}`
-   Ebenso `oContext.Type = 2` (beabsichtigt als `kFileBrowseIOMechanism`) im selben
-   Exportpfad.
-3. **`PropertySets.Item("Inventor User Defined Properties")`** — der genaue Name des
-   Eigenschaftssatzes; manche Inventor-Versionen verwenden möglicherweise einen anderen
-   Namen (z. B. ohne das Präfix "Inventor "). Der Schreibpfad hat bereits einen
-   Fallback von "setzen" auf "hinzufügen", wenn eine Eigenschaft noch nicht existiert,
-   aber ein falscher Satzname würde beides scheitern lassen.
-4. **`oDoc.Save`/`oDoc.SaveAs(path, False)`** genaues Verhalten und Fehlersignalisierung
-   (COM-Ausnahme, nicht `ByRef`-Ausgabeparameter wie SolidWorks' `Save3`) — die
-   grundsätzliche Form ist gut dokumentiert, aber noch nicht an einer echten Datei
-   erprobt.
-5. **`oDoc.DisplayName`** als Äquivalent zu SolidWorks' `GetTitle()`.
-6. **`view.ReferencedDocumentDescriptor.ReferencedDocument`** — der genaue
+2. **`oDoc.DisplayName`** als Äquivalent zu SolidWorks' `GetTitle()`.
+3. **`view.ReferencedDocumentDescriptor.ReferencedDocument`** — der genaue
    Eigenschaftspfad zur Auflösung des referenzierten Modells einer Zeichnungsansicht;
    erwartete Rückgabe von `Nothing`, wenn das Modell aktuell nicht geöffnet ist,
    dieselbe Einschränkung wie `view.ReferencedDocument` im SolidWorks-Makro.
-7. **Kein Äquivalent zu `ResolveAllLightWeightComponents`** — bewusst ausgelassen
+4. **Kein Äquivalent zu `ResolveAllLightWeightComponents`** — bewusst ausgelassen
    (siehe "Unterschiede zu den SolidWorks-Makros"); sollte sich herausstellen, dass
    Inventor eine eigene Falle bei leichten Komponenten hat, müsste sie hier ergänzt
    werden.
-8. **Custom-iProperty-Namen mit "Item" ließen sich auf einer echten Inventor-2027.1-
-   Installation reproduzierbar nicht schreiben** — `PropertySets.Item("Inventor User
-   Defined Properties").Add` schlug (allgemeiner COM-Fehler) konsequent für Namen wie
-   `EasyPDM_ItemId`/`EasyPDM_ItemNumber` fehl, auf mehreren Dokumenten, in mehreren
-   Sitzungen, während ein ansonsten identischer `Add`-Aufruf für einen nicht verwandten
-   Namen sofort gelang — über das VBA-Immediate-Fenster, völlig außerhalb dieses Makros,
-   auf den Eigenschaftsnamen selbst eingegrenzt. Die Eigenschaften heißen jetzt
-   `EasyPDM_LinkId`/`EasyPDM_LinkNumber` (ohne den Bestandteil "Item"), um zu umgehen,
-   was auch immer Inventor 2027 dort reserviert/abfängt — der genaue Mechanismus wurde
-   nie bestätigt. `GetLinkedItemIdOn` liest den alten Namen `EasyPDM_ItemId` weiterhin
-   als Rückfalloption, falls ihn eine ältere Inventor-Version doch einmal erfolgreich
-   geschrieben hat.
 
 ## Einschränkungen (bewusst außerhalb des Umfangs dieser Version)
 

@@ -61,83 +61,15 @@ All notable changes to EasyPDM are documented in this file.
 - New CAD integration: `EasyPDM.Inventor/EasyPDMUpload.bas` and `EasyPDMDownload.bas`, VBA
   macros for Autodesk Inventor, ported from `EasyPDM.SolidWorks/` with the same
   browser-based upload/download flow, STEP/PDF export, and automatic assembly-tree
-  detection. **Unverified on live Inventor** (no Inventor install available to test
-  against) — see `EasyPDM.Inventor/README.md` for the full list of known risks to check
-  on the first real run.
+  detection, and PDM-link tracking via custom iProperties
+  (`EasyPDM_LinkId`/`EasyPDM_LinkNumber`). Live-tested end to end on Autodesk Inventor
+  2027.1, including two install-specific COM automation quirks worth knowing about if
+  this ever needs touching again — see `EasyPDM.Inventor/README.md`'s "Known risks"
+  section: `PropertySet.Add` rejects a value passed as a bare variable (must be forced
+  by-value, e.g. `value & ""`), and the `kFileBrowseIOMechanism` translator constant is
+  `13059`, not a small number as its name might suggest.
 
 ### Fixed
-- `EasyPDM.Inventor/EasyPDMUpload.bas`: **PDM-link iProperty write and STEP/PDF export both
-  confirmed broken, then both confirmed fixed, on a live Inventor 2027.1 install.** Root
-  causes, found through an extensive live bisection session (many minimal test procedures
-  run one at a time from the VBA Immediate Window, each isolating one variable):
-
-  1. **`PropertySet.Add` reproducibly failed** (generic COM error, `-2147467259`) whenever
-     its value argument was a bare variable, while the identical call with a string
-     *literal* always succeeded. Mechanism: `Add`'s value parameter is a Variant, and a
-     late-bound VBA call passes a bare variable by reference (`VT_BYREF`) but a literal or
-     expression result by value — this Inventor install rejects the by-reference form.
-     `Property Let` (`.Value = <variable>`, the update path for an already-existing
-     property) was never affected, which is why re-uploads of an already-linked file always
-     worked while the very first link-creation on a new item never did. **Fix**:
-     concatenate an empty string onto the value at both `.Add` call sites
-     (`PendingLinkItemId & ""`) to force VBA to build a fresh temporary passed by value.
-     (Several earlier theories tested and ruled out along the way — a duplicate/reserved
-     property name, the calling procedure's parameter signature, call depth, Function vs.
-     Sub, inlining vs. a helper procedure — none of those were the actual cause; they're
-     preserved in git history for anyone retracing this.)
-  2. **`TranslatorAddIn.SaveCopyAs` reproducibly failed** (`err=-2147418113`,
-     `E_UNEXPECTED`) because `oContext.Type` was set to `2`, a guessed and always-
-     `UNVERIFIED` stand-in for `kFileBrowseIOMechanism` (no type library reference is used
-     in this file, so the symbolic constant was never available). The real value, read
-     directly out of Inventor's own type library via the VBA Immediate Window
-     (`?kFileBrowseIOMechanism`), is **`13059`**. Now a named constant,
-     `IO_MECHANISM_FILE_BROWSE`. (A by-value parentheses fix analogous to #1 was tried
-     first and reverted — wrapping an Object argument in redundant parentheses can force
-     evaluation of its default member instead of passing the reference, which made things
-     worse; the Type value was the actual and only fix needed here.)
-
-  `ExportViaTranslator` was also rewritten to clear and check `Err` after every individual
-  step instead of once at the top — with `On Error Resume Next` active for the whole
-  function, a single shared `Err` check was blaming the wrong call for several rounds
-  during this investigation.
-
-### Fixed
-- `EasyPDM.Inventor/EasyPDMUpload.bas`: two further issues found via a live test's log file,
-  both still present after the `HasSaveCopyAsOptions` fix below. (1) STEP export now failed
-  with a specific `SaveCopyAs` COM error (`-2147418113`, `E_UNEXPECTED`) rather than silently
-  producing nothing — root-caused to the temp export path: `Environ$("TEMP")` resolved to an
-  8.3 short path (the Windows account name contains a period, e.g.
-  `C:\Users\PAWEL~1.CEL\AppData\Local\Temp`), and `SaveCopyAs` is evidently unreliable with
-  such paths. STEP/PDF exports now write their temp file into the document's own folder
-  (already proven writable — the document was just saved there) instead of `%TEMP%`. (2) The
-  PDM-link iProperty write (`SetLinkedItemOn`) reproducibly failed on both properties with a
-  generic COM error (`-2147467259`) even though the property set itself was reachable and
-  empty (ruling out a duplicate-name conflict) — matches a documented Inventor 2018+
-  behavior change where the API refuses to modify iProperties on a document it treats as
-  write-protected, most commonly because the underlying file has the Windows read-only
-  attribute set (e.g. after being copied from a zip/share). `SetLinkedItemOn` now checks for
-  and clears that attribute before writing, and logs `oDoc.ReadOnly` for further diagnosis if
-  the write still fails. Also fixed a bug in this window's own earlier logging fix: the final
-  summary line could report "(updated existing)" even when both the update and add-fallback
-  attempts had just failed.
-- `EasyPDM.Inventor/EasyPDMUpload.bas` exported an empty/nothing STEP attachment even
-  when requested — `ExportViaTranslator` never called `TranslatorAddIn.HasSaveCopyAsOptions`
-  before `SaveCopyAs`, a required setup step confirmed against Autodesk's own official
-  "Export to STEP"/"Export to PDF" VBA samples (both call it, even with no specific option
-  to set through it). No crash resulted since this whole path tolerates export failures on
-  purpose — it just silently produced nothing. Also hardened `SetLinkedItemOn` (an
-  unguarded `PropertySets.Item(...)` call there could previously abort the entire upload,
-  including the STEP/PDF export calls that come after it, with zero log trace) and added
-  logging throughout both it and the local Save-As rename step, so a future occurrence of
-  "re-upload doesn't recognize an already-linked file" shows up clearly in the macro's log
-  file instead of failing silently.
-- `EasyPDM.Inventor/EasyPDMUpload.bas` failed to compile at all in a live Inventor VBA
-  project ("Only comments may appear after End Sub, End Function, or End Property") —
-  `PROPSET_NAME` was declared as a module-level `Const` in the middle of the file, right
-  before the function that uses it, instead of with the module's other declarations at
-  the top before any `Sub`/`Function`. Moved it there; this is the same declaration-
-  placement rule the SolidWorks macro's own header comments already documented for
-  `swApp`, just not followed for this later Inventor-only constant.
 - All three CAD macros (SolidWorks, Inventor, FreeCAD): uploading to an item already
   linked to PDM asked "export STEP?"/"export PDF?" before checking whether the item's
   status even allows the upload to proceed — a "wydany" item's own "create a new
