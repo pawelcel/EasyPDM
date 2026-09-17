@@ -134,6 +134,9 @@ function AddNodeDialog({
 
   const { t } = useLanguage()
   const needsProjectPicker = fixedProjectId == null
+  // Checkbox "Dodaj do projektu" -- zob. skipProject niżej (obok "mode") po pełne
+  // wyjaśnienie, co robi odznaczenie.
+  const [addToProject, setAddToProject] = useState(true)
   const [open, setOpenState] = useState(initialOpen ?? false)
   function setOpen(next: boolean) {
     setOpenState(next)
@@ -185,6 +188,18 @@ function AddNodeDialog({
     ? rawAvailableModes.filter((m): m is "part" | "assembly" => m === "part" || m === "assembly")
     : rawAvailableModes
   const [mode, setMode] = useState<Mode>(initialMode ?? lockMode ?? availableModes[0] ?? "folder")
+  // Checkbox "Dodaj do projektu" ograniczony do Część/Złożenie -- Folder bez projektu nie
+  // miałby gdzie istnieć (foldery organizują drzewo WEWNĄTRZ projektu), a "Plik"/"Istniejący"
+  // idą osobnymi ścieżkami (upload multipart / dowiązanie już istniejącego elementu), których
+  // to pole na razie nie obejmuje. Odznaczenie: element trafia do bazy z project_id = NULL
+  // (POST /nodes zamiast /projects/{id}/nodes), widoczny wyłącznie przez "Cała baza" —
+  // dokładnie ten sam stan co "Usuń ze struktury" + odpięcie od projektu. Przydatne przy
+  // komponentach złożenia tworzonych automatycznie przez makro CAD: makro samo dogrywa nowy
+  // element do BOM-u rodzica osobnym wywołaniem PO utworzeniu (niezależnie od project_id),
+  // więc odznaczenie tego dla komponentów pozwala uniknąć zaśmiecania drzewa projektu każdym
+  // z osobna — widoczne będą TYLKO jako pozycje BOM złożenia, nie jako korzenie projektu.
+  const projectOptional = mode === "part" || mode === "assembly"
+  const skipProject = needsProjectPicker && projectOptional && !addToProject
   // Zmiana wybranego rodzica (albo projektu, co czyści rodzica) może uczynić bieżący "mode"
   // niedostępnym pod nowym rodzicem (np. Złożenie nie przyjmuje Folderu) — bez tego
   // przyciski trybu poprawnie by się ukryły, ale stan "mode" zostałby przy starym,
@@ -278,11 +293,15 @@ function AddNodeDialog({
     if (needsProjectPicker) {
       setSelectedProjectId("")
       setSelectedParentId(null)
+      setAddToProject(true)
     }
   }
 
   async function handleCreateContainer(itemType: "folder" | "part" | "assembly") {
-    if (needsProjectPicker && !projectId) {
+    // Brak projektu jest tu poprawnym, świadomym wyborem, gdy skipProject (checkbox "Dodaj
+    // do projektu" odznaczony) -- błąd walidacji ma sens tylko, gdy projekt jest faktycznie
+    // wymagany, a po prostu nie został jeszcze wybrany.
+    if (needsProjectPicker && !skipProject && !projectId) {
       setError(t("addNode.projectRequired"))
       return
     }
@@ -340,15 +359,23 @@ function AddNodeDialog({
     setSubmitting(true)
     setError("")
     try {
-      await api.createNode(projectId, {
+      const nodeBody = {
         name: trimmed,
         itemType,
         properties,
-        parentId,
+        // Bez projektu nie ma z czego wybrać rodzica (picker rodzica pokazuje wyłącznie
+        // foldery/złożenia z WYBRANEGO projektu, zob. efekt fetchujący parentCandidates) --
+        // parentId zawsze null w tej gałęzi, żadnej utraty funkcjonalności.
+        parentId: skipProject ? null : parentId,
         ticket,
         exportStep: ticket ? exportStep : undefined,
         exportPdf: ticket ? exportPdf : undefined,
-      })
+      }
+      if (skipProject) {
+        await api.createNodeWithoutProject(nodeBody)
+      } else {
+        await api.createNode(projectId, nodeBody)
+      }
       setOpen(false)
       reset()
       await onCreated()
@@ -472,64 +499,89 @@ function AddNodeDialog({
 
         {needsProjectPicker && (
           <div className="flex flex-col gap-2">
-            <Label>{t("addNode.projectLabel")}</Label>
-            <Select
-              value={selectedProjectId || "none"}
-              onValueChange={(v) => {
-                setSelectedProjectId(v === "none" ? "" : (v as string))
-                setSelectedParentId(null)
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue>
-                  {(v: string) =>
-                    v === "none" || !v
-                      ? t("addNode.selectProjectPlaceholder")
-                      : (projects.find((p) => p.id === v)?.name ?? v)
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t("addNode.selectProjectPlaceholder")}</SelectItem>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {projectOptional && (
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={addToProject}
+                  onChange={(e) => {
+                    setAddToProject(e.target.checked)
+                    // Odznaczenie czyści wcześniej wybrany projekt/rodzica -- inaczej
+                    // ponowne zaznaczenie pokazałoby stary wybór, mimo że w międzyczasie
+                    // element miał już powstać BEZ projektu.
+                    if (!e.target.checked) {
+                      setSelectedProjectId("")
+                      setSelectedParentId(null)
+                    }
+                  }}
+                  className="size-3.5 shrink-0 accent-primary"
+                />
+                {t("addNode.addToProjectLabel")}
+              </label>
+            )}
 
-            {projectId && (
+            {!skipProject && (
               <>
-                <Label>{t("addNode.parentLabel")}</Label>
+                <Label>{t("addNode.projectLabel")}</Label>
                 <Select
-                  value={selectedParentId ?? "root"}
-                  onValueChange={(v) => setSelectedParentId(v === "root" ? null : (v as string))}
+                  value={selectedProjectId || "none"}
+                  onValueChange={(v) => {
+                    setSelectedProjectId(v === "none" ? "" : (v as string))
+                    setSelectedParentId(null)
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue>
                       {(v: string) =>
-                        v === "root" || !v
-                          ? t("addNode.noParent")
-                          : (candidateLabel(parentCandidates.find((i) => i.id === v)) ?? v)
+                        v === "none" || !v
+                          ? t("addNode.selectProjectPlaceholder")
+                          : (projects.find((p) => p.id === v)?.name ?? v)
                       }
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="root">{t("addNode.noParent")}</SelectItem>
-                    {parentCandidates.map((i) => (
-                      <SelectItem key={i.id} value={i.id}>
-                        {candidateLabel(i)}
+                    <SelectItem value="none">{t("addNode.selectProjectPlaceholder")}</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+
+                {projectId && (
+                  <>
+                    <Label>{t("addNode.parentLabel")}</Label>
+                    <Select
+                      value={selectedParentId ?? "root"}
+                      onValueChange={(v) => setSelectedParentId(v === "root" ? null : (v as string))}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue>
+                          {(v: string) =>
+                            v === "root" || !v
+                              ? t("addNode.noParent")
+                              : (candidateLabel(parentCandidates.find((i) => i.id === v)) ?? v)
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="root">{t("addNode.noParent")}</SelectItem>
+                        {parentCandidates.map((i) => (
+                          <SelectItem key={i.id} value={i.id}>
+                            {candidateLabel(i)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
               </>
             )}
           </div>
         )}
 
-        {(!needsProjectPicker || projectId) && !lockMode && (
+        {(!needsProjectPicker || projectId || skipProject) && !lockMode && (
           <div className="flex flex-wrap gap-1.5">
             {availableModes.map((m) => (
               <Button
@@ -548,7 +600,7 @@ function AddNodeDialog({
           </div>
         )}
 
-        {(!needsProjectPicker || projectId) && mode === "part" && (
+        {(!needsProjectPicker || projectId || skipProject) && mode === "part" && (
           <div className="flex flex-col gap-2">
             <Label>{t("part.kind")}</Label>
             <div className="flex gap-1.5">
@@ -671,7 +723,7 @@ function AddNodeDialog({
           </div>
         )}
 
-        {(!needsProjectPicker || projectId) && (mode === "folder" || mode === "assembly") && (
+        {(!needsProjectPicker || projectId || skipProject) && (mode === "folder" || mode === "assembly") && (
           <div className="flex flex-col gap-2">
             {mode === "assembly" && (
               <>
@@ -772,7 +824,7 @@ function AddNodeDialog({
           </div>
         )}
 
-        {(!needsProjectPicker || projectId) && mode === "file" && (
+        {(!needsProjectPicker || projectId || skipProject) && mode === "file" && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="node-file">{t("addNode.fileOptional")}</Label>
             <Input
@@ -802,7 +854,7 @@ function AddNodeDialog({
           </div>
         )}
 
-        {(!needsProjectPicker || projectId) && mode === "existing" && (
+        {(!needsProjectPicker || projectId || skipProject) && mode === "existing" && (
           <div className="flex flex-col gap-2">
             {parentId ? (
               <Hint>{t("addNode.existingHintWithParent")}</Hint>
@@ -857,7 +909,7 @@ function AddNodeDialog({
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting || (needsProjectPicker && !projectId)}>
+          <Button onClick={handleSubmit} disabled={submitting || (needsProjectPicker && !skipProject && !projectId)}>
             {submitting ? t("common.saving") : t("common.add")}
           </Button>
         </DialogFooter>

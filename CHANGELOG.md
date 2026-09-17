@@ -68,6 +68,16 @@ All notable changes to EasyPDM are documented in this file.
   section: `PropertySet.Add` rejects a value passed as a bare variable (must be forced
   by-value, e.g. `value & ""`), and the `kFileBrowseIOMechanism` translator constant is
   `13059`, not a small number as its name might suggest.
+- The "New item" dialog (both the plain web-UI one and the CAD-macro browser-ticket popup)
+  now has an "Add to a project" checkbox, checked by default, next to the project picker —
+  unchecking it creates the Part/Assembly in the database without assigning it to any
+  project (same state as "Remove from structure" + detaching from a project: reachable only
+  through "Whole database"). Meant for assembly components a CAD macro creates
+  automatically while uploading: the macro attaches each new component to the parent
+  assembly's BOM in a separate call regardless of the component's own project, so
+  unchecking this for those avoids every one of them also cluttering some project's tree as
+  an independent root item — they end up visible only as BOM entries under the assembly.
+  Only shown for Part/Assembly (a project-less Folder wouldn't have anywhere to exist).
 
 ### Fixed
 - All three CAD macros (SolidWorks, Inventor, FreeCAD): uploading to an item already

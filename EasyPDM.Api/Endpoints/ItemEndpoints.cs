@@ -239,7 +239,19 @@ static class ItemEndpoints
         // to kontenery bez własnego pliku; "file" utworzony tędy to plik "na razie bez zawartości"
         // (można ją dograć później przez POST /api/projects/{projectId}/items z parentId).
         // Część i Złożenie dostają automatycznie kolejny item_number (to pozycje BOM).
-        app.MapPost("/api/projects/{projectId:guid}/nodes", async (Guid projectId, CreateNodeRequest body, HttpContext ctx) =>
+        // Współdzielona przez oba warianty niżej: tworzenie w konkretnym projekcie
+        // (/api/projects/{projectId}/nodes) oraz tworzenie BEZ projektu (/api/nodes) --
+        // ten drugi wariant to backend dla checkboxa "Dodaj do projektu" w AddNodeDialog:
+        // element trafia do bazy (i, jeśli podano parentId, do BOM-u rodzica przez
+        // item_relations) ale project_id zostaje NULL, więc jest widoczny wyłącznie przez
+        // "Cała baza" -- dokładnie ten sam stan co element po "Usuń ze struktury" +
+        // odpięciu od projektu (PATCH .../project z ProjectId=null). Żadnej dodatkowej
+        // kontroli dostępu dla wariantu bez projektu: HasProjectAccessAsync(ctx, null)
+        // i tak zwraca true (patrz jej własny komentarz) -- "Cała baza" jest świadomie
+        // otwarta dla każdego zalogowanego użytkownika, więc tworzenie elementu, który od
+        // razu ląduje w tym samym, uniwersalnie dostępnym stanie, nie otwiera niczego
+        // nowego.
+        async Task<IResult> CreateNodeAsync(Guid? projectId, CreateNodeRequest body, HttpContext ctx)
         {
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest("Nazwa jest wymagana.");
@@ -249,9 +261,10 @@ static class ItemEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            await using (var checkCmd = new NpgsqlCommand("SELECT 1 FROM projects WHERE id = @id;", conn))
+            if (projectId is not null)
             {
-                checkCmd.Parameters.AddWithValue("id", projectId);
+                await using var checkCmd = new NpgsqlCommand("SELECT 1 FROM projects WHERE id = @id;", conn);
+                checkCmd.Parameters.AddWithValue("id", projectId.Value);
                 if (await checkCmd.ExecuteScalarAsync() is null)
                     return Results.NotFound("Projekt nie istnieje.");
             }
@@ -316,7 +329,7 @@ static class ItemEndpoints
                 """;
             await using var insertCmd = new NpgsqlCommand(insertSql, conn);
             insertCmd.Parameters.AddWithValue("id", itemId);
-            insertCmd.Parameters.AddWithValue("projectId", projectId);
+            insertCmd.Parameters.AddWithValue("projectId", (object?)projectId ?? DBNull.Value);
             insertCmd.Parameters.AddWithValue("itemType", body.ItemType);
             insertCmd.Parameters.AddWithValue("name", body.Name.Trim());
             insertCmd.Parameters.AddWithValue("props", propertiesJson);
@@ -352,7 +365,17 @@ static class ItemEndpoints
                 createTicketStore.Complete(body.Ticket.Value, itemId, itemNumber, itemNumberPrefix, body.Name.Trim(), body.ExportStep, body.ExportPdf, existing: false);
 
             return Results.Created($"/api/items/{itemId}", new { id = itemId, itemNumber, itemNumberPrefix });
-        });
+        }
+
+        app.MapPost("/api/projects/{projectId:guid}/nodes", (Guid projectId, CreateNodeRequest body, HttpContext ctx) =>
+            CreateNodeAsync(projectId, body, ctx));
+
+        // Bez projektu -- backend dla checkboxa "Dodaj do projektu" odznaczonego w
+        // AddNodeDialog (najczęściej przydatne przy komponentach złożenia tworzonych
+        // automatycznie przez makro CAD: mają trafić do BOM-u rodzica przez parentId, ale
+        // NIE mają się osobno pojawiać w drzewie żadnego projektu).
+        app.MapPost("/api/nodes", (CreateNodeRequest body, HttpContext ctx) =>
+            CreateNodeAsync(null, body, ctx));
 
         // ============================================================
         // POST /api/items/{id}/duplicate   body: { "parentId": "..."|null, "insertAfterOriginal": bool }

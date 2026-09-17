@@ -162,6 +162,22 @@ export const api = {
       handleResponse<{ id: string; itemNumber: number | null }>(r)
     ),
 
+  // Sama nazwa (Node)Request co createNode, ale bez projektu w ogóle — element trafia do
+  // bazy (i, jeśli podano parentId, do BOM-u tego rodzica) z project_id = NULL, widoczny
+  // wyłącznie przez "Cała baza". Backend checkboxa "Dodaj do projektu" w AddNodeDialog.
+  createNodeWithoutProject: (body: {
+    name: string
+    itemType: ItemType
+    properties?: Record<string, unknown>
+    parentId?: string | null
+    ticket?: string
+    exportStep?: boolean
+    exportPdf?: boolean
+  }) =>
+    fetch(`${BASE}/nodes`, json(body)).then((r) =>
+      handleResponse<{ id: string; itemNumber: number | null }>(r)
+    ),
+
   // Druga (obok createNode z ticket) droga dopełnienia biletu z makra CAD — wskazuje JUŻ
   // ISTNIEJĄCY element zamiast tworzenia nowego (zob. pending-create-ticket.ts). Używane
   // przez oba tryby biletu: "create" (dogranie pliku do istniejącego, exportStep/exportPdf
