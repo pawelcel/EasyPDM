@@ -76,3 +76,9 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/easypdm-postgres:${{ steps.version.outputs.tag }}
           cache-from: type=gha,scope=postgres
           cache-to: type=gha,mode=max,scope=postgres
+
+      - name: Zaktualizuj demo na Render
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          curl -sS -X POST "$RENDER_DEPLOY_HOOK_URL"
