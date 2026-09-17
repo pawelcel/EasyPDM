@@ -27,7 +27,7 @@ All notable changes to EasyPDM are documented in this file.
   elements and only some of them are already in EasyPDM (e.g. an assembly drawing with an
   extra detail view of one of its own components that was never uploaded on its own), the
   upload is now blocked with a message listing what's missing, rather than silently
-  attaching the drawing to just the linked item(s) and leaving the rest untracked -- this
+  attaching the drawing to just the linked item(s) and leaving the rest untracked — this
   also catches a component whose local link is stale (the item it used to point at was since
   deleted from EasyPDM), which previously still counted as "linked" and let the upload
   through.
@@ -80,6 +80,10 @@ All notable changes to EasyPDM are documented in this file.
   Only shown for Part/Assembly (a project-less Folder wouldn't have anywhere to exist).
 
 ### Fixed
+- `EasyPDM.SolidWorks/EasyPDMUpload.bas`/`EasyPDMDownload.bas` had Unix line endings
+  (LF only) — SolidWorks' VBA "Import File" expects Windows-style CRLF and fails outright
+  with "Input past end of file" on LF-only source, so these macro files failed to import at
+  all. Content is otherwise unchanged.
 - All three CAD macros (SolidWorks, Inventor, FreeCAD): uploading to an item already
   linked to PDM asked "export STEP?"/"export PDF?" before checking whether the item's
   status even allows the upload to proceed — a "wydany" item's own "create a new
