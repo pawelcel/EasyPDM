@@ -103,6 +103,6 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --draft \
-            --title "$GITHUB_REF_NAME" \
+            --title "EasyPDM $GITHUB_REF_NAME" \
             --notes-file release-notes.md \
             artifacts/windows/* artifacts/linux/* artifacts/macros/*
