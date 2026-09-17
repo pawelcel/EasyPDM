@@ -2,12 +2,18 @@ name: Create Release Draft
 
 # Po wypchnięciu taga wersji ("vX.Y.Z"): buduje instalator Windows i paczkę Linux (te same
 # workflowy co "on: push do main", wołane tu jako reużywalne przez workflow_call — zob.
-# "outputs" w build-windows-installer.yml/build-linux-package.yml), potem tworzy SZKIC
-# (draft) Release'a na GitHubie z tymi dwoma plikami i notatkami wyciągniętymi z
+# "outputs" w build-windows-installer.yml/build-linux-package.yml), kopiuje makra Inventora
+# i FreeCAD pod nazwami z numerem wersji (zob. "Przygotuj makra CAD" niżej), potem tworzy
+# SZKIC (draft) Release'a na GitHubie z tymi plikami i notatkami wyciągniętymi z
 # CHANGELOG.md. Świadomie NIE publikuje go automatycznie — to jedyny moment w całym
 # procesie wydania, który zostaje ręczny: ktoś musi przejrzeć szkic i kliknąć
 # "Publish release" na GitHubie. Obraz Docker (":latest"/":vX.Y.Z") publikuje się
 # niezależnie, tym samym pushem taga, przez osobny publish-docker-release.yml.
+#
+# Makra SolidWorks świadomie NIE są tu dodawane -- w odróżnieniu od Inventora/FreeCAD,
+# których pliki źródłowe (.bas/.FCMacro) trafiają do release'u wprost z repo, poprzednie
+# release'e dołączały SolidWorks jako skompilowane .swp (zob. v0.1/v0.2 assets), co wymaga
+# ręcznej kompilacji na żywym SolidWorks -- dorzucane do szkicu ręcznie.
 on:
   push:
     tags:
@@ -61,6 +67,19 @@ jobs:
           name: ${{ needs.linux.outputs.artifact-name }}
           path: artifacts/linux
 
+      # Osobne pliki (nie zip), nazwane jak dotychczasowe ręcznie dorzucane assety FreeCAD w
+      # v0.2 (EasyPDM_FreeCad_Upload_v0.2.FCMacro / EasyPDM_FreeCad_Download_v0.2.FCMacro) --
+      # tylko kod źródłowy makra, bez README (tak samo jak dotąd). Każdy plik to gotowy,
+      # importowalny kod wprost z repo, bez żadnego kroku budowania.
+      - name: Przygotuj makra CAD
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p artifacts/macros
+          cp EasyPDM.Inventor/EasyPDMUpload.bas   "artifacts/macros/EasyPDM_Inventor_Upload_v${VERSION}.bas"
+          cp EasyPDM.Inventor/EasyPDMDownload.bas "artifacts/macros/EasyPDM_Inventor_Download_v${VERSION}.bas"
+          cp EasyPDM.FreeCad/EasyPDMUpload.FCMacro   "artifacts/macros/EasyPDM_FreeCad_Upload_v${VERSION}.FCMacro"
+          cp EasyPDM.FreeCad/EasyPDMDownload.FCMacro "artifacts/macros/EasyPDM_FreeCad_Download_v${VERSION}.FCMacro"
+
       # Tag to np. "v0.2", nagłówek w CHANGELOG.md to "## [0.2]" (bez "v") — wycina samą
       # sekcję dla tej wersji (od nagłówka do NASTĘPNEGO "## [", wyłącznie), do notatek
       # Release'a. Jeśli tag nie ma odpowiadającego nagłówka (literówka/zapomniany wpis),
@@ -86,4 +105,4 @@ jobs:
             --draft \
             --title "$GITHUB_REF_NAME" \
             --notes-file release-notes.md \
-            artifacts/windows/* artifacts/linux/*
+            artifacts/windows/* artifacts/linux/* artifacts/macros/*
