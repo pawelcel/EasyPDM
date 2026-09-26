@@ -11,6 +11,27 @@ All notable changes to EasyPDM are documented in this file.
   Client/Name 2.
 
 ### Fixed
+- "Delete completely" on an Assembly deleted its components along with it. A Part/Assembly
+  is a first-class catalog entry (own number, revisions, history, attachments) that can be
+  used in any other assembly, so deleting one assembly it happened to sit in must not take
+  it down. Deletion now recurses **only through Folders** (a Folder owns its contents; an
+  Assembly only *uses* its components), so removing an assembly deletes just that record and leaves every component in place, losing only that one BOM relation.
+- The FreeCAD upload macro sent assemblies to the PDM still pointing at their components'
+  pre-upload filenames, so downloading such an assembly again produced a wall of
+  "Link broken". Three separate causes, all found from a live Report View log:
+  - The copy into the PDM ran *before* the local Save As under the PDM name, so the file
+    that reached the server was always the pre-rename one. The order is now reversed — the
+    document is renamed (and every link pointing at it refreshed) first, and only the
+    finished file is copied/uploaded.
+  - A component opened only as a link dependency is loaded *partially* by FreeCAD, and a
+    partially loaded document silently refuses to save ("Partial loaded document ... cannot
+    be saved"), so the renamed file never actually appeared on disk. Such documents are now
+    pulled in fully before saving, and a save that produces no file is reported instead of
+    being counted as a success.
+  - Links to an `App::VarSet` (shared parameters, which two documents often point at in
+    both directions) were treated as assembly components — that fabricated a cycle in the
+    BOM, which the backend then rightly rejected, and inflated component quantities. The
+    tree walk now skips them.
 - The project's Nazwa/Opis/date fields saved on every blur regardless of whether they'd
   actually changed, which could race a genuinely intended change made right after (e.g.
   picking a Project lead immediately after clicking away from another field) and silently

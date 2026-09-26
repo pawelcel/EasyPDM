@@ -147,9 +147,16 @@ Was darf unter was hinzugefügt werden (sowohl im Backend als auch im Frontend e
 
 Das Löschen eines Elements hat zwei Modi: **„Aus Struktur entfernen"** (löst die
 Beziehung / verbirgt die Wurzel, der Datensatz bleibt bestehen) und **„Vollständig
-löschen"** (rekursiv, aber sicher für gemeinsam genutzte Komponenten — ein Element mit
-einem Elternteil außerhalb des gelöschten Teilbaums verschwindet nicht; nur
-Administrator). Ein Teil/eine Baugruppe kann auch **dupliziert** werden (die Kopie
+löschen"** (nur Administrator). Letzteres steigt **ausschließlich über Ordner** ab — ein
+Ordner *besitzt* seinen Inhalt und nimmt ihn beim Löschen mit, während eine Baugruppe ihre
+Komponenten nur *verwendet* (die Stücklistenbeziehung bedeutet „ist Teil von", nicht
+„gehört zu"). Das Löschen einer Baugruppe entfernt daher nur diesen einen Datensatz; alle
+Komponenten bleiben bestehen und verlieren lediglich diese eine Beziehung. Ein Teil/eine
+Baugruppe ist ein eigenständiger Katalogeintrag (eigene Nummer, Revisionen, Historie,
+Eigentümer, Anhänge) und kann später jeder anderen Baugruppe beitreten, wird also nie als
+Nebeneffekt gelöscht. Innerhalb eines gelöschten Ordner-Teilbaums überlebt zusätzlich
+alles, was auch einen Elternteil außerhalb davon hat (siehe `survivors` in
+`ItemEndpoints.cs`). Ein Teil/eine Baugruppe kann auch **dupliziert** werden (die Kopie
 erhält eine neue Nummer, einen frischen Status und Eigentümer) — im Baum landet die Kopie
 direkt unter dem Original.
 
@@ -369,7 +376,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | POST | `/api/items/{id}/duplicate` | dupliziert ein Teil/eine Baugruppe (neue Nummer, Status, Eigentümer) |
 | PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | Umbenennen / Sichtbarkeit im Baum ändern / Status ändern / in anderes Projekt verschieben |
 | POST | `/api/items/{id}/lock` \| `/release` | Sperren (Eigentum übernehmen) / Freigeben eines Elements |
-| DELETE | `/api/items/{id}` | vollständige Löschung (rekursiv, sicher für gemeinsam genutzte Elemente) — **nur Administrator** |
+| DELETE | `/api/items/{id}` | vollständige Löschung (Rekursion nur über Ordner — Komponenten einer Baugruppe werden nie mitgelöscht) — **nur Administrator** |
 | GET | `/api/projects/{projectId}/relations` | Eltern-Kind-Beziehungen (Struktur/Stückliste) eines Projekts |
 | POST/DELETE | `/api/items/{parentId}/children[/{childId}]` | Hinzufügen/Lösen eines Kindelements |
 | PATCH | `/api/items/{parentId}/children/{childId}/position` \| `/reorder` | Änderung der Stücklistenposition (einzelne Position oder gesamte neue Reihenfolge) |

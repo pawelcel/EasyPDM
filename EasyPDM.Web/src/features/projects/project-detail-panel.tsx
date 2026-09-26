@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { Info } from "lucide-react"
 
 import { api } from "@/api/client"
 import type { Client, ClientContact, Project } from "@/api/types"
@@ -12,6 +13,7 @@ import {
   ComboboxList,
 } from "@/components/ui/combobox"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
@@ -96,6 +98,8 @@ function ProjectDetailPanel({
   const [deletingPending, setDeletingPending] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [leadContacts, setLeadContacts] = useState<ClientContact[]>([])
+  const [showingLeadContact, setShowingLeadContact] = useState(false)
+  const selectedLeadContact = leadContacts.find((c) => c.id === form.leadContactId)
 
   // Odśwież formularz, gdy z zewnątrz przyjdą nowe dane projektu (np. po zapisie albo
   // przełączeniu na inny projekt) — nie ma osobnego trybu "edycji", pola są edytowalne
@@ -337,31 +341,74 @@ function ProjectDetailPanel({
 
         <Label htmlFor="project-lead-contact">{t("project.leadContact")}</Label>
         {form.clientId && leadContacts.length > 0 ? (
-          <Combobox
-            items={leadContacts.map((c) => c.id)}
-            value={form.leadContactId}
-            onValueChange={(v) => {
-              const next = { ...form, leadContactId: (v as number | null) ?? null }
-              setForm(next)
-              save(next)
-            }}
-            itemToStringLabel={(id: number) => contactLabel(leadContacts.find((c) => c.id === id))}
-            disabled={!isAdmin}
-          >
-            <ComboboxInput id="project-lead-contact" placeholder={t("part.searchPlaceholder")} showClear />
-            <ComboboxContent>
-              <ComboboxEmpty>{t("project.noMatchingLeadContact")}</ComboboxEmpty>
-              <ComboboxList>
-                {(id: number) => (
-                  <ComboboxItem key={id} value={id}>
-                    {contactLabel(leadContacts.find((c) => c.id === id))}
-                  </ComboboxItem>
-                )}
-              </ComboboxList>
-            </ComboboxContent>
-          </Combobox>
+          <div className="flex items-center gap-1.5">
+            <div className="flex-1">
+              <Combobox
+                items={leadContacts.map((c) => c.id)}
+                value={form.leadContactId}
+                onValueChange={(v) => {
+                  const next = { ...form, leadContactId: (v as number | null) ?? null }
+                  setForm(next)
+                  save(next)
+                }}
+                itemToStringLabel={(id: number) => contactLabel(leadContacts.find((c) => c.id === id))}
+                disabled={!isAdmin}
+              >
+                <ComboboxInput id="project-lead-contact" placeholder={t("part.searchPlaceholder")} showClear />
+                <ComboboxContent>
+                  <ComboboxEmpty>{t("project.noMatchingLeadContact")}</ComboboxEmpty>
+                  <ComboboxList>
+                    {(id: number) => (
+                      <ComboboxItem key={id} value={id}>
+                        {contactLabel(leadContacts.find((c) => c.id === id))}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
+            {selectedLeadContact && (
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={t("project.leadContactDetailsAria")}
+                onClick={() => setShowingLeadContact(true)}
+              >
+                <Info className="size-4" />
+              </Button>
+            )}
+          </div>
         ) : (
           <Hint>{form.clientId ? t("project.noLeadContactsHint") : t("project.leadContactNeedsClientHint")}</Hint>
+        )}
+
+        {showingLeadContact && selectedLeadContact && (
+          <Dialog open onOpenChange={setShowingLeadContact}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{contactLabel(selectedLeadContact)}</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">{t("common.position")}</span>
+                  <span>{selectedLeadContact.position || "-"}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">{t("common.phone")}</span>
+                  <span>{selectedLeadContact.phone || "-"}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">{t("common.email")}</span>
+                  <span>{selectedLeadContact.email || "-"}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">{t("common.address")}</span>
+                  <span>{selectedLeadContact.address || "-"}</span>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
 
         <div className="flex gap-2">

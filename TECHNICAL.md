@@ -133,9 +133,16 @@ What's allowed as a child of what (enforced both in the backend and the frontend
 | Part / File | nothing — these are leaves of the structure |
 
 Deleting an item has two modes: **"Remove from structure"** (detaches the relation /
-hides the root, the record stays) and **"Delete completely"** (recursive, but safe for
-shared components — an item with a parent outside the deleted subtree does not
-disappear; administrator only). A Part/Assembly can also be **duplicated** (the copy
+hides the root, the record stays) and **"Delete completely"** (administrator only). The
+second one recurses **only through Folders** — a Folder *owns* its contents, so deleting
+it takes them along, while an Assembly only *uses* its components (the BOM relation means
+"is part of", not "belongs to"), so deleting an Assembly deletes just that one record and
+leaves every component in place, losing only that one relation. A Part/Assembly is a
+first-class catalog entry (its own number, revisions, history, owner, attachments) and may
+join any other assembly later, so it is never deleted as a side effect of deleting an
+assembly it happened to be used in. Within a deleted Folder subtree, anything that also
+has a parent outside it survives as well (see `survivors` in `ItemEndpoints.cs`).
+A Part/Assembly can also be **duplicated** (the copy
 gets a new number, a fresh status and owner) — from the tree, the copy lands right
 under the original.
 
@@ -337,7 +344,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | POST | `/api/items/{id}/duplicate` | duplicates a Part/Assembly (new number, status, owner) |
 | PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | rename / change tree visibility / change status / move to another project |
 | POST | `/api/items/{id}/lock` \| `/release` | lock (take ownership) / release an item |
-| DELETE | `/api/items/{id}` | complete deletion (recursive, safe for shared items) — **administrator only** |
+| DELETE | `/api/items/{id}` | complete deletion (recurses through Folders only — an Assembly's components are never deleted with it) — **administrator only** |
 | GET | `/api/projects/{projectId}/relations` | parent-child relations (structure/BOM) of a given project |
 | POST/DELETE | `/api/items/{parentId}/children[/{childId}]` | add/detach a child item |
 | PATCH | `/api/items/{parentId}/children/{childId}/position` \| `/reorder` | change BOM position (a single position or the whole new order) |

@@ -129,8 +129,15 @@ Co wolno dodać pod czym (wymuszane i backendowo, i we froncie):
 | Część / Plik | nic — to liście struktury |
 
 Usuwanie elementu ma dwa tryby: **„Usuń ze struktury”** (odpina relację / chowa korzeń,
-rekord zostaje) i **„Usuń całkowicie”** (rekurencyjne, ale bezpieczne dla współdzielonych
-komponentów — element z rodzicem poza usuwanym poddrzewem nie znika; tylko administrator).
+rekord zostaje) i **„Usuń całkowicie”** (tylko administrator). Ten drugi schodzi w dół
+**wyłącznie przez Foldery** — Folder swoją zawartość *posiada*, więc usuwa się razem z nią,
+natomiast Złożenie swoich komponentów tylko *używa* (relacja BOM znaczy „wchodzi w skład”,
+nie „należy do”), więc usunięcie Złożenia kasuje TYLKO ten jeden rekord, a komponenty
+zostają, tracąc jedynie tę jedną relację. Część/Złożenie to samodzielny byt katalogowy
+(własny numer, rewizje, historia, właściciel, załączniki) i może wejść w skład dowolnego
+innego złożenia także później, więc nigdy nie jest kasowane jako efekt uboczny usunięcia
+złożenia, w którym akurat było użyte. Wewnątrz usuwanego poddrzewa Folderów przeżywa
+dodatkowo wszystko, co ma rodzica także poza nim (zob. `survivors` w `ItemEndpoints.cs`).
 Część/Złożenie da się też **zduplikować** (kopia dostaje nowy numer, świeży status i
 właściciela) — z poziomu drzewka kopia ląduje zaraz pod oryginałem.
 
@@ -329,7 +336,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | POST | `/api/items/{id}/duplicate` | duplikuje Część/Złożenie (nowy numer, status, właściciel) |
 | PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | zmiana nazwy / widoczności w drzewku / statusu / przeniesienie do innego projektu |
 | POST | `/api/items/{id}/lock` \| `/release` | zablokowanie (przejęcie na własność) / zwolnienie elementu |
-| DELETE | `/api/items/{id}` | usunięcie całkowite (rekurencyjne, bezpieczne dla współdzielonych elementów) — **tylko administrator** |
+| DELETE | `/api/items/{id}` | usunięcie całkowite (rekurencja tylko przez Foldery — komponenty Złożenia nigdy nie są kasowane razem z nim) — **tylko administrator** |
 | GET | `/api/projects/{projectId}/relations` | relacje rodzic-dziecko (struktura/BOM) danego projektu |
 | POST/DELETE | `/api/items/{parentId}/children[/{childId}]` | dodanie/odpięcie podelementu |
 | PATCH | `/api/items/{parentId}/children/{childId}/position` \| `/reorder` | zmiana L.p. w BOM-ie (pojedyncza pozycja albo cała nowa kolejność) |

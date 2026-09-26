@@ -1196,29 +1196,37 @@ static class ItemEndpoints
                     return Results.NotFound();
             }
 
-            // "descendants" = wszystko osiągalne z @id. Element inny niż @id ma zostać
-            // skasowany TYLKO jeśli WSZYSCY jego rodzice też zostaną skasowani (żaden
-            // rodzic nie "przeżywa") -- to wymaga fixpointu, bo przeżycie jest zaraźliwe
-            // w dół: jeśli rodzic X przeżywa, to każde jego dziecko w tym poddrzewie też
-            // przeżywa (relacja (X, dziecko) zostaje, bo X nie jest kasowany).
-            // "survivors" liczy to jako rosnący fixpoint: baza -- element ma rodzica SPOZA
-            // descendants (współdzielenie z zupełnie inną gałęzią) -- krok rekurencyjny --
-            // dziecko elementu, który już wiadomo, że przeżywa, też przeżywa. @id sam nigdy
-            // nie trafia do survivors (jest kasowany bezwarunkowo, to jawny cel operacji).
+            // "descendants" = wszystko osiągalne z @id, ale schodzimy w dół WYŁĄCZNIE przez
+            // FOLDERY. To rozróżnienie wynika wprost z modelu struktury: Folder to kontener,
+            // który swoją zawartość POSIADA (usunięcie folderu bez zawartości zostawiałoby ją
+            // bez żadnego miejsca w strukturze), natomiast Złożenie swoich komponentów tylko
+            // UŻYWA -- relacja BOM mówi "wchodzi w skład", nie "należy do". Część/Złożenie to
+            // samodzielny byt katalogowy: ma własny numer z globalnej sekwencji, rewizje,
+            // historię, właściciela i załączniki, i może wejść w skład dowolnego innego
+            // złożenia (także dopiero w przyszłości). Kasowanie go tylko dlatego, że akurat
+            // ktoś usunął jedno ze złożeń, w których był użyty, kasowało dane, których admin
+            // nigdy nie chciał ruszyć (zgłoszone w praktyce: usunięcie Szuflady zabierało ze
+            // sobą Płyty). Usunięcie Złożenia kasuje więc TYLKO je samo -- jego komponenty
+            // zostają, tracąc jedynie tę jedną relację (kaskada ON DELETE na item_relations),
+            // dokładnie tak jak przy "Usuń ze struktury".
             //
-            // Poprzednia wersja sprawdzała "czy rodzic jest poza descendants" zamiast "czy
-            // rodzic przeżywa" -- błędnie kasowała element, którego JEDYNY rodzic sam
-            // przeżył (bo miał inny wpięcie gdzie indziej), zamiast zostawić też jego
-            // dzieci nietknięte. Przykład: R (kasowane) -> A -> P, a A ma DODATKOWO rodzica
-            // Z spoza poddrzewa R. A poprawnie przeżywa, ale stara wersja i tak kasowała P
-            // (bo jedyny rodzic P, czyli A, był "w descendants"), cichо psując BOM złożenia
-            // A, mimo że admin nigdy go nie dotknął.
+            // "survivors" chroni dodatkowo zawartość kasowanych FOLDERÓW: element ma zostać
+            // skasowany TYLKO jeśli WSZYSCY jego rodzice też zostaną skasowani (żaden rodzic
+            // nie "przeżywa") -- to wymaga fixpointu, bo przeżycie jest zaraźliwe w dół:
+            // jeśli rodzic X przeżywa, to każde jego dziecko w tym poddrzewie też przeżywa
+            // (relacja (X, dziecko) zostaje, bo X nie jest kasowany). Liczone jako rosnący
+            // fixpoint: baza -- element ma rodzica SPOZA descendants (współdzielenie z
+            // zupełnie inną gałęzią) -- krok rekurencyjny -- dziecko elementu, który już
+            // wiadomo, że przeżywa, też przeżywa. @id sam nigdy nie trafia do survivors
+            // (jest kasowany bezwarunkowo, to jawny cel operacji).
             const string selectSql = """
                 WITH RECURSIVE descendants AS (
                     SELECT @id::uuid AS item_id
                     UNION
                     SELECT ir.child_id FROM item_relations ir
                     JOIN descendants d ON ir.parent_id = d.item_id
+                    JOIN items parent ON parent.id = ir.parent_id
+                    WHERE parent.item_type = 'folder'
                 ),
                 survivors AS (
                     SELECT ir.child_id AS item_id

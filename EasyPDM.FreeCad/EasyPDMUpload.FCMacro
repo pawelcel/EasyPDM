@@ -918,6 +918,17 @@ def _iter_external_link_targets(doc):
         if linked is None:
             App.Console.PrintMessage(f"  {obj.Name} ({obj.TypeId}): pomijam -- brak LinkedObject\n")
             continue
+        # Link do zestawu zmiennych (App::VarSet) to WSPÓŁDZIELONE PARAMETRY, nie komponent
+        # -- dwa dokumenty potrafią wskazywać nawzajem na swoje VarSet-y, co dawało dwa realne
+        # błędy: w BOM powstawał CYKL (złożenie jako rodzic swojej własnej części, backend
+        # słusznie odrzucał taką relację), a ilość sztuk komponentu była zawyżona o każdy taki
+        # link. Potwierdzone w praktyce -- w Report View FreeCAD sam zgłaszał przy tym
+        # "Document::getDependentDocuments: The graph must be a DAG."
+        if linked.isDerivedFrom("App::VarSet"):
+            App.Console.PrintMessage(
+                f"  {obj.Name} ({obj.TypeId}): pomijam -- link do zestawu zmiennych (App::VarSet), nie do komponentu\n"
+            )
+            continue
         linked_doc = getattr(linked, "Document", None)
         if linked_doc is None:
             App.Console.PrintMessage(
@@ -1070,6 +1081,25 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
     new_label = f"{item_number} ({name}).{revision_label(revision)}"
     new_local_path = os.path.join(target_folder or os.path.dirname(doc.FileName), new_filename)
 
+    # KOLEJNOŚĆ JEST TU ISTOTNA: najpierw lokalny Save As pod nazwą PDM (razem z
+    # odświeżeniem linków), DOPIERO POTEM kopia/wysyłka do PDM -- to, co idzie na serwer,
+    # musi być plikiem JUŻ przemianowanym, z odniesieniami wskazującymi na nowe nazwy
+    # komponentów. Wcześniej było odwrotnie (kopia szła pierwsza, "dopiero po potwierdzonym
+    # sukcesie serwera" zmieniała się etykieta i lokalny plik) i to był realny błąd: do PDM
+    # trafiał plik sprzed przemianowania, więc złożenie pobrane potem przez
+    # EasyPDMDownload.FCMacro szukało komponentów pod ORYGINALNYMI nazwami sprzed wysyłki i
+    # kończyło się serią "Link broken" (potwierdzone w praktyce na złożeniu, którego części
+    # leżały na zupełnie innym dysku niż folder docelowy).
+    #
+    # Skutek uboczny zamiany: jeśli wysyłka padnie PO tym zapisie, lokalny plik zostaje już
+    # pod nazwą PDM. To odwracalne i nieszkodliwe -- ponowne uruchomienie makra rozpozna go
+    # po etykiecie (zob. match_existing_item) i zaproponuje dogranie do tego samego elementu.
+    doc = _ensure_fully_loaded(doc)
+    doc.Label = new_label
+    local_renamed = _save_local_as_pdm_name(doc, new_local_path)
+    if local_renamed:
+        _refresh_links_to(doc)
+
     storage_root = get_storage_root()
     target_path = None
     if storage_root:
@@ -1104,12 +1134,6 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
                 except OSError:
                     pass
                 raise
-        # Etykieta dokumentu (i lokalny Save As) zmieniają się DOPIERO PO potwierdzonym
-        # sukcesie kopii/rejestracji — wcześniej (przed tym momentem) żadna zmiana na
-        # serwerze jeszcze się nie powiodła, więc ani etykieta, ani lokalny plik nie powinny
-        # sugerować, że wysyłka już się udała.
-        doc.Label = new_label
-        local_renamed = _save_local_as_pdm_name(doc, new_local_path)
         if export_step:
             _upload_step_attachment(doc, item_id)
         if export_pdf:
@@ -1146,8 +1170,6 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
         f"/items/{item_id}/attachments", doc.FileName,
         override_filename=new_filename, extra_fields={"role": "cad"},
     )
-    doc.Label = new_label
-    local_renamed = _save_local_as_pdm_name(doc, new_local_path)
     if export_step:
         _upload_step_attachment(doc, item_id)
     if export_pdf:
@@ -1160,6 +1182,92 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
     }
 
 
+def _refresh_links_to(changed_doc):
+    """Po zmianie ścieżki pliku dokumentu (Save As pod nazwą PDM, zob. _save_local_as_pdm_name)
+    wymusza odświeżenie WSZYSTKICH App::Link (w każdym innym otwartym dokumencie), które
+    wskazują na TEN dokument -- przez ponowne przypisanie LinkedObject tą samą wartością.
+
+    Po co: w pamięci link działa dalej bez żadnego odświeżania (trzyma żywe odwołanie do
+    obiektu, nie do ścieżki), więc w tej samej sesji wszystko wygląda poprawnie. Ale zapisana
+    NA DYSK referencja międzydokumentowa (App::PropertyXLink) potrafi zostać ze ścieżką z
+    momentu, w którym link był USTAWIANY, zamiast odczytać aktualną przy zapisie -- efekt:
+    złożenie zapisane po zmianie nazwy komponentu nadal ma w pliku STARĄ nazwę i po ponownym
+    otwarciu (już w nowej sesji) zgłasza "Link broken" wskazując plik sprzed wysyłki, mimo że
+    komponent leży obok pod nową nazwą (zgłoszone i potwierdzone w praktyce). Ponowne
+    przypisanie tej samej wartości "dotyka" właściwość, więc najbliższy zapis dokumentu
+    nadrzędnego serializuje już aktualną ścieżkę.
+
+    Cicho ignoruje błędy pojedynczego obiektu/dokumentu -- to krok naprawczy, a nie warunek
+    powodzenia wysyłki, która w tym momencie już się udała."""
+    for other_doc in App.listDocuments().values():
+        if other_doc is changed_doc:
+            continue
+        refreshed_any = False
+        for obj in other_doc.Objects:
+            try:
+                if not obj.isDerivedFrom("App::Link"):
+                    continue
+                linked = getattr(obj, "LinkedObject", None)
+                if linked is None or getattr(linked, "Document", None) is not changed_doc:
+                    continue
+            except Exception:
+                continue
+            # Przypisanie i touch w OSOBNYCH try -- LinkedObject bywa tylko do odczytu
+            # (potwierdzone dla części typów pochodnych App::Link), a wtedy samo "touch"
+            # nadal ma szansę wymusić ponowną serializację referencji.
+            try:
+                obj.LinkedObject = linked
+            except Exception:
+                pass
+            try:
+                obj.touch()
+            except Exception:
+                pass
+            refreshed_any = True
+            App.Console.PrintMessage(
+                f"EasyPDM: odswiezono link '{other_doc.Name}.{obj.Name}' -> '{changed_doc.FileName}'\n"
+            )
+        # Bez jawnego oznaczenia dokumentu jako zmienionego jego save() na koncu run() bywa
+        # pustym przebiegiem (FreeCAD pomija zapis dokumentu, ktory nie jest "touched") --
+        # wlasnie dlatego zaktualizowana sciezka komponentu moglaby nigdy nie trafic na dysk.
+        if refreshed_any:
+            try:
+                other_doc.recompute()
+            except Exception:
+                pass
+
+
+def _ensure_fully_loaded(doc):
+    """Dociąga dokument załadowany CZĘŚCIOWO (partial) do pełnego i zwraca dokument, na
+    którym dalej należy pracować.
+
+    FreeCAD ładuje dokument otwarty WYŁĄCZNIE jako zależność linku z innego dokumentu w
+    trybie częściowym -- wczytuje tylko te obiekty, których wymagają same linki. Takiego
+    dokumentu NIE DA SIĘ ZAPISAĆ: zapis kończy się cicho, a w Report View zostaje
+    "Partial loaded document '<nazwa>' cannot be saved" (potwierdzone w praktyce: to był
+    realny powód, dla którego komponent nigdy nie powstawał na dysku pod nazwą PDM, mimo
+    że w pamięci wszystko wyglądało poprawnie). Dotyczy dokładnie typowego układu przy
+    wysyłce złożenia: użytkownik otwiera samo złożenie, a jego części FreeCAD dociąga sam,
+    właśnie częściowo.
+
+    `App.openDocument` na już otwartym, częściowym dokumencie dociąga go do pełnego.
+    Zwracamy to, co odda FreeCAD (a przy niepowodzeniu -- oryginalny obiekt), bo teoretycznie
+    może to być inna instancja dokumentu niż przekazana."""
+    file_name = getattr(doc, "FileName", "")
+    if not file_name:
+        return doc
+    try:
+        reloaded = App.openDocument(file_name)
+        if reloaded is not None and reloaded is not doc:
+            App.Console.PrintMessage(
+                f"EasyPDM: dokument '{doc.Name}' byl zaladowany czesciowo -- dociagniety do pelnego\n"
+            )
+            return reloaded
+    except Exception as e:
+        App.Console.PrintMessage(f"EasyPDM: nie udalo sie dociagnac dokumentu '{doc.Name}': {e}\n")
+    return doc
+
+
 def _save_local_as_pdm_name(doc, new_local_path):
     """Save As lokalnego dokumentu pod nazwą PDM (numer/nazwa/rewizja), do new_local_path —
     patrz pełne wyjaśnienie w docstringu _rename_and_upload. Cicho ignoruje błąd zapisu (np.
@@ -1167,15 +1275,25 @@ def _save_local_as_pdm_name(doc, new_local_path):
     nieudana lokalna zmiana nazwy nie powinna wyglądać jak porażka całej operacji — w
     najgorszym razie lokalny plik zostaje pod starą nazwą, dokładnie jak przed tą funkcją.
     Zwraca True, jeśli plik faktycznie zmienił ścieżkę; False, jeśli już tam był (nic do
-    zrobienia) albo zapis się nie udał."""
+    zrobienia) albo zapis się nie udał.
+
+    Sukces sprawdzamy po ISTNIENIU pliku, nie po braku wyjątku: zapis dokumentu załadowanego
+    częściowo (zob. _ensure_fully_loaded) nie rzuca błędem, tylko cicho nic nie robi -- bez
+    tej weryfikacji wracaliśmy stąd z True dla pliku, którego na dysku w ogóle nie ma."""
     if os.path.abspath(new_local_path) == os.path.abspath(doc.FileName):
         return False
     try:
         doc.recompute()
         doc.saveAs(new_local_path)
-        return True
-    except Exception:
+    except Exception as e:
+        App.Console.PrintMessage(f"EasyPDM: zapis '{new_local_path}' nie powiodl sie: {e}\n")
         return False
+    if not os.path.exists(new_local_path):
+        App.Console.PrintMessage(
+            f"EasyPDM: zapis '{new_local_path}' nie utworzyl pliku (dokument zaladowany czesciowo?)\n"
+        )
+        return False
+    return True
 
 
 def _upload_step_attachment(doc, item_id):

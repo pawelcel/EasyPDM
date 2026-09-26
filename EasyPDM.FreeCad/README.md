@@ -302,7 +302,23 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
 - **The local document file is MOVED to a new name (Save As) on every upload** — the old
   file (under the original name) stays on disk, but is no longer actively edited/open; a
   manual change to the old file will NOT automatically make it into the PDM (it needs to
-  be uploaded back as another revision).
+  be uploaded back as another revision). The rename happens **before** anything is copied
+  to the PDM, on purpose: the file that goes to the server has to be the renamed one, with
+  its links already pointing at the components' new names. Doing it the other way round
+  (the original order) meant a downloaded assembly looked for its parts under their
+  pre-upload names and reported "Link broken" for every one of them.
+- **A component opened only as a link dependency is loaded PARTIALLY by FreeCAD, and a
+  partially loaded document cannot be saved** — the save neither succeeds nor raises, it
+  just leaves `Partial loaded document '<name>' cannot be saved` in the Report View, so the
+  file under the PDM name never appears on disk. This is the normal situation when
+  uploading an assembly (you open the assembly, FreeCAD pulls its parts in itself), so the
+  macro forces such documents to load fully before saving and treats "saved but no file on
+  disk" as a failure rather than success.
+- **Links to an `App::VarSet` are skipped by assembly detection** — a VarSet is a shared
+  set of parameters, not a component, and two documents commonly reference each other's
+  VarSets. Counting them as components fabricated a cycle in the BOM (an assembly ending up
+  as the parent of its own part, which the backend rejects) and inflated the quantity of
+  the linked component by one per VarSet link.
 - **Copying/registering the file in `storage/` assumes that folder is visible in this
   machine's file system** — today the client (FreeCAD) and the server (`EasyPDM.Api`) run
   on the same disk, so this works with no extra configuration. If `GET /api/config` is
