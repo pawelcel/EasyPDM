@@ -1,3 +1,4 @@
+using System.Linq;
 using Npgsql;
 
 // Tworzenie, edycja i usuwanie projektów — wyłącznie dla administratora (ten sam wzorzec
@@ -21,15 +22,17 @@ static class ProjectEndpoints
             const string sql = """
                 SELECT p.id, p.name, p.description, p.client, p.client_id, c.name,
                        p.client_name2_id, n2.name2, p.closed,
-                       p.start_date, p.end_date, p.created_at, COUNT(i.id) AS item_count
+                       p.start_date, p.end_date, p.created_at, COUNT(i.id) AS item_count,
+                       p.lead_contact_id, lc.first_name, lc.last_name
                 FROM projects p
                 LEFT JOIN items i ON i.project_id = p.id
                 LEFT JOIN clients c ON c.id = p.client_id
                 LEFT JOIN client_name2 n2 ON n2.id = p.client_name2_id
+                LEFT JOIN client_contacts lc ON lc.id = p.lead_contact_id
                 WHERE @isAdmin OR EXISTS (
                     SELECT 1 FROM project_users pu WHERE pu.project_id = p.id AND pu.user_id = @userId
                 )
-                GROUP BY p.id, c.id, n2.id
+                GROUP BY p.id, c.id, n2.id, lc.id
                 ORDER BY c.name, n2.name2, p.name;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -57,14 +60,21 @@ static class ProjectEndpoints
             if (name2Error is not null)
                 return Results.BadRequest(name2Error);
 
+            var leadContactError = await ValidateLeadContactAsync(conn, body.ClientId, body.ClientName2Id, body.LeadContactId);
+            if (leadContactError is not null)
+                return Results.BadRequest(leadContactError);
+
             const string sql = """
-                INSERT INTO projects (name, description, client_id, client_name2_id, closed, start_date, end_date)
-                VALUES (@name, @description, @clientId, @clientName2Id, @closed, @startDate, @endDate)
+                INSERT INTO projects (name, description, client_id, client_name2_id, closed, start_date, end_date, lead_contact_id)
+                VALUES (@name, @description, @clientId, @clientName2Id, @closed, @startDate, @endDate, @leadContactId)
                 RETURNING id, name, description, client, client_id,
                     (SELECT name FROM clients WHERE clients.id = client_id) AS client_name,
                     client_name2_id,
                     (SELECT name2 FROM client_name2 WHERE client_name2.id = client_name2_id) AS client_name2_name,
-                    closed, start_date, end_date, created_at;
+                    closed, start_date, end_date, created_at,
+                    lead_contact_id,
+                    (SELECT first_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_first_name,
+                    (SELECT last_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_last_name;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("name", body.Name.Trim());
@@ -74,6 +84,7 @@ static class ProjectEndpoints
             cmd.Parameters.AddWithValue("closed", body.Closed);
             cmd.Parameters.AddWithValue("startDate", (object?)body.StartDate ?? DBNull.Value);
             cmd.Parameters.AddWithValue("endDate", (object?)body.EndDate ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("leadContactId", (object?)body.LeadContactId ?? DBNull.Value);
 
             try
             {
@@ -102,6 +113,10 @@ static class ProjectEndpoints
             if (name2Error is not null)
                 return Results.BadRequest(name2Error);
 
+            var leadContactError = await ValidateLeadContactAsync(conn, body.ClientId, body.ClientName2Id, body.LeadContactId);
+            if (leadContactError is not null)
+                return Results.BadRequest(leadContactError);
+
             const string sql = """
                 UPDATE projects SET
                     name = @name,
@@ -110,14 +125,18 @@ static class ProjectEndpoints
                     client_name2_id = @clientName2Id,
                     closed = @closed,
                     start_date = @startDate,
-                    end_date = @endDate
+                    end_date = @endDate,
+                    lead_contact_id = @leadContactId
                 WHERE id = @id
                 RETURNING id, name, description, client, client_id,
                     (SELECT name FROM clients WHERE clients.id = client_id) AS client_name,
                     client_name2_id,
                     (SELECT name2 FROM client_name2 WHERE client_name2.id = client_name2_id) AS client_name2_name,
                     closed, start_date, end_date, created_at,
-                    (SELECT COUNT(*) FROM items WHERE items.project_id = projects.id);
+                    (SELECT COUNT(*) FROM items WHERE items.project_id = projects.id),
+                    lead_contact_id,
+                    (SELECT first_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_first_name,
+                    (SELECT last_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_last_name;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
@@ -128,6 +147,7 @@ static class ProjectEndpoints
             cmd.Parameters.AddWithValue("closed", body.Closed);
             cmd.Parameters.AddWithValue("startDate", (object?)body.StartDate ?? DBNull.Value);
             cmd.Parameters.AddWithValue("endDate", (object?)body.EndDate ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("leadContactId", (object?)body.LeadContactId ?? DBNull.Value);
 
             try
             {
@@ -207,22 +227,40 @@ static class ProjectEndpoints
         });
     }
 
-    private static object ReadProject(NpgsqlDataReader reader, long? itemCount = null) => new
+    // Kolumny 0-11 (id..createdAt) i "lead contact" mają zawsze tę samą pozycję względem
+    // SIEBIE, ale item_count (kolumna 12) jest obecna tylko w zapytaniach GET/PATCH -- POST
+    // go w ogóle nie SELECTuje (patrz wywołanie z itemCount: 0 niżej) -- stąd przesunięcie
+    // o jedną kolumnę w zależności od tego, czy itemCount przyszedł z zewnątrz czy z bazy.
+    private static object ReadProject(NpgsqlDataReader reader, long? itemCount = null)
     {
-        id = reader.GetGuid(0),
-        name = reader.GetString(1),
-        description = reader.IsDBNull(2) ? null : reader.GetString(2),
-        client = reader.IsDBNull(3) ? null : reader.GetString(3),
-        clientId = reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4),
-        clientName = reader.IsDBNull(5) ? null : reader.GetString(5),
-        clientName2Id = reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
-        clientName2Name = reader.IsDBNull(7) ? null : reader.GetString(7),
-        closed = reader.GetBoolean(8),
-        startDate = reader.IsDBNull(9) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(9),
-        endDate = reader.IsDBNull(10) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(10),
-        createdAt = reader.GetDateTime(11),
-        itemCount = itemCount ?? reader.GetInt64(12)
-    };
+        var leadBase = itemCount is null ? 13 : 12;
+        return new
+        {
+            id = reader.GetGuid(0),
+            name = reader.GetString(1),
+            description = reader.IsDBNull(2) ? null : reader.GetString(2),
+            client = reader.IsDBNull(3) ? null : reader.GetString(3),
+            clientId = reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4),
+            clientName = reader.IsDBNull(5) ? null : reader.GetString(5),
+            clientName2Id = reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
+            clientName2Name = reader.IsDBNull(7) ? null : reader.GetString(7),
+            closed = reader.GetBoolean(8),
+            startDate = reader.IsDBNull(9) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(9),
+            endDate = reader.IsDBNull(10) ? (DateOnly?)null : reader.GetFieldValue<DateOnly>(10),
+            createdAt = reader.GetDateTime(11),
+            itemCount = itemCount ?? reader.GetInt64(12),
+            leadContactId = reader.IsDBNull(leadBase) ? (int?)null : reader.GetInt32(leadBase),
+            leadContactName = BuildContactName(reader, leadBase + 1, leadBase + 2)
+        };
+    }
+
+    private static string? BuildContactName(NpgsqlDataReader reader, int firstNameIndex, int lastNameIndex)
+    {
+        var firstName = reader.IsDBNull(firstNameIndex) ? null : reader.GetString(firstNameIndex);
+        var lastName = reader.IsDBNull(lastNameIndex) ? null : reader.GetString(lastNameIndex);
+        var name = string.Join(" ", new[] { firstName, lastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        return string.IsNullOrEmpty(name) ? null : name;
+    }
 
     // Projekt ma prawdziwy klucz obcy do JEDNEJ Nazwy 2 (nie dopasowanie po nazwie jak
     // properties.clientName2 na elementach) -- musi więc rzeczywiście należeć do
@@ -243,7 +281,33 @@ static class ProjectEndpoints
         return null;
     }
 
+    // Prowadzący projekt musi być kontaktem TEGO klienta -- albo kontaktem samego klienta
+    // (name2_id IS NULL, widoczny niezależnie od wybranej Nazwy 2), albo kontaktem
+    // przypisanym dokładnie do tej Nazwy 2, którą ma projekt (client_name2_id) -- ten sam
+    // zakres "główna + podrzędna dla wybranej Nazwy 2", z którego front buduje listę do
+    // wyboru (GET .../clients/{id} + GET .../clients/{id}/name2/{name2Id}).
+    private static async Task<string?> ValidateLeadContactAsync(NpgsqlConnection conn, int? clientId, int? clientName2Id, int? leadContactId)
+    {
+        if (leadContactId is null)
+            return null;
+        if (clientId is null)
+            return "Nie można wskazać prowadzącego projekt bez wybranego klienta.";
+
+        await using var cmd = new NpgsqlCommand("SELECT client_id, name2_id FROM client_contacts WHERE id = @id;", conn);
+        cmd.Parameters.AddWithValue("id", leadContactId.Value);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+            return "Wskazany kontakt prowadzącego nie istnieje.";
+        var contactClientId = reader.GetInt32(0);
+        int? contactName2Id = reader.IsDBNull(1) ? null : reader.GetInt32(1);
+        if (contactClientId != clientId)
+            return "Wskazany kontakt nie należy do wybranego klienta.";
+        if (contactName2Id is not null && contactName2Id != clientName2Id)
+            return "Wskazany kontakt należy do innej Nazwy 2 tego klienta.";
+        return null;
+    }
+
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }
 
-record ProjectRequest(string Name, string? Description, int? ClientId, int? ClientName2Id, bool Closed, DateOnly? StartDate, DateOnly? EndDate);
+record ProjectRequest(string Name, string? Description, int? ClientId, int? ClientName2Id, bool Closed, DateOnly? StartDate, DateOnly? EndDate, int? LeadContactId);

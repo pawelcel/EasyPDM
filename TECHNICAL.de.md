@@ -210,6 +210,15 @@ Die Projektauswahlliste und die eigene Zeile des Projekts oben in seiner Struktu
 dann "Projekt (Kunde, Name 2)", und die Projektliste ist überall sortiert nach Kundenname,
 dann Name 2, zuletzt nach dem Namen des Projekts selbst.
 
+Ein Projekt kann außerdem einen **Projektleiter** (`projects.lead_contact_id`) haben — eine
+bestimmte Person aus der Kontaktliste dieses Kunden (`client_contacts`), angezeigt neben
+Kunde/Name 2 in den eigenen Projekteigenschaften. Entweder ein Kontakt, der direkt zum
+Kunden gehört, oder einer, der genau zu dem Namen 2 gehört, mit dem das Projekt verknüpft
+ist (niemals ein Kontakt eines ANDEREN Namens 2 desselben Kunden — geprüft in
+`ProjectEndpoints.ValidateLeadContactAsync`, derselben "muss tatsächlich zusammengehören"-
+Regel wie bei `client_name2_id`). Wird beim Wechsel des Kunden oder des gewählten Namens 2
+geleert und bei späterem Löschen dieses Kontakts auf null zurückgesetzt.
+
 Ein Projekt trägt außerdem ein `closed`-Flag, umgeschaltet über eine Schaltfläche in seinen
 eigenen Eigenschaften. Ein geschlossenes Projekt fällt aus den "aktiven" Listen heraus
 (Auswahlliste, "Meine Projekte", der Projekt-Picker beim Hinzufügen eines Elements), bleibt

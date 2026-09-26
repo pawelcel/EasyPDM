@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { api } from "@/api/client"
-import type { Client, Project } from "@/api/types"
+import type { Client, ClientContact, Project } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -26,6 +26,7 @@ type ProjectForm = {
   description: string
   clientId: number | null
   clientName2Id: number | null
+  leadContactId: number | null
   closed: boolean
   startDate: string
   endDate: string
@@ -37,10 +38,29 @@ function formFromProject(project: Project): ProjectForm {
     description: project.description ?? "",
     clientId: project.clientId,
     clientName2Id: project.clientName2Id,
+    leadContactId: project.leadContactId,
     closed: project.closed,
     startDate: project.startDate ?? "",
     endDate: project.endDate ?? "",
   }
+}
+
+function contactLabel(contact: ClientContact | undefined): string {
+  if (!contact) return ""
+  return [contact.firstName, contact.lastName].filter(Boolean).join(" ") || ""
+}
+
+function formsEqual(a: ProjectForm, b: ProjectForm): boolean {
+  return (
+    a.name === b.name &&
+    a.description === b.description &&
+    a.clientId === b.clientId &&
+    a.clientName2Id === b.clientName2Id &&
+    a.leadContactId === b.leadContactId &&
+    a.closed === b.closed &&
+    a.startDate === b.startDate &&
+    a.endDate === b.endDate
+  )
 }
 
 // Etykieta w wyszukiwarce klienta to zawsze sama nazwa główna -- Nazwa 2 (gdy klient ją ma
@@ -75,6 +95,7 @@ function ProjectDetailPanel({
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deletingPending, setDeletingPending] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [leadContacts, setLeadContacts] = useState<ClientContact[]>([])
 
   // Odśwież formularz, gdy z zewnątrz przyjdą nowe dane projektu (np. po zapisie albo
   // przełączeniu na inny projekt) — nie ma osobnego trybu "edycji", pola są edytowalne
@@ -82,6 +103,42 @@ function ProjectDetailPanel({
   useEffect(() => {
     setForm(formFromProject(project))
   }, [project])
+
+  // Prowadzącego wybiera się z kontaktów TEGO klienta -- zarówno jego własnych (name2_id
+  // IS NULL), jak i przypisanych do wybranej Nazwy 2 -- ten sam zestaw dwóch zapytań i to
+  // samo łączenie po stronie frontu co w ClientName2DetailPanel (własne + odziedziczone).
+  useEffect(() => {
+    if (!form.clientId) {
+      setLeadContacts([])
+      return
+    }
+    let cancelled = false
+    async function loadContacts(clientId: number, clientName2Id: number | null) {
+      const [client, name2] = await Promise.all([
+        api.getClient(clientId),
+        clientName2Id ? api.getClientName2(clientId, clientName2Id) : Promise.resolve(null),
+      ])
+      if (cancelled) return
+      setLeadContacts(name2 ? [...client.contacts, ...name2.contacts] : client.contacts)
+    }
+    loadContacts(form.clientId, form.clientName2Id)
+    return () => {
+      cancelled = true
+    }
+  }, [form.clientId, form.clientName2Id])
+
+  // Nazwa/Opis/daty wywołują save() na KAŻDYM blur, niezależnie czy coś w nich faktycznie
+  // się zmieniło (np. samo kliknięcie w pole i wyjście bez edycji) — bez tej strażniczej
+  // funkcji taki "pusty" zapis wysyła CAŁY, wcześniejszy stan formularza (zob. `next`
+  // budowane przez spread `form` w innych onValueChange), który może dogonić i nadpisać
+  // W TLE świeższą zmianę zrobioną tuż po (np. wybór Prowadzącego zaraz po kliknięciu z
+  // pola Nazwa) — dokładnie ten sam wyścig dwóch równoległych PATCH-ów, co przy przycisku
+  // Zamknij/Otwórz projekt niżej, tylko odpalany przez zwykłe przejście fokusu między
+  // polami zamiast klikiem w przycisk. Pomijając zapis, gdy formularz nie różni się od
+  // ostatniego stanu z serwera, ten "widmowy" PATCH w ogóle nie powstaje.
+  function saveIfChanged() {
+    if (!formsEqual(form, formFromProject(project))) save(form)
+  }
 
   async function save(next: ProjectForm) {
     if (!next.name.trim()) return
@@ -92,6 +149,7 @@ function ProjectDetailPanel({
         description: next.description.trim() || null,
         clientId: next.clientId,
         clientName2Id: next.clientName2Id,
+        leadContactId: next.leadContactId,
         closed: next.closed,
         startDate: next.startDate || null,
         endDate: next.endDate || null,
@@ -197,7 +255,7 @@ function ProjectDetailPanel({
           value={form.name}
           disabled={!isAdmin}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          onBlur={() => save(form)}
+          onBlur={saveIfChanged}
         />
 
         <Label htmlFor="project-description">{t("project.description")}</Label>
@@ -206,7 +264,7 @@ function ProjectDetailPanel({
             id="project-description"
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            onBlur={() => save(form)}
+            onBlur={saveIfChanged}
             placeholder={t("project.noDescription")}
           />
         ) : project.description ? (
@@ -221,7 +279,7 @@ function ProjectDetailPanel({
             items={clients.map((c) => c.id)}
             value={form.clientId}
             onValueChange={(v) => {
-              const next = { ...form, clientId: (v as number | null) ?? null, clientName2Id: null }
+              const next = { ...form, clientId: (v as number | null) ?? null, clientName2Id: null, leadContactId: null }
               setForm(next)
               save(next)
             }}
@@ -252,7 +310,7 @@ function ProjectDetailPanel({
           items={name2s.map((n) => n.id)}
           value={form.clientName2Id}
           onValueChange={(v) => {
-            const next = { ...form, clientName2Id: (v as number | null) ?? null }
+            const next = { ...form, clientName2Id: (v as number | null) ?? null, leadContactId: null }
             setForm(next)
             save(next)
           }}
@@ -277,6 +335,35 @@ function ProjectDetailPanel({
           </ComboboxContent>
         </Combobox>
 
+        <Label htmlFor="project-lead-contact">{t("project.leadContact")}</Label>
+        {form.clientId && leadContacts.length > 0 ? (
+          <Combobox
+            items={leadContacts.map((c) => c.id)}
+            value={form.leadContactId}
+            onValueChange={(v) => {
+              const next = { ...form, leadContactId: (v as number | null) ?? null }
+              setForm(next)
+              save(next)
+            }}
+            itemToStringLabel={(id: number) => contactLabel(leadContacts.find((c) => c.id === id))}
+            disabled={!isAdmin}
+          >
+            <ComboboxInput id="project-lead-contact" placeholder={t("part.searchPlaceholder")} showClear />
+            <ComboboxContent>
+              <ComboboxEmpty>{t("project.noMatchingLeadContact")}</ComboboxEmpty>
+              <ComboboxList>
+                {(id: number) => (
+                  <ComboboxItem key={id} value={id}>
+                    {contactLabel(leadContacts.find((c) => c.id === id))}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        ) : (
+          <Hint>{form.clientId ? t("project.noLeadContactsHint") : t("project.leadContactNeedsClientHint")}</Hint>
+        )}
+
         <div className="flex gap-2">
           <div className="flex flex-1 flex-col gap-2">
             <Label htmlFor="project-start-date">{t("project.startDate")}</Label>
@@ -286,7 +373,7 @@ function ProjectDetailPanel({
               value={form.startDate}
               disabled={!isAdmin}
               onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
-              onBlur={() => save(form)}
+              onBlur={saveIfChanged}
             />
           </div>
           <div className="flex flex-1 flex-col gap-2">
@@ -297,7 +384,7 @@ function ProjectDetailPanel({
               value={form.endDate}
               disabled={!isAdmin}
               onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
-              onBlur={() => save(form)}
+              onBlur={saveIfChanged}
             />
           </div>
         </div>

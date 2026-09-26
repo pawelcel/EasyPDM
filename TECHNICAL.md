@@ -191,6 +191,15 @@ and the project's own row at the top of its structure show "Project (Client, Nam
 set, and everywhere the project list is sorted by client name, then Name 2, then the
 project's own name.
 
+A project can also point at a **Project lead** (`projects.lead_contact_id`) — one specific
+person from that client's contact list (`client_contacts`), shown next to Client/Name 2 in
+the project's own properties. Either a contact belonging to the client directly, or one
+belonging to the exact Name 2 the project is linked to (never a contact of a *different*
+Name 2 of the same client — enforced in `ProjectEndpoints.ValidateLeadContactAsync`, the
+same "must actually belong together" check as `client_name2_id` itself). Cleared when the
+client or the chosen Name 2 changes, and set back to null (not deleted) if that contact is
+later removed.
+
 A project also carries a `closed` flag, toggled by a button in its own properties. A closed
 project drops out of the "active" lists (selector, "My projects", the new-item project
 picker) but keeps existing exactly as before otherwise — its items remain fully searchable

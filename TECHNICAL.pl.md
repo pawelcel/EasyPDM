@@ -185,6 +185,15 @@ zostanie później usunięta. Rozwijana lista wyboru projektu i pierwszy wiersz 
 samego projektu pokazują wtedy "Projekt (Klient, Nazwa 2)", a wszędzie lista projektów jest
 sortowana po nazwie klienta, potem Nazwie 2, na końcu po nazwie samego projektu.
 
+Projekt może też wskazywać **Prowadzącego projekt** (`projects.lead_contact_id`) — jedną
+konkretną osobę z listy kontaktów tego klienta (`client_contacts`), pokazywaną obok
+Klient/Nazwa 2 we własnych właściwościach projektu. Albo kontakt należący bezpośrednio do
+klienta, albo kontakt należący dokładnie do tej Nazwy 2, z którą powiązany jest projekt
+(nigdy kontakt INNEJ Nazwy 2 tego samego klienta — pilnowane w
+`ProjectEndpoints.ValidateLeadContactAsync`, tą samą zasadą "musi faktycznie należeć razem"
+co przy `client_name2_id`). Czyszczony przy zmianie klienta lub wybranej Nazwy 2, i zerowany
+(nie kasujący projektu), gdy ten kontakt zostanie później usunięty.
+
 Projekt niesie też flagę `closed`, przełączaną przyciskiem we własnych właściwościach.
 Zamknięty projekt znika z list "aktywnych" (selektor, "Moje projekty", picker projektu przy
 dodawaniu elementu), ale poza tym nic się nie zmienia -- jego elementy nadal są w pełni

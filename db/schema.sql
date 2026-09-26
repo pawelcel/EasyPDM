@@ -250,6 +250,13 @@ CREATE INDEX idx_projects_client_name2 ON projects (client_name2_id);
 -- its items stay fully searchable through "Whole database" and the flag can be toggled back.
 ALTER TABLE projects ADD COLUMN closed BOOLEAN NOT NULL DEFAULT false;
 
+-- Prowadzący projekt -- opiekun po stronie klienta, wybierany z jego listy kontaktów
+-- (client_contacts): zarówno kontakty samego klienta (name2_id IS NULL) jak i kontakty
+-- przypisane do konkretnej Nazwy 2 wskazanej wyżej (client_name2_id). Zgodność między tą
+-- kolumną a client_name2_id pilnowana jest po stronie aplikacji, nie przez FK.
+ALTER TABLE projects ADD COLUMN lead_contact_id INTEGER REFERENCES client_contacts(id) ON DELETE SET NULL;
+CREATE INDEX idx_projects_lead_contact ON projects (lead_contact_id);
+
 -- ============================================================
 -- Powiadomienia -- zdarzenia dotyczące elementów/projektów/konta, adresowane do
 -- konkretnego użytkownika, plus per-użytkownik wyłączenia poszczególnych typów.

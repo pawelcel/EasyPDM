@@ -45,6 +45,13 @@ export interface Project {
   // properties.clientName2 na elementach).
   clientName2Id: number | null
   clientName2Name: string | null
+  // Opiekun ze strony klienta -- kontakt z client_contacts, albo kontakt samego klienta,
+  // albo kontakt przypisany dokładnie do clientName2Id powyżej (zob. komentarz przy
+  // ValidateLeadContactAsync w ProjectEndpoints.cs). leadContactName to gotowe "Imię
+  // Nazwisko" do wyświetlenia -- pełne dane kontaktu (telefon/e-mail) dociąga front z listy
+  // dostępnych kontaktów, którą i tak musi mieć załadowaną dla samego pickera.
+  leadContactId: number | null
+  leadContactName: string | null
   // A closed project drops out of the "active projects" lists (selector, "My projects", the
   // new-item project picker) but stays fully searchable through "Whole database" and can be
   // reopened.

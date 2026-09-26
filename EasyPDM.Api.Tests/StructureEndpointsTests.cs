@@ -64,4 +64,37 @@ public class StructureEndpointsTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    // Złożenie należące formalnie do INNEGO projektu (jego project_id), dodane jako
+    // WSPÓŁDZIELONY komponent pod elementem w projekcie B (przez "Dodaj istniejący element")
+    // -- GET /api/projects/{B}/relations musi zwrócić też WŁASNE dzieci tego złożenia,
+    // nie tylko krawędź "coś w B -> to złożenie". Regresja dla bugu, gdzie zapytanie
+    // filtrowało relacje po project_id RODZICA każdej krawędzi -- dzieci złożenia (ich
+    // "rodzic" to samo złożenie, którego project_id to A, nie B) znikały, więc w drzewku
+    // projektu B złożenie pokazywało się jako liść bez rozwijania.
+    [Fact]
+    public async Task Wspoldzielone_zlozenie_pokazuje_wlasne_dzieci_w_innym_projekcie()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        var projectA = await client.CreateProjectAsync("Projekt A wspolny");
+        var sharedAssembly = await client.CreateNodeAsync(projectA, "Zlozenie wspolne", "assembly");
+        var ownComponent = await client.CreateNodeAsync(projectA, "Skladowa zlozenia", "part");
+        var linkOwn = await client.PostAsJsonAsync($"/api/items/{sharedAssembly}/children", new { childId = ownComponent, quantity = 1 });
+        Assert.Equal(HttpStatusCode.OK, linkOwn.StatusCode);
+
+        var projectB = await client.CreateProjectAsync("Projekt B odbiorca");
+        var folderInB = await client.CreateNodeAsync(projectB, "Folder w B", "folder");
+        var linkShared = await client.PostAsJsonAsync($"/api/items/{folderInB}/children", new { childId = sharedAssembly, quantity = 1 });
+        Assert.Equal(HttpStatusCode.OK, linkShared.StatusCode);
+
+        var relationsB = await client.GetAsync($"/api/projects/{projectB}/relations");
+        Assert.Equal(HttpStatusCode.OK, relationsB.StatusCode);
+        var text = await relationsB.Content.ReadAsStringAsync();
+
+        Assert.Contains(sharedAssembly.ToString(), text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(ownComponent.ToString(), text, StringComparison.OrdinalIgnoreCase);
+    }
 }

@@ -2,6 +2,27 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.4]
+
+### Added
+- A project can now have a "Project lead" — a contact picked from the client's own contact
+  list (either a contact belonging to the client directly, or one belonging to the specific
+  Name 2 the project is linked to), shown right in the project's properties panel next to
+  Client/Name 2.
+
+### Fixed
+- The project's Nazwa/Opis/date fields saved on every blur regardless of whether they'd
+  actually changed, which could race a genuinely intended change made right after (e.g.
+  picking a Project lead immediately after clicking away from another field) and silently
+  revert it if the stale, unrelated save happened to finish second.
+- A Part/Assembly shared as a component under an item in a *different* project (via "Add
+  existing item") showed up in that project's tree as a leaf, with its own already-existing
+  sub-components missing — `GET /api/projects/{id}/relations` filtered relations by the
+  *parent's* `project_id`, which excluded the shared component's own children (their parent
+  is the shared component itself, filed under its original project). Now walks the
+  structure recursively from the project's own items, the same pattern already used for a
+  single item's BOM.
+
 ## [0.3]
 
 ### Added
@@ -19,18 +40,7 @@ All notable changes to EasyPDM are documented in this file.
   own CAD file (one drawing per revision) — and can optionally export/upload the drawing
   sheet itself as the item's PDF, upgrading it from a rendered 3D-view snapshot to a real
   print-quality drawing. Downloading a Part/Assembly now also fetches its current drawing
-  (if any) and saves it next to the model file, without opening it. If the drawing documents
-  a Part/Assembly that has never itself been uploaded to EasyPDM, the macro now offers to
-  upload that Part/Assembly first (full flow, including picking its number/name/revision in
-  the browser) and then continues straight into the drawing upload, instead of requiring a
-  separate macro run on the part first. If the drawing instead documents SEVERAL distinct
-  elements and only some of them are already in EasyPDM (e.g. an assembly drawing with an
-  extra detail view of one of its own components that was never uploaded on its own), the
-  upload is now blocked with a message listing what's missing, rather than silently
-  attaching the drawing to just the linked item(s) and leaving the rest untracked — this
-  also catches a component whose local link is stale (the item it used to point at was since
-  deleted from EasyPDM), which previously still counted as "linked" and let the upload
-  through.
+  (if any) and saves it next to the model file, without opening it. If the drawing documents a Part/Assembly that has never itself been uploaded to EasyPDM, the macro now offers to upload that Part/Assembly first (full flow, including picking its number/name/revision in the browser) and then continues straight into the drawing upload, instead of requiring a separate macro run on the part first. If the drawing instead documents SEVERAL distinct elements and only some of them are already in EasyPDM (e.g. an assembly drawing with an extra detail view of one of its own components that was never uploaded on its own), the upload is now blocked with a message listing what's missing, rather than silently  attaching the drawing to just the linked item(s) and leaving the rest untracked — this also catches a component whose local link is stale (the item it used to point at was since deleted from EasyPDM), which previously still counted as "linked" and let the upload through.
 - Clients tab: hovering a client's row in the list now reveals a small "+" button next to
   its name — a shortcut to add another Name 2 to that client without going through the
   regular "Add client" dialog's search. The client's own name comes pre-filled and locked;
@@ -53,11 +63,7 @@ All notable changes to EasyPDM are documented in this file.
   "Project (Client, Name 2)" instead of the item count in parentheses, which wasn't
   particularly useful there.
 - A project can now be closed (and reopened) with a single button in its own properties. A
-  closed project drops out of the project selector, "My projects", and the picker shown when
-  adding a new item — but nothing about it actually changes: its items stay fully searchable
-  through "Whole database", and the button flips it back open at any time. The project list
-  everywhere is also now sorted by client name, then the client's Name 2, then the project's
-  own name, instead of just alphabetically by project name.
+  closed project drops out of the project selector, "My projects", and the picker shown when adding a new item — but nothing about it actually changes: its items stay fully searchable through "Whole database", and the button flips it back open at any time. The project list everywhere is also now sorted by client name, then the client's Name 2, then the project's own name, instead of just alphabetically by project name.
 - New CAD integration: `EasyPDM.Inventor/EasyPDMUpload.bas` and `EasyPDMDownload.bas`, VBA
   macros for Autodesk Inventor, ported from `EasyPDM.SolidWorks/` with the same
   browser-based upload/download flow, STEP/PDF export, and automatic assembly-tree
@@ -137,8 +143,7 @@ All notable changes to EasyPDM are documented in this file.
   Polish diacritics) sent that name mangled through the Windows machine's current ANSI code
   page inside the upload's multipart HTTP request, arriving at the server (which assumes
   UTF-8 throughout) as invalid byte sequences — visible as literal replacement characters
-  wherever that file's name was shown afterward. It's now encoded as UTF-8 instead. Existing
-  attachments already uploaded with a mangled name need re-uploading to pick up the fix.
+  wherever that file's name was shown afterward. It's now encoded as UTF-8 instead. Existing attachments already uploaded with a mangled name need re-uploading to pick up the fix.
 
 ## [0.2]
 

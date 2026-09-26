@@ -83,7 +83,16 @@ static class StructureEndpoints
         });
 
         // GET /api/projects/{projectId}/relations — wszystkie relacje rodzic-dziecko
-        // dla elementów należących do danego projektu (do zbudowania drzewka po stronie klienta).
+        // dla elementów należących do danego projektu (do zbudowania drzewka po stronie klienta),
+        // ZAGŁĘBIONE rekurencyjnie -- nie tylko relacje, w których RODZIC formalnie należy do
+        // tego projektu. Bez tego współdzielony komponent (Część/Złożenie dodane przez "Dodaj
+        // istniejący element" mimo że jego project_id wskazuje na INNY projekt -- zob. komentarz
+        // przy use-project-tree.ts, ten sam mechanizm co "Whole database") pokazywał się w
+        // drzewku jako LIŚĆ: jego WŁASNE dzieci mają za rodzica JEGO, więc "i.project_id =
+        // @projectId" (i tu, "i" to rodzic KAŻDEJ relacji) odrzucało te wiersze, mimo że
+        // struktura w bazie była kompletna -- ten sam wzorzec rekurencji co
+        // BomEndpoints.FetchBomRowsAsync (BOM pojedynczego elementu), tylko punktem startowym
+        // jest tu CAŁY zestaw elementów tego projektu, nie jeden konkretny id.
         // Nieprzypisany zwykły użytkownik dostaje pustą listę (nie błąd) — z jego punktu widzenia
         // projekt po prostu nie ma żadnej struktury do pokazania, spójnie z tym, że w ogóle nie
         // widzi go na liście projektów (GET /api/projects).
@@ -95,13 +104,18 @@ static class StructureEndpoints
             await conn.OpenAsync();
 
             const string sql = """
+                WITH RECURSIVE reachable AS (
+                    SELECT id AS item_id FROM items WHERE project_id = @projectId
+                    UNION
+                    SELECT ir.child_id FROM item_relations ir
+                    JOIN reachable r ON ir.parent_id = r.item_id
+                )
                 SELECT ir.parent_id, ir.child_id, ir.quantity, ir.position
                 FROM item_relations ir
-                JOIN items i ON i.id = ir.parent_id
-                WHERE i.project_id = @projectId
-                  AND (@isAdmin OR EXISTS (
-                        SELECT 1 FROM project_users pu WHERE pu.project_id = @projectId AND pu.user_id = @userId
-                  ))
+                JOIN reachable r ON r.item_id = ir.parent_id
+                WHERE @isAdmin OR EXISTS (
+                    SELECT 1 FROM project_users pu WHERE pu.project_id = @projectId AND pu.user_id = @userId
+                )
                 ORDER BY ir.parent_id, ir.position;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
