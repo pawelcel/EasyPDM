@@ -18,11 +18,22 @@
 ;      konsoli) i ją uruchamia.
 ;   6. Skrót na pulpicie/w Menu Start otwierający http://localhost:5000.
 ;
-; Aktualizacja: uruchom ten sam instalator ponownie (nowy build z packaging\windows\build.ps1)
-; — wykrywa istniejącą rolę/bazę (pomija zakładanie schematu), zatrzymuje usługę PRZED
-; podmianą plików (PrepareToInstall — inaczej Windows zablokowałby nadpisanie działającego
-; .exe), i uruchamia ją z powrotem zamiast rejestrować od nowa. Nowe migracje bazy program
-; stosuje sam automatycznie przy starcie (nic nie trzeba robić ręcznie).
+; Aktualizacja: uruchom ten sam instalator ponownie (nowy build z packaging\windows\build.ps1).
+; Istniejąca instalacja jest wykrywana po stałym AppId (rejestr, klucz Uninstall — zob.
+; UninstallRegKey w [Code]), więc Inno podmienia ją W MIEJSCU zamiast instalować obok.
+; Przebieg aktualizacji:
+;   - NIE pyta o hasło superużytkownika "postgres" — odczytuje hasło roli pdm_user z
+;     appsettings.Production.json poprzedniej instalacji (ReadExistingPdmPassword) i w ogóle
+;     nie dotyka roli ani bazy. Hasło roli ZOSTAJE bez zmian, więc nic, co łączy się do tej
+;     bazy poza EasyPDM (skrypty kopii, pgAdmin), nie przestaje działać.
+;   - Zatrzymuje usługę PRZED podmianą plików (PrepareToInstall — inaczej Windows
+;     zablokowałby nadpisanie działającego .exe) i uruchamia ją z powrotem zamiast
+;     rejestrować od nowa.
+;   - Nowe migracje bazy program stosuje sam przy starcie (nic ręcznie).
+;   - Ustawienia zmienione w aplikacji (np. lokalizacja magazynu plików) przeżywają
+;     aktualizację: siedzą w appsettings.Local.json, a instalator pisze tylko Production.json.
+; Instalacja STARSZEJ wersji na nowszej jest odrzucana (InitializeSetup) — migracje bazy idą
+; wyłącznie w przód, więc starszy program nie umiałby odczytać już zmigrowanego schematu.
 ;
 ; Kompilacja: automatyczna, przy każdym pushu dotykającym tych plików —
 ; .github/workflows/build-windows-installer.yml buduje EasyPDM_Windows_v{#MyAppVersion}.exe na windowsowym
@@ -99,6 +110,7 @@ en.PgRoleConfigFailed=Could not configure the PostgreSQL database role (pdm_user
 en.PgDatabaseCreateFailed=Could not create the PostgreSQL database "pdm". Details in the log:
 en.PgSchemaLoadFailed=Could not load the database schema. Details in the log:
 en.ServiceDescription=Local PDM server
+en.DowngradeBlocked=A newer version of EasyPDM (%1) is already installed — this installer carries version %2. Installing an older version over a newer one is not supported: the database has already been migrated to the newer schema and older versions cannot read it. Uninstall the current version first if you really want to go back.
 
 pl.PgPageCaption=Połączenie z PostgreSQL
 pl.PgPageSubCaption=Hasło superużytkownika "postgres"
@@ -111,6 +123,7 @@ pl.PgRoleConfigFailed=Nie udało się skonfigurować roli bazy danych PostgreSQL
 pl.PgDatabaseCreateFailed=Nie udało się utworzyć bazy danych PostgreSQL "pdm". Szczegóły w logu:
 pl.PgSchemaLoadFailed=Nie udało się załadować schematu bazy danych. Szczegóły w logu:
 pl.ServiceDescription=Lokalny serwer PDM
+pl.DowngradeBlocked=Zainstalowana jest już nowsza wersja EasyPDM (%1) — ten instalator zawiera wersję %2. Instalacja starszej wersji na nowszej nie jest wspierana: baza danych została już zmigrowana do nowszego schematu, którego starsze wersje nie potrafią odczytać. Jeśli naprawdę chcesz się cofnąć, najpierw odinstaluj obecną wersję.
 
 de.PgPageCaption=PostgreSQL-Verbindung
 de.PgPageSubCaption=Passwort des Superusers "postgres"
@@ -123,6 +136,7 @@ de.PgRoleConfigFailed=Die PostgreSQL-Datenbankrolle (pdm_user) konnte nicht konf
 de.PgDatabaseCreateFailed=Die PostgreSQL-Datenbank "pdm" konnte nicht erstellt werden. Details im Protokoll:
 de.PgSchemaLoadFailed=Das Datenbankschema konnte nicht geladen werden. Details im Protokoll:
 de.ServiceDescription=Lokaler PDM-Server
+de.DowngradeBlocked=Es ist bereits eine neuere Version von EasyPDM (%1) installiert — dieses Installationsprogramm enthält Version %2. Eine ältere Version über eine neuere zu installieren wird nicht unterstützt: Die Datenbank wurde bereits auf das neuere Schema migriert, das ältere Versionen nicht lesen können. Deinstallieren Sie zuerst die aktuelle Version, wenn Sie wirklich zurückgehen möchten.
 
 [Code]
 const
@@ -130,11 +144,19 @@ const
   // funkcji (błąd kompilacji "'BEGIN' expected") — dlatego to stała globalna, nie lokalna
   // wewnątrz GenerateRandomPassword, gdzie jest jedynym użyciem.
   RandomPasswordChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  // Klucz, pod którym Inno Setup trzyma dane odinstalowania (w tym DisplayVersion i
+  // InstallLocation) — GUID MUSI być identyczny z AppId w [Setup] wyżej, inaczej wykrywanie
+  // istniejącej instalacji po cichu przestanie działać.
+  UninstallRegKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B6E2B6B0-2B0A-4C1E-9C1B-5F6A6F6C7D8E}_is1';
 
 var
   PostgresPasswordPage: TInputQueryWizardPage;
   PsqlPath: String;
   DebugLogPath: String;
+  // Hasło roli pdm_user odczytane z appsettings.Production.json POPRZEDNIEJ instalacji.
+  // Niepuste = to aktualizacja, przy której rola i baza już istnieją i nie trzeba ich w
+  // ogóle dotykać (a więc i pytać o hasło superużytkownika "postgres").
+  ExistingPdmPassword: String;
 
 { Log instalacji zapisywany do %ProgramData%\EasyPDM (przetrwa poza katalogiem tymczasowym
   instalatora, więc da się go obejrzeć już PO zakończeniu) — RunPsql/RoleExists/DatabaseExists
@@ -207,6 +229,95 @@ begin
       FindClose(FindRec);
     end;
   end;
+end;
+
+{ Porównuje numery wersji ("0.4" vs "0.3", "1.0" vs "0.12") człon po członie, numerycznie.
+  Zwraca 1 gdy A > B, -1 gdy A < B, 0 gdy równe. Porównanie leksykograficzne byłoby tu
+  błędne — "0.12" < "0.3" jako zwykły tekst, a jako wersja jest odwrotnie. }
+function CompareVersionStrings(const A, B: String): Integer;
+var
+  PartA, PartB, RestA, RestB: String;
+  P: Integer;
+begin
+  Result := 0;
+  RestA := A;
+  RestB := B;
+  while (Result = 0) and ((RestA <> '') or (RestB <> '')) do
+  begin
+    P := Pos('.', RestA);
+    if P > 0 then
+    begin
+      PartA := Copy(RestA, 1, P - 1);
+      RestA := Copy(RestA, P + 1, Length(RestA));
+    end
+    else
+    begin
+      PartA := RestA;
+      RestA := '';
+    end;
+    P := Pos('.', RestB);
+    if P > 0 then
+    begin
+      PartB := Copy(RestB, 1, P - 1);
+      RestB := Copy(RestB, P + 1, Length(RestB));
+    end
+    else
+    begin
+      PartB := RestB;
+      RestB := '';
+    end;
+    if StrToIntDef(PartA, 0) > StrToIntDef(PartB, 0) then
+      Result := 1
+    else if StrToIntDef(PartA, 0) < StrToIntDef(PartB, 0) then
+      Result := -1;
+  end;
+end;
+
+{ Wersja EasyPDM już zainstalowana na tej maszynie (pusty string, jeśli żadnej nie ma). }
+function InstalledVersion(): String;
+begin
+  if not RegQueryStringValue(HKLM, UninstallRegKey, 'DisplayVersion', Result) then
+    Result := '';
+end;
+
+{ Katalog poprzedniej instalacji — potrzebny, żeby sięgnąć po jej appsettings.Production.json
+  JESZCZE ZANIM kreator ustali {app} (strona wyboru katalogu jest później). }
+function InstalledLocation(): String;
+begin
+  if not RegQueryStringValue(HKLM, UninstallRegKey, 'InstallLocation', Result) then
+    Result := '';
+end;
+
+{ Wyciąga hasło roli pdm_user z ConnectionString w appsettings.Production.json poprzedniej
+  instalacji. Dzięki temu aktualizacja NIE MUSI ani pytać o hasło superużytkownika
+  "postgres", ani przestawiać hasła roli — a to drugie było realnie uciążliwe: zmiana hasła
+  przy każdej aktualizacji wywracała wszystko, co łączy się do bazy poza samym EasyPDM
+  (skrypty kopii zapasowych, pgAdmin z zapamiętanym hasłem). Pusty string = nie udało się
+  odczytać (brak pliku, inny format) i wtedy przebieg wraca do pełnej konfiguracji z
+  pytaniem o hasło, dokładnie jak przy świeżej instalacji. }
+function ReadExistingPdmPassword(const AppDir: String): String;
+var
+  Content: AnsiString;
+  S: String;
+  P, E: Integer;
+begin
+  Result := '';
+  if AppDir = '' then
+    exit;
+  { LoadStringFromFile wymaga AnsiString w tym dialekcie Pascal Script. }
+  if not LoadStringFromFile(AddBackslash(AppDir) + 'appsettings.Production.json', Content) then
+    exit;
+  S := String(Content);
+  P := Pos('Password=', S);
+  if P = 0 then
+    exit;
+  S := Copy(S, P + Length('Password='), Length(S));
+  { Wartość kończy się cudzysłowem zamykającym string JSON albo średnikiem kolejnego
+    parametru connection stringa — bierzemy wszystko do pierwszego z nich. }
+  E := 1;
+  while (E <= Length(S)) and (S[E] <> '"') and (S[E] <> ';') do
+    E := E + 1;
+  Result := Copy(S, 1, E - 1);
 end;
 
 function GenerateRandomPassword(Len: Integer): String;
@@ -375,13 +486,38 @@ end;
   spójności interaktywnego przebiegu (np. /LoadInf), nie zmienia zachowania w /VERYSILENT. }
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  Result := (PageID = PostgresPasswordPage.ID) and (PgPasswordFromCmdLine() <> '');
+  { Hasło superużytkownika jest potrzebne WYŁĄCZNIE do założenia/przestawienia roli i bazy.
+    Przy aktualizacji, gdy znamy już hasło roli z poprzedniej instalacji, nie robimy ani
+    jednego, ani drugiego — więc pytanie o hasło "postgres" byłoby wtedy pytaniem o coś,
+    czego instalator i tak nie użyje. }
+  Result := (PageID = PostgresPasswordPage.ID)
+    and ((PgPasswordFromCmdLine() <> '') or (ExistingPdmPassword <> ''));
 end;
 
 function InitializeSetup(): Boolean;
 var
   ResultCode: Integer;
+  Installed: String;
 begin
+  { Blokada instalacji STARSZEJ wersji na nowszej. Migracje bazy idą wyłącznie w przód
+    (MigrationRunner stosuje brakujące przy każdym starcie, nie umie ich cofać), więc po
+    takim "downgradzie" program zastałby schemat z przyszłości, którego nie zna — cicha,
+    trudna do zdiagnozowania awaria już po instalacji. Lepiej odmówić od razu, z
+    wyjaśnieniem. }
+  Installed := InstalledVersion();
+  if (Installed <> '') and (CompareVersionStrings(Installed, '{#MyAppVersion}') > 0) then
+  begin
+    if not WizardSilent then
+      MsgBox(FmtMessage(CustomMessage('DowngradeBlocked'), [Installed, '{#MyAppVersion}']), mbError, MB_OK);
+    Result := False;
+    exit;
+  end;
+
+  { Aktualizacja: sięgamy po hasło roli z poprzedniej instalacji, żeby w ogóle nie ruszać
+    bazy (ani nie pytać o hasło superużytkownika) -- zob. ReadExistingPdmPassword. }
+  if Installed <> '' then
+    ExistingPdmPassword := ReadExistingPdmPassword(InstalledLocation());
+
   PsqlPath := FindPsqlPath();
   if PsqlPath = '' then
   begin
@@ -431,58 +567,72 @@ begin
   DebugLogPath := ExpandConstant('{#MyDataDir}\install-debug.log');
   LogInstall('=== Instalacja/aktualizacja EasyPDM rozpoczeta ===');
 
-  PgSuperPassword := PgPasswordFromCmdLine();
-  if PgSuperPassword = '' then
-    PgSuperPassword := PostgresPasswordPage.Values[0];
-  PdmPassword := GenerateRandomPassword(32);
-
-  { Rola — pomijana (tylko ALTER hasła), jeśli instalator jest uruchamiany ponownie
-    (aktualizacja) i rola już istnieje; hasło pdm_user jest wtedy i tak nadpisywane, żeby
-    appsettings zawsze się zgadzało z tym, co faktycznie jest w bazie. }
-  if RoleExists(PgSuperPassword) then
-    RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "ALTER ROLE pdm_user PASSWORD ''' + PdmPassword + ''';" postgres', 'ALTER ROLE pdm_user')
+  if ExistingPdmPassword <> '' then
+  begin
+    { AKTUALIZACJA ze znanym hasłem roli: rola i baza już istnieją i są sprawne (program
+      właśnie z nich korzystał), więc nie ruszamy ich w ogóle — ani CREATE, ani ALTER.
+      Wcześniej hasło pdm_user było przestawiane przy KAŻDEJ aktualizacji, co wywracało
+      wszystko inne, co łączy się do tej bazy (skrypty kopii, pgAdmin). Nowe migracje
+      schematu i tak stosuje sam program przy starcie, nie instalator. }
+    PdmPassword := ExistingPdmPassword;
+    LogInstall('Aktualizacja: rola i baza juz istnieja, uzywam zapisanego hasla pdm_user - pomijam konfiguracje bazy.');
+  end
   else
-    RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE ROLE pdm_user LOGIN PASSWORD ''' + PdmPassword + ''';" postgres', 'CREATE ROLE pdm_user');
-
-  { Wcześniej wynik powyższego wcale nie był sprawdzany — przy błędzie (np. złe hasło
-    superużytkownika albo połączenie z niewłaściwym serwerem PostgreSQL, gdy na maszynie
-    działa więcej niż jedna instancja na porcie 5432) appsettings.json i tak zapisywało się
-    z hasłem, które NIGDY nie trafiło do żadnej realnej roli — usługa startowała, ale
-    EasyPDM.Api.exe od razu padał na "password authentication failed". Teraz przerywamy
-    głośno zamiast zostawiać użytkownika z cichą, niedziałającą instalacją. MsgBox tylko
-    poza trybem cichym — /SUPPRESSMSGBOXES NIE wycisza własnych MsgBox z [Code], więc pod
-    /VERYSILENT taki MsgBox zawiesiłby instalator w nieskończoność (dokładnie to się stało
-    w CI, zanim doszła straż WizardSilent poniżej). }
-  if not RoleOk then
   begin
-    LogInstall('BLAD KRYTYCZNY: nie udalo sie zalozyc/zaktualizowac roli pdm_user - przerywam konfiguracje bazy.');
-    if not WizardSilent then
-      MsgBox(CustomMessage('PgRoleConfigFailed') + ' ' + DebugLogPath, mbError, MB_OK);
-    exit;
-  end;
+    PgSuperPassword := PgPasswordFromCmdLine();
+    if PgSuperPassword = '' then
+      PgSuperPassword := PostgresPasswordPage.Values[0];
+    PdmPassword := GenerateRandomPassword(32);
 
-  { Baza sprawdzana NIEZALEŻNIE od roli (nie w tej samej gałęzi if/else) — instalacja
-    przerwana wcześniej dokładnie między CREATE ROLE a CREATE DATABASE zostawiłaby rolę
-    bez bazy; gdyby to sprawdzenie było zagnieżdżone pod "if not RoleExists", taki stan
-    zostałby już NA ZAWSZE bez bazy/schematu przy każdym kolejnym uruchomieniu instalatora. }
-  if not DatabaseExists(PgSuperPassword) then
-  begin
-    DbOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE DATABASE pdm OWNER pdm_user;" postgres', 'CREATE DATABASE pdm');
-    if not DbOk then
+    { Rola — pomijana (tylko ALTER hasła), jeśli rola już istnieje, a mimo to nie udało się
+      odczytać hasła z poprzedniej instalacji (np. skasowany/uszkodzony
+      appsettings.Production.json): wtedy trzeba je ustawić na nowo, żeby appsettings
+      zgadzało się z tym, co faktycznie jest w bazie. }
+    if RoleExists(PgSuperPassword) then
+      RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "ALTER ROLE pdm_user PASSWORD ''' + PdmPassword + ''';" postgres', 'ALTER ROLE pdm_user')
+    else
+      RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE ROLE pdm_user LOGIN PASSWORD ''' + PdmPassword + ''';" postgres', 'CREATE ROLE pdm_user');
+
+    { Wcześniej wynik powyższego wcale nie był sprawdzany — przy błędzie (np. złe hasło
+      superużytkownika albo połączenie z niewłaściwym serwerem PostgreSQL, gdy na maszynie
+      działa więcej niż jedna instancja na porcie 5432) appsettings.json i tak zapisywało się
+      z hasłem, które NIGDY nie trafiło do żadnej realnej roli — usługa startowała, ale
+      EasyPDM.Api.exe od razu padał na "password authentication failed". Teraz przerywamy
+      głośno zamiast zostawiać użytkownika z cichą, niedziałającą instalacją. MsgBox tylko
+      poza trybem cichym — /SUPPRESSMSGBOXES NIE wycisza własnych MsgBox z [Code], więc pod
+      /VERYSILENT taki MsgBox zawiesiłby instalator w nieskończoność (dokładnie to się stało
+      w CI, zanim doszła straż WizardSilent poniżej). }
+    if not RoleOk then
     begin
-      LogInstall('BLAD KRYTYCZNY: nie udalo sie utworzyc bazy danych pdm.');
+      LogInstall('BLAD KRYTYCZNY: nie udalo sie zalozyc/zaktualizowac roli pdm_user - przerywam konfiguracje bazy.');
       if not WizardSilent then
-        MsgBox(CustomMessage('PgDatabaseCreateFailed') + ' ' + DebugLogPath, mbError, MB_OK);
+        MsgBox(CustomMessage('PgRoleConfigFailed') + ' ' + DebugLogPath, mbError, MB_OK);
       exit;
     end;
 
-    SchemaOk := RunPsql(PdmPassword, '-U pdm_user -f "' + ExpandConstant('{app}\db\schema.sql') + '" pdm', 'zaladuj schema.sql');
-    if not SchemaOk then
+    { Baza sprawdzana NIEZALEŻNIE od roli (nie w tej samej gałęzi if/else) — instalacja
+      przerwana wcześniej dokładnie między CREATE ROLE a CREATE DATABASE zostawiłaby rolę
+      bez bazy; gdyby to sprawdzenie było zagnieżdżone pod "if not RoleExists", taki stan
+      zostałby już NA ZAWSZE bez bazy/schematu przy każdym kolejnym uruchomieniu instalatora. }
+    if not DatabaseExists(PgSuperPassword) then
     begin
-      LogInstall('BLAD KRYTYCZNY: nie udalo sie zaladowac schema.sql do bazy pdm.');
-      if not WizardSilent then
-        MsgBox(CustomMessage('PgSchemaLoadFailed') + ' ' + DebugLogPath, mbError, MB_OK);
-      exit;
+      DbOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE DATABASE pdm OWNER pdm_user;" postgres', 'CREATE DATABASE pdm');
+      if not DbOk then
+      begin
+        LogInstall('BLAD KRYTYCZNY: nie udalo sie utworzyc bazy danych pdm.');
+        if not WizardSilent then
+          MsgBox(CustomMessage('PgDatabaseCreateFailed') + ' ' + DebugLogPath, mbError, MB_OK);
+        exit;
+      end;
+
+      SchemaOk := RunPsql(PdmPassword, '-U pdm_user -f "' + ExpandConstant('{app}\db\schema.sql') + '" pdm', 'zaladuj schema.sql');
+      if not SchemaOk then
+      begin
+        LogInstall('BLAD KRYTYCZNY: nie udalo sie zaladowac schema.sql do bazy pdm.');
+        if not WizardSilent then
+          MsgBox(CustomMessage('PgSchemaLoadFailed') + ' ' + DebugLogPath, mbError, MB_OK);
+        exit;
+      end;
     end;
   end;
 

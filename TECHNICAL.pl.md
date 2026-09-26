@@ -553,11 +553,20 @@ tle), pyta o hasło superużytkownika `postgres` (jednorazowo, do założenia w�
 `http://localhost:5000`. Odinstalowanie zatrzymuje i usuwa usługę (standardowy deinstalator
 Inno Setup) — tak samo jak na Linuksie, celowo nie rusza samej bazy danych.
 
-**Aktualizacja**: zbuduj nowy `EasyPDM_Windows_v<wersja>.exe` (jak wyżej) i uruchom go ponownie —
-`PrepareToInstall` w skrypcie `.iss` zatrzymuje usługę PRZED podmianą plików (inaczej
-Windows zablokowałby nadpisanie działającego `.exe`), instalator wykrywa istniejącą
-rolę/bazę (pomija zakładanie schematu) i istniejącą usługę (uruchamia ją z powrotem zamiast
-rejestrować od nowa). Nowe migracje bazy program stosuje sam automatycznie przy starcie.
+**Aktualizacja**: zbuduj nowy `EasyPDM_Windows_v<wersja>.exe` (jak wyżej) i uruchom go
+ponownie. Istniejąca instalacja jest wykrywana po stałym `AppId` (klucz Uninstall w
+rejestrze), więc Inno podmienia ją W MIEJSCU zamiast instalować obok. Aktualizacja **nie
+pyta o hasło superużytkownika `postgres`** — instalator odczytuje hasło roli `pdm_user` z
+`appsettings.Production.json` poprzedniej instalacji i w ogóle nie dotyka roli ani bazy,
+więc hasło roli ZOSTAJE bez zmian (nic, co łączy się do tej bazy poza EasyPDM — skrypty
+kopii, pgAdmin — nie przestaje działać). `PrepareToInstall` zatrzymuje usługę PRZED podmianą
+plików (inaczej Windows zablokowałby nadpisanie działającego `.exe`) i uruchamia ją z
+powrotem zamiast rejestrować od nowa. Nowe migracje bazy program stosuje sam przy starcie, a
+ustawienia zmienione w aplikacji (np. lokalizacja magazynu plików) przeżywają aktualizację —
+siedzą w `appsettings.Local.json`, a instalator pisze tylko `Production.json`.
+
+Instalacja **starszej** wersji na nowszej jest odrzucana z komunikatem: migracje bazy idą
+wyłącznie w przód, więc starszy program nie umiałby odczytać już zmigrowanego schematu.
 
 > Skrypt `.iss` faktycznie się kompiluje (zweryfikowane prawdziwym Inno Setup Compilerem w
 > CI, nie tylko przeglądem kodu) — po drodze złapane i poprawione 5 realnych błędów

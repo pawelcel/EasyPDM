@@ -617,12 +617,23 @@ eine Verknüpfung, die `http://localhost:5000` öffnet. Die Deinstallation stopp
 entfernt den Dienst (der Standard-Deinstaller von Inno Setup) — genau wie unter Linux wird
 bewusst die Datenbank selbst nicht angetastet.
 
-**Update**: ein neues `EasyPDM_Windows_v<Version>.exe` bauen (wie oben) und erneut ausführen —
-`PrepareToInstall` im `.iss`-Skript stoppt den Dienst VOR dem Austausch der Dateien
-(sonst würde Windows das Überschreiben einer laufenden `.exe` blockieren), der
-Installer erkennt die vorhandene Rolle/Datenbank (überspringt die Schemaerstellung) und
-den vorhandenen Dienst (startet ihn wieder, statt ihn neu zu registrieren). Neue
-Datenbankmigrationen wendet das Programm beim Start automatisch selbst an.
+**Update**: ein neues `EasyPDM_Windows_v<Version>.exe` bauen (wie oben) und erneut
+ausführen. Die vorhandene Installation wird über die feste `AppId` erkannt (ihr
+Uninstall-Schlüssel in der Registry), sodass Inno sie AN ORT UND STELLE ersetzt, statt
+daneben zu installieren. Ein Update **fragt nicht nach dem Passwort des Superusers
+`postgres`** — der Installer liest das Passwort der Rolle `pdm_user` aus der
+`appsettings.Production.json` der vorherigen Installation und fasst Rolle und Datenbank gar
+nicht an, das Rollenpasswort BLEIBT also unverändert (nichts anderes, was sich mit dieser
+Datenbank verbindet — Sicherungsskripte, pgAdmin — hört auf zu funktionieren).
+`PrepareToInstall` stoppt den Dienst VOR dem Austausch der Dateien (sonst würde Windows das
+Überschreiben einer laufenden `.exe` blockieren) und startet ihn wieder, statt ihn neu zu
+registrieren. Neue Datenbankmigrationen wendet das Programm beim Start selbst an, und in der
+Anwendung geänderte Einstellungen (z. B. der Speicherort der Dateien) überstehen das Update —
+sie liegen in `appsettings.Local.json`, während der Installer nur `Production.json` schreibt.
+
+Die Installation einer **älteren** Version über eine neuere wird mit einer Meldung
+abgelehnt: Datenbankmigrationen laufen ausschließlich vorwärts, eine ältere Version könnte
+das bereits migrierte Schema nicht lesen.
 
 > Das `.iss`-Skript lässt sich tatsächlich kompilieren (mit einem echten Inno Setup
 > Compiler in der CI verifiziert, nicht nur durch Code-Review) — dabei wurden 5 echte,

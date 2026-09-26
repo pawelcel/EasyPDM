@@ -613,12 +613,22 @@ console window), and creates a shortcut that opens `http://localhost:5000`.
 Uninstalling stops and removes the service (the standard Inno Setup uninstaller) — same
 as on Linux, it deliberately doesn't touch the database itself.
 
-**Update**: build a new `EasyPDM_Windows_v<version>.exe` (as above) and run it again — `PrepareToInstall`
-in the `.iss` script stops the service BEFORE replacing the files (otherwise Windows
-would block overwriting a running `.exe`), the installer detects the existing role/
-database (skips creating the schema) and the existing service (starts it back up instead
-of registering it again). The program applies new database migrations on its own
-automatically on startup.
+**Update**: build a new `EasyPDM_Windows_v<version>.exe` (as above) and run it again. The
+existing installation is detected via the fixed `AppId` (its Uninstall key in the registry),
+so Inno replaces it IN PLACE rather than installing alongside it. An update **does not ask
+for the `postgres` superuser password** — the installer reads the `pdm_user` role's password
+out of the previous installation's `appsettings.Production.json` and leaves the role and the
+database alone entirely, so the role's password STAYS as it was (nothing else connecting to
+that database — backup scripts, pgAdmin — breaks). `PrepareToInstall` stops the service
+BEFORE replacing the files (otherwise Windows would block overwriting a running `.exe`) and
+starts it back up instead of registering it again. The program applies new database
+migrations itself on startup, and settings changed inside the application (e.g. the file
+storage location) survive the update — they live in `appsettings.Local.json`, while the
+installer only writes `Production.json`.
+
+Installing an **older** version over a newer one is refused with a message: database
+migrations only ever move forward, so an older build could not read the already-migrated
+schema.
 
 > The `.iss` script actually compiles (verified with a real Inno Setup Compiler in CI,
 > not just by code review) — 5 real bugs specific to Inno Setup's Pascal Script dialect

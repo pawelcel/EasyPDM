@@ -10,6 +10,17 @@ All notable changes to EasyPDM are documented in this file.
   Name 2 the project is linked to), shown right in the project's properties panel next to
   Client/Name 2.
 
+### Changed
+- Updating an existing Windows installation no longer asks for the `postgres` superuser
+  password, and no longer changes the `pdm_user` role's password. The installer reads the
+  existing password out of the previous installation's `appsettings.Production.json` and
+  leaves the role and database untouched — so anything else connecting to that database
+  (backup scripts, pgAdmin with a saved password) keeps working across updates, and an
+  update is now just "next, next" with no credentials to hunt down.
+- The Windows installer refuses to install an older version over a newer one, explaining
+  why instead of failing obscurely afterwards: database migrations only ever move forward,
+  so an older build cannot read a schema that has already been migrated.
+
 ### Fixed
 - "Delete completely" on an Assembly deleted its components along with it. A Part/Assembly
   is a first-class catalog entry (own number, revisions, history, attachments) that can be
