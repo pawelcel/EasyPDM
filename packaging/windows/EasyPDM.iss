@@ -281,7 +281,11 @@ begin
 end;
 
 { Katalog poprzedniej instalacji — potrzebny, żeby sięgnąć po jej appsettings.Production.json
-  JESZCZE ZANIM kreator ustali {app} (strona wyboru katalogu jest później). }
+  JESZCZE ZANIM kreator ustali katalog docelowy (strona wyboru katalogu jest później).
+  UWAGA przy edycji komentarzy w tej sekcji: komentarz w nawiasach klamrowych kończy się na
+  PIERWSZYM nawiasie zamykającym, więc nie wolno w nim użyć stałej w klamrach (np. tej
+  oznaczającej katalog aplikacji) — reszta zdania stałaby się wtedy kodem i kompilacja padłaby
+  na "'BEGIN' expected" (dokładnie to się tu zdarzyło). }
 function InstalledLocation(): String;
 begin
   if not RegQueryStringValue(HKLM, UninstallRegKey, 'InstallLocation', Result) then
