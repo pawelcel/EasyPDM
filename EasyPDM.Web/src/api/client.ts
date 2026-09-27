@@ -7,6 +7,8 @@ import type {
   ClientFileSearchResult,
   ClientName2Detail,
   ClientNode,
+  ClientVerification,
+  ClientVerificationSummary,
   CurrentUser,
   HistoryEntry,
   Item,
@@ -692,6 +694,34 @@ export const api = {
     fetch(`${BASE}/attachments/${attachmentId}`, { method: "DELETE" }).then((r) =>
       handleResponse<void>(r)
     ),
+
+  // Weryfikacja klienta — zawsze W KONTEKŚCIE PROJEKTU (ta sama Część w innym projekcie ma
+  // własne wpisy, bo akceptuje ją inny klient), stąd projectId w każdej ścieżce.
+  getClientVerifications: (projectId: string, itemId: string) =>
+    fetch(`${BASE}/projects/${projectId}/items/${itemId}/client-verifications`).then((r) =>
+      handleResponse<ClientVerification[]>(r)
+    ),
+
+  // Ostatni wynik dla KAŻDEGO elementu projektu, który ma choć jeden wpis — jedno żądanie
+  // zasila znaczniki w całym drzewku zamiast odpytywania raz na element.
+  getProjectClientVerificationSummary: (projectId: string) =>
+    fetch(`${BASE}/projects/${projectId}/client-verifications`).then((r) =>
+      handleResponse<ClientVerificationSummary[]>(r)
+    ),
+
+  addClientVerification: (projectId: string, itemId: string, formData: FormData) =>
+    fetch(`${BASE}/projects/${projectId}/items/${itemId}/client-verifications`, {
+      method: "POST",
+      body: formData,
+    }).then((r) => handleResponse<{ id: string }>(r)),
+
+  deleteClientVerification: (verificationId: string) =>
+    fetch(`${BASE}/client-verifications/${verificationId}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
+    ),
+
+  clientVerificationAttachmentUrl: (attachmentId: string) =>
+    `${BASE}/client-verification-attachments/${attachmentId}/download`,
 
   attachmentDownloadUrl: (attachmentId: string) => `${BASE}/attachments/${attachmentId}/file`,
 

@@ -20,9 +20,12 @@ import {
   isLocked,
   itemDisplayLabel,
   itemTypeLabelKey,
+  revisionLabel,
   type BomEntry,
+  type ClientVerificationSummary,
   type Item,
 } from "@/api/types"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
@@ -138,6 +141,7 @@ function ItemDetailPanel({
   onDuplicated,
   duplicateParentId,
   hideActions = false,
+  clientVerification = null,
 }: {
   item: Item
   projectName?: string
@@ -165,6 +169,10 @@ function ItemDetailPanel({
   // akcjami zaznaczonego projektu) zamiast w tym panelu — tu renderowane są tylko przy
   // wywołaniu z "Cała baza" (item-list.tsx), gdzie osobnej belki nie ma.
   hideActions?: boolean
+  // Ostatni wynik weryfikacji klienta dla tego elementu W BIEŻĄCYM projekcie. Podawany
+  // wyłącznie z widoku projektu -- w "Całej bazie" nie ma kontekstu projektu, więc ta sekcja
+  // się tam nie pokazuje (null), zgodnie z zasadą, że weryfikacja nie idzie za elementem.
+  clientVerification?: ClientVerificationSummary | null
 }) {
   const { t } = useLanguage()
   const { user } = useAuth()
@@ -597,6 +605,41 @@ function ItemDetailPanel({
             lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
             onChanged={refreshAfterAction}
           />
+        </>
+      )}
+
+      {/* Ostatni wynik weryfikacji klienta -- tylko w widoku projektu (prop podawany stamtąd),
+          bo weryfikacja należy do pary element+projekt i nie ma sensu bez tego kontekstu. */}
+      {clientVerification && (
+        <>
+          <SectionLabel>{t("clientVerification.lastResult")}</SectionLabel>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <Badge
+              variant={
+                clientVerification.result === "zweryfikowany"
+                  ? "default"
+                  : clientVerification.result === "do_poprawy"
+                    ? "destructive"
+                    : "secondary"
+              }
+            >
+              {t(
+                clientVerification.result === "zweryfikowany"
+                  ? "clientVerification.resultVerified"
+                  : clientVerification.result === "do_poprawy"
+                    ? "clientVerification.resultNeedsWork"
+                    : "clientVerification.resultPending"
+              )}
+            </Badge>
+            <span className="text-muted-foreground">
+              {new Date(clientVerification.createdAt).toLocaleString("pl-PL")}
+              {clientVerification.revisionNumber !== null &&
+                ` · ${t("item.revisionShort")} ${revisionLabel(clientVerification.revisionNumber)}`}
+            </span>
+          </div>
+          {clientVerification.revisionNumber !== item.revisionNumber && (
+            <Hint>{t("clientVerification.staleRevisionHint")}</Hint>
+          )}
         </>
       )}
 

@@ -386,6 +386,44 @@ export interface ClientDetail {
   projects: ClientProjectSummary[]
 }
 
+// Wynik jednej rundy weryfikacji u klienta. Te same wartości co CHECK w bazie
+// (item_client_verifications.result) — po polsku, tak jak statusy elementów.
+// null = wpis bez rozstrzygnięcia, czyli "w trakcie weryfikacji": rzecz poszła do klienta
+// i czekamy na odpowiedź. To świadomy wybór (w oknie żaden wynik nie jest domyślnie
+// zaznaczony), nie brak danych.
+export type ClientVerificationResult = "zweryfikowany" | "do_poprawy"
+
+export interface ClientVerificationAttachment {
+  id: string
+  fileName: string
+  fileSize: number | null
+  uploadedAt: string
+}
+
+// Pojedynczy wpis weryfikacji klienta. Należy do PARY (element, projekt) — ta sama
+// Część/Złożenie w innym projekcie ma własne wpisy, bo akceptuje ją inny klient; dlatego
+// tych danych nie widać w "Całej bazie", gdzie nie ma kontekstu projektu.
+export interface ClientVerification {
+  id: string
+  result: ClientVerificationResult | null
+  comment: string | null
+  // Rewizja elementu w chwili wpisu — po wydaniu nowej rewizji stare wpisy zostają, ale
+  // widać, że dotyczyły poprzedniej wersji.
+  revisionNumber: number | null
+  createdAt: string
+  createdBy: string | null
+  attachments: ClientVerificationAttachment[]
+}
+
+// Ostatni wynik weryfikacji dla jednego elementu w projekcie — zasila znaczniki w drzewku
+// i sekcję w panelu właściwości, bez odpytywania serwera osobno dla każdego elementu.
+export interface ClientVerificationSummary {
+  itemId: string
+  result: ClientVerificationResult | null
+  revisionNumber: number | null
+  createdAt: string
+}
+
 export type ClientNodeType = "folder" | "file"
 
 // Węzeł struktury dokumentów klienta (folder albo plik) — płaska lista, front buduje

@@ -408,6 +408,52 @@ CREATE TABLE item_owner_history (
 CREATE INDEX idx_item_owner_history_item ON item_owner_history (item_id);
 GRANT SELECT, INSERT ON item_owner_history TO pdm_user;
 
+-- ============================================================
+-- Weryfikacja klienta -- ślad akceptacji (albo uwag) klienta dla WYDANEJ Części/Złożenia,
+-- prowadzony jako rosnąca lista wpisów z własnymi załącznikami (np. e-mail z potwierdzeniem).
+-- ============================================================
+-- project_id obok item_id, bo ta sama Część/Złożenie bywa współdzielona przez kilka projektów
+-- (item_relations nie zna granic projektu), a weryfikuje ją KONKRETNY klient konkretnego
+-- projektu -- akceptacja w jednym nie mówi nic o drugim. Stąd też te wpisy celowo nie
+-- pokazują się w "Całej bazie", gdzie element ogląda się bez kontekstu projektu.
+-- revision_number: rewizja elementu w chwili wpisu (jak przy item_attachments) -- po wydaniu
+-- nowej rewizji stare wpisy zostają, ale widać, że dotyczyły POPRZEDNIEJ wersji.
+-- result NULL = wpis bez rozstrzygnięcia, czyli "w trakcie weryfikacji": rzecz poszła do
+-- klienta i czekamy na odpowiedź. To świadomie wybierany stan (w oknie nie ma domyślnie
+-- zaznaczonego wyniku), a nie brak danych.
+CREATE TABLE item_client_verifications (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id         UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    project_id      UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    result          TEXT CHECK (result IN ('zweryfikowany', 'do_poprawy')),
+    comment         TEXT,
+    revision_number INTEGER,
+    created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_item_client_verifications_item_project
+    ON item_client_verifications (item_id, project_id, created_at DESC);
+CREATE INDEX idx_item_client_verifications_project
+    ON item_client_verifications (project_id);
+
+-- Osobna tabela zamiast kolumny z jednym plikiem -- jeden wpis potrafi nieść kilka dowodów
+-- (np. e-mail klienta plus zrzut ekranu z uwagami).
+CREATE TABLE item_client_verification_attachments (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    verification_id UUID NOT NULL REFERENCES item_client_verifications(id) ON DELETE CASCADE,
+    file_name       TEXT NOT NULL,
+    file_path       TEXT NOT NULL UNIQUE,
+    file_size       BIGINT,
+    uploaded_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_item_client_verification_attachments_verification
+    ON item_client_verification_attachments (verification_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verifications TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verification_attachments TO pdm_user;
+
 -- Harmonogram automatycznej kopii zapasowej (Ustawienia -> Magazyn plików). Jeden
 -- wiersz-singleton wymuszony przez "id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id)".
 CREATE TABLE backup_schedule (

@@ -11,7 +11,11 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
+  BadgeAlert,
+  BadgeCheck,
+  BadgeQuestionMark,
   ChevronDown,
+  Clock,
   ChevronRight,
   FolderKanban,
   GripVertical,
@@ -20,7 +24,7 @@ import {
 } from "lucide-react"
 
 import { api } from "@/api/client"
-import { itemDisplayLabel, type Item } from "@/api/types"
+import { itemDisplayLabel, type ClientVerificationSummary, type Item } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { iconColorClass, itemIcon, ownerLockVisual } from "@/lib/item-visuals"
@@ -56,6 +60,7 @@ function ItemTree({
   selectedIds,
   onToggleSelect,
   onError,
+  clientVerifications,
 }: {
   tree: Tree
   projectId: string
@@ -68,6 +73,9 @@ function ItemTree({
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onError?: (message: string | null) => void
+  // Ostatni wynik weryfikacji klienta per element (zob. useClientVerifications) -- tylko do
+  // znacznika przy wierszu; pusta mapa = nic nie pokazujemy.
+  clientVerifications: Map<string, ClientVerificationSummary>
 }) {
   const { t } = useLanguage()
   const rootSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
@@ -154,6 +162,7 @@ function ItemTree({
                   selectedIds={selectedIds}
                   onToggleSelect={onToggleSelect}
                   onError={onError}
+                  clientVerifications={clientVerifications}
                 />
               ))}
             </SortableContext>
@@ -181,6 +190,7 @@ function TreeNode({
   selectedIds,
   onToggleSelect,
   onError,
+  clientVerifications,
 }: {
   item: Item
   quantity: number | null
@@ -195,6 +205,7 @@ function TreeNode({
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onError?: (message: string | null) => void
+  clientVerifications: Map<string, ClientVerificationSummary>
 }) {
   const { t } = useLanguage()
   const { user } = useAuth()
@@ -204,6 +215,18 @@ function TreeNode({
   const TypeIcon = itemIcon(item)
   const lockVisual = ownerLockVisual(item, user?.id)
   const checked = selectedIds.has(item.id)
+  const clientVerification = clientVerifications.get(item.id)
+  // Trzy stany wyniku (zweryfikowany / do poprawy / brak = w trakcie) plus czwarty przypadek:
+  // wpis dotyczący INNEJ (starszej) rewizji niż aktualna -- wynik zostaje widoczny, ale
+  // odróżniony, bo nie mówi nic o wersji, którą element ma teraz.
+  const ClientVerificationIcon =
+    clientVerification && clientVerification.revisionNumber !== item.revisionNumber
+      ? BadgeQuestionMark
+      : clientVerification?.result === "zweryfikowany"
+        ? BadgeCheck
+        : clientVerification?.result === "do_poprawy"
+          ? BadgeAlert
+          : Clock
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
@@ -280,6 +303,29 @@ function TreeNode({
           <lockVisual.Icon
             className={cn("size-3 shrink-0", lockVisual.colorClass)}
             aria-label={t("item.ownerLockIconAria")}
+          />
+        )}
+        {/* Ostatni wynik weryfikacji klienta. Osobna, mała ikona obok kłódki (nie kolor
+            samego wiersza) -- weryfikacja jest NIEZALEŻNA od statusu i blokady, więc musi
+            dać się odczytać razem z nimi, a nie zamiast nich. Znak zapytania przy wpisie
+            dotyczącym STARSZEJ rewizji: wynik jest, ale nie dla tego, co widać teraz. */}
+        {clientVerification && (
+          <ClientVerificationIcon
+            className={cn(
+              "size-3 shrink-0",
+              clientVerification.result === "zweryfikowany"
+                ? "text-emerald-600"
+                : clientVerification.result === "do_poprawy"
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+            )}
+            aria-label={t(
+              clientVerification.result === "zweryfikowany"
+                ? "clientVerification.resultVerified"
+                : clientVerification.result === "do_poprawy"
+                  ? "clientVerification.resultNeedsWork"
+                  : "clientVerification.resultPending"
+            )}
           />
         )}
 
@@ -362,6 +408,7 @@ function TreeNode({
                   selectedIds={selectedIds}
                   onToggleSelect={onToggleSelect}
                   onError={onError}
+                  clientVerifications={clientVerifications}
                 />
               ))}
             </div>

@@ -5,6 +5,19 @@ All notable changes to EasyPDM are documented in this file.
 ## [0.4]
 
 ### Added
+- **Client verification** for released Parts/Assemblies. With a released item selected, a
+  "Client verification" button in the toolbar opens a window holding the running record of
+  what the client said: each entry has a result (Verified / Needs work), an optional comment
+  and its own attachments (e.g. the confirmation e-mail). Entries accumulate — a round of
+  remarks followed by an acceptance stays visible as history, with who added it and when.
+  The latest result also shows as a marker next to the item in the project tree and as a
+  section in its properties panel.
+  Verification belongs to the pair (item, project), not to the item alone: the same Part
+  used in two projects is accepted by two different clients, so each project keeps its own
+  record and none of it shows up in "Whole database", where there is no project context.
+  Each entry remembers the revision it applied to, so after a new revision is released the
+  old acceptance stays visible but is clearly marked as no longer covering what the item is
+  now.
 - A project can now have a "Project lead" — a contact picked from the client's own contact
   list (either a contact belonging to the client directly, or one belonging to the specific
   Name 2 the project is linked to), shown right in the project's properties panel next to

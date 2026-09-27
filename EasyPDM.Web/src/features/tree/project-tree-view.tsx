@@ -1,7 +1,13 @@
 
 import { useEffect, useState } from "react"
 import { api } from "@/api/client"
-import { projectLabel, STATUS_LABEL_KEYS, type ItemStatus, type Project } from "@/api/types"
+import {
+  itemDisplayLabel,
+  projectLabel,
+  STATUS_LABEL_KEYS,
+  type ItemStatus,
+  type Project,
+} from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { FormError } from "@/components/ui/form-error"
@@ -15,7 +21,9 @@ import {
 import { ResizeHandle } from "@/components/ui/resize-handle"
 import { AddTagRow } from "@/features/tags/add-tag-row"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
+import { ClientVerificationDialog } from "@/features/items/client-verification-dialog"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
+import { useClientVerifications } from "@/features/items/use-client-verifications"
 import { ProjectDetailPanel } from "@/features/projects/project-detail-panel"
 import { ItemTree } from "@/features/tree/item-tree"
 import { useProjectTree } from "@/features/tree/use-project-tree"
@@ -44,6 +52,9 @@ function ProjectTreeView({
 }) {
   const { t } = useLanguage()
   const tree = useProjectTree(project.id)
+  const { clientVerifications, refetchClientVerifications } = useClientVerifications(project.id)
+  // Element, dla którego otwarte jest okno weryfikacji klienta (null = zamknięte).
+  const [verifyingItemId, setVerifyingItemId] = useState<string | null>(null)
   // Domyślnie zaznaczony jest sam projekt — to teraz pierwsza (i zawsze widoczna) pozycja
   // w strukturze, więc naturalnie jest tym, co widać po wejściu w projekt.
   const [selection, setSelection] = useState<Selection>({ kind: "project" })
@@ -98,6 +109,7 @@ function ProjectTreeView({
   }, [tree.itemsById])
 
   const selectedItem = selection.kind === "item" ? tree.itemsById.get(selection.id) : undefined
+  const verifyingItem = verifyingItemId ? tree.itemsById.get(verifyingItemId) : undefined
   const selectedItemParentId = selection.kind === "item" ? selection.parentId : null
   const selectedForBulk = [...selectedIds].map((id) => tree.itemsById.get(id)).filter((i) => i != null)
   // Elementy "Wydane" są celowo wykluczone z masowej zmiany statusu — pojedyncza zmiana z
@@ -352,6 +364,27 @@ function ProjectTreeView({
                 {t("item.duplicate")}
               </Button>
             )}
+            {/* Weryfikacja klienta dotyczy tego, co klient faktycznie dostał, czyli wersji
+                WYDANEJ — dla elementu w pracy/sprawdzanego nie ma jeszcze czego akceptować
+                (backend pilnuje tego samego warunku, zob. ClientVerificationEndpoints).
+                Przycisk zostaje na belce ZAWSZE (dla Części/Złożeń), tylko wyszarzony —
+                znikający przycisk wygląda jak brak takiej funkcji w ogóle, a wyszarzony od
+                razu mówi, że jest, tylko jeszcze nie teraz; powód wyjaśnia podpowiedź. */}
+            {(selectedItem.itemType === "part" || selectedItem.itemType === "assembly") && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={selectedItem.status !== "wydany"}
+                title={
+                  selectedItem.status !== "wydany"
+                    ? t("clientVerification.onlyReleasedHint")
+                    : undefined
+                }
+                onClick={() => setVerifyingItemId(selectedItem.id)}
+              >
+                {t("clientVerification.button")}
+              </Button>
+            )}
             {(selectedItem.itemType === "part" || selectedItem.itemType === "assembly") && (
               <DocumentationDialog
                 trigger={
@@ -398,6 +431,7 @@ function ProjectTreeView({
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
             onError={setItemActionError}
+            clientVerifications={clientVerifications}
           />
         </div>
 
@@ -413,6 +447,7 @@ function ProjectTreeView({
               onSelectChild={(childId, parentId) => setSelection({ kind: "item", id: childId, parentId })}
               onItemsRefetch={tree.refetch}
               onTagsRefetch={onTagsRefetch}
+              clientVerification={clientVerifications.get(selectedItem.id) ?? null}
               // Akcje (usuń ze struktury/duplikuj/dokumentacja/usuń całkowicie) renderowane
               // w belce nad drzewem zamiast tutaj — zob. hideActions.
               hideActions
@@ -428,6 +463,19 @@ function ProjectTreeView({
           )}
         </div>
       </div>
+
+      {verifyingItemId && verifyingItem && (
+        <ClientVerificationDialog
+          projectId={project.id}
+          itemId={verifyingItemId}
+          itemLabel={itemDisplayLabel(verifyingItem)}
+          open
+          onOpenChange={(next) => {
+            if (!next) setVerifyingItemId(null)
+          }}
+          onChanged={refetchClientVerifications}
+        />
+      )}
 
       {confirmingDelete && selectedItem && (
         <ConfirmDialog
