@@ -182,6 +182,37 @@ public class ClientVerificationTests
         Assert.Equal(JsonValueKind.Null, rows[0].GetProperty("result").ValueKind);
     }
 
+    // Zestawienie w panelu projektu rozbija elementy na trzy tabele wg ostatniego wyniku,
+    // więc podsumowanie musi nieść też dane samego elementu (numer, nazwa, jego AKTUALNA
+    // rewizja) — inaczej nie dałoby się wypisać wiersza ani odróżnić wyniku dla bieżącej
+    // wersji od takiego, który został przy poprzedniej.
+    [Fact]
+    public async Task Podsumowanie_niesie_dane_elementu_i_jego_aktualna_rewizje()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        var projectId = await client.CreateProjectAsync($"Projekt zestawienie {Guid.NewGuid()}");
+        var itemId = await client.CreateNodeAsync(projectId, "Czesc zestawienie", "part");
+        await ReleaseItemAsync(client, itemId);
+        (await AddVerificationAsync(client, projectId, itemId, "do_poprawy")).EnsureSuccessStatusCode();
+
+        // Nowa rewizja PO wpisie — wynik zostaje przy rewizji 1, element jest już na 2.
+        (await client.PatchAsJsonAsync($"/api/items/{itemId}/status", new { status = "w_pracy", comment = "poprawki" }))
+            .EnsureSuccessStatusCode();
+        await ReleaseItemAsync(client, itemId);
+
+        var response = await client.GetAsync($"/api/projects/{projectId}/client-verifications");
+        response.EnsureSuccessStatusCode();
+        var row = (await response.Content.ReadFromJsonAsync<JsonElement>())[0];
+
+        Assert.Equal("Czesc zestawienie", row.GetProperty("fileName").GetString());
+        Assert.True(row.GetProperty("itemNumber").GetInt32() > 0);
+        Assert.Equal(1, row.GetProperty("revisionNumber").GetInt32());
+        Assert.Equal(2, row.GetProperty("itemRevisionNumber").GetInt32());
+    }
+
     [Fact]
     public async Task Nieznany_wynik_jest_odrzucany()
     {

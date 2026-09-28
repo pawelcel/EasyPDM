@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { Info } from "lucide-react"
 
 import { api } from "@/api/client"
-import type { Client, ClientContact, Project } from "@/api/types"
+import type { Client, ClientContact, ClientVerificationSummary, Project } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
 import { useClients } from "@/features/clients/use-clients"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
+import { ClientVerificationOverview } from "@/features/projects/client-verification-overview"
 import { ProjectAttachmentsPanel } from "@/features/projects/project-attachments-panel"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -79,6 +80,8 @@ function ProjectDetailPanel({
   onDeleted,
   onNavigateToProject,
   hideActions = false,
+  clientVerifications = [],
+  onSelectItem,
 }: {
   project: Project
   isAdmin: boolean
@@ -89,6 +92,11 @@ function ProjectDetailPanel({
   // (razem z akcjami zaznaczonego elementu) zamiast w tym panelu — tu renderowane są
   // tylko przy wywołaniu z "Cała baza" (item-list.tsx), gdzie osobnej belki nie ma.
   hideActions?: boolean
+  // Zestawienie weryfikacji klienta dla całego projektu (ostatni wynik na element).
+  // Podawane z widoku projektu, który i tak je pobiera na znaczniki w drzewku.
+  clientVerifications?: ClientVerificationSummary[]
+  // Skok do elementu w strukturze z wiersza zestawienia; brak = przycisk się nie pokazuje.
+  onSelectItem?: (itemId: string) => void
 }) {
   const { t } = useLanguage()
   const { clients } = useClients("")
@@ -420,6 +428,8 @@ function ProjectDetailPanel({
           właściwości, bo to osobna rzecz niż pola projektu, i widoczna dla każdego z dostępem
           do projektu, nie tylko dla administratora edytującego właściwości. */}
       <ProjectAttachmentsPanel projectId={project.id} />
+
+      <ClientVerificationOverview summaries={clientVerifications} onSelectItem={onSelectItem} />
 
       {!hideActions && confirmingDelete && (
         <ConfirmDialog

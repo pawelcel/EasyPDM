@@ -475,6 +475,10 @@ function ProjectTreeView({
               isAdmin={isAdmin}
               onUpdated={onProjectUpdated}
               onDeleted={onProjectDeleted}
+              // Zestawienie weryfikacji dla całego projektu -- te same dane, które zasilają
+              // znaczniki w drzewku, więc nie ma drugiego zapytania.
+              clientVerifications={[...clientVerifications.values()]}
+              onSelectItem={(itemId) => setSelection({ kind: "item", id: itemId, parentId: undefined })}
               hideActions
             />
           )}

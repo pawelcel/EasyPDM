@@ -13,6 +13,12 @@ All notable changes to EasyPDM are documented in this file.
   re-sent, and the earlier version is worth keeping. Unlike "Whole database", which is
   deliberately open to every logged-in user, these are commercial terms — so both reading
   and uploading require access to the project itself.
+- The project panel now carries a **client verification overview**: three tables, one per
+  result — needs work first (that is what requires action), then in progress, then verified.
+  Each row names the item, the revision the entry covered and when it was made, with an
+  arrow that jumps straight to that item in the structure. Until now the only view of
+  verification was per item, so answering "what is still with the client?" on a project of
+  any size meant clicking through parts one by one.
 - Each project attachment now shows when it was uploaded and by whom, under the file name.
   Nothing forces attachment names to be unique — and rightly so, since a revised quote is
   usually named exactly like the one before it — so two entries could look identical with

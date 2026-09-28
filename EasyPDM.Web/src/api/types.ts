@@ -420,8 +420,16 @@ export interface ClientVerification {
 export interface ClientVerificationSummary {
   itemId: string
   result: ClientVerificationResult | null
+  // Rewizja, której dotyczył wpis — porównywana z itemRevisionNumber poniżej, żeby odróżnić
+  // wynik dla AKTUALNEJ wersji od takiego, który został przy poprzedniej.
   revisionNumber: number | null
   createdAt: string
+  // Dane samego elementu, dołączane przez serwer — zestawienie ma działać też tam, gdzie
+  // drzewko projektu nie jest załadowane.
+  itemNumber: number | null
+  itemNumberPrefix: string | null
+  fileName: string
+  itemRevisionNumber: number | null
 }
 
 // Wyróżnione kategorie załączników PROJEKTU (dokumentów całego zlecenia, nie pojedynczej

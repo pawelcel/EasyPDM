@@ -100,11 +100,18 @@ static class ClientVerificationEndpoints
 
             // DISTINCT ON (item_id) + ORDER BY created_at DESC daje dokładnie jeden, najnowszy
             // wiersz na element — to samo co okienkowe row_number()=1, tylko krócej i taniej.
+            //
+            // Dane elementu (numer/nazwa/aktualna rewizja) dołączane tutaj, a nie dobierane
+            // po stronie frontu: zestawienie ma działać także tam, gdzie nie ma załadowanego
+            // drzewka projektu, a i tak są już potrzebne do wyświetlenia wiersza.
             const string sql = """
-                SELECT DISTINCT ON (item_id) item_id, result, revision_number, created_at
-                FROM item_client_verifications
-                WHERE project_id = @projectId
-                ORDER BY item_id, created_at DESC;
+                SELECT DISTINCT ON (v.item_id)
+                       v.item_id, v.result, v.revision_number, v.created_at,
+                       i.item_number, i.item_number_prefix, i.file_name, i.revision_number
+                FROM item_client_verifications v
+                JOIN items i ON i.id = v.item_id
+                WHERE v.project_id = @projectId
+                ORDER BY v.item_id, v.created_at DESC;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("projectId", projectId);
@@ -118,6 +125,10 @@ static class ClientVerificationEndpoints
                     result = reader.IsDBNull(1) ? null : reader.GetString(1),
                     revisionNumber = reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2),
                     createdAt = reader.GetDateTime(3),
+                    itemNumber = reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4),
+                    itemNumberPrefix = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    fileName = reader.GetString(6),
+                    itemRevisionNumber = reader.IsDBNull(7) ? (int?)null : reader.GetInt32(7),
                 });
             }
             return Results.Ok(result);
