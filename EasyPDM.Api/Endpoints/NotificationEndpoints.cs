@@ -10,11 +10,15 @@ static class NotificationEndpoints
     // Stała lista wszystkich typów — używana przez GET /api/notification-preferences,
     // żeby front zawsze dostał kompletną listę checkboxów, nawet dla typów, których
     // użytkownik jeszcze nigdy nie dostał/nie zmienił.
+    // Dopisując tu nowy typ, dopisz go RÓWNIEŻ do CHECK-a na notifications.type (migracja +
+    // db/schema.sql) i do listy na froncie — te trzy miejsca muszą się zgadzać, inaczej typ
+    // albo nie da się zapisać, albo nie pokaże się w Ustawieniach do wyłączenia.
     private static readonly string[] AllTypes =
     [
         "status_review", "status_released", "status_regressed", "new_revision",
         "project_assigned", "project_unassigned", "project_deleted",
-        "password_changed", "low_disk_space", "sample_project"
+        "password_changed", "low_disk_space", "sample_project",
+        "client_verification_needs_work", "client_verification_verified"
     ];
 
     public static void MapNotificationEndpoints(this WebApplication app, string connectionString)

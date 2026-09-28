@@ -13,6 +13,12 @@ All notable changes to EasyPDM are documented in this file.
   re-sent, and the earlier version is worth keeping. Unlike "Whole database", which is
   deliberately open to every logged-in user, these are commercial terms — so both reading
   and uploading require access to the project itself.
+- Client verification now raises **notifications**: one when the client comes back with
+  remarks, another when they accept. They go to the item's author — verification only
+  applies to released items, and a released item never has an owner, so the author is the
+  only person the system can point at. Each type can be switched off separately in Settings,
+  and an entry with no result picked ("in progress") deliberately stays silent: it records
+  that something went out, not that anyone needs to act.
 - The project panel now carries a **client verification overview**: three tables, one per
   result — needs work first (that is what requires action), then in progress, then verified.
   Each row names the item, the revision the entry covered and when it was made, with an

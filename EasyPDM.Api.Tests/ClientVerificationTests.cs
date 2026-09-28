@@ -213,6 +213,74 @@ public class ClientVerificationTests
         Assert.Equal(2, row.GetProperty("itemRevisionNumber").GetInt32());
     }
 
+    private static async Task<List<string>> VerificationNotificationTypesAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/notifications");
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return body.GetProperty("items").EnumerateArray()
+            .Select(n => n.GetProperty("type").GetString()!)
+            .Where(t => t.StartsWith("client_verification"))
+            .ToList();
+    }
+
+    // Wynik weryfikacji trafia do twórcy elementu. To nie jest przypadek brzegowy, tylko
+    // reguła: weryfikować da się wyłącznie element "wydany", a taki zawsze ma owner_id=NULL,
+    // więc bez zapasu na created_by nie byłoby komu tego pokazać.
+    [Fact]
+    public async Task Wynik_weryfikacji_powiadamia_tworce_elementu()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var adminClient = factory.CreateClient();
+        await adminClient.LoginAsync(AdminUsername, AdminPassword);
+
+        var projectId = await adminClient.CreateProjectAsync($"Projekt powiadomienia {Guid.NewGuid()}");
+        var username = $"konstruktor{Guid.NewGuid():N}"[..20];
+        var userId = await adminClient.CreateUserAsync(username, "haslo123");
+        await adminClient.GrantProjectAccessAsync(projectId, userId);
+
+        // Element tworzy i wydaje KONSTRUKTOR — to on jest created_by.
+        using var authorClient = factory.CreateClient();
+        await authorClient.LoginAsync(username, "haslo123");
+        var itemId = await authorClient.CreateNodeAsync(projectId, "Czesc powiadomienia", "part");
+        await ReleaseItemAsync(authorClient, itemId);
+
+        // Wpis dodaje KTOŚ INNY (admin).
+        (await AddVerificationAsync(adminClient, projectId, itemId, "do_poprawy")).EnsureSuccessStatusCode();
+        Assert.Equal(["client_verification_needs_work"], await VerificationNotificationTypesAsync(authorClient));
+
+        (await AddVerificationAsync(adminClient, projectId, itemId, "zweryfikowany")).EnsureSuccessStatusCode();
+        Assert.Contains("client_verification_verified", await VerificationNotificationTypesAsync(authorClient));
+
+        // Autor wpisu nie dostaje powiadomienia o własnej akcji.
+        Assert.Empty(await VerificationNotificationTypesAsync(adminClient));
+    }
+
+    // Wpis bez wyniku to tylko odnotowanie, że rzecz poszła do klienta — nie ma tam zdarzenia,
+    // które wymagałoby czyjejkolwiek uwagi.
+    [Fact]
+    public async Task Wpis_bez_wyniku_nie_powiadamia()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var adminClient = factory.CreateClient();
+        await adminClient.LoginAsync(AdminUsername, AdminPassword);
+
+        var projectId = await adminClient.CreateProjectAsync($"Projekt bez powiadomienia {Guid.NewGuid()}");
+        var username = $"konstruktor{Guid.NewGuid():N}"[..20];
+        var userId = await adminClient.CreateUserAsync(username, "haslo123");
+        await adminClient.GrantProjectAccessAsync(projectId, userId);
+
+        using var authorClient = factory.CreateClient();
+        await authorClient.LoginAsync(username, "haslo123");
+        var itemId = await authorClient.CreateNodeAsync(projectId, "Czesc w toku", "part");
+        await ReleaseItemAsync(authorClient, itemId);
+
+        (await AddVerificationAsync(adminClient, projectId, itemId, result: null, comment: "wyslane"))
+            .EnsureSuccessStatusCode();
+
+        Assert.Empty(await VerificationNotificationTypesAsync(authorClient));
+    }
+
     [Fact]
     public async Task Nieznany_wynik_jest_odrzucany()
     {

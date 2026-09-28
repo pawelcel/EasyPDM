@@ -264,6 +264,8 @@ export type NotificationType =
   | "password_changed"
   | "low_disk_space"
   | "sample_project"
+  | "client_verification_needs_work"
+  | "client_verification_verified"
 
 // "data" niesie surowe dane zapisane w momencie zdarzenia (np. itemLabel, projectName) —
 // treść jest renderowana po stronie frontu (i18n), zob. describe() w notification-bell.tsx.

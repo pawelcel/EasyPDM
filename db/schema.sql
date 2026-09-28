@@ -264,10 +264,14 @@ CREATE INDEX idx_projects_lead_contact ON projects (lead_contact_id);
 CREATE TABLE notifications (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- client_verification_* -- klient zgłosił uwagi albo zaakceptował wydaną Część/Złożenie.
+    -- Dwa osobne typy, bo niosą inną pilność i każdy da się wyłączyć osobno; wpis "w trakcie
+    -- weryfikacji" (bez wyniku) świadomie nie powiadamia, bo to tylko odnotowanie wysyłki.
     type       TEXT NOT NULL CHECK (type IN (
         'status_review', 'status_released', 'status_regressed', 'new_revision',
         'project_assigned', 'project_unassigned', 'project_deleted',
-        'password_changed', 'low_disk_space', 'sample_project'
+        'password_changed', 'low_disk_space', 'sample_project',
+        'client_verification_needs_work', 'client_verification_verified'
     )),
     -- Dane do wyrenderowania treści PO STRONIE FRONTU (i18n, 3 języki) -- ten sam
     -- wzorzec co HistoryEntry/ItemHistoryPanel: zapisujemy surowe dane (nazwy/numery

@@ -13,6 +13,8 @@ const ITEM_TYPES: { type: NotificationType; labelKey: TranslationKey }[] = [
   { type: "status_released", labelKey: "notifications.pref.statusReleased" },
   { type: "status_regressed", labelKey: "notifications.pref.statusRegressed" },
   { type: "new_revision", labelKey: "notifications.pref.newRevision" },
+  { type: "client_verification_needs_work", labelKey: "notifications.pref.clientVerificationNeedsWork" },
+  { type: "client_verification_verified", labelKey: "notifications.pref.clientVerificationVerified" },
 ]
 const PROJECT_TYPES: { type: NotificationType; labelKey: TranslationKey }[] = [
   { type: "project_assigned", labelKey: "notifications.pref.projectAssigned" },

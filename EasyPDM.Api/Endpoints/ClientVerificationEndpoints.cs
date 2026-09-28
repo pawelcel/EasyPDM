@@ -252,6 +252,33 @@ static class ClientVerificationEndpoints
                 throw;
             }
 
+            // Powiadomienie dopiero TERAZ, po komplecie wpisu razem z załącznikami — gdyby
+            // poszło wcześniej, nieudany upload cofnąłby wpis (catch wyżej), a powiadomienie
+            // o nieistniejącym zdarzeniu już by wisiało.
+            //
+            // Odbiorca: właściciel, a gdy go nie ma — twórca elementu. Ten drugi przypadek jest
+            // tu REGUŁĄ, nie wyjątkiem: weryfikować da się wyłącznie element "wydany", a taki
+            // ZAWSZE ma owner_id=NULL (zerowane przy przejściu na ten status), więc bez zapasu
+            // na created_by te powiadomienia nie miałyby komu się pokazać. Ten sam wzorzec co
+            // przy powiadomieniach o zmianie statusu w ItemEndpoints.
+            //
+            // Wpis bez wyniku ("w trakcie weryfikacji") świadomie nie powiadamia — to tylko
+            // odnotowanie, że rzecz poszła do klienta, a nie zdarzenie wymagające czyjejś uwagi.
+            var recipientId = info.Value.OwnerId ?? info.Value.CreatedBy;
+            if (verificationResult is not null && recipientId is not null && recipientId != user.Id)
+            {
+                var notifyData = new
+                {
+                    itemLabel = ItemEndpoints.ItemLabel(
+                        info.Value.FileName, info.Value.ItemNumber, info.Value.ItemNumberPrefix),
+                };
+                var type = verificationResult == ResultNeedsWork
+                    ? "client_verification_needs_work"
+                    : "client_verification_verified";
+                await Notifications.NotifyAsync(
+                    conn, app.Logger, recipientId.Value, type, notifyData, itemId: itemId, projectId: projectId);
+            }
+
             return Results.Created($"/api/client-verifications/{verificationId}", new { id = verificationId });
         });
 

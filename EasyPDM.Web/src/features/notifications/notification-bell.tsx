@@ -143,6 +143,10 @@ function describe(entry: NotificationEntry, t: LanguageContextValue["t"]): strin
       return t("notifications.lowDiskSpace", { freeGb: data.freeGb, totalGb: data.totalGb })
     case "sample_project":
       return t("notifications.sampleProject", { projectName: data.projectName })
+    case "client_verification_needs_work":
+      return t("notifications.clientVerificationNeedsWork", { itemLabel: data.itemLabel })
+    case "client_verification_verified":
+      return t("notifications.clientVerificationVerified", { itemLabel: data.itemLabel })
   }
 }
 
