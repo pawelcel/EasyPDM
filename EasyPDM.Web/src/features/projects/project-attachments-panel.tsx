@@ -53,29 +53,52 @@ function AttachmentSlot({
       {attachments.length > 0 ? (
         <ul className="flex flex-col gap-1">
           {attachments.map((attachment) => (
-            <li key={attachment.id} className="flex items-center justify-between gap-2 text-[13px]">
-              <a
-                className="truncate text-primary hover:underline"
-                href={api.projectAttachmentDownloadUrl(attachment.id)}
-                download
-              >
-                {attachment.fileName}
-              </a>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                aria-label={t("common.delete")}
-                onClick={() => onDelete(attachment)}
-              >
-                <Trash2 className="size-3.5 text-muted-foreground" />
-              </Button>
-            </li>
+            <AttachmentRow key={attachment.id} attachment={attachment} onDelete={onDelete} />
           ))}
         </ul>
       ) : (
         <Hint>{emptyHint}</Hint>
       )}
     </div>
+  )
+}
+
+// Jeden wiersz listy: nazwa pliku, a pod nią data wgrania i autor. Nazwa sama w sobie nie
+// wystarcza do rozróżnienia — nic nie wymusza jej unikalności (i słusznie: poprawiona oferta
+// zwykle nazywa się tak samo jak poprzednia), więc dwie pozycje potrafią wyglądać
+// identycznie. Data z autorem mówi, która jest która, bez otwierania plików.
+function AttachmentRow({
+  attachment,
+  onDelete,
+}: {
+  attachment: ProjectAttachment
+  onDelete: (attachment: ProjectAttachment) => void
+}) {
+  const { t } = useLanguage()
+  return (
+    <li className="flex items-start justify-between gap-2 text-[13px]">
+      <div className="min-w-0 flex-1">
+        <a
+          className="block truncate text-primary hover:underline"
+          href={api.projectAttachmentDownloadUrl(attachment.id)}
+          download
+        >
+          {attachment.fileName}
+        </a>
+        <div className="truncate text-[11.5px] text-muted-foreground">
+          {new Date(attachment.uploadedAt).toLocaleString("pl-PL")}
+          {attachment.uploadedBy && ` · ${attachment.uploadedBy}`}
+        </div>
+      </div>
+      <Button
+        size="icon-xs"
+        variant="ghost"
+        aria-label={t("common.delete")}
+        onClick={() => onDelete(attachment)}
+      >
+        <Trash2 className="size-3.5 text-muted-foreground" />
+      </Button>
+    </li>
   )
 }
 
@@ -190,23 +213,7 @@ function ProjectAttachmentsPanel({ projectId }: { projectId: string }) {
       {others.length > 0 ? (
         <ul className="flex flex-col gap-1">
           {others.map((attachment) => (
-            <li key={attachment.id} className="flex items-center justify-between gap-2 text-[13px]">
-              <a
-                className="truncate text-primary hover:underline"
-                href={api.projectAttachmentDownloadUrl(attachment.id)}
-                download
-              >
-                {attachment.fileName}
-              </a>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                aria-label={t("common.delete")}
-                onClick={() => setConfirmingDelete(attachment)}
-              >
-                <Trash2 className="size-3.5 text-muted-foreground" />
-              </Button>
-            </li>
+            <AttachmentRow key={attachment.id} attachment={attachment} onDelete={setConfirmingDelete} />
           ))}
         </ul>
       ) : (

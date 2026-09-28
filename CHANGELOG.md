@@ -13,6 +13,10 @@ All notable changes to EasyPDM are documented in this file.
   re-sent, and the earlier version is worth keeping. Unlike "Whole database", which is
   deliberately open to every logged-in user, these are commercial terms — so both reading
   and uploading require access to the project itself.
+- Each project attachment now shows when it was uploaded and by whom, under the file name.
+  Nothing forces attachment names to be unique — and rightly so, since a revised quote is
+  usually named exactly like the one before it — so two entries could look identical with
+  no way to tell which was which.
 - **Client verification** for released Parts/Assemblies. With a released item selected, a
   "Client verification" button in the toolbar opens a window holding the running record of
   what the client said: each entry has a result (Verified / Needs work), an optional
