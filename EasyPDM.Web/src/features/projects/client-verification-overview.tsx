@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react"
+import { ArrowUpRight } from "lucide-react"
 
 import { itemDisplayLabel, revisionLabel, type ClientVerificationSummary } from "@/api/types"
 import { Button } from "@/components/ui/button"
@@ -70,15 +70,17 @@ function VerificationTable({
                     {new Date(row.createdAt).toLocaleString("pl-PL")}
                   </TableCell>
                   <TableCell>
+                    {/* Ten sam przycisk co w "Gdzie używane" (UsedInPanel) -- to jedyny
+                        wzorzec skoku do elementu w projekcie, więc ma wyglądać identycznie. */}
                     {onSelectItem && (
                       <Button
+                        type="button"
                         size="icon-xs"
-                        variant="ghost"
-                        aria-label={t("clientVerification.goToItem")}
-                        title={t("clientVerification.goToItem")}
                         onClick={() => onSelectItem(row.itemId)}
+                        aria-label={t("item.goToItemAria")}
+                        title={t("item.goToItemAria")}
                       >
-                        <ArrowRight className="size-3.5 text-muted-foreground" />
+                        <ArrowUpRight />
                       </Button>
                     )}
                   </TableCell>
