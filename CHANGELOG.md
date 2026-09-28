@@ -5,30 +5,6 @@ All notable changes to EasyPDM are documented in this file.
 ## [0.4]
 
 ### Added
-- **Order documents on a project**: a quote and an order confirmation each get their own
-  highlighted slot in the project panel — the same shape as the CAD file slots on an item
-  — plus a third, open category for everything else that arrives with a job
-  (correspondence, the client's specifications, meeting notes). Both highlighted roles
-  accept several files rather than replacing the previous one: a quote gets revised and
-  re-sent, and the earlier version is worth keeping. Unlike "Whole database", which is
-  deliberately open to every logged-in user, these are commercial terms — so both reading
-  and uploading require access to the project itself.
-- Client verification now raises **notifications**: one when the client comes back with
-  remarks, another when they accept. They go to the item's author — verification only
-  applies to released items, and a released item never has an owner, so the author is the
-  only person the system can point at. Each type can be switched off separately in Settings,
-  and an entry with no result picked ("in progress") deliberately stays silent: it records
-  that something went out, not that anyone needs to act.
-- The project panel now carries a **client verification overview**: three tables, one per
-  result — needs work first (that is what requires action), then in progress, then verified.
-  Each row names the item, the revision the entry covered and when it was made, with an
-  arrow that jumps straight to that item in the structure. Until now the only view of
-  verification was per item, so answering "what is still with the client?" on a project of
-  any size meant clicking through parts one by one.
-- Each project attachment now shows when it was uploaded and by whom, under the file name.
-  Nothing forces attachment names to be unique — and rightly so, since a revised quote is
-  usually named exactly like the one before it — so two entries could look identical with
-  no way to tell which was which.
 - **Client verification** for released Parts/Assemblies. With a released item selected, a
   "Client verification" button in the toolbar opens a window holding the running record of
   what the client said: each entry has a result (Verified / Needs work), an optional
@@ -41,11 +17,34 @@ All notable changes to EasyPDM are documented in this file.
   "Whole database", where there is no project context. Each entry remembers the revision
   it applied to, so after a new revision is released the old acceptance stays visible but
   is clearly marked as no longer covering what the item is now.
+- The project panel now carries a **client verification overview**: three tables, one per
+  result — needs work first (that is what requires action), then in progress, then verified.
+  Each row names the item, the revision the entry covered and when it was made, with an
+  arrow that jumps straight to that item in the structure. Until now the only view of
+  verification was per item, so answering "what is still with the client?" on a project of
+  any size meant clicking through parts one by one.
+- Client verification now raises **notifications**: one when the client comes back with
+  remarks, another when they accept. They go to the item's author — verification only
+  applies to released items, and a released item never has an owner, so the author is the
+  only person the system can point at. Each type can be switched off separately in Settings,
+  and an entry with no result picked ("in progress") deliberately stays silent: it records
+  that something went out, not that anyone needs to act.
+- **Order documents on a project**: a quote and an order confirmation each get their own
+  highlighted slot in the project panel — the same shape as the CAD file slots on an item
+  — plus a third, open category for everything else that arrives with a job
+  (correspondence, the client's specifications, meeting notes). Both highlighted roles
+  accept several files rather than replacing the previous one: a quote gets revised and
+  re-sent, and the earlier version is worth keeping. Unlike "Whole database", which is
+  deliberately open to every logged-in user, these are commercial terms — so both reading
+  and uploading require access to the project itself.
+- Each project attachment now shows when it was uploaded and by whom, under the file name.
+  Nothing forces attachment names to be unique — and rightly so, since a revised quote is
+  usually named exactly like the one before it — so two entries could look identical with
+  no way to tell which was which.
 - A project can now have a "Project lead" — a contact picked from the client's own contact
   list (either a contact belonging to the client directly, or one belonging to the
   specific Name 2 the project is linked to), shown right in the project's properties panel
   next to Client/Name 2.
-
 ### Changed
 - The "Close project" button moved from the project's properties into the toolbar above the
   tree, next to the other project actions. It also stopped sending the whole project on
