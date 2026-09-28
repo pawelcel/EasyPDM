@@ -25,6 +25,7 @@ import type {
   NotificationPreference,
   NotificationType,
   Project,
+  ProjectAttachment,
   ProjectUserAssignment,
   RevisionComment,
   SavedFilter,
@@ -116,6 +117,16 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => handleResponse<Project>(r)),
+
+  // Rusza WYŁĄCZNIE flagę "zamknięty" — przycisk stoi w belce nad drzewem, poza formularzem
+  // właściwości, więc wysyłanie całego obiektu projektu wyścigałoby się z zapisem pola, z
+  // którego użytkownik właśnie kliknął (zob. komentarz przy endpoincie).
+  setProjectClosed: (id: string, closed: boolean) =>
+    fetch(`${BASE}/projects/${id}/closed`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ closed }),
+    }).then((r) => handleResponse<{ id: string; closed: boolean }>(r)),
 
   deleteProject: (id: string) =>
     fetch(`${BASE}/projects/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
@@ -722,6 +733,26 @@ export const api = {
 
   clientVerificationAttachmentUrl: (attachmentId: string) =>
     `${BASE}/client-verification-attachments/${attachmentId}/download`,
+
+  // Załączniki PROJEKTU (oferta / potwierdzenie zlecenia / pozostałe) — dokumenty całego
+  // zlecenia, niezależne od załączników pojedynczych elementów.
+  getProjectAttachments: (projectId: string) =>
+    fetch(`${BASE}/projects/${projectId}/attachments`).then((r) =>
+      handleResponse<ProjectAttachment[]>(r)
+    ),
+
+  uploadProjectAttachment: (projectId: string, formData: FormData) =>
+    fetch(`${BASE}/projects/${projectId}/attachments`, { method: "POST", body: formData }).then((r) =>
+      handleResponse<{ id: string; fileName: string }>(r)
+    ),
+
+  deleteProjectAttachment: (attachmentId: string) =>
+    fetch(`${BASE}/project-attachments/${attachmentId}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
+    ),
+
+  projectAttachmentDownloadUrl: (attachmentId: string) =>
+    `${BASE}/project-attachments/${attachmentId}/download`,
 
   attachmentDownloadUrl: (attachmentId: string) => `${BASE}/attachments/${attachmentId}/file`,
 

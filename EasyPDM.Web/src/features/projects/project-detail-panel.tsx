@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
 import { useClients } from "@/features/clients/use-clients"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
+import { ProjectAttachmentsPanel } from "@/features/projects/project-attachments-panel"
 import { useLanguage } from "@/i18n/use-language"
 
 type ProjectForm = {
@@ -223,33 +224,9 @@ function ProjectDetailPanel({
           itemWord: t(project.itemCount === 1 ? "project.itemSingular" : "project.itemPlural"),
         })}
       </div>
+      {/* Sam przycisk Zamknij/Otwórz projekt mieszka w belce nad drzewem (ProjectTreeView),
+          razem z resztą akcji projektu — tu zostaje wyłącznie informacja o stanie. */}
       {form.closed && <Hint>{t("project.closedHint")}</Hint>}
-      {isAdmin && (
-        // Poza blokiem !hideActions celowo -- w odróżnieniu od Usuń/Dokumentacja (które
-        // ProjectTreeView pokazuje we własnej belce nad drzewem zamiast tutaj), ten przycisk
-        // ma być widoczny zawsze, niezależnie skąd panel jest wywołany.
-        <Button
-          size="sm"
-          variant="secondary"
-          className="mt-1.5"
-          // onMouseDown + preventDefault -- bez tego, klikanie tego przycisku podczas gdy
-          // inne pole (np. Nazwa) ma fokus najpierw odpala JEGO onBlur (save ze STARĄ,
-          // sprzed przełączenia wartością closed), a dopiero potem ten onClick (save z NOWĄ
-          // wartością) -- dwa równoległe zapytania PATCH, których kolejność zakończenia nie
-          // jest gwarantowana, więc czasem "wygrywa" to starsze i projekt natychmiast wraca
-          // do poprzedniego stanu (potwierdzone w praktyce). preventDefault na mousedown nie
-          // pozwala przeglądarce w ogóle przenieść fokusu (więc blur się nie odpala), bez
-          // wpływu na sam onClick.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            const next = { ...form, closed: !form.closed }
-            setForm(next)
-            save(next)
-          }}
-        >
-          {form.closed ? t("project.reopenButton") : t("project.closeButton")}
-        </Button>
-      )}
 
       <SectionLabel>{t("item.properties")}</SectionLabel>
       <div className="flex flex-col gap-2">
@@ -438,6 +415,11 @@ function ProjectDetailPanel({
 
         <FormError>{error}</FormError>
       </div>
+
+      {/* Dokumenty całego zlecenia (oferta / potwierdzenie / pozostałe) -- poza blokiem
+          właściwości, bo to osobna rzecz niż pola projektu, i widoczna dla każdego z dostępem
+          do projektu, nie tylko dla administratora edytującego właściwości. */}
+      <ProjectAttachmentsPanel projectId={project.id} />
 
       {!hideActions && confirmingDelete && (
         <ConfirmDialog

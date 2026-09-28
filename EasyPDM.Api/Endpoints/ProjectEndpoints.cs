@@ -162,6 +162,34 @@ static class ProjectEndpoints
             }
         });
 
+        // PATCH /api/projects/{id}/closed   body: { closed }
+        // Zamknięcie/otwarcie projektu RUSZA WYŁĄCZNIE tę jedną flagę — w odróżnieniu od
+        // PATCH /api/projects/{id} wyżej, które zapisuje cały formularz. To nie jest
+        // kosmetyka: przycisk stoi w belce nad drzewem, a więc POZA formularzem właściwości.
+        // Gdyby wysyłał cały obiekt projektu, to kliknięcie zaraz po edycji któregoś pola
+        // wysłałoby stan sprzed tej edycji (kliknięcie odpala najpierw blur pola, czyli jego
+        // własny zapis, a tuż po nim ten drugi PATCH ze STARYMI danymi) — dwa równoległe
+        // zapisy, których kolejność zakończenia nie jest gwarantowana. Przy osobnym
+        // endpoincie nie ma czego nadpisać, więc wyścig znika u źródła zamiast być obchodzony
+        // sztuczkami z fokusem po stronie UI.
+        app.MapPatch("/api/projects/{id:guid}/closed", async (Guid id, HttpContext ctx, ProjectClosedRequest body) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand(
+                "UPDATE projects SET closed = @closed WHERE id = @id;", conn);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("closed", body.Closed);
+            if (await cmd.ExecuteNonQueryAsync() == 0)
+                return Results.NotFound();
+
+            return Results.Ok(new { id, closed = body.Closed });
+        });
+
         // DELETE /api/projects/{id} — usuwa TYLKO sam projekt. Części/Złożenia, które do
         // niego należały, NIE są kasowane — zostają odpięte (project_id = NULL), czyli
         // stają się elementami "bez projektu", dokładnie w tym samym stanie co po ręcznym
@@ -311,3 +339,5 @@ static class ProjectEndpoints
 }
 
 record ProjectRequest(string Name, string? Description, int? ClientId, int? ClientName2Id, bool Closed, DateOnly? StartDate, DateOnly? EndDate, int? LeadContactId);
+
+record ProjectClosedRequest(bool Closed);

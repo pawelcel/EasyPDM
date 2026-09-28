@@ -424,6 +424,20 @@ export interface ClientVerificationSummary {
   createdAt: string
 }
 
+// Wyróżnione kategorie załączników PROJEKTU (dokumentów całego zlecenia, nie pojedynczej
+// Części). null = zwykły załącznik, bez własnego miejsca w panelu. Obie wyróżnione role
+// dopuszczają wiele plików — oferta bywa poprawiana i wysyłana ponownie.
+export type ProjectAttachmentRole = "oferta" | "zlecenie"
+
+export interface ProjectAttachment {
+  id: string
+  fileName: string
+  fileSize: number | null
+  role: ProjectAttachmentRole | null
+  uploadedAt: string
+  uploadedBy: string | null
+}
+
 export type ClientNodeType = "folder" | "file"
 
 // Węzeł struktury dokumentów klienta (folder albo plik) — płaska lista, front buduje

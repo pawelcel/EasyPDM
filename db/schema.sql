@@ -409,6 +409,29 @@ CREATE INDEX idx_item_owner_history_item ON item_owner_history (item_id);
 GRANT SELECT, INSERT ON item_owner_history TO pdm_user;
 
 -- ============================================================
+-- Załączniki PROJEKTU -- dokumenty dotyczące całego zlecenia, nie pojedynczej Części:
+-- oferta, potwierdzenie przyjęcia zlecenia i wszystko inne, co przychodzi "do projektu".
+-- ============================================================
+-- role: 'oferta' / 'zlecenie' mają wyróżnione miejsce w panelu projektu, NULL to zwykły
+-- załącznik. Wyróżnione role dopuszczają WIELE plików (jak 'cad' przy elementach, nie jak
+-- 'pdf'/'step') -- oferta bywa poprawiana i wysyłana ponownie, a nowa wersja nie powinna
+-- kasować śladu po poprzedniej.
+CREATE TABLE project_attachments (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    file_name   TEXT NOT NULL,
+    file_path   TEXT NOT NULL UNIQUE,
+    file_size   BIGINT,
+    role        TEXT CHECK (role IN ('oferta', 'zlecenie')),
+    uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_project_attachments_project ON project_attachments (project_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON project_attachments TO pdm_user;
+
+-- ============================================================
 -- Weryfikacja klienta -- ślad akceptacji (albo uwag) klienta dla WYDANEJ Części/Złożenia,
 -- prowadzony jako rosnąca lista wpisów z własnymi załącznikami (np. e-mail z potwierdzeniem).
 -- ============================================================

@@ -120,6 +120,7 @@ app.MapClientEndpoints(connectionString, storage);
 app.MapSavedFilterEndpoints(connectionString);
 app.MapAttachmentEndpoints(connectionString, storage);
 app.MapClientVerificationEndpoints(connectionString, storage);
+app.MapProjectAttachmentEndpoints(connectionString, storage);
 app.MapConfigEndpoints(storage);
 app.MapSettingsEndpoints(connectionString, storage, appSettingsPath);
 app.MapLogEndpoints(logRoot);

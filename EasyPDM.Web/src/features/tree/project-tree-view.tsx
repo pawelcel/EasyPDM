@@ -186,6 +186,18 @@ function ProjectTreeView({
     }
   }
 
+  // Zamknięcie/otwarcie rusza wyłącznie tę jedną flagę (osobny endpoint), więc nie ma jak
+  // nadpisać właściwości, które użytkownik mógł właśnie edytować w panelu obok.
+  async function toggleProjectClosed() {
+    setItemActionError(null)
+    try {
+      await api.setProjectClosed(project.id, !project.closed)
+      await onProjectUpdated()
+    } catch (err) {
+      setItemActionError(err instanceof Error ? err.message : t("project.saveFailed"))
+    }
+  }
+
   async function confirmProjectDelete() {
     setProjectDeletingPending(true)
     setProjectDeleteError(null)
@@ -334,6 +346,11 @@ function ProjectTreeView({
               fetchExtensions={() => api.getProjectDocumentationExtensions(project.id)}
               buildDownloadUrl={(extensions) => api.projectDocumentationUrl(project.id, extensions)}
             />
+            {isAdmin && (
+              <Button size="sm" variant="secondary" onClick={toggleProjectClosed}>
+                {project.closed ? t("project.reopenButton") : t("project.closeButton")}
+              </Button>
+            )}
             {isAdmin && (
               <Button
                 size="sm"
