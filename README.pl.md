@@ -8,9 +8,9 @@ EasyPDM to miejsce, w którym Twoje Części i Złożenia mają jeden, wspólny 
 zespołu porządek: każdy element ma swój numer, rewizję, status i historię zmian, a
 złożenia — gotowe zestawienie części (BOM). Koniec z
 `wspornik_v3_NAPRAWDE_FINALNA.SLDPRT` na wspólnym dysku i pytaniem "która wersja jest
-aktualna?". Do FreeCAD i SolidWorks są gotowe makra, które wysyłają i pobierają pliki
-wprost z poziomu programu CAD — reszta (przeglądarka, katalogi materiałów/producentów,
-BOM) działa tak samo niezależnie od tego, w czym projektujesz.
+aktualna?". Do FreeCAD, SolidWorks i Autodesk Inventor są gotowe makra, które wysyłają i
+pobierają pliki wprost z poziomu programu CAD — reszta (przeglądarka, katalogi
+materiałów/producentów, BOM) działa tak samo niezależnie od tego, w czym projektujesz.
 
 Jestem konstruktorem mechanikiem i dokładnie wiedziałem, jak takie narzędzie powinno
 wyglądać i działać na co dzień — czego mi brakowało w pracy z plikami CAD. Sam tego nie
@@ -33,9 +33,10 @@ powstał i działa — czemu nie udostępnić go innym.
   bez Twojej zgody (administrator może w razie potrzeby przejąć albo zwolnić cudzą
   blokadę — np. gdy właściciel jest nieobecny).
 - **Powiadomienia** — ikonka dzwonka pokazuje, co wymaga Twojej uwagi: Twój element
-  czeka na sprawdzenie, został wydany albo cofnięty do "W pracy", ma nową rewizję,
-  został dodany do projektu lub z niego usunięty, a dla administratorów — mało miejsca
-  na dysku. Każdy typ można osobno wyłączyć w Ustawieniach.
+  czeka na sprawdzenie, został wydany albo cofnięty do "W pracy", ma nową rewizję, przyszła
+  ocena klienta do czegoś, co projektowałeś, element został dodany do projektu lub z niego
+  usunięty, a dla administratorów — mało miejsca na dysku. Każdy typ można osobno wyłączyć
+  w Ustawieniach.
 
 ## Pierwsze uruchomienie
 
@@ -67,10 +68,9 @@ nie, wskaże stronę, skąd go pobrać, zanim będzie mógł kontynuować).
   cd EasyPDM
   ./install-easypdm-docker.sh
   ```
-- *Instalacja natywna, bez Dockera* — pobierz gotową paczkę `EasyPDM-Linux-x64_v<wersja>`
-  (budowaną automatycznie przez CI tego repo — z zakładki
-  [Actions](https://github.com/pawelcel/EasyPDM/actions/workflows/build-linux-package.yml),
-  najnowszy udany przebieg, sekcja "Artifacts") albo sklonuj repo samodzielnie, potem:
+- *Instalacja natywna, bez Dockera* — pobierz gotową paczkę
+  `EasyPDM-Linux-x64_v<wersja>.tar.gz` ze [strony Releases](https://github.com/pawelcel/EasyPDM/releases)
+  albo sklonuj repo samodzielnie, potem:
   ```bash
   tar xzf EasyPDM-Linux-x64_v<wersja>.tar.gz && cd EasyPDM-Linux-x64_v<wersja>   # jeśli pobrałeś paczkę
   sudo ./install-easypdm-linux.sh
@@ -95,7 +95,7 @@ Po zalogowaniu: wybierz projekt (albo utwórz nowy, jeśli masz uprawnienia) —
 na Twoje pliki i strukturę złożenia — i doinstaluj makro do swojego programu CAD, patrz
 niżej.
 
-## Praca z poziomu FreeCAD / SolidWorks
+## Praca z poziomu FreeCAD / SolidWorks / Inventor
 
 Makra dodają w CAD-zie dwie proste operacje: **Upload** (wyślij aktywny dokument do PDM) i
 **Download** (pobierz Część/Złożenie z PDM, razem z całym złożeniem, i otwórz w programie).
@@ -103,18 +103,30 @@ Makra dodają w CAD-zie dwie proste operacje: **Upload** (wyślij aktywny dokume
 Instalacja i szczegóły:
 - FreeCAD: [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
 - SolidWorks: [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
+- Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 
 **Upload** — masz otwarty i zapisany plik, klikasz Upload. Otwiera się przeglądarka
 (automatycznie zalogowana) z pytaniem: nowy element, duplikat istniejącego (kopiuje jego
 właściwości, bez plików) czy dogranie nowej wersji do już istniejącego elementu. Wybierasz,
 zatwierdzasz w przeglądarce — makro samo wykrywa zakończenie i kończy wysyłkę (zmienia
-nazwę lokalnego pliku na numer z PDM, dogrywa plik, eksportuje podgląd STEP). Dla całego
-złożenia z nowymi, jeszcze niewysłanymi komponentami: makro samo je wykrywa i pyta o dane
-każdego z osobna, zanim wyśle główny plik.
+nazwę lokalnego pliku na numer z PDM, dogrywa plik i — jeśli zaznaczysz to w przeglądarce —
+eksportuje podgląd STEP i/lub PDF). Dla całego złożenia z nowymi, jeszcze niewysłanymi
+komponentami: makro samo je wykrywa i przeprowadza przez każdy z osobna, zanim wyśle główny
+plik. Każdy taki komponent można utworzyć bez przypisania do jakiegokolwiek projektu — żeby
+część istniejąca wyłącznie jako pozycja w BOM nie zaśmiecała drzewka projektu.
+
+**Rysunki techniczne** są rozpoznawane jako rysunki (plik `.SLDDRW`/`.idw`/`.dwg` albo strona
+TechDraw z FreeCAD-a) i dopasowywane do Części/Złożenia, które dokumentują — przez odczytanie,
+na jakie modele faktycznie wskazują widoki rysunku, a nie przez zgadywanie z nazwy pliku.
+Rysunek trafia do PDM jako osobny załącznik, jeden na rewizję, obok własnego pliku CAD
+modelu, i opcjonalnie można go wyeksportować do PDF. Jeśli rysunek dokumentuje coś, czego
+nigdy nie wysłano, makro proponuje najpierw wysłać tę Część/Złożenie, a potem od razu
+przechodzi do rysunku.
 
 **Download** — klikasz Download, w przeglądarce wskazujesz Część/Złożenie do pobrania.
 Dla złożenia od razu ściąga się CAŁE drzewo komponentów, a główny plik otwiera się
-automatycznie w CAD-zie.
+automatycznie w CAD-zie. Aktualny rysunek, jeśli istnieje, zapisuje się obok pliku modelu,
+bez otwierania.
 
 ## Praca w przeglądarce
 
@@ -127,14 +139,35 @@ używany w wielu złożeniach i projektach naraz, więc zmiana w jednym miejscu 
 wszędzie, gdzie ten komponent jest użyty.
 
 Element można **odpiąć ze struktury** (zostaje w bazie, znika tylko z tego miejsca w
-drzewku) albo **usunąć całkowicie** (tylko administrator) — usuwanie całkowite jest
-bezpieczne dla współdzielonych komponentów: element z rodzicem gdzie indziej nie zniknie
-razem z usuwanym poddrzewem. Część/Złożenie da się też **zduplikować** — kopia dostaje
-własny numer i od razu ląduje obok oryginału, z jego skopiowanymi właściwościami.
+drzewku) albo **usunąć całkowicie** (tylko administrator). Usunięcie Złożenia usuwa samo
+Złożenie — jego komponenty zostają i tracą jedynie tę jedną pozycję w BOM, bo Złożenie
+swoich części tylko *używa*, podczas gdy Folder swoją zawartość *posiada*. Usunięcie
+Folderu zabiera więc jego zawartość ze sobą, poza tym, co leży również gdzieś poza nim.
+Część/Złożenie da się też **zduplikować** — kopia dostaje własny numer i od razu ląduje
+obok oryginału, z jego skopiowanymi właściwościami.
+
+Skończony projekt można **zamknąć** jednym przyciskiem na belce — wypada wtedy z listy
+wyboru projektu i z okna dodawania elementów, ale nic poza tym się w nim nie zmienia: jego
+elementy są nadal w pełni wyszukiwalne przez "Całą bazę", a ten sam przycisk otwiera go
+z powrotem.
 
 Sam projekt też da się usunąć (tylko administrator) — NIE usuwa to jego Części/Złożeń: stają
 się bezprojektowe i zostają w pełni nienaruszone (pliki, załączniki, tagi, historia, relacje
 BOM), dostępne później przez "Całą bazę".
+
+### Dokumenty zamówienia i prowadzący projekt
+
+Obok właściwości samego projektu leżą dokumenty, które przychodzą razem ze zleceniem:
+**oferta** i **potwierdzenie zlecenia** mają własne, wyróżnione okna, a do tego jest otwarta
+kategoria na wszystko pozostałe (korespondencja, specyfikacje klienta, notatki ze spotkań).
+Dwa nazwane okna przyjmują wiele plików, zamiast podmieniać poprzedni — oferta bywa
+poprawiana i wysyłana ponownie, a wcześniejsza wersja jest warta zachowania — i przy każdym
+pliku widać datę wgrania oraz kto go wgrał.
+
+W projekcie można też wskazać **osobę prowadzącą go po stronie klienta**, wybieraną z
+kontaktów tego klienta (zarówno tych przypisanych do samego klienta, jak i tych należących
+do konkretnej drugiej nazwy, z którą projekt jest powiązany). Przycisk obok pola pokazuje
+jej telefon, e-mail i stanowisko bez wychodzenia z projektu.
 
 ### Części i Złożenia — rodzaje i właściwości
 
@@ -175,6 +208,28 @@ ikonkę. Na dole panelu elementu widać pełną **historię**: kto utworzył, ka
 statusu, każda rewizja z komentarzem, każdy dodany/usunięty załącznik, każda blokada/
 zwolnienie.
 
+### Weryfikacja klienta
+
+Gdy Część/Złożenie jest już **wydane**, przycisk "Weryfikacja klienta" na belce otwiera
+bieżący zapis tego, co klient o nim powiedział. Każdy wpis niesie wynik — **zweryfikowany**,
+**do poprawy** albo brak wyniku, co oznacza po prostu, że element poszedł do klienta i
+czekasz — opcjonalny komentarz i własne załączniki, na przykład potwierdzającego maila.
+Wpisy się kumulują, więc runda uwag, a po niej akceptacja, zostaje czytelna jako historia,
+razem z tym, kto i kiedy ją dodał.
+
+Panel projektu pokazuje całość rozbitą na trzy tabele (do poprawy, w trakcie weryfikacji,
+zweryfikowane), a przy każdym wierszu jest przycisk przenoszący wprost do tego elementu w
+strukturze. Najnowszy wynik widać też jako plakietkę w panelu samego elementu, razem z datą
+i rewizją, której dotyczył. Gdy przyjdzie ocena, osoba, która utworzyła element, dostaje
+powiadomienie.
+
+Weryfikacja należy do elementu **w danym projekcie**, a nie do samego elementu: tę samą
+Część użytą dla dwóch odbiorców akceptują dwie różne osoby, więc każdy projekt prowadzi
+własny zapis, a nic z tego nie pokazuje się w "Całej bazie", gdzie nie ma kontekstu
+projektu. Każdy wpis pamięta też, której rewizji dotyczył — po wydaniu nowej rewizji stara
+akceptacja zostaje widoczna, ale jest wyraźnie oznaczona jako niedotycząca już tego, czym
+element jest teraz.
+
 ### Kto edytuje — blokada elementu
 
 Twórca Części/Złożenia od razu staje się jej właścicielem, a element jest zablokowany —
@@ -208,8 +263,9 @@ uzupełnianiu właściwości Części/Złożenia, zamiast wpisywać ręcznie.
 (dowolną liczbę — wpisanie w oknie "Dodaj klienta" nazwy już istniejącego klienta dodaje mu
 kolejną, zamiast zakładać duplikat), własne osoby kontaktowe i własne drzewko dokumentów,
 np. norm czy plików referencyjnych — osobne od plików projektu. Projekt można opcjonalnie
-powiązać z Klientem; panel szczegółów tego klienta wypisuje wtedy każdy przypisany do niego
-Projekt, z przyciskiem do bezpośredniego przejścia.
+powiązać z Klientem, a gdy ten ma ich kilka — z konkretną drugą nazwą. Lista wyboru projektu
+pokazuje wtedy "Projekt (Klient, Druga nazwa)", a panel szczegółów klienta wypisuje każdy
+przypisany do niego Projekt, z przyciskiem do bezpośredniego przejścia.
 
 ### Wyszukiwanie i cała baza
 
@@ -227,7 +283,8 @@ klientowi.
 
 Ikonka dzwonka (u góry po prawej, obok Twojego imienia) pokazuje listę zdarzeń: Twój
 element czeka na sprawdzenie, został wydany albo cofnięty do "W pracy", ma nową rewizję,
-został dodany do projektu lub z niego usunięty, przypisany do Ciebie projekt został
+przyszedł wynik weryfikacji klienta (uwagi albo akceptacja) do elementu, który utworzyłeś,
+zostałeś dodany do projektu lub z niego usunięty, przypisany do Ciebie projekt został
 usunięty, Twoje hasło zostało zmienione przez administratora, albo (tylko administratorzy)
 mało miejsca na dysku na przechowywanie plików. Każde powiadomienie można osobno oznaczyć
 jako przeczytane albo usunąć, a każdy typ można wyłączyć w Ustawienia → Powiadomienia.

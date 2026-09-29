@@ -8,9 +8,9 @@ EasyPDM is where your Parts and Assemblies get one, shared order for the whole t
 every item has its own number, revision, status and change history, and assemblies get
 a ready-made bill of materials (BOM). No more `bracket_v3_FINAL_FOR_REAL.SLDPRT` on a
 shared drive and the question "which version is the current one?". Ready-made macros
-for FreeCAD and SolidWorks send and fetch files straight from within the CAD program —
-everything else (the browser app, material/manufacturer catalogs, BOM) works the same
-regardless of what you design in.
+for FreeCAD, SolidWorks and Autodesk Inventor send and fetch files straight from within
+the CAD program — everything else (the browser app, material/manufacturer catalogs, BOM)
+works the same regardless of what you design in.
 
 I'm a mechanical design engineer and I knew exactly what such a tool should look like
 and how it should work day to day — what I was missing when working with CAD files.
@@ -33,9 +33,9 @@ my own use, and since it already exists and works — why not share it with othe
   changes without your consent (an administrator can take over or release someone
   else's lock if needed — e.g. when the owner is away).
 - **Notifications** — a bell icon shows what needs your attention: an item of yours
-  waiting for review, released, or reverted to "In progress", a new revision, being
-  added to or removed from a project, or (administrators) low disk space — each type
-  can be turned off individually in Settings.
+  waiting for review, released, or reverted to "In progress", a new revision, a verdict
+  from the client on something you designed, being added to or removed from a project, or
+  (administrators) low disk space — each type can be turned off individually in Settings.
 
 ## First run
 
@@ -68,10 +68,9 @@ it can continue).
   cd EasyPDM
   ./install-easypdm-docker.sh
   ```
-- *Native install, no Docker* — download the ready-made `EasyPDM-Linux-x64_v<version>` package
-  (built automatically by this repo's CI — grab it from the
-  [Actions tab](https://github.com/pawelcel/EasyPDM/actions/workflows/build-linux-package.yml),
-  latest successful run, "Artifacts" section) or clone the repo yourself, then:
+- *Native install, no Docker* — download the ready-made `EasyPDM-Linux-x64_v<version>.tar.gz`
+  package from the [Releases page](https://github.com/pawelcel/EasyPDM/releases), or clone
+  the repo yourself, then:
   ```bash
   tar xzf EasyPDM-Linux-x64_v<version>.tar.gz && cd EasyPDM-Linux-x64_v<version>   # if you downloaded the package
   sudo ./install-easypdm-linux.sh
@@ -95,7 +94,7 @@ After logging in: pick a project (or create a new one, if you have permission) �
 the container for your files and assembly structure — and install the macro for your
 CAD program, see below.
 
-## Working from FreeCAD / SolidWorks
+## Working from FreeCAD / SolidWorks / Inventor
 
 The macros add two simple operations inside the CAD program: **Upload** (send the active
 document to the PDM) and **Download** (fetch a Part/Assembly from the PDM, together with
@@ -104,18 +103,31 @@ the whole assembly, and open it in the program).
 Installation and details:
 - FreeCAD: [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
 - SolidWorks: [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
+- Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 
 **Upload** — you have a saved file open, you click Upload. Your browser opens
 (automatically logged in) and asks: new item, duplicate of an existing one (copies its
 properties, no files), or attach a new version to an already-existing item. You choose,
-confirm in the browser — the macro detects completion on its own and finishes the
-upload (renames the local file to the PDM number, attaches the file, exports a STEP
-preview). For a whole assembly with new, not-yet-uploaded components: the macro detects
-them on its own and asks for each one's data individually before sending the main file.
+confirm in the browser — the macro detects completion on its own and finishes the upload
+(renames the local file to the PDM number, attaches the file, and — if you tick the boxes
+in the browser — exports a STEP and/or PDF preview). For a whole assembly with new,
+not-yet-uploaded components: the macro detects them on its own and walks through each one
+before sending the main file. Each of those components can be created without assigning it
+to any project, so that a part which only exists as a BOM entry does not clutter the
+project tree on its own.
+
+**Technical drawings** are recognized as such (a `.SLDDRW`/`.idw`/`.dwg` file, or a FreeCAD
+TechDraw page) and matched to the Part/Assembly they document — by reading which models the
+drawing's views actually point at, not by guessing from the file name. The drawing uploads
+as its own attachment, one per revision, alongside the model's own CAD file, and can
+optionally be exported to PDF. If a drawing documents something that has never been
+uploaded, the macro offers to send that Part/Assembly first and then continues straight
+into the drawing.
 
 **Download** — you click Download, and in the browser you point to the Part/Assembly to
 fetch. For an assembly, the ENTIRE component tree is fetched right away, and the main
-file opens automatically in the CAD program.
+file opens automatically in the CAD program. A current drawing, if there is one, is saved
+next to the model file without being opened.
 
 ## Working in the browser
 
@@ -128,15 +140,34 @@ structure of its own underneath). An Assembly can contain Parts and other Assemb
 change in one place is visible everywhere that component is used.
 
 An item can be **detached from the structure** (stays in the database, only disappears
-from that spot in the tree) or **deleted completely** (administrator only) — complete
-deletion is safe for shared components: an item with a parent outside the deleted
-subtree will not disappear along with it. A Part/Assembly can also be **duplicated** — the
-copy gets its own number and lands right next to the original, with its properties
-copied over.
+from that spot in the tree) or **deleted completely** (administrator only). Deleting an
+Assembly removes just that Assembly — its components stay, losing only that one BOM
+entry, because an Assembly merely *uses* its parts while a Folder *owns* its contents.
+Deleting a Folder therefore does take its contents with it, minus anything that also
+sits somewhere outside it. A Part/Assembly can also be **duplicated** — the copy gets its
+own number and lands right next to the original, with its properties copied over.
+
+A finished project can be **closed** with one button in the toolbar — it drops out of the
+project selector and the "add item" picker, but nothing else about it changes: its items
+stay fully searchable through "Whole database", and the same button opens it again.
 
 A project itself can also be deleted (administrator only) — this does NOT delete its
 Parts/Assemblies: they become project-less and stay fully intact (files, attachments,
 tags, history, BOM relations), reachable afterward through "Whole database".
+
+### Order documents and who runs the project
+
+Next to the project's own properties sit the documents that come with the job: a **quote**
+and an **order confirmation** each have their own slot, plus an open category for
+everything else (correspondence, the client's specifications, meeting notes). The two
+named slots take several files rather than replacing the previous one — a quote gets
+revised and re-sent, and the earlier version is worth keeping — and every file shows when
+it was uploaded and by whom.
+
+A project can also name the **person leading it on the client's side**, picked from that
+client's contacts (either the client's own, or one belonging to the specific Name 2 the
+project is linked to). A button next to the field shows their phone, e-mail and position
+without leaving the project.
 
 ### Parts and Assemblies — kinds and properties
 
@@ -177,6 +208,27 @@ bottom of an item's panel you can see the full **history**: who created it, ever
 change, every revision with its comment, every added/removed attachment, every
 lock/release.
 
+### Client verification
+
+Once a Part/Assembly is **released**, a "Client verification" button in the toolbar opens
+the running record of what the client said about it. Each entry carries a result —
+**Verified**, **Needs work**, or no result at all, which simply means it went out and you
+are waiting — an optional comment, and its own attachments, for example the confirming
+e-mail. Entries accumulate, so a round of remarks followed by an acceptance stays readable
+as history, with who added it and when.
+
+The project panel shows the whole thing split into three tables (needs work, in progress,
+verified), each row with a button that jumps straight to that item in the structure. The
+latest result also shows as a badge in the item's own panel, with the date and the revision
+it covered. When a verdict arrives, the person who created the item gets a notification.
+
+Verification belongs to the item **in that project**, not to the item alone: the same Part
+used for two customers is accepted by two different people, so each project keeps its own
+record, and none of it shows up in "Whole database", where there is no project context.
+Each entry also remembers which revision it covered — after a new revision is released, the
+old acceptance stays visible but is clearly marked as no longer covering what the item is
+now.
+
 ### Who's editing — item locking
 
 The creator of a Part/Assembly immediately becomes its owner, and the item is locked —
@@ -211,8 +263,9 @@ A **Client** has a name (plus an optional location), a list of second names/trad
 (add as many as you need — typing an existing client's name into "Add client" switches to
 adding it a new one instead of creating a duplicate), its own contact people, and its own
 document tree for e.g. norms or reference files — separate from project files. A Project
-can optionally be linked to a Client; that client's detail panel then lists every Project
-assigned to it, with a button to jump straight there.
+can optionally be linked to a Client — and, when that client has several, to one specific
+Name 2. The project selector then shows "Project (Client, Name 2)", and the client's detail
+panel lists every Project assigned to it, with a button to jump straight there.
 
 ### Search and the whole database
 
@@ -230,7 +283,8 @@ set of drawings to a client.
 
 A bell icon (top right, next to your name) shows a list of events: an item you own
 waiting for review, released, or reverted to "In progress", a new revision on your
-item, being assigned to or removed from a project, an assigned project being deleted,
+item, a client verification result (remarks or acceptance) on an item you created,
+being assigned to or removed from a project, an assigned project being deleted,
 your password being changed by an administrator, or (administrators only) low disk
 space on the file storage. Each notification can be marked as read or deleted
 individually, and each type can be turned off in Settings → Notifications.

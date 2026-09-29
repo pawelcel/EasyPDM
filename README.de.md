@@ -8,8 +8,9 @@ EasyPDM ist der Ort, an dem Ihre Teile und Baugruppen eine einzige, für das gan
 gemeinsame Ordnung erhalten: Jedes Element hat seine eigene Nummer, Revision, Status und
 Änderungshistorie, und Baugruppen erhalten eine fertige Stückliste (BOM). Schluss mit
 `halterung_v3_ENDGUELTIG_FINAL.SLDPRT` auf dem gemeinsamen Laufwerk und der Frage
-"welche Version ist eigentlich aktuell?". Für FreeCAD und SolidWorks gibt es fertige
-Makros, die Dateien direkt aus dem CAD-Programm heraus senden und abrufen — der Rest
+"welche Version ist eigentlich aktuell?". Für FreeCAD, SolidWorks und Autodesk Inventor
+gibt es fertige Makros, die Dateien direkt aus dem CAD-Programm heraus senden und abrufen —
+der Rest
 (Browser-Anwendung, Material-/Herstellerkataloge, Stückliste) funktioniert unabhängig
 davon, womit Sie konstruieren, genauso.
 
@@ -37,9 +38,10 @@ existiert und funktioniert — warum es nicht auch anderen zur Verfügung stelle
   übernehmen oder aufheben — z. B. wenn der Besitzer abwesend ist).
 - **Benachrichtigungen** — ein Glockensymbol zeigt, was Ihre Aufmerksamkeit erfordert: ein
   eigenes Element wartet auf Prüfung, wurde freigegeben oder auf "In Bearbeitung"
-  zurückgesetzt, hat eine neue Revision, wurde einem Projekt hinzugefügt oder daraus
-  entfernt, oder (für Administratoren) wenig Speicherplatz. Jeder Typ lässt sich einzeln
-  in den Einstellungen abschalten.
+  zurückgesetzt, hat eine neue Revision, es kam eine Rückmeldung des Kunden zu etwas, das
+  Sie konstruiert haben, ein Element wurde einem Projekt hinzugefügt oder daraus entfernt,
+  oder (für Administratoren) wenig Speicherplatz. Jeder Typ lässt sich einzeln in den
+  Einstellungen abschalten.
 
 ## Erste Inbetriebnahme
 
@@ -73,11 +75,10 @@ verweist er auf die Download-Seite, bevor er fortfahren kann).
   cd EasyPDM
   ./install-easypdm-docker.sh
   ```
-- *Native Installation, ohne Docker* — laden Sie das fertige Paket `EasyPDM-Linux-x64_v<Version>`
-  herunter (wird automatisch von der CI dieses Repos gebaut — im
-  [Actions-Tab](https://github.com/pawelcel/EasyPDM/actions/workflows/build-linux-package.yml),
-  letzter erfolgreicher Lauf, Abschnitt "Artifacts") oder klonen Sie das Repo selbst,
-  dann:
+- *Native Installation, ohne Docker* — laden Sie das fertige Paket
+  `EasyPDM-Linux-x64_v<Version>.tar.gz` von der
+  [Releases-Seite](https://github.com/pawelcel/EasyPDM/releases) herunter oder klonen Sie
+  das Repo selbst, dann:
   ```bash
   tar xzf EasyPDM-Linux-x64_v<Version>.tar.gz && cd EasyPDM-Linux-x64_v<Version>   # falls Sie das Paket heruntergeladen haben
   sudo ./install-easypdm-linux.sh
@@ -102,7 +103,7 @@ Nach der Anmeldung: wählen Sie ein Projekt (oder erstellen Sie ein neues, falls
 Berechtigung haben) — das ist der Container für Ihre Dateien und die
 Baugruppenstruktur — und installieren Sie das Makro für Ihr CAD-Programm, siehe unten.
 
-## Arbeiten von FreeCAD / SolidWorks aus
+## Arbeiten von FreeCAD / SolidWorks / Inventor aus
 
 Die Makros fügen im CAD-Programm zwei einfache Operationen hinzu: **Upload** (aktives
 Dokument an das PDM senden) und **Download** (Teil/Baugruppe aus dem PDM abrufen,
@@ -111,20 +112,34 @@ zusammen mit der gesamten Baugruppe, und im Programm öffnen).
 Installation und Details:
 - FreeCAD: [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
 - SolidWorks: [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
+- Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 
 **Upload** — Sie haben eine gespeicherte Datei geöffnet und klicken auf Upload. Der
 Browser öffnet sich (automatisch angemeldet) mit der Frage: neues Element, Duplikat
 eines vorhandenen (kopiert dessen Eigenschaften, ohne Dateien) oder eine neue Version an
 ein bereits vorhandenes Element anhängen. Sie wählen, bestätigen im Browser — das Makro
 erkennt den Abschluss selbstständig und beendet den Upload (benennt die lokale Datei in
-die PDM-Nummer um, hängt die Datei an, exportiert eine STEP-Vorschau). Für eine ganze
-Baugruppe mit neuen, noch nicht hochgeladenen Komponenten: Das Makro erkennt sie
-selbstständig und fragt für jede einzeln nach den Daten, bevor die Hauptdatei gesendet
-wird.
+die PDM-Nummer um, hängt die Datei an und exportiert — wenn Sie es im Browser ankreuzen —
+eine STEP- und/oder PDF-Vorschau). Für eine ganze Baugruppe mit neuen, noch nicht
+hochgeladenen Komponenten: Das Makro erkennt sie selbstständig und führt Sie durch jede
+einzelne, bevor die Hauptdatei gesendet wird. Jede dieser Komponenten lässt sich anlegen,
+ohne sie einem Projekt zuzuordnen — damit ein Teil, das nur als Stücklistenposition
+existiert, den Projektbaum nicht unnötig füllt.
+
+**Technische Zeichnungen** werden als solche erkannt (eine `.SLDDRW`-/`.idw`-/`.dwg`-Datei
+oder eine TechDraw-Seite aus FreeCAD) und dem Teil/der Baugruppe zugeordnet, die sie
+dokumentieren — indem ausgelesen wird, auf welche Modelle die Ansichten der Zeichnung
+tatsächlich zeigen, und nicht anhand des Dateinamens geraten. Die Zeichnung wird als
+eigener Anhang hochgeladen, einer je Revision, neben der CAD-Datei des Modells selbst, und
+kann optional als PDF exportiert werden. Dokumentiert eine Zeichnung etwas, das nie
+hochgeladen wurde, bietet das Makro an, dieses Teil/diese Baugruppe zuerst zu senden, und
+geht anschließend direkt zur Zeichnung über.
 
 **Download** — Sie klicken auf Download und geben im Browser das abzurufende
 Teil/Baugruppe an. Bei einer Baugruppe wird sofort der GESAMTE Komponentenbaum
-abgerufen, und die Hauptdatei öffnet sich automatisch im CAD-Programm.
+abgerufen, und die Hauptdatei öffnet sich automatisch im CAD-Programm. Eine aktuelle
+Zeichnung wird, sofern vorhanden, neben der Modelldatei gespeichert, ohne geöffnet zu
+werden.
 
 ## Arbeiten im Browser
 
@@ -138,15 +153,37 @@ und Projekten verwendet werden, sodass eine Änderung an einer Stelle überall d
 sichtbar ist, wo diese Komponente verwendet wird.
 
 Ein Element kann **aus der Struktur gelöst** werden (bleibt in der Datenbank, verschwindet
-nur an dieser Stelle im Baum) oder **vollständig gelöscht** werden (nur Administrator) —
-das vollständige Löschen ist sicher für gemeinsam genutzte Komponenten: Ein Element mit
-einem Elternteil außerhalb des gelöschten Teilbaums verschwindet nicht mit. Ein
-Teil/eine Baugruppe kann auch **dupliziert** werden — die Kopie erhält eine eigene
-Nummer und landet sofort neben dem Original, mit dessen kopierten Eigenschaften.
+nur an dieser Stelle im Baum) oder **vollständig gelöscht** werden (nur Administrator). Das
+Löschen einer Baugruppe entfernt nur diese Baugruppe — ihre Komponenten bleiben und
+verlieren lediglich diese eine Stücklistenposition, denn eine Baugruppe *verwendet* ihre
+Teile nur, während ein Ordner seinen Inhalt *besitzt*. Das Löschen eines Ordners nimmt
+seinen Inhalt daher mit, abzüglich dessen, was auch außerhalb davon liegt. Ein Teil/eine
+Baugruppe kann auch **dupliziert** werden — die Kopie erhält eine eigene Nummer und landet
+sofort neben dem Original, mit dessen kopierten Eigenschaften.
+
+Ein fertiges Projekt lässt sich mit einer Schaltfläche in der Leiste **schließen** — es
+fällt aus der Projektauswahl und aus dem Dialog zum Hinzufügen von Elementen heraus, sonst
+ändert sich nichts daran: Seine Elemente bleiben über "Gesamte Datenbank" vollständig
+durchsuchbar, und dieselbe Schaltfläche öffnet es wieder.
 
 Auch das Projekt selbst kann gelöscht werden (nur Administrator) — dies löscht NICHT seine
 Teile/Baugruppen: Sie werden projektlos und bleiben vollständig erhalten (Dateien, Anhänge,
 Tags, Historie, Stücklisten-Beziehungen), danach über "Gesamte Datenbank" erreichbar.
+
+### Auftragsdokumente und wer das Projekt leitet
+
+Neben den Eigenschaften des Projekts selbst liegen die Dokumente, die mit dem Auftrag
+kommen: ein **Angebot** und eine **Auftragsbestätigung** haben jeweils ihr eigenes,
+hervorgehobenes Fenster, dazu kommt eine offene Kategorie für alles Übrige (Korrespondenz,
+Spezifikationen des Kunden, Besprechungsnotizen). Die beiden benannten Fenster nehmen
+mehrere Dateien auf, statt die vorherige zu ersetzen — ein Angebot wird überarbeitet und
+erneut verschickt, und die frühere Fassung ist es wert, aufgehoben zu werden — und bei
+jeder Datei ist zu sehen, wann sie hochgeladen wurde und von wem.
+
+Ein Projekt kann außerdem die **Person benennen, die es auf Kundenseite leitet**,
+ausgewählt aus den Kontakten dieses Kunden (entweder denen des Kunden selbst oder denen des
+konkreten zweiten Namens, mit dem das Projekt verknüpft ist). Eine Schaltfläche neben dem
+Feld zeigt deren Telefon, E-Mail und Position, ohne das Projekt zu verlassen.
 
 ### Teile und Baugruppen — Arten und Eigenschaften
 
@@ -189,6 +226,30 @@ Symbol eines stornierten Elements rot. Am unteren Rand des Elementbereichs sieht
 vollständige **Historie**: wer es erstellt hat, jede Statusänderung, jede Revision mit
 Kommentar, jeden hinzugefügten/entfernten Anhang, jede Sperrung/Freigabe.
 
+### Kundenprüfung
+
+Sobald ein Teil/eine Baugruppe **freigegeben** ist, öffnet eine Schaltfläche
+"Kundenprüfung" in der Leiste die laufende Aufzeichnung dessen, was der Kunde dazu gesagt
+hat. Jeder Eintrag trägt ein Ergebnis — **geprüft**, **nachzubessern** oder gar kein
+Ergebnis, was schlicht bedeutet, dass es hinausgegangen ist und Sie warten — einen
+optionalen Kommentar und eigene Anhänge, zum Beispiel die bestätigende E-Mail. Die Einträge
+sammeln sich, sodass eine Runde Anmerkungen und die anschließende Abnahme als Historie
+lesbar bleiben, samt wer sie wann hinzugefügt hat.
+
+Der Projektbereich zeigt das Ganze aufgeteilt in drei Tabellen (nachzubessern, in Prüfung,
+geprüft), mit einer Schaltfläche in jeder Zeile, die direkt zu diesem Element in der
+Struktur springt. Das jüngste Ergebnis erscheint auch als Plakette im Bereich des Elements
+selbst, mit Datum und der Revision, die es betraf. Trifft eine Rückmeldung ein, erhält die
+Person, die das Element erstellt hat, eine Benachrichtigung.
+
+Die Prüfung gehört zum Element **in diesem Projekt**, nicht zum Element allein: Dasselbe
+Teil, für zwei Kunden verwendet, wird von zwei verschiedenen Personen abgenommen, also
+führt jedes Projekt seine eigene Aufzeichnung, und nichts davon erscheint in "Gesamte
+Datenbank", wo es keinen Projektkontext gibt. Jeder Eintrag merkt sich zudem, welche
+Revision er betraf — nach der Freigabe einer neuen Revision bleibt die alte Abnahme
+sichtbar, ist aber deutlich als nicht mehr zutreffend für den jetzigen Stand des Elements
+gekennzeichnet.
+
 ### Wer bearbeitet — Elementsperre
 
 Der Ersteller eines Teils/einer Baugruppe wird sofort dessen/deren Eigentümer, und das
@@ -226,8 +287,10 @@ Handelsvarianten (beliebig viele — die Eingabe des Namens eines bereits vorhan
 im Dialog „Kunde hinzufügen" fügt diesem stattdessen einen weiteren hinzu, statt einen
 doppelten Kunden anzulegen), eigene Kontaktpersonen und einen eigenen Dokumentenbaum, z. B.
 für Normen oder Referenzdateien — getrennt von den Projektdateien. Ein Projekt kann
-optional mit einem Kunden verknüpft werden; der Detailbereich dieses Kunden listet dann
-jedes ihm zugewiesene Projekt auf, mit einer Schaltfläche zum direkten Wechsel dorthin.
+optional mit einem Kunden verknüpft werden — und, wenn dieser mehrere hat, mit einem
+bestimmten zweiten Namen. Die Projektauswahl zeigt dann "Projekt (Kunde, Zweiter Name)",
+und der Detailbereich des Kunden listet jedes ihm zugewiesene Projekt auf, mit einer
+Schaltfläche zum direkten Wechsel dorthin.
 
 ### Suche und gesamte Datenbank
 
@@ -246,8 +309,9 @@ Kunden zu senden.
 
 Ein Glockensymbol (oben rechts, neben Ihrem Namen) zeigt eine Liste von Ereignissen: ein
 eigenes Element wartet auf Prüfung, wurde freigegeben oder auf "In Bearbeitung"
-zurückgesetzt, hat eine neue Revision, wurde einem Projekt hinzugefügt oder daraus
-entfernt, ein zugewiesenes Projekt wurde gelöscht, Ihr Passwort wurde von einem
+zurückgesetzt, hat eine neue Revision, es kam ein Ergebnis der Kundenprüfung (Anmerkungen
+oder Abnahme) zu einem von Ihnen erstellten Element, Sie wurden einem Projekt hinzugefügt
+oder daraus entfernt, ein zugewiesenes Projekt wurde gelöscht, Ihr Passwort wurde von einem
 Administrator geändert, oder (nur Administratoren) wenig Speicherplatz im Dateispeicher.
 Jede Benachrichtigung kann einzeln als gelesen markiert oder gelöscht werden, und jeder
 Typ lässt sich unter Einstellungen → Benachrichtigungen abschalten.
