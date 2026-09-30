@@ -138,7 +138,7 @@ function ClientDetailPanel({
           </div>
           <FormError>{nameError}</FormError>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <Button size="sm" variant="secondary" onClick={() => onAddName2(client)}>
             {t("client.addName2Button")}
           </Button>

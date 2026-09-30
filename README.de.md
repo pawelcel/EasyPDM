@@ -226,6 +226,21 @@ Symbol eines stornierten Elements rot. Am unteren Rand des Elementbereichs sieht
 vollständige **Historie**: wer es erstellt hat, jede Statusänderung, jede Revision mit
 Kommentar, jeden hinzugefügten/entfernten Anhang, jede Sperrung/Freigabe.
 
+**Eine Baugruppe kann ihrer eigenen Stückliste nicht vorauseilen.** Sie geht erst dann
+"in Prüfung", wenn jede Komponente eine Ebene darunter mindestens in Prüfung ist, und erst
+dann "freigegeben", wenn jede von ihnen freigegeben ist. Geprüft wird ausschließlich eine
+Ebene nach unten — worauf es tiefer ankommt, sichert dieselbe Regel, angewandt auf die
+Unterbaugruppe, wenn diese an der Reihe ist; so benennt die Meldung immer etwas, das am
+Bildschirm zu sehen ist. Hängt eine Komponente hinterher, wird die Statusänderung nicht
+abgelehnt, sondern angeboten: ein Fenster listet genau auf, welche es sind, und fragt, ob
+sie zusammen mit der Baugruppe mitgezogen werden sollen. Eine Ablehnung ändert gar nichts;
+eine Zustimmung setzt in einem Zug erst die Komponenten und dann die Baugruppe, und jede
+mitgezogene Komponente erhält ihren eigenen Historieneintrag. Zwei Fälle bleiben von
+diesem Angebot ausgenommen — eine **Unterbaugruppe** hat eine eigene Stückliste und wird
+deshalb nur benannt, damit Sie sie getrennt bearbeiten, und eine Komponente, die
+**storniert, von jemand anderem gesperrt oder in einem Projekt ohne Zugriff** ist, wird
+samt Grund benannt und nicht angerührt.
+
 ### Kundenprüfung
 
 Sobald ein Teil/eine Baugruppe **freigegeben** ist, öffnet eine Schaltfläche

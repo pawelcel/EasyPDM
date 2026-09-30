@@ -29,6 +29,7 @@ import type {
   ProjectUserAssignment,
   RevisionComment,
   SavedFilter,
+  StatusPrecheck,
   StorageInfo,
   Tag,
   UsedInEntry,
@@ -245,12 +246,20 @@ export const api = {
       body: JSON.stringify({ name }),
     }).then((r) => handleResponse<void>(r)),
 
-  setStatus: (itemId: string, status: ItemStatus, comment?: string) =>
+  // promoteChildren — zgoda użytkownika na pociągnięcie w górę statusu bezpośrednich
+  // komponentów Złożenia (zob. getStatusPrecheck). Domyślnie false: bez jawnej zgody serwer
+  // odmawia zamiast po cichu zmieniać cudze elementy.
+  setStatus: (itemId: string, status: ItemStatus, comment?: string, promoteChildren = false) =>
     fetch(`${BASE}/items/${itemId}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, comment: comment || null }),
+      body: JSON.stringify({ status, comment: comment || null, promoteChildren }),
     }).then((r) => handleResponse<{ status: ItemStatus; revisionNumber: number | null }>(r)),
+
+  getStatusPrecheck: (itemId: string, target: "sprawdzany" | "wydany") =>
+    fetch(`${BASE}/items/${itemId}/status-precheck?target=${target}`).then((r) =>
+      handleResponse<StatusPrecheck>(r)
+    ),
 
   getRevisionComments: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/revisions`).then((r) => handleResponse<RevisionComment[]>(r)),

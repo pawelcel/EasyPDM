@@ -770,6 +770,48 @@ static class ItemEndpoints
         });
 
         // ============================================================
+        // GET /api/items/{id}/status-precheck?target=sprawdzany|wydany
+        // Odpowiada na pytanie "czy to Złożenie może teraz dostać ten status, a jeśli nie, to
+        // co stoi na przeszkodzie" -- BEZ zmieniania czegokolwiek. Front woła to zaraz po
+        // kliknięciu przycisku statusu, żeby wiedzieć, które okno pokazać: zwykłe
+        // potwierdzenie, propozycję pociągnięcia komponentów w górę, czy komunikat o
+        // przeszkodzie. Sam PATCH /status i tak sprawdza wszystko jeszcze raz -- to jest
+        // wyłącznie podpowiedź dla interfejsu, nie zabezpieczenie.
+        // ============================================================
+        app.MapGet("/api/items/{id:guid}/status-precheck", async (Guid id, string target, HttpContext ctx) =>
+        {
+            if (target != "sprawdzany" && target != "wydany")
+                return Results.BadRequest("Sprawdzenie dotyczy wyłącznie przejścia na 'sprawdzany' albo 'wydany'.");
+
+            var info = await GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ProjectAccessForbidden();
+
+            // Część nie ma BOM-u, więc nie ma czego sprawdzać -- odpowiadamy "można",
+            // zamiast błędem, żeby front mógł wołać ten endpoint bez rozróżniania rodzaju.
+            if (info.Value.ItemType != "assembly")
+                return Results.Ok(new { ok = true, subAssemblies = Array.Empty<object>(), blocked = Array.Empty<object>(), promotable = Array.Empty<object>() });
+
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            var children = await GetDirectBomChildrenAsync(conn, id);
+            var classified = await ClassifyNonConformingChildrenAsync(conn, ctx, user, children, target);
+
+            return Results.Ok(new
+            {
+                ok = classified.SubAssemblies.Count == 0 && classified.Blocked.Count == 0 && classified.Promotable.Count == 0,
+                subAssemblies = classified.SubAssemblies.Select(c => new { id = c.Id, label = c.Label, status = c.Status }),
+                blocked = classified.Blocked.Select(b => new { id = b.Child.Id, label = b.Child.Label, status = b.Child.Status, reason = b.Reason }),
+                promotable = classified.Promotable.Select(c => new { id = c.Id, label = c.Label, status = c.Status }),
+            });
+        });
+
+        // ============================================================
         // PATCH /api/items/{id}/status   body: { "status": "...", "comment": "..." (opcjonalnie) }
         // Maszyna stanów dla Części/Złożeń:
         //   w_pracy    -> sprawdzany
@@ -842,7 +884,81 @@ static class ItemEndpoints
                         $"Nie można ustawić statusu \"Wydany\" — złożenie zawiera anulowane elementy: {string.Join(", ", cancelledDescendants)}.");
             }
 
+            // === Reguła BOM (0.5) ===
+            // Złożenie nie może wyprzedzać swoich komponentów. Sprawdzamy tylko bezpośrednie
+            // dzieci — zob. ChildSatisfiesParentStatus. Front pyta wcześniej o to samo przez
+            // GET /status-precheck, ale tu sprawdzamy NIEZALEŻNIE: to jest miejsce, które
+            // faktycznie broni reguły (API wołają też makra CAD, nie tylko przeglądarka).
+            var childrenToPromote = new List<BomChild>();
+            if (itemType == "assembly" && body.Status != currentStatus
+                && (body.Status == "sprawdzany" || body.Status == "wydany"))
+            {
+                var targetLabel = body.Status == "wydany" ? "Wydany" : "Sprawdzany";
+                var requiredLabel = body.Status == "wydany" ? "wydane" : "co najmniej sprawdzone";
+                var children = await GetDirectBomChildrenAsync(conn, id);
+                var classified = await ClassifyNonConformingChildrenAsync(conn, ctx, user, children, body.Status);
+
+                // Podzłożenia idą pierwsze w kolejności komunikatów: dopóki któreś z nich nie
+                // jest gotowe, nie ma sensu rozmawiać o pojedynczych częściach.
+                if (classified.SubAssemblies.Count > 0)
+                    return Results.BadRequest(
+                        $"Nie można ustawić statusu \"{targetLabel}\" — najpierw zajmij się podzłożeniami, " +
+                        $"które nie są jeszcze {requiredLabel}: {string.Join(", ", classified.SubAssemblies.Select(c => c.Label))}.");
+
+                if (classified.Blocked.Count > 0)
+                    return Results.BadRequest(
+                        $"Nie można ustawić statusu \"{targetLabel}\" — tych komponentów nie da się przestawić: " +
+                        string.Join(", ", classified.Blocked.Select(b => $"{b.Child.Label} ({BlockedReasonText(b.Reason)})")) + ".");
+
+                if (classified.Promotable.Count > 0)
+                {
+                    // Bez jawnej zgody nic nie ruszamy — front pokazuje listę i pyta.
+                    if (!body.PromoteChildren)
+                        return Results.BadRequest(
+                            $"Nie można ustawić statusu \"{targetLabel}\" — te komponenty nie są jeszcze {requiredLabel}: " +
+                            string.Join(", ", classified.Promotable.Select(c => c.Label)) + ".");
+                    childrenToPromote = classified.Promotable;
+                }
+            }
+
             bool bumpRevision = (currentStatus == "wydany" || currentStatus == "anulowana") && body.Status == "w_pracy";
+
+            // Transakcja obejmuje pociągnięcie komponentów RAZEM ze zmianą statusu złożenia —
+            // "połowa BOM-u wydana, a złożenie nie" byłaby gorsza niż nierobienie niczego.
+            // Powiadomienia wysyłamy dopiero PO zatwierdzeniu (niżej), żeby nikt nie dostał
+            // wiadomości o zmianie, która finalnie się wycofała.
+            await using var tx = await conn.BeginTransactionAsync();
+
+            foreach (var child in childrenToPromote)
+            {
+                const string childSql = """
+                    UPDATE items SET status = @status,
+                           owner_id = CASE WHEN @status = 'wydany' THEN NULL ELSE owner_id END,
+                           owner_locked = CASE WHEN @status = 'wydany' THEN false ELSE owner_locked END
+                    WHERE id = @id AND status IS NOT DISTINCT FROM @expected;
+                    """;
+                await using var childCmd = new NpgsqlCommand(childSql, conn, tx);
+                childCmd.Parameters.AddWithValue("id", child.Id);
+                childCmd.Parameters.AddWithValue("status", body.Status);
+                childCmd.Parameters.AddWithValue("expected", (object?)child.Status ?? DBNull.Value);
+                // Ten sam warunek na poprzedni status co przy złożeniu niżej — jeśli ktoś
+                // zmienił komponent między naszym odczytem a tym UPDATE-em, wycofujemy całość.
+                if (await childCmd.ExecuteNonQueryAsync() == 0)
+                    return Results.Conflict("Status jednego z komponentów zmienił się w międzyczasie — odśwież i spróbuj ponownie.");
+
+                await using var childHistoryCmd = new NpgsqlCommand("""
+                    INSERT INTO item_status_history (item_id, from_status, to_status, changed_by)
+                    VALUES (@itemId, @fromStatus, @toStatus, @userId);
+                    """, conn, tx);
+                childHistoryCmd.Parameters.AddWithValue("itemId", child.Id);
+                childHistoryCmd.Parameters.AddWithValue("fromStatus", (object?)child.Status ?? DBNull.Value);
+                childHistoryCmd.Parameters.AddWithValue("toStatus", body.Status);
+                childHistoryCmd.Parameters.AddWithValue("userId", user.Id);
+                await childHistoryCmd.ExecuteNonQueryAsync();
+
+                if (body.Status == "wydany" && child.OwnerId is not null)
+                    await LogOwnerHistoryAsync(conn, child.Id, "released", user.Id, tx);
+            }
 
             // Wydany element nie może mieć właściciela ani być zablokowany — zawsze jest zwolniony
             // (patrz też /lock i /release, które odrzucają próby zmiany blokady w tym statusie).
@@ -866,7 +982,7 @@ static class ItemEndpoints
                   WHERE id = @id AND status IS NOT DISTINCT FROM @currentStatus
                   RETURNING revision_number;
                   """;
-            await using var cmd = new NpgsqlCommand(sql, conn);
+            await using var cmd = new NpgsqlCommand(sql, conn, tx);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("status", body.Status);
             cmd.Parameters.AddWithValue("currentStatus", (object?)currentStatus ?? DBNull.Value);
@@ -888,7 +1004,7 @@ static class ItemEndpoints
             // nastąpiło. info.Value.OwnerId to stan SPRZED tego UPDATE-u (patrz komentarz przy
             // "recipientId" niżej) — poprawny warunek "był właściciel do zwolnienia".
             if (body.Status == "wydany" && info.Value.OwnerId is not null)
-                await LogOwnerHistoryAsync(conn, id, "released", user.Id);
+                await LogOwnerHistoryAsync(conn, id, "released", user.Id, tx);
 
             if (bumpRevision && revisionNumber is not null && !string.IsNullOrWhiteSpace(body.Comment))
             {
@@ -897,7 +1013,7 @@ static class ItemEndpoints
                     VALUES (@itemId, @revisionNumber, @comment, @userId)
                     ON CONFLICT (item_id, revision_number) DO UPDATE SET comment = EXCLUDED.comment, created_at = now(), created_by = EXCLUDED.created_by;
                     """;
-                await using var commentCmd = new NpgsqlCommand(commentSql, conn);
+                await using var commentCmd = new NpgsqlCommand(commentSql, conn, tx);
                 commentCmd.Parameters.AddWithValue("itemId", id);
                 commentCmd.Parameters.AddWithValue("revisionNumber", revisionNumber.Value);
                 commentCmd.Parameters.AddWithValue("comment", body.Comment!.Trim());
@@ -913,12 +1029,28 @@ static class ItemEndpoints
                     INSERT INTO item_status_history (item_id, from_status, to_status, changed_by)
                     VALUES (@itemId, @fromStatus, @toStatus, @userId);
                     """;
-                await using var historyCmd = new NpgsqlCommand(historySql, conn);
+                await using var historyCmd = new NpgsqlCommand(historySql, conn, tx);
                 historyCmd.Parameters.AddWithValue("itemId", id);
                 historyCmd.Parameters.AddWithValue("fromStatus", (object?)currentStatus ?? DBNull.Value);
                 historyCmd.Parameters.AddWithValue("toStatus", body.Status);
                 historyCmd.Parameters.AddWithValue("userId", user.Id);
                 await historyCmd.ExecuteNonQueryAsync();
+            }
+
+            await tx.CommitAsync();
+
+            // Komponenty pociągnięte razem ze złożeniem dostają dokładnie takie same
+            // powiadomienia, jak gdyby ktoś przestawił je pojedynczo — dla ich autora to
+            // ta sama informacja ("Twoja część jest już wydana"), niezależnie od tego, czy
+            // padła osobno, czy przy okazji wydawania całości.
+            foreach (var child in childrenToPromote)
+            {
+                var childRecipient = child.OwnerId ?? child.CreatedBy;
+                if (childRecipient is null || childRecipient == user.Id)
+                    continue;
+                await Notifications.NotifyAsync(conn, app.Logger, childRecipient.Value,
+                    body.Status == "wydany" ? "status_released" : "status_review",
+                    new { itemLabel = child.Label }, itemId: child.Id);
             }
 
             // Powiadomienia — nigdy o własnej akcji, i tylko gdy jest kogo powiadomić.
@@ -1338,6 +1470,123 @@ static class ItemEndpoints
     internal static string ItemLabel(string fileName, int? itemNumber, string? itemNumberPrefix) =>
         itemNumber is not null ? $"{itemNumberPrefix}{itemNumber} ({fileName})" : fileName;
 
+    // ============================================================
+    // Reguła statusu Złożenia względem jego BOM-u (od 0.5).
+    // Złożenie nie może wyprzedzać swoich komponentów: idzie "do sprawdzenia" dopiero, gdy
+    // każdy komponent jest co najmniej sprawdzany, i "wydany" dopiero, gdy każdy jest wydany.
+    // Sprawdzamy WYŁĄCZNIE bezpośrednie dzieci (jeden poziom) -- głębiej pilnuje tego ta sama
+    // reguła zastosowana do podzłożenia, kiedy przychodzi jego kolej. Dzięki temu komunikat
+    // zawsze wskazuje element, na który użytkownik faktycznie patrzy, zamiast czegoś pięć
+    // poziomów niżej, o czym nie ma pojęcia.
+    // ============================================================
+    internal static bool ChildSatisfiesParentStatus(string? childStatus, string parentTarget) => parentTarget switch
+    {
+        "sprawdzany" => childStatus is "sprawdzany" or "wydany",
+        "wydany" => childStatus is "wydany",
+        // Pozostałe przejścia (w_pracy, anulowana) niczego od komponentów nie wymagają --
+        // cofnięcie złożenia do pracy nie ma powodu ruszać części, które są już wydane.
+        _ => true,
+    };
+
+    internal sealed record BomChild(
+        Guid Id, string Label, string ItemType, string? Status,
+        Guid? OwnerId, bool OwnerLocked, Guid? ProjectId, Guid? CreatedBy);
+
+    // Bezpośrednie komponenty Złożenia (jeden poziom), wyłącznie Części/Złożenia -- tylko one
+    // mają status. PRIMARY KEY (parent_id, child_id) na item_relations gwarantuje, że każdy
+    // komponent pojawi się tu raz, niezależnie od ilości sztuk w zestawieniu.
+    internal static async Task<List<BomChild>> GetDirectBomChildrenAsync(
+        NpgsqlConnection conn, Guid assemblyId, NpgsqlTransaction? tx = null)
+    {
+        const string sql = """
+            SELECT i.id, i.file_name, i.item_number, i.item_number_prefix,
+                   i.item_type, i.status, i.owner_id, i.owner_locked, i.project_id, i.created_by
+            FROM item_relations ir
+            JOIN items i ON i.id = ir.child_id
+            WHERE ir.parent_id = @id AND i.item_type IN ('part', 'assembly')
+            ORDER BY ir.position;
+            """;
+        await using var cmd = new NpgsqlCommand(sql, conn, tx);
+        cmd.Parameters.AddWithValue("id", assemblyId);
+
+        var rows = new List<BomChild>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add(new BomChild(
+                reader.GetGuid(0),
+                ItemLabel(reader.GetString(1),
+                          reader.IsDBNull(2) ? null : reader.GetInt32(2),
+                          reader.IsDBNull(3) ? null : reader.GetString(3)),
+                reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetGuid(6),
+                reader.GetBoolean(7),
+                reader.IsDBNull(8) ? null : reader.GetGuid(8),
+                reader.IsDBNull(9) ? null : reader.GetGuid(9)));
+        }
+        return rows;
+    }
+
+    // Powody, dla których komponentu NIE da się pociągnąć w górę razem ze złożeniem.
+    // Zwracamy kody, nie zdania -- tekst składa front, bo to trafia na listę w oknie
+    // dialogowym, a ta musi być po polsku/angielsku/niemiecku tak samo jak reszta interfejsu.
+    internal const string BlockedCancelled = "anulowana";
+    internal const string BlockedOwnerLocked = "zablokowany";
+    internal const string BlockedNoAccess = "brak_dostepu";
+
+    // Kod powodu -> czytelny fragment zdania. Serwer składa z tego komunikat dla wywołań
+    // spoza przeglądarki (makra CAD, curl); przeglądarka tłumaczy sobie sam kod.
+    internal static string BlockedReasonText(string reason) => reason switch
+    {
+        BlockedCancelled => "anulowany",
+        BlockedOwnerLocked => "zablokowany przez innego użytkownika",
+        BlockedNoAccess => "w projekcie bez dostępu",
+        _ => reason,
+    };
+
+    internal sealed record ChildClassification(
+        List<BomChild> SubAssemblies,
+        List<(BomChild Child, string Reason)> Blocked,
+        List<BomChild> Promotable);
+
+    // Dzieli komponenty NIESPEŁNIAJĄCE reguły na trzy kubełki:
+    //   SubAssemblies -- podzłożenia. Nie ruszamy ich automatycznie, bo każde ma własny BOM i
+    //                    własną regułę; użytkownik musi zająć się nimi osobno (i wtedy zobaczy
+    //                    ich własne komunikaty, zamiast lawiny zmian, której nie zamawiał).
+    //   Blocked       -- komponenty, których nie wolno tknąć: anulowane (przywracanie ich do
+    //                    obiegu to decyzja, nie skutek uboczny wydawania złożenia), zablokowane
+    //                    przez kogoś innego, albo leżące w projekcie bez dostępu.
+    //   Promotable    -- reszta, czyli Części, które można bezpiecznie przestawić.
+    // Komponent SPEŁNIAJĄCY regułę nie trafia do żadnego kubełka -- nie ma o czym mówić.
+    internal static async Task<ChildClassification> ClassifyNonConformingChildrenAsync(
+        NpgsqlConnection conn, HttpContext ctx, CurrentUser user,
+        List<BomChild> children, string target)
+    {
+        var subAssemblies = new List<BomChild>();
+        var blocked = new List<(BomChild, string)>();
+        var promotable = new List<BomChild>();
+
+        foreach (var child in children)
+        {
+            if (ChildSatisfiesParentStatus(child.Status, target))
+                continue;
+
+            if (child.ItemType == "assembly")
+                subAssemblies.Add(child);
+            else if (child.Status == "anulowana")
+                blocked.Add((child, BlockedCancelled));
+            else if (!await HasProjectAccessAsync(conn, ctx, child.ProjectId))
+                blocked.Add((child, BlockedNoAccess));
+            else if (!CanEditOwnerLocked(user.Id, child.OwnerId, child.OwnerLocked) && user.Role != "admin")
+                blocked.Add((child, BlockedOwnerLocked));
+            else
+                promotable.Add(child);
+        }
+
+        return new ChildClassification(subAssemblies, blocked, promotable);
+    }
+
     // Etykiety WSZYSTKICH elementów o statusie "anulowana" w całym poddrzewie BOM-u
     // złożenia @id (na dowolnej głębokości, nie tylko bezpośrednie dzieci) -- ten sam
     // rekurencyjny wzorzec co BomEndpoints.FetchBomRowsAsync (tablica "visited" jako
@@ -1428,13 +1677,13 @@ static class ItemEndpoints
 
     // Wpis do panelu "Historia" — kto i kiedy zablokował (przejął na własność) albo zwolnił
     // element (patrz /lock i /release powyżej).
-    private static async Task LogOwnerHistoryAsync(NpgsqlConnection conn, Guid itemId, string action, Guid userId)
+    private static async Task LogOwnerHistoryAsync(NpgsqlConnection conn, Guid itemId, string action, Guid userId, NpgsqlTransaction? tx = null)
     {
         const string sql = """
             INSERT INTO item_owner_history (item_id, action, user_id)
             VALUES (@itemId, @action, @userId);
             """;
-        await using var cmd = new NpgsqlCommand(sql, conn);
+        await using var cmd = new NpgsqlCommand(sql, conn, tx);
         cmd.Parameters.AddWithValue("itemId", itemId);
         cmd.Parameters.AddWithValue("action", action);
         cmd.Parameters.AddWithValue("userId", userId);
@@ -1516,6 +1765,8 @@ record AttachExistingTicketRequest(Guid ItemId, bool? ExportStep, bool? ExportPd
 record ResolveDrawingTicketRequest(Guid ItemId, bool ExportPdf);
 record VisibilityRequest(bool ShowInTree);
 record RenameRequest(string Name);
-record StatusRequest(string Status, string? Comment = null);
+// PromoteChildren -- świadoma zgoda użytkownika na pociągnięcie w górę statusu
+// bezpośrednich komponentów Złożenia, zob. GET /api/items/{id}/status-precheck.
+record StatusRequest(string Status, string? Comment = null, bool PromoteChildren = false);
 record MoveToProjectRequest(Guid? ProjectId);
 record DuplicateItemRequest(Guid? ParentId = null, bool InsertAfterOriginal = false);

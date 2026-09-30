@@ -66,6 +66,26 @@ export type ItemType = "folder" | "part" | "file" | "assembly"
 
 export type ItemStatus = "w_pracy" | "sprawdzany" | "wydany" | "anulowana"
 
+// Odpowiedź GET /api/items/{id}/status-precheck — "czy to Złożenie może teraz dostać ten
+// status, a jeśli nie, to co stoi na przeszkodzie". Trzy rozłączne kubełki komponentów,
+// które reguły NIE spełniają; komponenty spełniające ją nie są tu w ogóle wymieniane.
+export type StatusPrecheckEntry = {
+  id: string
+  label: string
+  status: ItemStatus | null
+}
+
+// Powód, dla którego komponentu nie da się pociągnąć razem ze złożeniem. Kod, nie zdanie —
+// tekst składa front, bo trafia na listę w oknie dialogowym i musi być przetłumaczony.
+export type BomBlockedReason = "anulowana" | "zablokowany" | "brak_dostepu"
+
+export type StatusPrecheck = {
+  ok: boolean
+  subAssemblies: StatusPrecheckEntry[]
+  blocked: (StatusPrecheckEntry & { reason: BomBlockedReason })[]
+  promotable: StatusPrecheckEntry[]
+}
+
 export const STATUS_LABEL_KEYS: Record<ItemStatus, TranslationKey> = {
   w_pracy: "status.w_pracy",
   sprawdzany: "status.sprawdzany",

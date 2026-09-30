@@ -208,6 +208,19 @@ bottom of an item's panel you can see the full **history**: who created it, ever
 change, every revision with its comment, every added/removed attachment, every
 lock/release.
 
+An **Assembly can't get ahead of its own bill of materials**. It goes "under review" only
+once every component one level below it is at least under review, and "released" only once
+every one of them is released. Only the direct children are checked — what sits deeper is
+guarded by the same rule applied to the sub-assembly when its turn comes, so the message
+always names something you can see on screen. If a component is behind, the status change
+is offered rather than refused: a window lists exactly which ones and asks whether to move
+them along with the assembly. Declining changes nothing; accepting moves the components
+first and the assembly second, in one go, and each moved component gets its own history
+entry. Two cases stop short of that offer — a **sub-assembly** that is behind has a bill of
+materials of its own, so it is named and left for you to handle separately, and a component
+that is **cancelled, locked by someone else, or in a project you can't access** is named
+together with the reason, untouched.
+
 ### Client verification
 
 Once a Part/Assembly is **released**, a "Client verification" button in the toolbar opens

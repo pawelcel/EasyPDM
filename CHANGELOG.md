@@ -2,6 +2,40 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.5]
+
+### Added
+- **An Assembly can no longer get ahead of its own bill of materials.** Moving an Assembly
+  to "In review" now requires every component one level below it to be at least in review,
+  and moving it to "Released" requires every one of them to be released — because an
+  assembly that is "done" while the parts it is made of are still being drawn is a promise
+  nobody can keep. Only the direct children are checked: what sits deeper is guarded by the
+  same rule applied to the sub-assembly when its own turn comes, so the message always
+  names something visible on screen rather than a part five levels down that means nothing
+  to whoever is looking.
+- When components are not there yet, the status change is **offered rather than refused**:
+  a window lists exactly which ones are behind and asks whether to move them along with
+  the assembly. Declining changes nothing at all. Accepting moves the components first and
+  the assembly second, in one transaction — a half-released bill of materials would be
+  worse than not starting. Each component moved this way gets its own history entry and its
+  author gets the same notification they would have had if someone had moved that part on
+  its own.
+- Two cases deliberately stop short of that offer. A **sub-assembly** that is behind has a
+  bill of materials of its own, so it is named and left alone — walking it automatically
+  would cascade changes nobody asked for. A component that is **cancelled, locked by
+  someone else, or in a project the person has no access to** is named together with the
+  reason and nothing is touched: bringing a cancelled part back into circulation is a
+  decision, not a side effect of releasing an assembly.
+
+### Fixed
+- Rows of buttons no longer spill outside their panel in English and German. Several rows —
+  the kind of a Part/Assembly in the "Add item" window, the four statuses, the item and
+  project toolbars, and the client header — were laid out without wrapping, which held as
+  long as the labels were the short Polish ones. "Standard part", "Dokumentation
+  herunterladen" or "Aus der Struktur entfernen" did not fit, and since the detail panel's
+  width is dragged by the person using it, a narrow panel could push the buttons out of the
+  frame in Polish too.
+
 ## [0.4]
 
 ### Added

@@ -309,7 +309,7 @@ function ItemDetailPanel({
       {!hideActions &&
         (onRemoveFromStructure || canDuplicate || canDownloadDocumentation || onDeleteCompletely) && (
         <div className="mb-3 flex flex-col gap-1.5 border-b pb-3">
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {onRemoveFromStructure && (
               <Button size="sm" variant="outline" onClick={handleRemoveFromStructureClick}>
                 {t("item.removeFromStructure")}

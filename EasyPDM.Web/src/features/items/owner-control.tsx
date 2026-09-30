@@ -63,7 +63,7 @@ function OwnerControl({ item, onChanged }: { item: Item; onChanged: () => void |
         {t("item.owner")}: {ownerName ?? t("item.ownerNone")}
       </span>
 
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         <Button
           size="sm"
           variant={locked ? "default" : "outline"}

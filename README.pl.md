@@ -208,6 +208,19 @@ ikonkę. Na dole panelu elementu widać pełną **historię**: kto utworzył, ka
 statusu, każda rewizja z komentarzem, każdy dodany/usunięty załącznik, każda blokada/
 zwolnienie.
 
+**Złożenie nie może wyprzedzać swojego zestawienia części.** Na "sprawdzany" przechodzi
+dopiero, gdy każdy komponent o jeden poziom niżej jest co najmniej sprawdzany, a na
+"wydany" — gdy każdy z nich jest wydany. Sprawdzany jest wyłącznie jeden poziom w dół; to,
+co leży głębiej, pilnuje ta sama reguła zastosowana do podzłożenia, kiedy przyjdzie jego
+kolej, więc komunikat zawsze wskazuje coś, co widać na ekranie. Jeśli komponent nie jest
+gotowy, zmiana statusu nie jest odrzucana, tylko proponowana: okno wypisuje dokładnie
+które komponenty są w tyle i pyta, czy zmienić je razem ze złożeniem. Odmowa nie zmienia
+nic; zatwierdzenie zmienia najpierw komponenty, potem złożenie, za jednym razem, a każdy
+przestawiony komponent dostaje własny wpis w historii. Dwa przypadki są z tej propozycji
+wyłączone — **podzłożenie** ma własne zestawienie części, więc zostaje wymienione z nazwy
+do osobnego załatwienia, a komponent **anulowany, zablokowany przez kogoś innego albo
+leżący w projekcie bez dostępu** jest wypisany razem z powodem i nietknięty.
+
 ### Weryfikacja klienta
 
 Gdy Część/Złożenie jest już **wydane**, przycisk "Weryfikacja klienta" na belce otwiera

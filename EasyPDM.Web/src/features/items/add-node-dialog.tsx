@@ -603,7 +603,7 @@ function AddNodeDialog({
         {(!needsProjectPicker || projectId || skipProject) && mode === "part" && (
           <div className="flex flex-col gap-2">
             <Label>{t("part.kind")}</Label>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               <Button
                 type="button"
                 size="sm"
@@ -728,7 +728,7 @@ function AddNodeDialog({
             {mode === "assembly" && (
               <>
                 <Label>{t("part.kind")}</Label>
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   <Button
                     type="button"
                     size="sm"
