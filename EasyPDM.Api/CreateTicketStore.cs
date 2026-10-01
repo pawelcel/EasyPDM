@@ -23,10 +23,10 @@ class CreateTicketStore
     // widoczne tylko, gdy dodawanie ma przypięty bilet) — makro po stronie klienta używa
     // ich zamiast jakiegokolwiek lokalnego wyboru, zob. ItemEndpoints.cs i
     // EasyPDMUpload.FCMacro/EasyPDMUpload.bas.
-    public void Complete(Guid ticket, Guid itemId, int? itemNumber, string? itemNumberPrefix, string name, bool? exportStep, bool? exportPdf, bool existing)
+    public void Complete(Guid ticket, Guid itemId, int? itemNumber, string? itemNumberPrefix, int? itemNumberDigits, string name, bool? exportStep, bool? exportPdf, bool existing)
     {
         Sweep();
-        _tickets[ticket] = new TicketState(DateTime.UtcNow, itemId, itemNumber, itemNumberPrefix, name, exportStep, exportPdf, existing);
+        _tickets[ticket] = new TicketState(DateTime.UtcNow, itemId, itemNumber, itemNumberPrefix, itemNumberDigits, name, exportStep, exportPdf, existing);
     }
 
     public bool TryGet(Guid ticket, out TicketState state)
@@ -48,4 +48,4 @@ class CreateTicketStore
     }
 }
 
-record TicketState(DateTime CreatedAt, Guid ItemId, int? ItemNumber, string? ItemNumberPrefix, string Name, bool? ExportStep, bool? ExportPdf, bool Existing);
+record TicketState(DateTime CreatedAt, Guid ItemId, int? ItemNumber, string? ItemNumberPrefix, int? ItemNumberDigits, string Name, bool? ExportStep, bool? ExportPdf, bool Existing);

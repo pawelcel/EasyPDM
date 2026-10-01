@@ -98,6 +98,7 @@ static class ClientVerificationEndpoints
             if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId))
                 return ItemEndpoints.ProjectAccessForbidden();
 
+
             // DISTINCT ON (item_id) + ORDER BY created_at DESC daje dokładnie jeden, najnowszy
             // wiersz na element — to samo co okienkowe row_number()=1, tylko krócej i taniej.
             //
@@ -107,7 +108,8 @@ static class ClientVerificationEndpoints
             const string sql = """
                 SELECT DISTINCT ON (v.item_id)
                        v.item_id, v.result, v.revision_number, v.created_at,
-                       i.item_number, i.item_number_prefix, i.file_name, i.revision_number
+                       i.item_number, i.item_number_prefix, i.file_name, i.revision_number,
+                       i.item_number_digits
                 FROM item_client_verifications v
                 JOIN items i ON i.id = v.item_id
                 WHERE v.project_id = @projectId
@@ -127,6 +129,10 @@ static class ClientVerificationEndpoints
                     createdAt = reader.GetDateTime(3),
                     itemNumber = reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4),
                     itemNumberPrefix = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    itemNumberLabel = ItemNumbering.Label(
+                        reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                        reader.IsDBNull(5) ? null : reader.GetString(5),
+                        reader.IsDBNull(8) ? null : reader.GetInt32(8)),
                     fileName = reader.GetString(6),
                     itemRevisionNumber = reader.IsDBNull(7) ? (int?)null : reader.GetInt32(7),
                 });
@@ -270,7 +276,8 @@ static class ClientVerificationEndpoints
                 var notifyData = new
                 {
                     itemLabel = ItemEndpoints.ItemLabel(
-                        info.Value.FileName, info.Value.ItemNumber, info.Value.ItemNumberPrefix),
+                        info.Value.FileName, info.Value.ItemNumber, info.Value.ItemNumberPrefix,
+                        info.Value.ItemNumberDigits),
                 };
                 var type = verificationResult == ResultNeedsWork
                     ? "client_verification_needs_work"

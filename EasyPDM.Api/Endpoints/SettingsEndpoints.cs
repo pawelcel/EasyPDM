@@ -491,6 +491,46 @@ static class SettingsEndpoints
             return Results.Ok(new { rodzaj, prefix });
         });
 
+        // GET /api/settings/item-number-format — minimalna liczba cyfr numeru (0 = bez
+        // dopełniania). Osobno od prefiksów, bo to JEDNA wartość dla całej bazy, a nie
+        // mapowanie per rodzaj; razem składają się na to, co widać jako numer elementu
+        // (zob. ItemNumbering).
+        app.MapGet("/api/settings/item-number-format", async (HttpContext ctx) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            return Results.Ok(new { digits = await ItemNumbering.GetDigitsAsync(conn) });
+        });
+
+        // PATCH /api/settings/item-number-format   body: { "digits": 4 }
+        // W ODRÓŻNIENIU od prefiksu (zamrażanego przy tworzeniu elementu) ta zmiana działa
+        // WSTECZ: dopełnienie liczone jest przy wyświetlaniu, więc elementy utworzone wcześniej
+        // też zaczną się pokazywać jako 0001. Sam numer w bazie pozostaje liczbą.
+        app.MapPatch("/api/settings/item-number-format", async (HttpContext ctx, ItemNumberFormatRequest body) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+            if (body.Digits < 0 || body.Digits > 10)
+                return Results.BadRequest("Liczba cyfr musi mieścić się w zakresie 0-10.");
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            // system_state bywa pusta aż do pierwszego zasiania przykładowego projektu --
+            // upsert, żeby ustawienie dało się zapisać także na całkiem świeżej bazie.
+            await using var cmd = new NpgsqlCommand("""
+                INSERT INTO system_state (id, item_number_digits) VALUES (true, @digits)
+                ON CONFLICT (id) DO UPDATE SET item_number_digits = EXCLUDED.item_number_digits;
+                """, conn);
+            cmd.Parameters.AddWithValue("digits", body.Digits);
+            await cmd.ExecuteNonQueryAsync();
+
+            return Results.Ok(new { digits = body.Digits });
+        });
+
         // GET /api/settings/item-number-sequence
         // Podgląd stanu sekwencji numerów elementów -- jaki numer dostałby KOLEJNY nowo
         // utworzony element teraz (bez konsumowania go -- last_value/is_called to
@@ -743,4 +783,5 @@ record BackupScheduleRequest(
     bool Enabled, string Frequency, int? DayOfWeek, int? DayOfMonth, int Hour, int Minute, int RetentionCount);
 
 record ItemNumberPrefixRequest(string? Prefix);
+record ItemNumberFormatRequest(int Digits);
 record ResetItemNumberSequenceRequest(int NextNumber);

@@ -151,13 +151,18 @@ function PartSummaryFields({
       {ownerBlocked && !statusLocked && <Hint>{t("item.ownerLockedHint")}</Hint>}
 
       <Label>{t("part.kind")}</Label>
+      {/* Przyciski zostają widoczne, tylko wyszarzone — żeby było wiadomo, jakie rodzaje
+          istnieją i że akurat tego elementu już nie dotyczą. Wyjaśnienie pokazujemy tylko
+          wtedy, gdy blokuje WŁAŚNIE to (statusLocked/ownerBlocked mają własne komunikaty
+          wyżej), żeby nie mnożyć trzech podpowiedzi naraz. */}
+      {item.kindLocked && !locked && <Hint>{t("part.kindLockedHint")}</Hint>}
       <div className="flex flex-wrap gap-1.5">
         {(isAssembly ? ASSEMBLY_KINDS : PART_KINDS).map((kind) => (
           <Button
             key={kind.value}
             size="sm"
             variant={rodzaj === kind.value ? "default" : "outline"}
-            disabled={locked}
+            disabled={locked || item.kindLocked}
             onClick={() => changeRodzaj(kind.value)}
           >
             {t(kind.labelKey)}

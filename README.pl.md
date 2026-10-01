@@ -194,6 +194,16 @@ uszczegółowienie w obrębie tej serii (np. seria „Łożyska walcowe” → p
 pola widoczne obok siebie. Seria/Typ jest zablokowana, dopóki nie wybierzesz producenta, a
 Podtyp — dopóki nie wybierzesz serii; zmiana producenta albo serii czyści to, co niżej.
 
+**Jak wygląda numer**, ustawia się raz, w Ustawieniach → Numeracja: każdy rodzaj może dostać
+własny literowy prefiks (np. `C` dla części klienta), a numery można dopełniać zerami do
+stałej szerokości, przez co element czyta się jako `C0001(płyta)` zamiast `1(płyta)`. Oba
+są odciskane na elemencie przy jego tworzeniu i nigdy potem nieprzeliczane — makra CAD budują
+z tego numeru nazwę każdego pliku, więc późniejsza zmiana zostawiłaby na dyskach pliki
+mówiące coś innego. Warto więc ustawić to przed pierwszym prawdziwym elementem. Jedyny
+wyjątek to pomyłka złapana wcześnie: poprawienie rodzaju Części poprawia też jej prefiks —
+ale tylko dopóki jej pola CAD/rysunek/PDF/3D są puste. Gdy w którymś leży już plik, rodzaj
+też jest przesądzony, bo plik na dysku nosi numer, o którym rodzaj decyduje.
+
 ### Status i rewizje
 
 Część/Złożenie przechodzą przez cztery statusy: **w pracy → sprawdzany → wydany**, a z

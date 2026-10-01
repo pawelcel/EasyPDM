@@ -521,8 +521,12 @@ def _revision_attachment_pattern(item_number, name):
     """Regex dopasowujący własną konwencję nazewnictwa makr PDM: "numer (nazwa).REWIZJA."
     — grupa 1 to litera rewizji. Ta sama nazwa co nada EasyPDMUpload.FCMacro (zob. tam
     _rename_and_upload) — dzięki temu pobieranie i wysyłanie zawsze się zgadzają."""
+    # [A-Za-z]*0* przed numerem: nazwa moze miec literowy prefiks rodzaju i zera wiodace
+    # (Ustawienia -> Nazewnictwo), a zalaczniki wgrane przed wlaczeniem tych ustawien maja
+    # sam numer -- oba warianty musza pasowac, inaczej pobieranie przestaloby widziec
+    # wlasne starsze pliki.
     return re.compile(
-        rf"^{item_number}\s*\({re.escape(sanitize_filename(name))}\)\.([A-Za-z]+)\.",
+        rf"^[A-Za-z]*0*{item_number}\s*\({re.escape(sanitize_filename(name))}\)\.([A-Za-z]+)\.",
         re.IGNORECASE,
     )
 
@@ -599,7 +603,7 @@ def _download_item(item, target_dir, log):
     ta stara, którą i tak ma), albo None, jeśli nic nie udało się ustalić."""
     number = item.get("itemNumber")
     name = item.get("fileName", "")
-    label = f"{number} ({name})"
+    label = f"{item.get('itemNumberLabel') or number}({name})"
 
     try:
         attachments = api_get(f"/items/{item['id']}/attachments") or []
@@ -671,7 +675,7 @@ def _download_children_recursive(item, target_dir, log, seen):
     try:
         rows = api_get(f"/items/{item['id']}/children") or []
     except Exception as e:
-        label = f"{item.get('itemNumber')} ({item.get('fileName')})"
+        label = f"{item.get('itemNumberLabel') or item.get('itemNumber')}({item.get('fileName')})"
         log(t("log_no_children_list", label=label, error=e))
         return
     # UWAGA: odpowiedź to lista {"item": {...}, "quantity": ..., "position": ...} — sam

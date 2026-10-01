@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace EasyPDM.Api.Tests;
 
-// Reguła statusu Złożenia względem jego BOM-u (0.5): złożenie nie może wyprzedzać swoich
+// Reguła statusu Złożenia względem jego BOM-u (0.4.1): złożenie nie może wyprzedzać swoich
 // komponentów. Sprawdzany jest WYŁĄCZNIE jeden poziom w dół — głębiej pilnuje tego ta sama
 // reguła zastosowana do podzłożenia, kiedy przychodzi jego kolej.
 [Collection("EasyPDM database")]

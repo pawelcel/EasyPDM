@@ -2,7 +2,7 @@
 
 All notable changes to EasyPDM are documented in this file.
 
-## [0.5]
+## [0.4.1]
 
 ### Added
 - **An Assembly can no longer get ahead of its own bill of materials.** Moving an Assembly
@@ -27,7 +27,43 @@ All notable changes to EasyPDM are documented in this file.
   reason and nothing is touched: bringing a cancelled part back into circulation is a
   decision, not a side effect of releasing an assembly.
 
+- **The number format is now shown while you set it, not after.** Each prefix field in
+  Settings -> Numbering carries a live example to its left, so typing "C" immediately shows
+  `C0001` instead of leaving you to guess whether the letter is glued to the number or gets
+  a separator.
+- **Numbers can be zero-padded to a fixed width.** Switch padding on, set the digit count,
+  and new numbers read `0001`, `0002`; switched off, everything behaves exactly as before.
+  A number longer than the width is not truncated — it is a minimum, not a fixed-length
+  format. Padding is frozen on an item when it is created, exactly like the prefix, and so
+  applies only to items created after the change: the item's number is also the name its
+  file carries on disk and as an attachment, and those cannot be rewritten after the fact.
+  A database that has been running for a while will therefore hold a mix of `4` and `0005`
+  — the same way it already holds items with and without a prefix.
+
+### Changed
+- **Correcting a Part's kind now corrects its prefix too** — as long as nothing has been
+  uploaded to it yet. Picking "Manufactured" instead of "Purchased" used to leave the item
+  stuck with the wrong letter forever, because the prefix is frozen when the item is
+  created. It is frozen for a reason: the CAD macros build a file's name out of that number,
+  so the file carries it on disk and in the database. The prefix therefore follows the kind
+  only until something lands in one of the four dedicated slots — CAD file, drawing, PDF or
+  3D model. Ordinary attachments (a mill certificate, a photo) keep their own names and
+  block nothing. Once a dedicated slot is filled the kind itself can no longer be changed:
+  the buttons grey out and say why, because a kind that disagrees with the number would be
+  worse than not being able to correct it. The number itself never changes either way.
+- **The space between the number and the name is gone**: an item now reads `C0001(plate)`
+  and its file is written as `C0001(plate).A.sldprt`. This is the same convention
+  everywhere — the tree, the bill-of-materials exports, the folders inside a documentation
+  ZIP and all three CAD macros. Files written before the change keep their space and are
+  still recognized, because the macros' name matching never required one.
+
 ### Fixed
+- **The CAD macros now name files the way the database does.** They built every file name
+  from the bare number, so a Part whose kind had the prefix "C" was `C5` in EasyPDM but
+  `5 (Name).A.sldprt` on disk — the prefix existed only in the database. All three macros
+  now take the ready-made number from the server (prefix and padding included), for the CAD
+  file, the STEP and the PDF alike, and their name-matching accepts both the new names and
+  the ones they wrote before.
 - Rows of buttons no longer spill outside their panel in English and German. Several rows —
   the kind of a Part/Assembly in the "Add item" window, the four statuses, the item and
   project toolbars, and the client header — were laid out without wrapping, which held as

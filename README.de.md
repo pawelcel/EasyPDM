@@ -211,6 +211,18 @@ und **Untertyp** verfeinert sie innerhalb dieser Serie (z. B. Serie „Zylinderr
 Hersteller gewählt ist, Untertyp, bis eine Serie gewählt ist; ein Wechsel des Herstellers
 oder der Serie löscht alles darunter.
 
+**Wie die Nummer aussieht**, wird einmal eingestellt, unter Einstellungen → Nummerierung:
+Jede Art kann ihr eigenes Buchstabenpräfix bekommen (etwa `C` für Kundenteile), und Nummern
+lassen sich auf eine feste Breite mit Nullen auffüllen, sodass ein Element `C0001(Platte)`
+statt `1(Platte)` lautet. Beides wird dem Element bei seiner Erstellung aufgeprägt und
+danach nie neu berechnet — die CAD-Makros bauen aus dieser Nummer den Namen jeder Datei, und
+eine spätere Änderung würde auf den Laufwerken Dateien zurücklassen, die etwas anderes sagen.
+Es lohnt sich also, das vor dem ersten echten Element einzustellen. Die einzige Ausnahme ist
+ein früh bemerkter Fehler: Wird die Art eines Teils korrigiert, wird auch sein Präfix
+korrigiert — aber nur, solange seine Felder CAD/Zeichnung/PDF/3D leer sind. Liegt in einem
+davon bereits eine Datei, steht auch die Art fest, denn die Datei auf der Festplatte trägt
+die Nummer, über die die Art entscheidet.
+
 ### Status und Revisionen
 
 Teile/Baugruppen durchlaufen vier Status: **in Bearbeitung → in Prüfung → freigegeben**,

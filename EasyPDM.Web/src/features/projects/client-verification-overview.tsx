@@ -53,6 +53,7 @@ function VerificationTable({
                       fileName: row.fileName,
                       itemNumber: row.itemNumber,
                       itemNumberPrefix: row.itemNumberPrefix,
+                      itemNumberLabel: row.itemNumberLabel,
                     })}
                   </TableCell>
                   <TableCell className={stale ? "text-destructive" : undefined}>

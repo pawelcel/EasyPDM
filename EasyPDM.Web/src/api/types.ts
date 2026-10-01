@@ -121,11 +121,13 @@ export function fileTypeLabel(item: Pick<Item, "itemType" | "fileType">): string
 // Część/Złożenie mają numer z bazy (item_number) — wyświetlamy je zawsze jako "numer (nazwa)".
 // Folder/Plik nie mają numeru, więc pokazują samą nazwę.
 export function itemDisplayLabel(
-  item: Pick<Item, "fileName" | "itemNumber" | "itemNumberPrefix">
+  item: Pick<Item, "fileName" | "itemNumber" | "itemNumberPrefix" | "itemNumberLabel">
 ): string {
-  return item.itemNumber !== null
-    ? `${item.itemNumberPrefix ?? ""}${item.itemNumber} (${item.fileName})`
-    : item.fileName
+  if (item.itemNumber === null) return item.fileName
+  // itemNumberLabel pochodzi z serwera i uwzględnia dopełnienie zerami. Złożenie prefiksu z
+  // numerem zostaje jako zapas dla odpowiedzi, które tego pola jeszcze nie niosą.
+  const number = item.itemNumberLabel ?? `${item.itemNumberPrefix ?? ""}${item.itemNumber}`
+  return `${number}(${item.fileName})`
 }
 
 // W nawiasie Nazwa/Nazwa 2 klienta (gdy przypisane), potem nazwa samego projektu bez
@@ -169,6 +171,13 @@ export interface Item {
   itemType: ItemType
   itemNumber: number | null
   itemNumberPrefix: string | null
+  // Gotowa etykieta numeru z serwera: prefiks + numer dopełniony zerami wg ustawień
+  // (Ustawienia -> Nazewnictwo). Serwer liczy to w jednym miejscu, tak samo jak revisionLabel,
+  // żeby frontend i trzy makra CAD nie składały jej każde po swojemu.
+  itemNumberLabel: string | null
+  // Rodzaju nie da się już zmienić: element ma plik w którymś z czterech wyróżnionych pól,
+  // a ich nazwy zawierają jego numer, który od rodzaju zależy (zob. PropertyEndpoints).
+  kindLocked: boolean
   showInTree: boolean
   status: ItemStatus | null
   revisionNumber: number | null
@@ -247,6 +256,10 @@ export interface BomEntry {
   path: number[]
   itemNumber: number | null
   itemNumberPrefix: string | null
+  // Gotowa etykieta numeru z serwera: prefiks + numer dopełniony zerami wg ustawień
+  // (Ustawienia -> Nazewnictwo). Serwer liczy to w jednym miejscu, tak samo jak revisionLabel,
+  // żeby frontend i trzy makra CAD nie składały jej każde po swojemu.
+  itemNumberLabel: string | null
   fileName: string
   revisionNumber: number | null
   revisionLabel: string | null
@@ -265,6 +278,10 @@ export interface UsedInEntry {
   id: string
   itemNumber: number | null
   itemNumberPrefix: string | null
+  // Gotowa etykieta numeru z serwera: prefiks + numer dopełniony zerami wg ustawień
+  // (Ustawienia -> Nazewnictwo). Serwer liczy to w jednym miejscu, tak samo jak revisionLabel,
+  // żeby frontend i trzy makra CAD nie składały jej każde po swojemu.
+  itemNumberLabel: string | null
   fileName: string
   itemType: ItemType
   projectId: string | null
@@ -450,6 +467,10 @@ export interface ClientVerificationSummary {
   // drzewko projektu nie jest załadowane.
   itemNumber: number | null
   itemNumberPrefix: string | null
+  // Gotowa etykieta numeru z serwera: prefiks + numer dopełniony zerami wg ustawień
+  // (Ustawienia -> Nazewnictwo). Serwer liczy to w jednym miejscu, tak samo jak revisionLabel,
+  // żeby frontend i trzy makra CAD nie składały jej każde po swojemu.
+  itemNumberLabel: string | null
   fileName: string
   itemRevisionNumber: number | null
 }

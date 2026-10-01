@@ -62,7 +62,7 @@ PostgreSQL 18.
 - **`EasyPDM.FreeCad/`** — two macros: `EasyPDMUpload.FCMacro` (run from within FreeCAD,
   saves the active document, delegates the project/new-vs-existing/properties choice to
   the browser, creates a Part/Assembly in the PDM, attaches the file, exports STEP, and
-  renames the local file to `number (name)`) and `EasyPDMDownload.FCMacro` (the opposite
+  renames the local file to `number(name)`) and `EasyPDMDownload.FCMacro` (the opposite
   direction: pick a Part/Assembly in the browser, fetch it together with the WHOLE tree
   of the Assembly's components — so that `App::Link` references resolve — and open it
   in FreeCAD right away; skips already-downloaded files, asks before overwriting an
@@ -287,6 +287,31 @@ Numbering) — this only works when no existing item already has that number or 
 so it lets you reclaim the numbering "tail" left behind by deleted test items without
 risking a collision.
 
+What the user sees is that number dressed in two things, both stored **on the item** and
+frozen when it is created: a letter prefix per kind (`item_number_prefix`, from
+`item_number_prefixes`) and a minimum width to zero-pad to (`item_number_digits`, from
+`system_state.item_number_digits`). Changing either setting therefore affects only items
+created afterwards. That is not conservatism for its own sake: the CAD macros build a
+file's name out of this number, so the name lives on disk and inside `item_attachments`,
+where nothing can rewrite it after the fact. `ItemNumbering.Label` composes the three
+parts in one place and the API ships the result as `itemNumberLabel` next to
+`itemNumber`/`itemNumberPrefix` — the same pattern as `revisionLabel`, so that the web
+frontend and the three CAD macros never compose it themselves (and never disagree).
+
+The one exception is a mistake caught early: changing a Part/Assembly's kind recomputes
+the prefix for as long as the item has no attachment in any of the four dedicated slots
+(`preview_role` of `cad`, `drawing`, `pdf` or `step`). Those are the files whose names the
+macros derive from the number; ordinary attachments keep their own names and block
+nothing. Once a dedicated slot is filled, `PATCH /properties` REFUSES a kind change
+outright rather than applying it with a stale prefix, and the item payload carries
+`kindLocked` so the UI can grey the buttons out. Only a real change is refused — resending
+the same kind passes. The number itself never changes.
+
+The full name of an item reads `prefix + padded number` immediately followed by the name
+in brackets — `C0001(plate)` — with the revision letter and the extension appended for a
+file on disk: `C0001(plate).A.sldprt`. Files written before this convention keep the space
+they were saved with; every macro's name matching accepts both forms.
+
 ### Login, roles, and project access
 
 Every request to `/api/*` (except `/api/auth/login`) requires being logged in — a
@@ -342,7 +367,8 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | POST | `/api/projects/{projectId}/items` | **multipart/form-data**: file upload (optional `parentId`) |
 | GET | `/api/items/{id}/file` | download the uploaded file |
 | POST | `/api/items/{id}/duplicate` | duplicates a Part/Assembly (new number, status, owner) |
-| PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | rename / change tree visibility / change status / move to another project |
+| PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | rename / change tree visibility / change status / move to another project. An Assembly moving to `sprawdzany`/`wydany` is refused while its DIRECT BOM children are behind; `promoteChildren: true` moves them and the assembly in one transaction |
+| GET | `/api/items/{id}/status-precheck?target=` | what blocks that status change: sub-assemblies to handle separately, components that cannot be touched (cancelled / owner-locked / inaccessible project), and components that could be moved along. Read-only — `PATCH /status` enforces the same rule independently |
 | POST | `/api/items/{id}/lock` \| `/release` | lock (take ownership) / release an item |
 | DELETE | `/api/items/{id}` | complete deletion (recurses through Folders only — an Assembly's components are never deleted with it) — **administrator only** |
 | GET | `/api/projects/{projectId}/relations` | parent-child relations (structure/BOM) of a given project |
@@ -372,6 +398,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | storage location/stats, moving it, backup (pg_dump + files in a ZIP), restore from backup — **administrator only** |
 | GET/PATCH | `/api/settings/backup-schedule` | automatic backup schedule (enable/disable, frequency, day, time, number of kept copies) — **administrator only** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | item number letter prefixes per kind (the 4 Part kinds plus `Zlozenie` = manufactured assembly; purchased/client assemblies reuse the Part kind's prefix) — **administrator only** |
+| GET/PATCH | `/api/settings/item-number-format` | minimum number of digits to zero-pad item numbers to (0 = no padding); frozen onto each item as it is created — **administrator only** |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | preview/rewind the item number sequence — **administrator only** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | list of days with a saved log, the last N lines of a given day, download of the full file — **administrator only** |
 

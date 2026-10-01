@@ -589,7 +589,22 @@ class AuthError(RuntimeError):
 # przez to samo makro po wysłaniu do PDM) — np. "76 (RewizjaTest).C". Jeśli dokument został
 # ponownie otwarty z takiego pliku, nazwa/etykieta NIE jest już samą nazwą elementu, tylko
 # tym pełnym formatem — trzeba wyłuskać numer, żeby rozpoznać, o który element chodzi.
-_REVISION_NAME_PATTERN = re.compile(r"^(\d+)\s*\((.+)\)(?:\.[A-Za-z]+)?$")
+# Nazwa pliku PDM to "NUMER (nazwa).REWIZJA.rozszerzenie", gdzie NUMER może mieć literowy
+# prefiks rodzaju i zera wiodace (Ustawienia -> Nazewnictwo), np. "C0005 (Wspornik).A.FCStd".
+# Prefiks i zera sa tu tylko ozdoba -- do odpytania API liczy sie sama liczba, a int() zjada
+# zera wiodace. Stare nazwy bez prefiksu ("5 (Wspornik)") dalej pasuja, bo prefiks jest
+# opcjonalny.
+_REVISION_NAME_PATTERN = re.compile(r"^(?P<prefix>[A-Za-z]*)(?P<number>\d+)\s*\((?P<name>.+)\)(?:\.[A-Za-z]+)?$")
+
+
+def item_number_text(item):
+    """Numer elementu TAK, JAK MA WYGLADAC W NAZWIE PLIKU -- gotowa etykieta z serwera
+    (prefiks rodzaju + zera wiodace, zob. ItemNumbering po stronie API). Zapas na samą liczbę
+    zostaje dla starszego serwera, ktory tego pola jeszcze nie zwraca."""
+    label = item.get("itemNumberLabel")
+    if label:
+        return str(label)
+    return str(item.get("itemNumber", ""))
 
 
 def get_base_url():
@@ -1001,8 +1016,8 @@ def match_existing_item(doc, existing_items):
     m = _REVISION_NAME_PATTERN.match(doc.Label)
     if not m:
         return None
-    item_number = int(m.group(1))
-    label_name = m.group(2).strip().lower()
+    item_number = int(m.group("number"))
+    label_name = m.group("name").strip().lower()
     for it in existing_items:
         if it.get("itemNumber") == item_number and it.get("fileName", "").strip().lower() == label_name:
             return it
@@ -1020,8 +1035,8 @@ def match_existing_item_single(doc):
     m = _REVISION_NAME_PATTERN.match(doc.Label)
     if not m:
         return None
-    item_number = int(m.group(1))
-    label_name = m.group(2).strip().lower()
+    item_number = int(m.group("number"))
+    label_name = m.group("name").strip().lower()
     try:
         it = api_get(f"/items/by-number/{item_number}")
     except Exception:
@@ -1076,9 +1091,9 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
     rewizji już przemianowanego pliku) — do komunikatu końcowego w run(), żeby nie sugerować
     przenosin, które się nie odbyły."""
     ext = os.path.splitext(doc.FileName)[1]
-    name_prefix = f"{item_number} ({sanitize_filename(name)})"
+    name_prefix = f"{item_number}({sanitize_filename(name)})"
     new_filename = f"{name_prefix}.{revision_label(revision)}{ext}"
-    new_label = f"{item_number} ({name}).{revision_label(revision)}"
+    new_label = f"{item_number}({name}).{revision_label(revision)}"
     new_local_path = os.path.join(target_folder or os.path.dirname(doc.FileName), new_filename)
 
     # KOLEJNOŚĆ JEST TU ISTOTNA: najpierw lokalny Save As pod nazwą PDM (razem z
@@ -1525,7 +1540,7 @@ def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None
 
     try:
         return _rename_and_upload(
-            doc, item_id, item["itemNumber"], item["fileName"], revision, target_folder, export_step, export_pdf
+            doc, item_id, item_number_text(item), item["fileName"], revision, target_folder, export_step, export_pdf
         )
     except Exception as exc:
         if status_changed:
@@ -1911,7 +1926,7 @@ def submit_via_browser(doc, target_folder):
         )
 
     return _rename_and_upload(
-        doc, ticket_data["itemId"], ticket_data["itemNumber"], ticket_data["name"],
+        doc, ticket_data["itemId"], item_number_text(ticket_data), ticket_data["name"],
         1, target_folder, export_step, export_pdf,
     )
 
@@ -1945,7 +1960,7 @@ def sync_stale_children(parent_item_id, local_child_ids):
     if not stale:
         return
 
-    lines = "\n".join(f"- {c.get('itemNumber')} ({c.get('fileName')})" for c in stale)
+    lines = "\n".join(f"- {c.get('itemNumber')}({c.get('fileName')})" for c in stale)
     choice = QtWidgets.QMessageBox.question(
         None, t("pdm_title"), t("stale_children_confirm", count=len(stale), lines=lines),
         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No,
@@ -2126,7 +2141,7 @@ def process_assembly_tree(top_doc, target_folder=None):
                     # pliku; tworzenie kolejnego elementu przez API stworzyłoby DRUGI
                     # rekord.
                     result = _rename_and_upload(
-                        doc, ticket_data["itemId"], ticket_data["itemNumber"], ticket_data["name"],
+                        doc, ticket_data["itemId"], item_number_text(ticket_data), ticket_data["name"],
                         1, target_folder, comp_export_step, comp_export_pdf,
                     )
                     newly_created_paths.add(file_path)
@@ -2311,7 +2326,7 @@ def run():
     if locked_matches:
         status_labels = {"sprawdzany": t("status_label_sprawdzany"), "wydany": t("status_label_wydany")}
         lines = "\n".join(
-            f"- {number} ({name}) -- {status_labels.get(status, status)}"
+            f"- {number}({name}) -- {status_labels.get(status, status)}"
             for number, name, status in locked_matches
         )
         locked_tail = t("locked_components_tail", count=len(locked_matches), lines=lines)

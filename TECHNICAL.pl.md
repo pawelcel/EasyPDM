@@ -59,7 +59,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 - **`EasyPDM.FreeCad/`** — dwa makra: `EasyPDMUpload.FCMacro` (uruchamiane z poziomu
   FreeCAD, zapisuje aktywny dokument, deleguje wybór projektu/nowy-czy-istniejący/
   właściwości do przeglądarki, tworzy Część/Złożenie w PDM, dogrywa plik jako załącznik,
-  eksportuje STEP i zmienia nazwę lokalnego pliku na `numer (nazwa)`) i
+  eksportuje STEP i zmienia nazwę lokalnego pliku na `numer(nazwa)`) i
   `EasyPDMDownload.FCMacro` (odwrotny kierunek: wybór Części/Złożenia w przeglądarce,
   pobiera je razem z CAŁYM drzewem składników Złożenia — żeby odnośniki `App::Link` się
   rozwiązały — i od razu otwiera w FreeCAD; pomija już pobrane pliki, pyta przed
@@ -281,6 +281,31 @@ sekwencji). Administrator może ręcznie cofnąć sekwencję do wskazanego numer
 wyższego, więc pozwala odzyskać "ogon" numeracji po usuniętych elementach testowych bez
 ryzyka kolizji.
 
+To, co widzi użytkownik, to ten numer ubrany w dwie rzeczy, obie trzymane **na elemencie**
+i zamrażane przy jego tworzeniu: literowy prefiks rodzaju (`item_number_prefix`, z
+`item_number_prefixes`) i minimalną szerokość dopełnienia zerami (`item_number_digits`, z
+`system_state.item_number_digits`). Zmiana któregokolwiek ustawienia dotyczy więc wyłącznie
+elementów tworzonych później. To nie jest ostrożność dla samej ostrożności: makra CAD budują
+z tego numeru nazwę pliku, więc nazwa ta żyje na dysku i w `item_attachments`, gdzie nic jej
+wstecz nie przepisze. `ItemNumbering.Label` składa te trzy części w jednym miejscu, a API
+podaje wynik jako `itemNumberLabel` obok `itemNumber`/`itemNumberPrefix` — tym samym wzorcem
+co `revisionLabel`, żeby frontend i trzy makra CAD nigdy nie składały tego same (i nigdy się
+nie rozjechały).
+
+Jedyny wyjątek to pomyłka złapana wcześnie: zmiana rodzaju Części/Złożenia przelicza prefiks
+dopóty, dopóki element nie ma załącznika w żadnym z czterech wyróżnionych pól (`preview_role`
+= `cad`, `drawing`, `pdf`, `step`). To są pliki, których nazwy makra wyprowadzają z numeru;
+zwykłe załączniki zachowują własne nazwy i niczego nie blokują. Gdy wyróżnione pole jest już
+zajęte, `PATCH /properties` ODRZUCA zmianę rodzaju, zamiast przyjąć ją ze starym prefiksem, a
+obiekt elementu niesie `kindLocked`, żeby interfejs mógł wyszarzyć przyciski. Odrzucana jest
+wyłącznie rzeczywista zmiana — ponowne przysłanie tego samego rodzaju przechodzi. Sam numer
+nie zmienia się nigdy.
+
+Pełna nazwa elementu to `prefiks + dopełniony numer` i zaraz za nim nazwa w nawiasie —
+`C0001(płyta)` — a dla pliku na dysku dochodzi jeszcze litera rewizji i rozszerzenie:
+`C0001(płyta).A.sldprt`. Pliki zapisane przed tą konwencją zachowują spację, z którą
+powstały; dopasowywanie nazw w każdym makrze przyjmuje obie postacie.
+
 ### Logowanie, role i dostęp do projektów
 
 Każde żądanie do `/api/*` (poza `/api/auth/login`) wymaga zalogowania — sesja to losowy
@@ -334,7 +359,8 @@ usunąć (`DELETE /api/notifications/{id}`).
 | POST | `/api/projects/{projectId}/items` | **multipart/form-data**: upload pliku (opcjonalnie `parentId`) |
 | GET | `/api/items/{id}/file` | pobranie wgranego pliku |
 | POST | `/api/items/{id}/duplicate` | duplikuje Część/Złożenie (nowy numer, status, właściciel) |
-| PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | zmiana nazwy / widoczności w drzewku / statusu / przeniesienie do innego projektu |
+| PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | zmiana nazwy / widoczności w drzewku / statusu / przeniesienie do innego projektu. Złożenie przechodzące na `sprawdzany`/`wydany` dostaje odmowę, dopóki jego BEZPOŚREDNIE komponenty są w tyle; `promoteChildren: true` przestawia je razem ze złożeniem w jednej transakcji |
+| GET | `/api/items/{id}/status-precheck?target=` | co stoi na przeszkodzie tej zmianie statusu: podzłożenia do osobnego załatwienia, komponenty, których nie wolno tknąć (anulowane / zablokowane przez kogoś / w projekcie bez dostępu) i komponenty, które da się pociągnąć. Tylko odczyt — `PATCH /status` sprawdza tę samą regułę niezależnie |
 | POST | `/api/items/{id}/lock` \| `/release` | zablokowanie (przejęcie na własność) / zwolnienie elementu |
 | DELETE | `/api/items/{id}` | usunięcie całkowite (rekurencja tylko przez Foldery — komponenty Złożenia nigdy nie są kasowane razem z nim) — **tylko administrator** |
 | GET | `/api/projects/{projectId}/relations` | relacje rodzic-dziecko (struktura/BOM) danego projektu |
@@ -364,6 +390,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | lokalizacja/statystyki magazynu, przeniesienie, backup (pg_dump + pliki w ZIP), przywrócenie z backupu — **tylko administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | harmonogram automatycznej kopii zapasowej (włącz/wyłącz, częstotliwość, dzień, godzina, liczba przechowywanych kopii) — **tylko administrator** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | prefiksy-litery numeru elementu per rodzaj (4 rodzaje Części + `Zlozenie` = złożenie wykonywane; złożenie zakupowe/klienta używa prefiksu rodzaju Części) — **tylko administrator** |
+| GET/PATCH | `/api/settings/item-number-format` | minimalna liczba cyfr, do której dopełniany jest numer zerami (0 = bez dopełniania); zamrażana na elemencie przy jego tworzeniu — **tylko administrator** |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | podgląd/cofnięcie sekwencji numerów elementów — **tylko administrator** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | lista dni z zapisanym logiem, ostatnie N wierszy z danego dnia, pobranie pełnego pliku — **tylko administrator** |
 

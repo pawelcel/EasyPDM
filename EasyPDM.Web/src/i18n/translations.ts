@@ -103,6 +103,15 @@ const pl = {
   "settings.noPermission": "Brak uprawnień.",
 
   "naming.hint": "Litera-prefiks jest doklejana przed numerem nowo tworzonych Części/Złożeń danego rodzaju. Zmiana nie wpływa na już istniejące elementy — ich prefiks został zamrożony w momencie utworzenia.",
+  "part.kindLockedHint": "Rodzaju nie można już zmienić — element ma plik w jednym z wyróżnionych pól (CAD, rysunek, PDF, model 3D), a nazwy tych plików zawierają jego numer, który od rodzaju zależy. Zwykłe załączniki niczego nie blokują.",
+  "naming.examplePrefix": "Przykład:",
+  // Przykładowa nazwa elementu w podglądzie numeracji — konkretna część czyta się lepiej
+  // niż abstrakcyjne "nazwa", bo przykład ma wyglądać jak prawdziwy wpis.
+  "naming.exampleName": "płyta",
+  "naming.digitsTitle": "Dopełnianie zerami",
+  "naming.digitsHint": "Wyłączone — numery wyglądają jak dotąd (1, 2, 3). Włączone — są dopełniane zerami do podanej liczby cyfr, np. 0001, 0002. Numer dłuższy niż ta wartość nie jest przycinany. Tak samo jak prefiks, dopełnienie dotyczy WYŁĄCZNIE elementów tworzonych po tej zmianie — istniejące zachowują swój zapis, bo ich pliki są już zapisane pod tą nazwą na dyskach i jako załączniki.",
+  "naming.digitsEnableLabel": "Dopełniaj numery zerami",
+  "naming.digitsLabel": "Liczba cyfr",
   "naming.assemblyManufacturedLabel": "Wykonywane",
   "naming.assemblyPrefixHint": "Złożenia zakupowe i klienta numerują się prefiksem odpowiedniego rodzaju Części powyżej — własny prefiks ma tylko złożenie wykonywane.",
   "naming.prefixPlaceholder": "brak",
@@ -598,7 +607,7 @@ const pl = {
   "item.propValuePlaceholder": "wartość",
   "item.statusChangeTitle": "Zmiana statusu",
   "item.statusChangeConfirm": "Zmień status",
-  // Reguła BOM (0.5) — złożenie nie może wyprzedzać swoich komponentów.
+  // Reguła BOM (0.4.1) — złożenie nie może wyprzedzać swoich komponentów.
   "item.bomPromoteText": "Te komponenty nie mają jeszcze statusu „{statusTo}”: {items}.",
   "item.bomPromoteQuestion": "Zmienić ich status na „{statusTo}” razem ze złożeniem?",
   "item.bomPromoteConfirm": "Zmień komponenty i złożenie",
@@ -830,6 +839,13 @@ const en: Record<TranslationKey, string> = {
   "settings.noPermission": "No permission.",
 
   "naming.hint": "The letter prefix is prepended to the number of newly created Parts/Assemblies of that kind. Changing it does not affect existing items — their prefix was frozen when they were created.",
+  "part.kindLockedHint": "The kind can no longer be changed — this item has a file in one of the dedicated slots (CAD, drawing, PDF, 3D model), and those file names carry its number, which depends on the kind. Ordinary attachments block nothing.",
+  "naming.examplePrefix": "Example:",
+  "naming.exampleName": "plate",
+  "naming.digitsTitle": "Zero padding",
+  "naming.digitsHint": "Off — numbers look the way they always have (1, 2, 3). On — they are padded with zeros to the given width, e.g. 0001, 0002. A number longer than that is not truncated. Like the prefix, padding applies ONLY to items created after the change — existing ones keep what they have, because their files are already saved under that name on disk and as attachments.",
+  "naming.digitsEnableLabel": "Pad numbers with zeros",
+  "naming.digitsLabel": "Digits",
   "naming.assemblyManufacturedLabel": "Manufactured",
   "naming.assemblyPrefixHint": "Purchased and client assemblies are numbered with the prefix of the matching Part kind above — only manufactured assemblies have their own.",
   "naming.prefixPlaceholder": "none",
@@ -1554,6 +1570,13 @@ const de: Record<TranslationKey, string> = {
   "settings.noPermission": "Keine Berechtigung.",
 
   "naming.hint": "Das Buchstabenpräfix wird der Nummer neu erstellter Teile/Baugruppen dieser Art vorangestellt. Eine Änderung wirkt sich nicht auf bestehende Elemente aus — deren Präfix wurde bei der Erstellung eingefroren.",
+  "part.kindLockedHint": "Die Art lässt sich nicht mehr ändern — zu diesem Element gibt es eine Datei in einem der hervorgehobenen Felder (CAD, Zeichnung, PDF, 3D-Modell), und deren Dateinamen enthalten seine Nummer, die von der Art abhängt. Gewöhnliche Anhänge blockieren nichts.",
+  "naming.examplePrefix": "Beispiel:",
+  "naming.exampleName": "Platte",
+  "naming.digitsTitle": "Auffüllen mit Nullen",
+  "naming.digitsHint": "Aus — die Nummern sehen aus wie bisher (1, 2, 3). Ein — sie werden auf die angegebene Stellenzahl mit Nullen aufgefüllt, z. B. 0001, 0002. Eine längere Nummer wird nicht abgeschnitten. Wie beim Präfix gilt das Auffüllen NUR für Elemente, die nach der Änderung erstellt werden — bestehende behalten ihre Schreibweise, denn ihre Dateien liegen bereits unter diesem Namen auf den Laufwerken und als Anhänge.",
+  "naming.digitsEnableLabel": "Nummern mit Nullen auffüllen",
+  "naming.digitsLabel": "Stellen",
   "naming.assemblyManufacturedLabel": "Gefertigt",
   "naming.assemblyPrefixHint": "Zugekaufte und Kunden-Baugruppen werden mit dem Präfix der entsprechenden Teileart oben nummeriert — ein eigenes Präfix hat nur die gefertigte Baugruppe.",
   "naming.prefixPlaceholder": "keins",

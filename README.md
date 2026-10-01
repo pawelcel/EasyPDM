@@ -194,6 +194,16 @@ Next to it, **Name 2** — one of that client's second names/trade variants from
 manufacturer, and Subtype until you pick a series; changing the manufacturer or the series
 clears whatever is below.
 
+**How the number looks** is set once, in Settings → Numbering: each kind can get its own
+letter prefix (say `C` for client-supplied parts), and numbers can be zero-padded to a
+fixed width, so an item reads `C0001(plate)` instead of `1(plate)`. Both are stamped onto
+an item when it is created and never recalculated afterwards — the CAD macros build each
+file's name out of that number, so changing it later would leave the files on disk saying
+something different. Worth setting before the first real item, then. The one exception is
+an early mistake: correcting a Part's kind also corrects its prefix — but only while its
+CAD/drawing/PDF/3D slots are still empty. Once a file is in one of them the kind is fixed
+too, since the file on disk already carries the number that the kind decides.
+
 ### Status and revisions
 
 Parts/Assemblies move through four statuses: **in progress → under review → released**,

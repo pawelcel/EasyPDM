@@ -761,7 +761,7 @@ function SortableBomRow({
           </TableCell>
           <TableCell style={{ paddingLeft: (entry.depth - 1) * 16 }}>
             {entry.itemNumber !== null
-              ? `${entry.itemNumberPrefix ?? ""}${entry.itemNumber} (${entry.fileName})`
+              ? `${entry.itemNumberPrefix ?? ""}${entry.itemNumber}(${entry.fileName})`
               : entry.fileName}
           </TableCell>
           <TableCell>{entry.revisionLabel ?? "—"}</TableCell>

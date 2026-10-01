@@ -321,7 +321,10 @@ export const api = {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(props),
-    }).then((r) => handleResponse<void>(r)),
+      // Typ jest opcjonalny CELOWO: handleResponse zwraca undefined dla odpowiedzi bez treści,
+      // a ten endpoint zwracał puste 200 do wersji 0.4.1 — front musi to przeżyć, bo nowy
+      // wwwroot bywa serwowany przez jeszcze nieprzeładowany, starszy proces API.
+    }).then((r) => handleResponse<{ prefixRecalculated: boolean } | undefined>(r)),
 
   deleteProperty: (itemId: string, key: string) =>
     fetch(`${BASE}/items/${itemId}/properties/${encodeURIComponent(key)}`, {
@@ -681,6 +684,18 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prefix }),
     }).then((r) => handleResponse<{ rodzaj: string; prefix: string | null }>(r)),
+
+  getItemNumberFormat: () =>
+    fetch(`${BASE}/settings/item-number-format`).then((r) =>
+      handleResponse<{ digits: number }>(r)
+    ),
+
+  setItemNumberFormat: (digits: number) =>
+    fetch(`${BASE}/settings/item-number-format`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ digits }),
+    }).then((r) => handleResponse<{ digits: number }>(r)),
 
   getItemNumberSequence: () =>
     fetch(`${BASE}/settings/item-number-sequence`).then((r) =>

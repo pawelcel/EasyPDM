@@ -1104,7 +1104,11 @@ Private Function NewRevisionRegex(ByVal itemNumber As Long, ByVal name As String
     Dim re As Object
     Set re = CreateObject("VBScript.RegExp")
     re.IgnoreCase = True
-    re.Pattern = "^" & itemNumber & "\s*\(" & RegexEscape(name) & "\)\.([A-Za-z]+)\."
+    ' [A-Za-z]*0* przed numerem: nazwa zalacznika moze miec literowy prefiks rodzaju i
+    ' zera wiodace (Ustawienia -> Nazewnictwo), a pliki wgrane przed wlaczeniem tych
+    ' ustawien maja sam numer -- oba warianty musza pasowac, inaczej pobieranie
+    ' przestaloby rozpoznawac wlasne starsze pliki.
+    re.Pattern = "^[A-Za-z]*0*" & itemNumber & "\s*\(" & RegexEscape(name) & "\)\.([A-Za-z]+)\."
     Set NewRevisionRegex = re
 End Function
 
@@ -1292,7 +1296,7 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
     Dim name As String
     name = JsonGetString(item, "fileName", "")
     Dim label As String
-    label = number & " (" & name & ")"
+    label = number & "(" & name & ")"
 
     Dim attachments As Object
     On Error Resume Next
@@ -1451,7 +1455,7 @@ Sub DownloadChildrenRecursive(ByVal item As Object, ByVal targetDir As String, B
     Set rows = ApiGet("/items/" & JsonGetString(item, "id", "") & "/children")
     On Error GoTo 0
     If rows Is Nothing Then
-        AppendLog "  " & JsonGetLong(item, "itemNumber", 0) & " (" & JsonGetString(item, "fileName", "") & T("Dl_FetchChildrenFailed")
+        AppendLog "  " & JsonGetLong(item, "itemNumber", 0) & "(" & JsonGetString(item, "fileName", "") & T("Dl_FetchChildrenFailed")
         Exit Sub
     End If
 
@@ -1545,7 +1549,7 @@ Sub main()
     SetDownloadFolder targetDir
 
     gLogText = ""
-    AppendLog T("Dl_DownloadingToPrefix") & JsonGetLong(topItem, "itemNumber", 0) & " (" & JsonGetString(topItem, "fileName", "") & T("Dl_DownloadingToMiddle") & targetDir & "..."
+    AppendLog T("Dl_DownloadingToPrefix") & JsonGetLong(topItem, "itemNumber", 0) & "(" & JsonGetString(topItem, "fileName", "") & T("Dl_DownloadingToMiddle") & targetDir & "..."
 
     Dim seen As Object
     Set seen = CreateObject("Scripting.Dictionary")

@@ -61,6 +61,7 @@ CREATE TABLE items (
                             CHECK (item_type IN ('folder', 'part', 'file', 'assembly')),
     item_number         INTEGER,                -- numer nadawany automatycznie Częściom i Złożeniom (item_number_seq)
     item_number_prefix  TEXT,                    -- opcjonalny prefiks-litera, zamrożony przy tworzeniu wg rodzaju + item_number_prefixes
+    item_number_digits  INTEGER,                 -- dopełnienie numeru zerami, zamrożone przy tworzeniu wg system_state.item_number_digits; NULL = bez dopełniania
     file_path           TEXT UNIQUE,             -- ścieżka w wewnętrznym magazynie API; puste dla folderów/Części (to kontenery bez własnego pliku)
     file_name           TEXT NOT NULL,           -- nazwa pliku (dla typu 'file') albo nazwa folderu/Części
     file_type           TEXT,                    -- sldprt, sldasm, slddrw, step, dxf... — puste dla folderów/Części
@@ -509,7 +510,12 @@ GRANT SELECT, INSERT, UPDATE ON backup_schedule TO pdm_user;
 -- ponownie zasiewał przykładowy projekt startowy (EnsureSampleProjectAsync w Program.cs).
 CREATE TABLE system_state (
     id                     BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
-    sample_project_seeded  BOOLEAN NOT NULL DEFAULT false
+    sample_project_seeded  BOOLEAN NOT NULL DEFAULT false,
+    -- Minimalna liczba cyfr numeru elementu: 0 = bez dopełniania (1, 2, 3), 4 = 0001, 0002...
+    -- Numer dłuższy niż ta wartość nie jest przycinany. W odróżnieniu od prefiksu (zamrażanego
+    -- na elemencie przy tworzeniu) to format WYŚWIETLANIA, liczony przy renderowaniu, więc
+    -- zmiana działa wstecz na wszystkie elementy.
+    item_number_digits     INTEGER NOT NULL DEFAULT 0 CHECK (item_number_digits BETWEEN 0 AND 10)
 );
 GRANT SELECT, INSERT, UPDATE ON system_state TO pdm_user;
 

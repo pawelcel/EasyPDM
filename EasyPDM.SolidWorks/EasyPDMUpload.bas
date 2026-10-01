@@ -1501,6 +1501,35 @@ End Function
 ' the web app can show it under its "CAD attachments" section, separately from ordinary,
 ' attachments -- one per revision (unique filename per revision means these ACCUMULATE,
 ' unlike the single-slot "pdf"/"step" roles which replace the previous attachment).
+' Numer elementu TAK, JAK MA WYGLADAC W NAZWIE PLIKU -- gotowa etykieta z serwera
+' (itemNumberLabel: literowy prefiks rodzaju plus zera wiodace, zob. Ustawienia ->
+' Nazewnictwo). Dotad makro sklejalo nazwe z samej liczby, przez co plik na dysku nazywal
+' sie inaczej niz element w bazie, gdy rodzaj mial ustawiony prefiks.
+'
+' Pobieramy to tutaj, zamiast przeciagac przez kilkanascie wywolan po drodze: jedno dodatkowe
+' GET na wysylke jest nieodczuwalne, a sygnatury pozostalych funkcji zostaja nietkniete.
+' Starszy serwer nie zwraca tego pola -- wtedy, jak i przy bledzie, zostaje sama liczba.
+Function ItemNumberLabelFor(ByVal itemId As String, ByVal fallbackNumber As Long) As String
+    Dim it As Object
+    Dim labelText As String
+
+    ItemNumberLabelFor = CStr(fallbackNumber)
+    If Len(itemId) = 0 Then Exit Function
+
+    On Error Resume Next
+    Set it = ApiGet("/items/" & itemId)
+    If Err.Number <> 0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    On Error GoTo 0
+
+    If it Is Nothing Then Exit Function
+    labelText = JsonGetString(it, "itemNumberLabel", "")
+    If Len(labelText) > 0 Then ItemNumberLabelFor = labelText
+End Function
+
 Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long, ByVal targetFolder As String, Optional ByVal role As String = "cad") As Boolean
     Dim ext As String
     Dim dotPos As Long
@@ -1520,7 +1549,7 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
     End If
 
     Dim newFilename As String
-    newFilename = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ext
+    newFilename = ItemNumberLabelFor(itemId, itemNumber) & "(" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ext
 
     ' UNVERIFIED against a live SolidWorks install for this SPECIFIC use (same-format
     ' native Save As, as opposed to UploadStepAttachment's format-CONVERTING SaveAs) --
@@ -1822,7 +1851,9 @@ Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
 
     Dim re As Object
     Set re = CreateObject("VBScript.RegExp")
-    re.Pattern = "^(\d+)\s*\("
+    ' [A-Za-z]*0* przed numerem: nazwa moze miec literowy prefiks rodzaju i zera
+    ' wiodace, a pliki sprzed wlaczenia tych ustawien maja sam numer -- oba musza pasowac.
+    re.Pattern = "^[A-Za-z]*0*(\d+)\s*\("
     If Not re.Test(fname) Then
         MsgBox T("Dwg_CannotIdentifyItem"), vbExclamation, T("AppTitle")
         LogLine "Drawing upload: could not parse an item number out of """ & fname & """ -- done."
@@ -2110,7 +2141,7 @@ Sub UploadStepAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal 
     ' now (see ReplaceExistingRoleAttachmentAsync in AttachmentEndpoints.cs) -- no need to
     ' fetch/delete the old one from here anymore.
     Dim stepDisplayName As String
-    stepDisplayName = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".step"
+    stepDisplayName = ItemNumberLabelFor(itemId, itemNumber) & "(" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".step"
 
     ApiUploadFile "/items/" & itemId & "/attachments", tempPath, stepDisplayName, "role", "step"
     LogLine "Uploaded STEP attachment for item " & itemId & " as """ & stepDisplayName & """ (from " & tempPath & ")."
@@ -2146,7 +2177,7 @@ Sub UploadPdfAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal i
     ' UploadStepAttachment's comment for why, and ReplaceExistingRoleAttachmentAsync for
     ' why no manual pre-delete of the previous "pdf" attachment is needed here.
     Dim pdfDisplayName As String
-    pdfDisplayName = itemNumber & " (" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".pdf"
+    pdfDisplayName = ItemNumberLabelFor(itemId, itemNumber) & "(" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".pdf"
 
     ApiUploadFile "/items/" & itemId & "/attachments", tempPath, pdfDisplayName, "role", "pdf"
     LogLine "Uploaded PDF attachment for item " & itemId & " as """ & pdfDisplayName & """ (from " & tempPath & ")."
@@ -2507,7 +2538,7 @@ Sub SyncStaleChildren(ByVal parentItemId As String, ByVal localChildIds As Objec
     Dim lines As String
     Dim c As Variant
     For Each c In staleList
-        lines = lines & "- " & JsonGetLong(c, "itemNumber", 0) & " (" & JsonGetString(c, "fileName", "") & ")" & vbCrLf
+        lines = lines & "- " & JsonGetLong(c, "itemNumber", 0) & "(" & JsonGetString(c, "fileName", "") & ")" & vbCrLf
     Next c
 
     Dim choice As VbMsgBoxResult
@@ -2616,7 +2647,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
                 Dim summaryStatus As String
                 summaryStatus = JsonGetString(summaryLinkedInfo, "status", "")
                 If summaryStatus = "sprawdzany" Or summaryStatus = "wydany" Then
-                    lockedComponents.Add JsonGetLong(summaryLinkedInfo, "itemNumber", 0) & " (" & _
+                    lockedComponents.Add JsonGetLong(summaryLinkedInfo, "itemNumber", 0) & "(" & _
                                          JsonGetString(summaryLinkedInfo, "fileName", "") & ") -- " & StatusLabel(summaryStatus)
                 End If
             End If

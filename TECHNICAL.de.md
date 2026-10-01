@@ -69,7 +69,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   ausgeführt, speichert das aktive Dokument, delegiert die Wahl von Projekt/neu-oder-
   vorhanden/Eigenschaften an den Browser, erstellt ein Teil/eine Baugruppe im PDM, hängt
   die Datei als Anhang an, exportiert STEP und benennt die lokale Datei in
-  `nummer (name)` um) und `EasyPDMDownload.FCMacro` (die umgekehrte Richtung: Teil/
+  `nummer(name)` um) und `EasyPDMDownload.FCMacro` (die umgekehrte Richtung: Teil/
   Baugruppe im Browser auswählen, zusammen mit dem GESAMTEN Baum der
   Baugruppenkomponenten abrufen — damit sich `App::Link`-Referenzen auflösen — und sofort
   in FreeCAD öffnen; überspringt bereits heruntergeladene Dateien, fragt vor dem
@@ -316,6 +316,34 @@ nur, wenn kein vorhandenes Element diese Nummer oder eine höhere bereits hat, s
 der von gelöschten Testelementen hinterlassene Nummern-"Schwanz" ohne Kollisionsrisiko
 zurückgewinnen lässt.
 
+Was der Benutzer sieht, ist diese Nummer, eingekleidet in zwei Dinge, die beide **am
+Element** gespeichert und bei dessen Erstellung eingefroren werden: ein Buchstabenpräfix je
+Art (`item_number_prefix`, aus `item_number_prefixes`) und eine Mindestbreite zum Auffüllen
+mit Nullen (`item_number_digits`, aus `system_state.item_number_digits`). Eine Änderung
+dieser Einstellungen wirkt sich daher nur auf später erstellte Elemente aus. Das ist keine
+Vorsicht um ihrer selbst willen: Die CAD-Makros bauen aus dieser Nummer den Dateinamen, der
+somit auf der Festplatte und in `item_attachments` liegt, wo ihn nachträglich nichts mehr
+umschreibt. `ItemNumbering.Label` setzt die drei Teile an einer Stelle zusammen, und die API
+liefert das Ergebnis als `itemNumberLabel` neben `itemNumber`/`itemNumberPrefix` — dasselbe
+Muster wie `revisionLabel`, damit das Web-Frontend und die drei CAD-Makros es nie selbst
+zusammensetzen (und nie voneinander abweichen).
+
+Die einzige Ausnahme ist ein früh bemerkter Fehler: Das Ändern der Art eines Teils/einer
+Baugruppe berechnet das Präfix neu, solange das Element in keinem der vier hervorgehobenen
+Felder einen Anhang hat (`preview_role` = `cad`, `drawing`, `pdf`, `step`). Das sind die
+Dateien, deren Namen die Makros aus der Nummer ableiten; gewöhnliche Anhänge behalten ihre
+eigenen Namen und blockieren nichts. Ist ein hervorgehobenes Feld belegt, LEHNT
+`PATCH /properties` eine Änderung der Art ab, statt sie mit veraltetem Präfix zu übernehmen,
+und das Element-Objekt führt `kindLocked`, damit die Oberfläche die Schaltflächen ausgrauen
+kann. Abgelehnt wird nur eine tatsächliche Änderung — dieselbe Art erneut zu senden geht
+durch. Die Nummer selbst ändert sich nie.
+
+Der vollständige Name eines Elements lautet `Präfix + aufgefüllte Nummer`, unmittelbar
+gefolgt vom Namen in Klammern — `C0001(Platte)` — und für eine Datei auf der Festplatte
+kommen noch der Revisionsbuchstabe und die Erweiterung hinzu: `C0001(Platte).A.sldprt`.
+Dateien, die vor dieser Konvention geschrieben wurden, behalten das Leerzeichen, mit dem sie
+entstanden sind; die Namenszuordnung jedes Makros akzeptiert beide Formen.
+
 ### Anmeldung, Rollen und Projektzugriff
 
 Jede Anfrage an `/api/*` (außer `/api/auth/login`) erfordert eine Anmeldung — eine
@@ -374,7 +402,8 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | POST | `/api/projects/{projectId}/items` | **multipart/form-data**: Datei-Upload (optional `parentId`) |
 | GET | `/api/items/{id}/file` | Download der hochgeladenen Datei |
 | POST | `/api/items/{id}/duplicate` | dupliziert ein Teil/eine Baugruppe (neue Nummer, Status, Eigentümer) |
-| PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | Umbenennen / Sichtbarkeit im Baum ändern / Status ändern / in anderes Projekt verschieben |
+| PATCH | `/api/items/{id}/name` \| `/visibility` \| `/status` \| `/project` | Umbenennen / Sichtbarkeit im Baum ändern / Status ändern / in anderes Projekt verschieben. Eine Baugruppe, die auf `sprawdzany`/`wydany` wechselt, wird abgelehnt, solange ihre DIREKTEN Stücklistenkomponenten zurückliegen; `promoteChildren: true` setzt sie zusammen mit der Baugruppe in einer Transaktion |
+| GET | `/api/items/{id}/status-precheck?target=` | was diese Statusänderung blockiert: separat zu behandelnde Unterbaugruppen, nicht anrührbare Komponenten (storniert / von jemand anderem gesperrt / Projekt ohne Zugriff) und Komponenten, die mitgezogen werden könnten. Nur lesend — `PATCH /status` prüft dieselbe Regel unabhängig |
 | POST | `/api/items/{id}/lock` \| `/release` | Sperren (Eigentum übernehmen) / Freigeben eines Elements |
 | DELETE | `/api/items/{id}` | vollständige Löschung (Rekursion nur über Ordner — Komponenten einer Baugruppe werden nie mitgelöscht) — **nur Administrator** |
 | GET | `/api/projects/{projectId}/relations` | Eltern-Kind-Beziehungen (Struktur/Stückliste) eines Projekts |
@@ -404,6 +433,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | Speicherort/-statistiken, Verschieben, Sicherung (pg_dump + Dateien in einem ZIP), Wiederherstellung aus einer Sicherung — **nur Administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | Zeitplan für automatische Sicherung (ein-/ausschalten, Häufigkeit, Tag, Uhrzeit, Anzahl aufbewahrter Kopien) — **nur Administrator** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | Buchstaben-Präfixe der Elementnummer pro Art (die 4 Teile-Arten plus `Zlozenie` = gefertigte Baugruppe; zugekaufte/Kunden-Baugruppen nutzen das Präfix der Teile-Art) — **nur Administrator** |
+| GET/PATCH | `/api/settings/item-number-format` | Mindestanzahl der Stellen, auf die Elementnummern mit Nullen aufgefüllt werden (0 = kein Auffüllen); wird beim Erstellen am Element eingefroren — **nur Administrator** |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | Vorschau/Zurückdrehen der Elementnummern-Sequenz — **nur Administrator** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | Liste der Tage mit gespeichertem Protokoll, die letzten N Zeilen eines bestimmten Tages, Download der vollständigen Datei — **nur Administrator** |
 
