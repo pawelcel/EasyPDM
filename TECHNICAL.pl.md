@@ -316,9 +316,13 @@ szablony rysunku. Oba zapisują też `EasyPDM-Mass` i `EasyPDM_Material`, a tuż
 odczytują je z powrotem i jednym PATCH-em wpisują do właściwości `mass`/`material` elementu.
 
 W SolidWorksie żadna z tych dwóch nie trzyma wartości, tylko wyrażenie —
-`SW-Mass@@Default@<nazwa pliku>` i `SW-Material@@Default@<nazwa pliku>` — które SolidWorks
+`"SW-Mass@@Default@<nazwa pliku>"` i `"SW-Material@@Default@<nazwa pliku>"` — które SolidWorks
 rozwiązuje przy przebudowie/zapisie, więc obie same nadążają za modelem; makro odczytuje
-wartość *rozwiązaną*. Inventor nie ma odpowiednika takiego wyrażenia, więc tam obie trzymają
+wartość *rozwiązaną*. Otaczające cudzysłowy są CZĘŚCIĄ WARTOŚCI, a nie zapisem: bez nich
+SolidWorks zostawia tekst w spokoju i nigdy go nie wylicza. Wartość, która wraca wciąż
+wyglądając jak wyrażenie (nierozwiązana, np. Część bez przypisanego materiału), trafia do logu
+i jest odrzucana zamiast wysyłana — tak właśnie `SW-Material@@Default@C0014.A.SLDPRT` trafił
+raz do pola materiału elementu. Inventor nie ma odpowiednika takiego wyrażenia, więc tam obie trzymają
 migawkę odczytaną z `ComponentDefinition` w chwili wysyłki i odświeżają się dopiero przy
 kolejnej. Rysunki są pomijane w całości, materiał zapisywany wyłącznie dla Części (złożenie
 nie ma własnego), a masa pusta albo niebędąca zwykłą liczbą trafia do logu i jest pomijana —

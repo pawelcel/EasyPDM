@@ -20,8 +20,10 @@ All notable changes to EasyPDM are documented in this file.
 - **Mass and material now fill themselves in.** On upload the macros add two custom
   properties, `EasyPDM-Mass` and `EasyPDM_Material`, and read them back into the item's Mass
   and Material fields in EasyPDM. In SolidWorks neither holds a value but a SolidWorks
-  expression — `SW-Mass@@Default@<file name>` and `SW-Material@@Default@<file name>` — which
-  the program resolves itself, so both keep up with the model. Inventor has no equivalent
+  expression — `"SW-Mass@@Default@<file name>"` and `"SW-Material@@Default@<file name>"`,
+  quotes included, since without them SolidWorks never evaluates it — which the program
+  resolves itself, so both keep up with the model. A value that comes back still looking like
+  the expression is logged and dropped rather than sent. Inventor has no equivalent
   expression, so there the two properties hold a snapshot taken at upload time. Drawings are
   skipped, assemblies get no material (they have none of their own), and a value that is
   empty or not a plain number is logged and left alone rather than guessed at.

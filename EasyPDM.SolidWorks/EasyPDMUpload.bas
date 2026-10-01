@@ -3055,12 +3055,19 @@ Sub SetMassPropertyOn(ByVal model As Object)
     Set mgr = GetCustPropMgrOn(model)
     On Error Resume Next
     Err.Clear
-    mgr.Add3 CUSTPROP_MASS, SW_CUSTOM_INFO_TEXT, "SW-Mass@@Default@" & docName, SW_CUSTOM_PROPERTY_REPLACE
+    ' Cudzyslowy sa CZESCIA WARTOSCI, nie ozdoba zapisu: SolidWorks rozwiazuje wyrazenie
+    ' tylko wtedy, gdy wartosc wlasciwosci zaczyna sie i konczy znakiem ". Bez nich zostaje
+    ' w dokumencie goly tekst "SW-Mass@@Default@plik.SLDPRT" i nic sie nie wylicza.
+    ' W VBA podwojony "" wewnatrz literalu daje jeden znak cudzyslowu.
+    Dim massExpr As String
+    massExpr = """SW-Mass@@Default@" & docName & """"
+
+    mgr.Add3 CUSTPROP_MASS, SW_CUSTOM_INFO_TEXT, massExpr, SW_CUSTOM_PROPERTY_REPLACE
     If Err.Number <> 0 Then
         LogLine "SetMassPropertyOn: could not set " & CUSTPROP_MASS & " (" & Err.Description & ")."
         Err.Clear
     Else
-        LogLine "SetMassPropertyOn: " & CUSTPROP_MASS & "=""SW-Mass@@Default@" & docName & """."
+        LogLine "SetMassPropertyOn: " & CUSTPROP_MASS & "=" & massExpr & "."
     End If
     On Error GoTo 0
 End Sub
@@ -3082,15 +3089,27 @@ Sub SetMaterialPropertyOn(ByVal model As Object)
     Set mgr = GetCustPropMgrOn(model)
     On Error Resume Next
     Err.Clear
-    mgr.Add3 CUSTPROP_MATERIAL, SW_CUSTOM_INFO_TEXT, "SW-Material@@Default@" & docName, SW_CUSTOM_PROPERTY_REPLACE
+    ' Cudzyslowy jak przy masie wyzej -- bez nich wyrazenie sie nie rozwiazuje.
+    Dim matExpr As String
+    matExpr = """SW-Material@@Default@" & docName & """"
+
+    mgr.Add3 CUSTPROP_MATERIAL, SW_CUSTOM_INFO_TEXT, matExpr, SW_CUSTOM_PROPERTY_REPLACE
     If Err.Number <> 0 Then
         LogLine "SetMaterialPropertyOn: could not set " & CUSTPROP_MATERIAL & " (" & Err.Description & ")."
         Err.Clear
     Else
-        LogLine "SetMaterialPropertyOn: " & CUSTPROP_MATERIAL & "=""SW-Material@@Default@" & docName & """."
+        LogLine "SetMaterialPropertyOn: " & CUSTPROP_MATERIAL & "=" & matExpr & "."
     End If
     On Error GoTo 0
 End Sub
+
+' Czy to, co wrocilo z Get4 jako "rozwiazane", jest nadal samym wyrazeniem. SolidWorks
+' oddaje wtedy surowy tekst zamiast wartosci -- np. gdy czesc nie ma przypisanego materialu
+' albo nazwa pliku w wyrazeniu nie zgadza sie z dokumentem. Taki tekst trafil raz do bazy
+' jako "materlial" ("SW-Material@@Default@C0014.A.SLDPRT"), stad ten straznik.
+Private Function LooksUnresolved(ByVal s As String) As Boolean
+    LooksUnresolved = (InStr(s, "@@") > 0) Or (InStr(s, "SW-Mass") > 0) Or (InStr(s, "SW-Material") > 0)
+End Function
 
 ' Odczytuje ROZWIAZANA mase i material, i zapisuje oba do wlasciwosci elementu w PDM --
 ' JEDNYM PATCH-em, zeby nie robic dwoch zapisow (kazdy i tak przeliczalby prefiks po stronie
@@ -3117,12 +3136,16 @@ Sub PushCadPropertiesToPdm(ByVal model As Object, ByVal itemId As String)
     On Error GoTo 0
 
     Dim massText As String
-    massText = NormalizeMassText(resolvedOut)
-    If Len(massText) > 0 Then
-        fields = """mass"":" & JsonStr(massText)
+    massText = ""
+    If LooksUnresolved(resolvedOut) Then
+        LogLine "PushCadPropertiesToPdm: mass expression did not resolve (got """ & resolvedOut & """) -- mass not sent. SolidWorks evaluates it on rebuild/save."
     Else
-        LogLine "PushCadPropertiesToPdm: resolved mass is empty or not numeric (raw=""" & resolvedOut & """) -- mass not sent. SolidWorks evaluates the expression on rebuild/save, so this can be normal on a brand new document."
+        massText = NormalizeMassText(resolvedOut)
+        If Len(massText) = 0 Then
+            LogLine "PushCadPropertiesToPdm: resolved mass is empty or not numeric (raw=""" & resolvedOut & """) -- mass not sent."
+        End If
     End If
+    If Len(massText) > 0 Then fields = """mass"":" & JsonStr(massText)
 
     Dim matValue As String, matResolved As String
     On Error Resume Next
@@ -3135,6 +3158,10 @@ Sub PushCadPropertiesToPdm(ByVal model As Object, ByVal itemId As String)
     On Error GoTo 0
 
     matResolved = Trim(matResolved)
+    If LooksUnresolved(matResolved) Then
+        LogLine "PushCadPropertiesToPdm: material expression did not resolve (got """ & matResolved & """) -- material not sent. The part may simply have no material assigned."
+        matResolved = ""
+    End If
     If Len(matResolved) > 0 Then
         If Len(fields) > 0 Then fields = fields & ","
         fields = fields & """material"":" & JsonStr(matResolved)
@@ -3161,22 +3188,27 @@ End Sub
 Function NormalizeMassText(ByVal raw As String) As String
     Dim s As String, i As Long, ch As String, result As String, dotSeen As Boolean
     s = Trim(Replace(raw, ",", "."))
+
+    ' Czytamy wylacznie od POCZATKU lancucha i przerywamy na pierwszym znaku, ktory nie jest
+    ' czescia liczby. Wczesniejsza wersja zbierala cyfry z CALEGO tekstu, wiec z
+    ' nierozwiazanego "SW-Mass@@Default@C0014.A.SLDPRT" robila "0014." i wysylala to jako mase.
     For i = 1 To Len(s)
         ch = Mid(s, i, 1)
         If ch >= "0" And ch <= "9" Then
             result = result & ch
-        ElseIf ch = "." And Not dotSeen Then
+        ElseIf ch = "." And Not dotSeen And Len(result) > 0 Then
             result = result & ch
             dotSeen = True
-        ElseIf ch = " " Then
-            ' Spacja konczy liczbe -- dalej jest juz jednostka.
-            Exit For
         Else
-            ' Cokolwiek innego przed pierwsza cyfra (np. znak) albo w srodku -- odrzucamy.
-            If Len(result) > 0 Then Exit For
+            Exit For
         End If
     Next i
+
+    ' Sama kropka albo zakonczenie kropka ("12.") to nie jest liczba, ktorej ufamy.
     If result = "." Then result = ""
+    If Len(result) > 0 Then
+        If Right(result, 1) = "." Then result = Left(result, Len(result) - 1)
+    End If
     NormalizeMassText = result
 End Function
 

@@ -323,9 +323,13 @@ drawing templates can pull it from there. Both also write `EasyPDM-Mass` and
 single PATCH right after the save.
 
 In SolidWorks neither property holds a value but an expression —
-`SW-Mass@@Default@<file name>` and `SW-Material@@Default@<file name>` — which SolidWorks
+`"SW-Mass@@Default@<file name>"` and `"SW-Material@@Default@<file name>"` — which SolidWorks
 resolves on rebuild/save, so both track the model by themselves; the macro reads the
-*resolved* value. Inventor has no equivalent expression, so there both properties hold a
+*resolved* value. The surrounding double quotes are part of the value, not notation: without
+them SolidWorks leaves the text alone and never evaluates it. When a value comes back still
+looking like the expression (an unresolved one, e.g. a Part with no material assigned), it is
+logged and dropped rather than sent — that is how `SW-Material@@Default@C0014.A.SLDPRT` once
+reached an item's material field. Inventor has no equivalent expression, so there both properties hold a
 snapshot read from `ComponentDefinition` at upload time and need a re-upload to refresh.
 Drawings are skipped entirely, material is written for Parts only (an Assembly has none of
 its own), and a mass that is empty or not a plain number is logged and skipped — it is

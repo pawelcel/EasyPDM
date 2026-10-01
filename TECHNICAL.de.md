@@ -355,9 +355,12 @@ außerdem `EasyPDM-Mass` und `EasyPDM_Material` und lesen sie unmittelbar nach d
 mit einem einzigen PATCH auf die Eigenschaften `mass`/`material` des Elements zurück.
 
 In SolidWorks enthält keine der beiden einen Wert, sondern einen Ausdruck —
-`SW-Mass@@Default@<Dateiname>` und `SW-Material@@Default@<Dateiname>` —, den SolidWorks beim
-Neuaufbau/Speichern auflöst, sodass beide dem Modell von selbst folgen; das Makro liest den
-*aufgelösten* Wert. Inventor kennt keinen entsprechenden Ausdruck, dort halten beide daher
+`"SW-Mass@@Default@<Dateiname>"` und `"SW-Material@@Default@<Dateiname>"` —, den SolidWorks
+beim Neuaufbau/Speichern auflöst, sodass beide dem Modell von selbst folgen; das Makro liest
+den *aufgelösten* Wert. Die umschließenden Anführungszeichen gehören zum Wert und sind keine
+Schreibweise: ohne sie lässt SolidWorks den Text unangetastet und wertet ihn nie aus. Ein Wert,
+der weiterhin wie der Ausdruck aussieht (unaufgelöst, etwa bei einem Teil ohne zugewiesenes
+Material), wird protokolliert und verworfen statt gesendet. Inventor kennt keinen entsprechenden Ausdruck, dort halten beide daher
 eine zum Zeitpunkt des Hochladens aus `ComponentDefinition` gelesene Momentaufnahme und
 werden erst beim nächsten Hochladen aktualisiert. Zeichnungen werden ganz übersprungen, das
 Material nur für Teile geschrieben (eine Baugruppe hat kein eigenes), und eine Masse, die leer
