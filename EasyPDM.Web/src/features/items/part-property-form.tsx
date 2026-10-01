@@ -55,7 +55,8 @@ const ASSEMBLY_KINDS: { value: string; labelKey: TranslationKey }[] = [
 // baza szuka po CAŁEJ treści properties, nie tylko po polach aktualnie pokazywanych w
 // UI — bez tego np. producent z porzuconej Części zakupowej dalej by się wyszukiwał po
 // zmianie rodzaju na Normalię). "notes" celowo pominięte — to pole wspólne dla wszystkich
-// rodzajów, nie "należy" do żadnego konkretnego.
+// rodzajów, nie "należy" do żadnego konkretnego. Tak samo "mass" — masę ma Część każdego
+// rodzaju i Złożenie, więc zmiana rodzaju nie ma prawa jej kasować.
 const PART_KIND_FIELDS: Record<string, string[]> = {
   Wykonywana: ["material", "price", "currency", "priceType", "priceDate"],
   Zakupowa: [
@@ -64,7 +65,6 @@ const PART_KIND_FIELDS: Record<string, string[]> = {
     "productSubtype",
     "orderNumber",
     "orderNumber2",
-    "mass",
     "price",
     "currency",
     "priceType",
@@ -74,9 +74,9 @@ const PART_KIND_FIELDS: Record<string, string[]> = {
   Klienta: ["client", "clientName2"],
 }
 
-// Złożenie ma "Masę" zawsze dostępną przez generyczny PropertyEditor (zob.
-// item-detail-panel.tsx), niezależnie od rodzaju — w odróżnieniu od Części, gdzie Masa
-// jest polem WYŁĄCZNIE Zakupowej — więc tu nie ma jej na liście do czyszczenia.
+// Masa jest polem WSPÓLNYM dla Części każdego rodzaju i dla Złożenia (renderowanym raz, nad
+// blokami rodzajów), więc nie ma jej tu na liście do czyszczenia — tak samo jak w
+// PART_KIND_FIELDS wyżej.
 const ASSEMBLY_KIND_FIELDS: Record<string, string[]> = {
   Wykonywane: [],
   Zakupowe: ["manufacturer", "productType", "productSubtype"],
@@ -235,6 +235,20 @@ function PartPropertyForm({
 
   return (
     <div className="flex flex-col gap-2">
+      {/* Masa stoi NAD blokami rodzajów, bo jako jedyna właściwość dotyczy ich wszystkich —
+          i Części każdego rodzaju, i Złożenia. Wcześniej była polem wyłącznie Części
+          zakupowej, a przy Złożeniu wpadała do generycznego edytora surowych właściwości,
+          więc makro CAD wpisywało masę w miejsce, którego nie było widać. */}
+      <PropField
+        label={t("part.mass")}
+        propKey="mass"
+        value={propValue("mass")}
+        onSave={saveField}
+        type="number"
+        disabled={locked}
+        onError={setError}
+      />
+
       {rodzaj === "Wykonywana" && (
         <>
           <PriceRow item={item} onChanged={onChanged} onError={setError} />
@@ -255,7 +269,6 @@ function PartPropertyForm({
           />
           <PropField label={t("part.orderNumber")} propKey="orderNumber" value={propValue("orderNumber")} onSave={saveField} disabled={locked} onError={setError} />
           <PropField label={t("part.orderNumber2")} propKey="orderNumber2" value={propValue("orderNumber2")} onSave={saveField} disabled={locked} onError={setError} />
-          <PropField label={t("part.mass")} propKey="mass" value={propValue("mass")} onSave={saveField} type="number" disabled={locked} onError={setError} />
           <PriceRow item={item} onChanged={onChanged} onError={setError} />
           <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
         </>
@@ -282,8 +295,9 @@ function PartPropertyForm({
       )}
 
       {/* Złożenie zakupowe — kupiony podzespół ma producenta i typ produktu dokładnie tak
-          samo jak część zakupowa. Reszta jego właściwości (masa, cena, cokolwiek własnego)
-          zostaje w generycznym PropertyEditorze pod spodem, zob. item-detail-panel.tsx. */}
+          samo jak część zakupowa. Reszta jego właściwości (cena, cokolwiek własnego) zostaje
+          w generycznym PropertyEditorze pod spodem, zob. item-detail-panel.tsx; masa ma już
+          własne pole wyżej. */}
       {rodzaj === "Zakupowe" && (
         <>
           <ManufacturerField value={propValue("manufacturer")} onSave={saveField} disabled={locked} onError={setError} />

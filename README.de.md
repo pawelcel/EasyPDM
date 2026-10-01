@@ -203,13 +203,17 @@ Ein Teil hat eine von vier **Arten**, jede mit einem anderen Satz von Feldern:
 | Art | Zusätzliche Felder |
 |---|---|
 | Gefertigt | Material, Preis, Zusätzliche Informationen |
-| Zugekauft | Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Masse, Preis, Zusätzliche Informationen |
+| Zugekauft | Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Preis, Zusätzliche Informationen |
 | Norm | Material, Norm, Zusätzliche Informationen |
 | Kundenteil | Kunde, Name 2, Zusätzliche Informationen |
 
+**Die Masse** steht darüber, denn sie ist das einzige Feld, das alle Arten teilen — ein Teil
+jeder Art ebenso wie eine Baugruppe. Die CAD-Makros tragen sie beim Hochladen ein, und ein
+Wechsel der Art lässt sie unangetastet.
+
 Eine Baugruppe hat eine von drei **Arten**: Gefertigt, Zugekauft (Hersteller, Serie/Typ
-und Untertyp) oder Vom Kunden (Kunde). Unabhängig von der Art kann sie zusätzlich eine
-optionale Masse und beliebige eigene Eigenschaften tragen.
+und Untertyp) oder Vom Kunden (Kunde). Unabhängig von der Art kann sie zusätzlich beliebige
+eigene Eigenschaften tragen.
 
 **Kunde** — für die Art „Vom Kunden“, ausgewählt aus demselben Katalog wie der Reiter Kunden.
 Daneben **Name 2** — einer der zweiten Namen/Handelsvarianten dieses Kunden aus dem Katalog

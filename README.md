@@ -186,13 +186,17 @@ A Part has one of four **kinds**, each with a different set of fields:
 | Kind | Additional fields |
 |---|---|
 | Manufactured | Material, Price, Additional notes |
-| Purchased | Manufacturer, Series/Type, Subtype, Order number 1/2, Mass, Price, Additional notes |
+| Purchased | Manufacturer, Series/Type, Subtype, Order number 1/2, Price, Additional notes |
 | Standard | Material, Norm, Additional notes |
 | Client-supplied | Client, Name 2, Additional notes |
 
+**Mass** sits above those, because it is the one field every kind shares — a Part of any
+kind and an Assembly alike. The CAD macros fill it in on upload, and changing an item's kind
+leaves it alone.
+
 An Assembly has one of three **kinds**: Manufactured, Purchased (Manufacturer,
 Series/Type and Subtype) or Client-supplied (Client). Whatever the kind, it can also carry
-an optional Mass and any custom properties.
+any custom properties of its own.
 
 **Client** — for the Client-supplied kind, picked from the same catalog as the Clients tab.
 Next to it, **Name 2** — one of that client's second names/trade variants from the catalog

@@ -34,6 +34,11 @@ All notable changes to EasyPDM are documented in this file.
   in.
 
 ### Changed
+- **Mass is now a field of every Part and Assembly**, not just a Purchased Part. It used to
+  be a property of one kind only, and on an Assembly it fell through to the raw-properties
+  editor — so the mass the macros now fill in landed somewhere nobody looks. It sits above
+  the kind-specific fields, since it is the one property they all share, and changing an
+  item's kind no longer clears it.
 - Zero padding now stands on its own in Settings → Numbering, instead of sitting inside the
   prefix list where it read as if it belonged to one of the kinds.
 

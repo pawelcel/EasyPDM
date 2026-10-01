@@ -187,13 +187,17 @@ Część ma jeden z czterech **rodzajów**, każdy z innym zestawem pól:
 | Rodzaj | Dodatkowe pola |
 |---|---|
 | Wykonywana | Materiał, Cena, Dodatkowe informacje |
-| Zakupowa | Producent, Seria/Typ, Podtyp, Numer zamówieniowy 1/2, Masa, Cena, Dodatkowe informacje |
+| Zakupowa | Producent, Seria/Typ, Podtyp, Numer zamówieniowy 1/2, Cena, Dodatkowe informacje |
 | Normalia | Materiał, Norma, Dodatkowe informacje |
 | Klienta | Klient, Nazwa 2, Dodatkowe informacje |
 
+**Masa** stoi nad nimi, bo jako jedyne pole jest wspólna dla wszystkich rodzajów — i Części
+każdego rodzaju, i Złożenia. Makra CAD wpisują ją przy wysyłce, a zmiana rodzaju elementu jej
+nie rusza.
+
 Złożenie ma jeden z trzech **rodzajów**: Wykonywane, Zakupowe (Producent, Seria/Typ
-i Podtyp) albo Klienta (Klient). Niezależnie od rodzaju można mu wpisać opcjonalną Masę
-i dowolne własne właściwości.
+i Podtyp) albo Klienta (Klient). Niezależnie od rodzaju można mu wpisać dowolne własne
+właściwości.
 
 **Klient** — dla rodzaju Klienta, wybierany z tego samego katalogu co zakładka Klienci. Obok
 pojawia się **Nazwa 2** — jedna z drugich nazw/wariantów handlowych TEGO klienta z katalogu

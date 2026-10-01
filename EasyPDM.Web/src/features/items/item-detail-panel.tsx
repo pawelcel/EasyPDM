@@ -70,6 +70,9 @@ const ASSEMBLY_MANAGED_PROPERTY_KEYS = new Set([
   "productSubtype",
   "client",
   "clientName2",
+  // Masa ma własne pole w PartPropertyForm (wspólne dla wszystkich rodzajów) — bez tego
+  // wpisu pokazałaby się dwa razy: jako pole i jako surowy klucz w edytorze niżej.
+  "mass",
 ])
 
 function propertyEditorEntries(item: Item): Record<string, unknown> {
@@ -455,9 +458,9 @@ function ItemDetailPanel({
 
       <SectionLabel>{t("item.properties")}</SectionLabel>
       {/* Część ma komplet pól zależnych od rodzaju i nie potrzebuje edytora surowych
-          właściwości. Złożenie dostaje z PartPropertyForm tylko pola swojego rodzaju
-          (dziś: producent i typ produktu dla zakupowego), a całą resztę — masę i dowolne
-          własne klucze — dalej obsługuje generyczny PropertyEditor pod spodem. */}
+          właściwości. Złożenie dostaje z PartPropertyForm masę (pole wspólne) i pola swojego
+          rodzaju (dziś: producent i typ produktu dla zakupowego), a dowolne własne klucze —
+          dalej generyczny PropertyEditor pod spodem. */}
       {item.itemType === "part" ? (
         <PartPropertyForm item={item} onChanged={refreshAfterAction} />
       ) : (
