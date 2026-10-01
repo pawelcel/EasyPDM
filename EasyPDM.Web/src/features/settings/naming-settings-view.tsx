@@ -35,8 +35,11 @@ const ASSEMBLY_KIND = {
 const DEFAULT_DIGITS = 4
 
 // Pole przyjmuje tylko 1-10: zero oznaczałoby "wyłączone", a od tego jest osobny włącznik.
+// Klamrowanie dopiero przy opuszczeniu pola — przy każdym naciśnięciu klawisza kasowanie
+// zawartości natychmiast wracało do wartości domyślnej, więc nie dało się wpisać nic nowego.
 function clampDigits(raw: string): number {
-  return Math.max(1, Math.min(10, Number(raw) || DEFAULT_DIGITS))
+  const parsed = Number.parseInt(raw, 10)
+  return Number.isNaN(parsed) ? DEFAULT_DIGITS : Math.max(1, Math.min(10, parsed))
 }
 
 // Jak numer będzie wyglądał po zapisaniu ustawień: prefiks + numer dopełniony zerami do
@@ -50,14 +53,16 @@ function formatNumberExample(
   prefix: string,
   digits: number,
   sample: number,
-  sampleName: string
+  sampleName: string,
+  withName: boolean
 ): string {
   const text = String(sample)
   const number = `${prefix}${digits > 0 ? text.padStart(digits, "0") : text}`
   // Pełna postać, a nie sam numer: dokładnie to widać w drzewku i taką nazwę nadaje plikowi
   // makro CAD (tam dochodzi jeszcze rozszerzenie zależne od programu). Rewizja zawsze "A",
   // bo nowy element zaczyna od pierwszej — revisionLabel(1), żeby nie zaszywać litery.
-  return `${number}(${sampleName}).${revisionLabel(1)}`
+  const name = withName ? `(${sampleName})` : ""
+  return `${number}${name}.${revisionLabel(1)}`
 }
 
 function NamingSettingsView() {
@@ -73,9 +78,19 @@ function NamingSettingsView() {
   // włącznik i liczbę cyfr: po wyłączeniu wpisana liczba zostaje w pamięci, więc ponowne
   // włączenie nie każe jej podawać od nowa. Wyłączone = dokładnie dotychczasowe zachowanie.
   const [paddingEnabled, setPaddingEnabled] = useState(false)
-  const [digitsInput, setDigitsInput] = useState(DEFAULT_DIGITS)
+  // Trzymane jako TEKST, nie liczba: w trakcie pisania pole bywa puste albo niepełne
+  // ("1" w drodze do "10"), a stan liczbowy wymuszałby podstawianie czegoś sensownego przy
+  // każdym znaku i deptał to, co użytkownik właśnie wpisuje.
+  const [digitsText, setDigitsText] = useState(String(DEFAULT_DIGITS))
   const [savingDigits, setSavingDigits] = useState(false)
-  const digits = paddingEnabled ? digitsInput : 0
+  const parsedDigits = Number.parseInt(digitsText, 10)
+  // Podgląd liczymy z tego, co w polu stoi TERAZ — niedokończona wartość pokazuje numer bez
+  // dopełnienia, zamiast udawać wartość, której nikt nie wpisał.
+  const digits =
+    paddingEnabled && !Number.isNaN(parsedDigits) ? Math.max(1, Math.min(10, parsedDigits)) : 0
+  // Czy nazwa elementu wchodzi w nazwę rekordu — osobne ustawienie, osobna sekcja niżej.
+  const [withName, setWithName] = useState(true)
+  const [savingWithName, setSavingWithName] = useState(false)
 
   useEffect(() => {
     Promise.all([api.getItemNumberPrefixes(), api.getItemNumberFormat()])
@@ -84,7 +99,8 @@ function NamingSettingsView() {
         for (const row of rows) map[row.rodzaj] = row.prefix ?? ""
         setPrefixes(map)
         setPaddingEnabled(format.digits > 0)
-        if (format.digits > 0) setDigitsInput(format.digits)
+        if (format.digits > 0) setDigitsText(String(format.digits))
+        setWithName(format.withName)
       })
       .catch(() => setLoadError(true))
   }, [])
@@ -94,16 +110,17 @@ function NamingSettingsView() {
   // zaktualizował.
   async function saveDigits(enabled: boolean, value: number) {
     const previousEnabled = paddingEnabled
-    const previousValue = digitsInput
+    const previousValue = digitsText
     setPaddingEnabled(enabled)
-    setDigitsInput(value)
+    // Po zapisie pole pokazuje wartość już sklamrowaną — wpisane "99" wraca jako "10".
+    setDigitsText(String(value))
     setSavingDigits(true)
     setError("")
     try {
-      await api.setItemNumberFormat(enabled ? value : 0)
+      await api.setItemNumberFormat({ digits: enabled ? value : 0 })
     } catch (err) {
       setPaddingEnabled(previousEnabled)
-      setDigitsInput(previousValue)
+      setDigitsText(previousValue)
       setError(err instanceof Error ? err.message : t("naming.saveFailed"))
     } finally {
       setSavingDigits(false)
@@ -126,6 +143,21 @@ function NamingSettingsView() {
     }
   }
 
+  async function saveWithName(next: boolean) {
+    const previous = withName
+    setWithName(next)
+    setSavingWithName(true)
+    setError("")
+    try {
+      await api.setItemNumberFormat({ withName: next })
+    } catch (err) {
+      setWithName(previous)
+      setError(err instanceof Error ? err.message : t("naming.saveFailed"))
+    } finally {
+      setSavingWithName(false)
+    }
+  }
+
   if (loadError) {
     return (
       <div className="mx-auto max-w-2xl">
@@ -142,41 +174,6 @@ function NamingSettingsView() {
       <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         <Hint>{t("naming.hint")}</Hint>
 
-        <SectionLabel>{t("naming.digitsTitle")}</SectionLabel>
-        <Hint>{t("naming.digitsHint")}</Hint>
-        <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={paddingEnabled}
-            disabled={savingDigits}
-            onChange={(e) => void saveDigits(e.target.checked, digitsInput)}
-            className="size-3.5 shrink-0 accent-primary"
-          />
-          {t("naming.digitsEnableLabel")}
-        </label>
-        {/* Pole zostaje widoczne także po wyłączeniu, tylko wyszarzone — żeby było wiadomo,
-            co się włącza, zamiast kazać szukać zniknniętej opcji. */}
-        <div className="mt-2 flex items-center gap-3">
-          <Label htmlFor="naming-digits" className="w-32 shrink-0">
-            {t("naming.digitsLabel")}
-          </Label>
-          <Input
-            id="naming-digits"
-            type="number"
-            min={1}
-            max={10}
-            step={1}
-            value={digitsInput}
-            disabled={savingDigits || !paddingEnabled}
-            className="w-24 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            onChange={(e) => setDigitsInput(clampDigits(e.target.value))}
-            onBlur={(e) => void saveDigits(paddingEnabled, clampDigits(e.target.value))}
-          />
-          <span className="flex-1 truncate text-right font-mono text-[13px] text-muted-foreground">
-            {t("naming.examplePrefix")} {formatNumberExample("", digits, 1, t("naming.exampleName"))}
-          </span>
-        </div>
-
         <SectionLabel>{t("itemType.part")}</SectionLabel>
         <div className="flex flex-col gap-3">
           {PART_KINDS.map((kind) => (
@@ -186,6 +183,7 @@ function NamingSettingsView() {
               label={t(kind.labelKey)}
               value={prefixes[kind.rodzaj] ?? ""}
               digits={digits}
+              withName={withName}
               disabled={saving === kind.rodzaj}
               placeholder={t("naming.prefixPlaceholder")}
               onChange={(value) => setPrefixes((p) => ({ ...p, [kind.rodzaj]: value }))}
@@ -202,6 +200,7 @@ function NamingSettingsView() {
             label={t(ASSEMBLY_KIND.labelKey)}
             value={prefixes[ASSEMBLY_KIND.rodzaj] ?? ""}
             digits={digits}
+            withName={withName}
             disabled={saving === ASSEMBLY_KIND.rodzaj}
             placeholder={t("naming.prefixPlaceholder")}
             onChange={(value) => setPrefixes((p) => ({ ...p, [ASSEMBLY_KIND.rodzaj]: value }))}
@@ -210,6 +209,71 @@ function NamingSettingsView() {
         </div>
 
         <FormError>{error}</FormError>
+      </div>
+
+      {/* Dopełnienie zerami w OSOBNEJ karcie: dotyczy wszystkich rodzajów naraz, więc wewnątrz
+          listy prefiksów czytało się jak ustawienie jednego z nich. */}
+      <div className="mt-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+        <SectionLabel>{t("naming.digitsTitle")}</SectionLabel>
+        <Hint>{t("naming.digitsHint")}</Hint>
+        <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={paddingEnabled}
+            disabled={savingDigits}
+            onChange={(e) => void saveDigits(e.target.checked, clampDigits(digitsText))}
+            className="size-3.5 shrink-0 accent-primary"
+          />
+          {t("naming.digitsEnableLabel")}
+        </label>
+        {/* Pole zostaje widoczne także po wyłączeniu, tylko wyszarzone — żeby było wiadomo,
+            co się włącza, zamiast kazać szukać zniknniętej opcji. */}
+        <div className="mt-2 flex items-center gap-3">
+          <Label htmlFor="naming-digits" className="w-32 shrink-0">
+            {t("naming.digitsLabel")}
+          </Label>
+          <Input
+            id="naming-digits"
+            type="number"
+            min={1}
+            max={10}
+            step={1}
+            value={digitsText}
+            disabled={savingDigits || !paddingEnabled}
+            className="w-24"
+            // Same cyfry: wartość ma być liczbą całkowitą, więc odrzucamy minus, kropkę i
+            // wykładnik, które pole typu number samo by przepuściło.
+            onChange={(e) => setDigitsText(e.target.value.replace(/[^0-9]/g, ""))}
+            onBlur={(e) => void saveDigits(paddingEnabled, clampDigits(e.target.value))}
+          />
+          <span className="flex-1 truncate text-right font-mono text-[13px] text-muted-foreground">
+            {t("naming.examplePrefix")} {formatNumberExample("", digits, 1, t("naming.exampleName"), withName)}
+          </span>
+        </div>
+      </div>
+
+      {/* Nazwa elementu w nazwie rekordu — osobna karta, bo to ustawienie innego rodzaju niż
+          prefiks (per rodzaj) i dopełnienie (szerokość liczby). */}
+      <div className="mt-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+        <SectionLabel>{t("naming.withNameTitle")}</SectionLabel>
+        <Hint>{t("naming.withNameHint")}</Hint>
+        <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={withName}
+            disabled={savingWithName}
+            onChange={(e) => void saveWithName(e.target.checked)}
+            className="size-3.5 shrink-0 accent-primary"
+          />
+          {t("naming.withNameLabel")}
+        </label>
+        <div className="mt-2 flex items-center gap-3">
+          <span className="w-32 shrink-0" />
+          <span className="flex-1 truncate text-right font-mono text-[13px] text-muted-foreground">
+            {t("naming.examplePrefix")}{" "}
+            {formatNumberExample("", digits, 1, t("naming.exampleName"), withName)}
+          </span>
+        </div>
       </div>
 
       <ResetSequenceSection />
@@ -340,6 +404,7 @@ function PrefixRow({
   label,
   value,
   digits,
+  withName,
   disabled,
   placeholder,
   onChange,
@@ -349,6 +414,7 @@ function PrefixRow({
   label: string
   value: string
   digits: number
+  withName: boolean
   disabled: boolean
   placeholder: string
   onChange: (value: string) => void
@@ -374,7 +440,7 @@ function PrefixRow({
           zamiast zgadywać, czy "C" skleja się z numerem, czy dostaje separator. Aktualizuje
           się przy pisaniu, zanim cokolwiek zostanie zapisane. */}
       <span className="flex-1 truncate text-right font-mono text-[13px] text-muted-foreground">
-        {t("naming.examplePrefix")} {formatNumberExample(value.trim(), digits, 1, t("naming.exampleName"))}
+        {t("naming.examplePrefix")} {formatNumberExample(value.trim(), digits, 1, t("naming.exampleName"), withName)}
       </span>
     </div>
   )

@@ -26,7 +26,8 @@ static class StructureEndpoints
                        i.item_type, i.item_number, i.item_number_prefix, i.show_in_tree, i.status, i.revision_number,
                        i.root_position, i.owner_id, i.owner_locked, u.display_name, ir.quantity, ir.position, i.item_number_digits,
                        EXISTS (SELECT 1 FROM item_attachments ia
-                               WHERE ia.item_id = i.id AND ia.preview_role IS NOT NULL) AS kind_locked
+                               WHERE ia.item_id = i.id AND ia.preview_role IS NOT NULL) AS kind_locked,
+                       i.item_number_with_name
                 FROM item_relations ir
                 JOIN items i ON i.id = ir.child_id
                 LEFT JOIN users u ON u.id = i.owner_id
@@ -63,6 +64,14 @@ static class StructureEndpoints
                         // Czy rodzaju elementu nie da się już zmienić: ma plik w którymś z czterech
                         // wyróżnionych pól, a te noszą jego numer w nazwie (zob. PropertyEndpoints).
                         ["kindLocked"] = reader.GetBoolean(20),
+                        // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego
+                        // na elemencie -- nazwa w nawiasie. Klienci jej nie składają (zob. ItemNumbering).
+                        ["recordName"] = ItemNumbering.RecordName(
+                            reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                            reader.IsDBNull(9) ? null : reader.GetString(9),
+                            reader.IsDBNull(19) ? null : reader.GetInt32(19),
+                            reader.IsDBNull(21) ? null : reader.GetBoolean(21),
+                            reader.GetString(2)),
                         ["showInTree"] = reader.GetBoolean(10),
                         ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
                         ["revisionNumber"] = reader.IsDBNull(12) ? null : reader.GetInt32(12),

@@ -281,11 +281,12 @@ sekwencji). Administrator może ręcznie cofnąć sekwencję do wskazanego numer
 wyższego, więc pozwala odzyskać "ogon" numeracji po usuniętych elementach testowych bez
 ryzyka kolizji.
 
-To, co widzi użytkownik, to ten numer ubrany w dwie rzeczy, obie trzymane **na elemencie**
-i zamrażane przy jego tworzeniu: literowy prefiks rodzaju (`item_number_prefix`, z
-`item_number_prefixes`) i minimalną szerokość dopełnienia zerami (`item_number_digits`, z
-`system_state.item_number_digits`). Zmiana któregokolwiek ustawienia dotyczy więc wyłącznie
-elementów tworzonych później. To nie jest ostrożność dla samej ostrożności: makra CAD budują
+To, co widzi użytkownik, to ten numer ubrany w trzy rzeczy, wszystkie trzymane **na
+elemencie** i zamrażane przy jego tworzeniu: literowy prefiks rodzaju (`item_number_prefix`,
+z `item_number_prefixes`), minimalną szerokość dopełnienia zerami (`item_number_digits`) oraz
+to, czy nazwa samego elementu w ogóle dochodzi w nawiasie (`item_number_with_name`) — dwa
+ostatnie z `system_state`. Zmiana któregokolwiek ustawienia dotyczy więc wyłącznie elementów
+tworzonych później. To nie jest ostrożność dla samej ostrożności: makra CAD budują
 z tego numeru nazwę pliku, więc nazwa ta żyje na dysku i w `item_attachments`, gdzie nic jej
 wstecz nie przepisze. `ItemNumbering.Label` składa te trzy części w jednym miejscu, a API
 podaje wynik jako `itemNumberLabel` obok `itemNumber`/`itemNumberPrefix` — tym samym wzorcem
@@ -301,10 +302,34 @@ obiekt elementu niesie `kindLocked`, żeby interfejs mógł wyszarzyć przyciski
 wyłącznie rzeczywista zmiana — ponowne przysłanie tego samego rodzaju przechodzi. Sam numer
 nie zmienia się nigdy.
 
-Pełna nazwa elementu to `prefiks + dopełniony numer` i zaraz za nim nazwa w nawiasie —
-`C0001(płyta)` — a dla pliku na dysku dochodzi jeszcze litera rewizji i rozszerzenie:
-`C0001(płyta).A.sldprt`. Pliki zapisane przed tą konwencją zachowują spację, z którą
-powstały; dopasowywanie nazw w każdym makrze przyjmuje obie postacie.
+Pełna nazwa elementu — jego **nazwa rekordu**, składana raz przez `ItemNumbering.RecordName`
+i podawana jako `recordName` — to `prefiks + dopełniony numer` i zaraz za nim nazwa w
+nawiasie: `C0001(płyta)`, albo samo `C0001` przy wyłączonej nazwie. Dla pliku na dysku
+dochodzi jeszcze litera rewizji i rozszerzenie: `C0001(płyta).A.sldprt`. Dopasowywanie nazw w
+każdym makrze traktuje i nazwę w nawiasie, i spację, z którą powstawały starsze pliki, jako
+opcjonalne — rozpoznaje więc pliki zapisane pod każdą wcześniejszą konwencją.
+
+Ponieważ nazwy może w nazwie pliku nie być, oba makra VBA zapisują ją dodatkowo jako
+właściwość dokumentu `EasyPDM_Name`, obok trzymanych tam już właściwości powiązania — wtedy
+to jedyne miejsce w dokumencie, gdzie nazwa w ogóle występuje, i stamtąd mogą ją wciągnąć
+szablony rysunku. Oba zapisują też `EasyPDM-Mass` i `EasyPDM_Material`, a tuż po zapisie
+odczytują je z powrotem i jednym PATCH-em wpisują do właściwości `mass`/`material` elementu.
+
+W SolidWorksie żadna z tych dwóch nie trzyma wartości, tylko wyrażenie —
+`SW-Mass@@Default@<nazwa pliku>` i `SW-Material@@Default@<nazwa pliku>` — które SolidWorks
+rozwiązuje przy przebudowie/zapisie, więc obie same nadążają za modelem; makro odczytuje
+wartość *rozwiązaną*. Inventor nie ma odpowiednika takiego wyrażenia, więc tam obie trzymają
+migawkę odczytaną z `ComponentDefinition` w chwili wysyłki i odświeżają się dopiero przy
+kolejnej. Rysunki są pomijane w całości, materiał zapisywany wyłącznie dla Części (złożenie
+nie ma własnego), a masa pusta albo niebędąca zwykłą liczbą trafia do logu i jest pomijana —
+najpierw normalizowana do cyfr i jednej kropki dziesiętnej, bo bywa z jednostką i przecinkiem
+dziesiętnym.
+
+Materiał, którego katalog jeszcze nie zna, zakłada sam `PATCH /properties`
+(`INSERT … ON CONFLICT (name) DO NOTHING`, więc dwa makra wysyłające równolegle ten sam nie
+mogą się zderzyć). Makra czytają materiał z dokumentu, a nie z listy wyboru, więc bez tego
+element miałby materiał, którego nie da się ani wybrać ponownie, ani użyć jako filtr.
+Zakładana jest sama nazwa; grupa i podgrupa zostają puste.
 
 ### Logowanie, role i dostęp do projektów
 
@@ -390,7 +415,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | lokalizacja/statystyki magazynu, przeniesienie, backup (pg_dump + pliki w ZIP), przywrócenie z backupu — **tylko administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | harmonogram automatycznej kopii zapasowej (włącz/wyłącz, częstotliwość, dzień, godzina, liczba przechowywanych kopii) — **tylko administrator** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | prefiksy-litery numeru elementu per rodzaj (4 rodzaje Części + `Zlozenie` = złożenie wykonywane; złożenie zakupowe/klienta używa prefiksu rodzaju Części) — **tylko administrator** |
-| GET/PATCH | `/api/settings/item-number-format` | minimalna liczba cyfr, do której dopełniany jest numer zerami (0 = bez dopełniania); zamrażana na elemencie przy jego tworzeniu — **tylko administrator** |
+| GET/PATCH | `/api/settings/item-number-format` | format numeru dla elementów tworzonych od teraz: `digits` (minimalna szerokość dopełnienia zerami, 0 = bez dopełniania) i `withName` (czy dochodzi nazwa elementu w nawiasie). Oba opcjonalne przy PATCH i zapisywane niezależnie, bo w interfejsie to dwie osobne sekcje; zamrażane na elemencie przy jego tworzeniu — **tylko administrator** |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | podgląd/cofnięcie sekwencji numerów elementów — **tylko administrator** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | lista dni z zapisanym logiem, ostatnie N wierszy z danego dnia, pobranie pełnego pliku — **tylko administrator** |
 

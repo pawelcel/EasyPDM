@@ -33,6 +33,8 @@ static class BomEndpoints
                     itemNumber = r.ItemNumber,
                     itemNumberPrefix = r.ItemNumberPrefix,
                     itemNumberLabel = ItemNumbering.Label(r.ItemNumber, r.ItemNumberPrefix, r.ItemNumberDigits),
+                    recordName = ItemNumbering.RecordName(r.ItemNumber, r.ItemNumberPrefix,
+                        r.ItemNumberDigits, r.ItemNumberWithName, r.FileName),
                     fileName = r.FileName,
                     revisionNumber = r.RevisionNumber,
                     revisionLabel = RevisionLabeling.Label(r.RevisionNumber),
@@ -61,7 +63,8 @@ static class BomEndpoints
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
                 var name = row.ItemNumber is not null
-                    ? $"{ItemNumbering.Label(row.ItemNumber, row.ItemNumberPrefix, row.ItemNumberDigits)}({row.FileName})"
+                    ? ItemNumbering.RecordName(row.ItemNumber, row.ItemNumberPrefix,
+                        row.ItemNumberDigits, row.ItemNumberWithName, row.FileName)
                     : row.FileName;
                 csv.Append(string.Join(';', new[]
                 {
@@ -111,7 +114,7 @@ static class BomEndpoints
                 )
                 SELECT DISTINCT i.id, i.item_number, i.item_number_prefix, i.file_name,
                        i.item_type, i.project_id, i.revision_number, p.name AS project_name,
-                       i.item_number_digits
+                       i.item_number_digits, i.item_number_with_name
                 FROM ancestors a
                 JOIN items i ON i.id = a.parent_id
                 LEFT JOIN projects p ON p.id = i.project_id
@@ -133,6 +136,12 @@ static class BomEndpoints
                         reader.IsDBNull(1) ? null : reader.GetInt32(1),
                         reader.IsDBNull(2) ? null : reader.GetString(2),
                         reader.IsDBNull(8) ? null : reader.GetInt32(8)),
+                    recordName = ItemNumbering.RecordName(
+                        reader.IsDBNull(1) ? null : reader.GetInt32(1),
+                        reader.IsDBNull(2) ? null : reader.GetString(2),
+                        reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                        reader.IsDBNull(9) ? null : reader.GetBoolean(9),
+                        reader.GetString(3)),
                     fileName = reader.GetString(3),
                     itemType = reader.GetString(4),
                     projectId = reader.IsDBNull(5) ? (Guid?)null : reader.GetGuid(5),
@@ -166,6 +175,7 @@ static class BomEndpoints
                     g.First().ItemNumber,
                     g.First().ItemNumberPrefix,
                     g.First().ItemNumberDigits,
+                    g.First().ItemNumberWithName,
                     g.First().FileName,
                     g.First().PropertiesJson,
                     TotalQuantity = g.Sum(r => r.ExtendedQuantity)
@@ -178,7 +188,8 @@ static class BomEndpoints
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
                 var name = row.ItemNumber is not null
-                    ? $"{ItemNumbering.Label(row.ItemNumber, row.ItemNumberPrefix, row.ItemNumberDigits)}({row.FileName})"
+                    ? ItemNumbering.RecordName(row.ItemNumber, row.ItemNumberPrefix,
+                        row.ItemNumberDigits, row.ItemNumberWithName, row.FileName)
                     : row.FileName;
                 csv.Append(string.Join(';', new[]
                 {
@@ -212,7 +223,7 @@ static class BomEndpoints
 
     private static async Task<string> GetItemLabel(NpgsqlConnection conn, Guid id)
     {
-        await using var cmd = new NpgsqlCommand("SELECT item_number, item_number_prefix, file_name, item_number_digits FROM items WHERE id = @id;", conn);
+        await using var cmd = new NpgsqlCommand("SELECT item_number, item_number_prefix, file_name, item_number_digits, item_number_with_name FROM items WHERE id = @id;", conn);
         cmd.Parameters.AddWithValue("id", id);
         await using var reader = await cmd.ExecuteReaderAsync();
         if (!await reader.ReadAsync())
@@ -223,7 +234,8 @@ static class BomEndpoints
         var prefix = reader.IsDBNull(1) ? "" : reader.GetString(1);
         var number = reader.GetInt32(0);
         var digits = reader.IsDBNull(3) ? (int?)null : reader.GetInt32(3);
-        return $"{ItemNumbering.Label(number, prefix, digits)}({fileName})";
+        var withName = reader.IsDBNull(4) ? (bool?)null : reader.GetBoolean(4);
+        return ItemNumbering.RecordName(number, prefix, digits, withName, fileName);
     }
 
     private static string PropertyOrEmpty(JsonElement properties, string key) =>
@@ -266,7 +278,7 @@ static class BomEndpoints
             )
             SELECT b.child_id, b.quantity, b.extended_quantity, b.depth, b.path,
                    i.item_number, i.item_number_prefix, i.file_name, i.revision_number, i.properties,
-                   i.item_number_digits
+                   i.item_number_digits, i.item_number_with_name
             FROM bom b
             JOIN items i ON i.id = b.child_id
             ORDER BY b.path;
@@ -289,7 +301,8 @@ static class BomEndpoints
                 FileName: reader.GetString(7),
                 RevisionNumber: reader.IsDBNull(8) ? null : reader.GetInt32(8),
                 PropertiesJson: reader.GetFieldValue<string>(9),
-                ItemNumberDigits: reader.IsDBNull(10) ? null : reader.GetInt32(10)));
+                ItemNumberDigits: reader.IsDBNull(10) ? null : reader.GetInt32(10),
+                ItemNumberWithName: reader.IsDBNull(11) ? null : reader.GetBoolean(11)));
         }
         return rows;
     }
@@ -297,5 +310,5 @@ static class BomEndpoints
     private record BomRow(
         Guid ChildId, decimal Quantity, decimal ExtendedQuantity, int Depth, int[] Path,
         int? ItemNumber, string? ItemNumberPrefix, string FileName, int? RevisionNumber, string PropertiesJson,
-        int? ItemNumberDigits);
+        int? ItemNumberDigits, bool? ItemNumberWithName);
 }

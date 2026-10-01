@@ -109,7 +109,7 @@ static class ClientVerificationEndpoints
                 SELECT DISTINCT ON (v.item_id)
                        v.item_id, v.result, v.revision_number, v.created_at,
                        i.item_number, i.item_number_prefix, i.file_name, i.revision_number,
-                       i.item_number_digits
+                       i.item_number_digits, i.item_number_with_name
                 FROM item_client_verifications v
                 JOIN items i ON i.id = v.item_id
                 WHERE v.project_id = @projectId
@@ -133,6 +133,12 @@ static class ClientVerificationEndpoints
                         reader.IsDBNull(4) ? null : reader.GetInt32(4),
                         reader.IsDBNull(5) ? null : reader.GetString(5),
                         reader.IsDBNull(8) ? null : reader.GetInt32(8)),
+                    recordName = ItemNumbering.RecordName(
+                        reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                        reader.IsDBNull(5) ? null : reader.GetString(5),
+                        reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                        reader.IsDBNull(9) ? null : reader.GetBoolean(9),
+                        reader.GetString(6)),
                     fileName = reader.GetString(6),
                     itemRevisionNumber = reader.IsDBNull(7) ? (int?)null : reader.GetInt32(7),
                 });
@@ -277,7 +283,7 @@ static class ClientVerificationEndpoints
                 {
                     itemLabel = ItemEndpoints.ItemLabel(
                         info.Value.FileName, info.Value.ItemNumber, info.Value.ItemNumberPrefix,
-                        info.Value.ItemNumberDigits),
+                        info.Value.ItemNumberDigits, info.Value.ItemNumberWithName),
                 };
                 var type = verificationResult == ResultNeedsWork
                     ? "client_verification_needs_work"

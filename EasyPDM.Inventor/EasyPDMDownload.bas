@@ -1108,7 +1108,10 @@ Private Function NewRevisionRegex(ByVal itemNumber As Long, ByVal name As String
     ' zera wiodace (Ustawienia -> Nazewnictwo), a pliki wgrane przed wlaczeniem tych
     ' ustawien maja sam numer -- oba warianty musza pasowac, inaczej pobieranie
     ' przestaloby rozpoznawac wlasne starsze pliki.
-    re.Pattern = "^[A-Za-z]*0*" & itemNumber & "\s*\(" & RegexEscape(name) & "\)\.([A-Za-z]+)\."
+    ' Czlon "(nazwa)" jest OPCJONALNY: po wylaczeniu nazwy elementu w nazwie rekordu
+    ' (Ustawienia -> Numeracja) zalacznik nazywa sie samym numerem, np. "C0005.A.sldprt".
+    ' Grupa nieprzechwytujaca (?:...), zeby SubMatches(0) dalej byl litera rewizji.
+    re.Pattern = "^[A-Za-z]*0*" & itemNumber & "\s*(?:\(" & RegexEscape(name) & "\))?\.([A-Za-z]+)\."
     Set NewRevisionRegex = re
 End Function
 

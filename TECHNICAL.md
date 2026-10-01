@@ -287,11 +287,12 @@ Numbering) — this only works when no existing item already has that number or 
 so it lets you reclaim the numbering "tail" left behind by deleted test items without
 risking a collision.
 
-What the user sees is that number dressed in two things, both stored **on the item** and
+What the user sees is that number dressed in three things, all stored **on the item** and
 frozen when it is created: a letter prefix per kind (`item_number_prefix`, from
-`item_number_prefixes`) and a minimum width to zero-pad to (`item_number_digits`, from
-`system_state.item_number_digits`). Changing either setting therefore affects only items
-created afterwards. That is not conservatism for its own sake: the CAD macros build a
+`item_number_prefixes`), a minimum width to zero-pad to (`item_number_digits`), and whether
+the item's own name is appended in brackets at all (`item_number_with_name`) — the last two
+from `system_state`. Changing any of these settings therefore affects only items created
+afterwards. That is not conservatism for its own sake: the CAD macros build a
 file's name out of this number, so the name lives on disk and inside `item_attachments`,
 where nothing can rewrite it after the fact. `ItemNumbering.Label` composes the three
 parts in one place and the API ships the result as `itemNumberLabel` next to
@@ -307,10 +308,35 @@ outright rather than applying it with a stale prefix, and the item payload carri
 `kindLocked` so the UI can grey the buttons out. Only a real change is refused — resending
 the same kind passes. The number itself never changes.
 
-The full name of an item reads `prefix + padded number` immediately followed by the name
-in brackets — `C0001(plate)` — with the revision letter and the extension appended for a
-file on disk: `C0001(plate).A.sldprt`. Files written before this convention keep the space
-they were saved with; every macro's name matching accepts both forms.
+The full name of an item — its **record name**, composed once by `ItemNumbering.RecordName`
+and shipped as `recordName` — reads `prefix + padded number` immediately followed by the name
+in brackets: `C0001(plate)`, or just `C0001` with the name switched off. The revision letter
+and the extension are appended for a file on disk: `C0001(plate).A.sldprt`. Every macro's
+name matching treats both the bracketed name and the space that older files were saved with
+as optional, so it still recognizes files written under any earlier convention.
+
+Because the name may be missing from the file name, both VBA macros also write it into a
+document custom property, `EasyPDM_Name`, next to the link properties they already keep
+there — that property is then the only place in the document where the name appears, and
+drawing templates can pull it from there. Both also write `EasyPDM-Mass` and
+`EasyPDM_Material`, and read them back onto the item's `mass`/`material` properties in a
+single PATCH right after the save.
+
+In SolidWorks neither property holds a value but an expression —
+`SW-Mass@@Default@<file name>` and `SW-Material@@Default@<file name>` — which SolidWorks
+resolves on rebuild/save, so both track the model by themselves; the macro reads the
+*resolved* value. Inventor has no equivalent expression, so there both properties hold a
+snapshot read from `ComponentDefinition` at upload time and need a re-upload to refresh.
+Drawings are skipped entirely, material is written for Parts only (an Assembly has none of
+its own), and a mass that is empty or not a plain number is logged and skipped — it is
+normalized to digits and one decimal point first, since it can arrive with a unit and a
+locale decimal comma.
+
+A material the catalog does not know yet is inserted by `PATCH /properties` itself
+(`INSERT … ON CONFLICT (name) DO NOTHING`, so two macros sending the same one concurrently
+cannot collide). The macros read the material off the document rather than from a list, so
+without this the item would carry a material that could neither be picked again nor used as
+a filter. Only the name is created; group and subgroup stay empty.
 
 ### Login, roles, and project access
 
@@ -398,7 +424,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | storage location/stats, moving it, backup (pg_dump + files in a ZIP), restore from backup — **administrator only** |
 | GET/PATCH | `/api/settings/backup-schedule` | automatic backup schedule (enable/disable, frequency, day, time, number of kept copies) — **administrator only** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | item number letter prefixes per kind (the 4 Part kinds plus `Zlozenie` = manufactured assembly; purchased/client assemblies reuse the Part kind's prefix) — **administrator only** |
-| GET/PATCH | `/api/settings/item-number-format` | minimum number of digits to zero-pad item numbers to (0 = no padding); frozen onto each item as it is created — **administrator only** |
+| GET/PATCH | `/api/settings/item-number-format` | number format for items created from now on: `digits` (minimum width to zero-pad to, 0 = no padding) and `withName` (whether the item's name is appended in brackets). Both optional on PATCH and saved independently, since they are two separate sections in the UI; frozen onto each item as it is created — **administrator only** |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | preview/rewind the item number sequence — **administrator only** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | list of days with a saved log, the last N lines of a given day, download of the full file — **administrator only** |
 

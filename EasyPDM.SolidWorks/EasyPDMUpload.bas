@@ -98,6 +98,22 @@ Private Const SESSION_COOKIE_NAME As String = "pdm_session"
 ' Names of the document Custom Properties used to store the PDM link -- see module header.
 Private Const CUSTPROP_ITEM_ID As String = "EasyPDM_ItemId"
 Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_ItemNumber"
+' Nazwa elementu z PDM, zapisywana jako wlasciwosc dokumentu, zeby dalo sie ja wciagnac do
+' wlasnych szablonow rysunku/tabelki ($PRP:"EasyPDM_Name"). Potrzebna zwlaszcza wtedy, gdy
+' nazwa elementu NIE wchodzi w nazwe pliku (Ustawienia -> Numeracja): wtedy plik nazywa sie
+' samym numerem i jest to jedyne miejsce w dokumencie, gdzie nazwa w ogole wystepuje.
+Private Const CUSTPROP_ITEM_NAME As String = "EasyPDM_Name"
+' Masa czesci -- NIE liczba, tylko wyrazenie SolidWorksa, ktore sam program rozwiazuje do
+' wyliczonej masy dokumentu: "SW-Mass@@Default@<nazwa pliku z rozszerzeniem>". Dzieki temu
+' wartosc sama nadaza za modelem (zmiana geometrii czy materialu = inna masa), a makro moze
+' ja odczytac i wpisac do pola Masa elementu w PDM.
+Private Const CUSTPROP_MASS As String = "EasyPDM-Mass"
+' Material czesci -- tak samo jak masa wyzej NIE wartosc, tylko wyrazenie SolidWorksa
+' "SW-Material@@Default@<nazwa pliku>", ktore program rozwiazuje do materialu przypisanego
+' dokumentowi. Dzieki temu nadaza za modelem, a makro odczytuje rozwiazana nazwe i wysyla do
+' PDM; jesli katalog PDM takiego materialu nie zna, serwer zaklada go sam (zob.
+' PropertyEndpoints).
+Private Const CUSTPROP_MATERIAL As String = "EasyPDM_Material"
 
 ' Own error numbers (Err.Raise) -- distinguish "missing/expired session" (ERR_AUTH, should
 ' trigger a fresh login) from a plain API error (ERR_API, just show the message).
@@ -1501,19 +1517,20 @@ End Function
 ' the web app can show it under its "CAD attachments" section, separately from ordinary,
 ' attachments -- one per revision (unique filename per revision means these ACCUMULATE,
 ' unlike the single-slot "pdf"/"step" roles which replace the previous attachment).
-' Numer elementu TAK, JAK MA WYGLADAC W NAZWIE PLIKU -- gotowa etykieta z serwera
-' (itemNumberLabel: literowy prefiks rodzaju plus zera wiodace, zob. Ustawienia ->
-' Nazewnictwo). Dotad makro sklejalo nazwe z samej liczby, przez co plik na dysku nazywal
-' sie inaczej niz element w bazie, gdy rodzaj mial ustawiony prefiks.
+' Pelna NAZWA REKORDU tak, jak ma wygladac w nazwie pliku -- gotowa z serwera (recordName:
+' literowy prefiks rodzaju, zera wiodace i -- zaleznie od ustawienia zamrozonego na elemencie
+' -- nazwa elementu w nawiasie, zob. Ustawienia -> Numeracja). Dotad makro sklejalo ja z samej
+' liczby, przez co plik na dysku nazywal sie inaczej niz element w bazie.
 '
 ' Pobieramy to tutaj, zamiast przeciagac przez kilkanascie wywolan po drodze: jedno dodatkowe
 ' GET na wysylke jest nieodczuwalne, a sygnatury pozostalych funkcji zostaja nietkniete.
-' Starszy serwer nie zwraca tego pola -- wtedy, jak i przy bledzie, zostaje sama liczba.
-Function ItemNumberLabelFor(ByVal itemId As String, ByVal fallbackNumber As Long) As String
+' Starszy serwer nie zwraca tego pola -- wtedy, jak i przy bledzie, zostaje stara konwencja
+' "numer(nazwa)".
+Function RecordNameFor(ByVal itemId As String, ByVal fallbackNumber As Long, ByVal fallbackName As String) As String
     Dim it As Object
-    Dim labelText As String
+    Dim recordText As String
 
-    ItemNumberLabelFor = CStr(fallbackNumber)
+    RecordNameFor = CStr(fallbackNumber) & "(" & SanitizeFilename(fallbackName) & ")"
     If Len(itemId) = 0 Then Exit Function
 
     On Error Resume Next
@@ -1526,8 +1543,10 @@ Function ItemNumberLabelFor(ByVal itemId As String, ByVal fallbackNumber As Long
     On Error GoTo 0
 
     If it Is Nothing Then Exit Function
-    labelText = JsonGetString(it, "itemNumberLabel", "")
-    If Len(labelText) > 0 Then ItemNumberLabelFor = labelText
+    recordText = JsonGetString(it, "recordName", "")
+    ' Nazwa elementu wchodzi do recordName surowa -- sanityzujemy calosc. SanitizeFilename
+    ' podmienia tylko znaki zakazane w nazwach plikow, nawiasow nie rusza.
+    If Len(recordText) > 0 Then RecordNameFor = SanitizeFilename(recordText)
 End Function
 
 Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long, ByVal targetFolder As String, Optional ByVal role As String = "cad") As Boolean
@@ -1549,7 +1568,7 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
     End If
 
     Dim newFilename As String
-    newFilename = ItemNumberLabelFor(itemId, itemNumber) & "(" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ext
+    newFilename = RecordNameFor(itemId, itemNumber, name) & "." & RevisionLabel(revision) & ext
 
     ' UNVERIFIED against a live SolidWorks install for this SPECIFIC use (same-format
     ' native Save As, as opposed to UploadStepAttachment's format-CONVERTING SaveAs) --
@@ -1599,7 +1618,17 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
     ' a successful upload are now a redundant final refresh, not the only place it happens).
     ' A failure here is logged but NOT fatal, matching this function's existing tolerant
     ' style -- the upload still proceeds even if the file ends up missing the embedded link.
-    SetLinkedItemOn swModel, itemId, CStr(itemNumber)
+    SetLinkedItemOn swModel, itemId, CStr(itemNumber), name
+
+    ' Tylko dla wlasciwego pliku CAD (Czesc/Zlozenie) -- rysunek (role="drawing") nie ma masy,
+    ' a wyrazenie wskazujace na .SLDDRW nie mialoby czego rozwiazac.
+    '
+    ' Wyrazenie masy musi wskazywac na RZECZYWISTA nazwe dokumentu, wiec czytamy ja z modelu
+    ' PO ewentualnym Save As wyzej -- gdyby Save As zawiodl, dokument ma nadal stara nazwe i
+    ' wyrazenie ma sie odnosic wlasnie do niej, inaczej SolidWorks go nie rozwiaze.
+    If role = "cad" Then SetMassPropertyOn swModel
+    If role = "cad" Then SetMaterialPropertyOn swModel
+
     Dim linkSaveErrors As Long, linkSaveWarnings As Long
     On Error Resume Next
     Err.Clear
@@ -1608,6 +1637,10 @@ Function RenameAndUpload(ByVal swModel As Object, ByVal filePath As String, ByVa
         LogLine "Warning: could not re-save after setting the PDM link Custom Property (" & Err.Description & ") -- the uploaded copy may be missing it."
     End If
     On Error GoTo 0
+
+    ' Dopiero PO zapisie -- SolidWorks rozwiazuje wyrazenia wlasciwosci przy przebudowie/
+    ' zapisie, wiec odczyt tuz po samym dodaniu wlasciwosci zwrocilby pusty lancuch.
+    If role = "cad" Then PushCadPropertiesToPdm swModel, itemId
 
     LogLine "RenameAndUpload: item #" & itemNumber & ", local file """ & filePath & """, new name """ & newFilename & """"
 
@@ -1853,7 +1886,9 @@ Sub UploadDrawingForActiveDoc(ByVal swModel As Object, ByVal filePath As String)
     Set re = CreateObject("VBScript.RegExp")
     ' [A-Za-z]*0* przed numerem: nazwa moze miec literowy prefiks rodzaju i zera
     ' wiodace, a pliki sprzed wlaczenia tych ustawien maja sam numer -- oba musza pasowac.
-    re.Pattern = "^[A-Za-z]*0*(\d+)\s*\("
+    ' Po nazwie rekordu moze stac "(" (nazwa elementu) albo od razu "." (gdy nazwa jest
+    ' wylaczona w Ustawieniach -> Numeracja, plik nazywa sie samym numerem).
+    re.Pattern = "^[A-Za-z]*0*(\d+)\s*(?:\(|\.)"
     If Not re.Test(fname) Then
         MsgBox T("Dwg_CannotIdentifyItem"), vbExclamation, T("AppTitle")
         LogLine "Drawing upload: could not parse an item number out of """ & fname & """ -- done."
@@ -1922,7 +1957,7 @@ Function FindLinkedCandidatesInDrawingViews(ByVal swDraw As Object) As Collectio
                     result.Add linkedId
                 Else
                     LogLine "Drawing upload: view's referenced document had a stale link to deleted item " & linkedId & " -- clearing it, treating as unlinked."
-                    SetLinkedItemOn refDoc, "", ""
+                    SetLinkedItemOn refDoc, "", "", ""
                 End If
             End If
         End If
@@ -2141,7 +2176,7 @@ Sub UploadStepAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal 
     ' now (see ReplaceExistingRoleAttachmentAsync in AttachmentEndpoints.cs) -- no need to
     ' fetch/delete the old one from here anymore.
     Dim stepDisplayName As String
-    stepDisplayName = ItemNumberLabelFor(itemId, itemNumber) & "(" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".step"
+    stepDisplayName = RecordNameFor(itemId, itemNumber, name) & "." & RevisionLabel(revision) & ".step"
 
     ApiUploadFile "/items/" & itemId & "/attachments", tempPath, stepDisplayName, "role", "step"
     LogLine "Uploaded STEP attachment for item " & itemId & " as """ & stepDisplayName & """ (from " & tempPath & ")."
@@ -2177,7 +2212,7 @@ Sub UploadPdfAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal i
     ' UploadStepAttachment's comment for why, and ReplaceExistingRoleAttachmentAsync for
     ' why no manual pre-delete of the previous "pdf" attachment is needed here.
     Dim pdfDisplayName As String
-    pdfDisplayName = ItemNumberLabelFor(itemId, itemNumber) & "(" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".pdf"
+    pdfDisplayName = RecordNameFor(itemId, itemNumber, name) & "." & RevisionLabel(revision) & ".pdf"
 
     ApiUploadFile "/items/" & itemId & "/attachments", tempPath, pdfDisplayName, "role", "pdf"
     LogLine "Uploaded PDF attachment for item " & itemId & " as """ & pdfDisplayName & """ (from " & tempPath & ")."
@@ -2704,7 +2739,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
         If existingItemId <> "" Then
             If Not ItemStillExists(existingItemId) Then
                 LogLine "Component's linked PDM item " & existingItemId & " no longer exists (deleted?) -- clearing stale link: " & filePath
-                SetLinkedItemOn childModel, "", ""
+                SetLinkedItemOn childModel, "", "", ""
                 existingItemId = ""
             End If
         End If
@@ -2797,7 +2832,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             ' path already set (and saved) this same Custom Property BEFORE uploading, so
             ' the file actually sent to the server already carries it. Kept here as cheap
             ' insurance.
-            SetLinkedItemOn childModel, newItemId, CStr(JsonGetLong(created, "itemNumber", 0))
+            SetLinkedItemOn childModel, newItemId, CStr(JsonGetLong(created, "itemNumber", 0)), JsonGetString(created, "name", "")
             pathToItemId.Add filePath, newItemId
             newlyCreatedPaths.Add filePath, True
         Else
@@ -2979,12 +3014,171 @@ End Function
 ' Saves the document-to-PDM-item link as Custom Properties on ANY document -- unlike the
 ' FreeCAD approach (changing the label, NOT saved to disk), this works reliably in a brand
 ' NEW SolidWorks session too, since Properties are part of the file itself.
-Sub SetLinkedItemOn(ByVal model As Object, ByVal itemId As String, ByVal itemNumberText As String)
+Sub SetLinkedItemOn(ByVal model As Object, ByVal itemId As String, ByVal itemNumberText As String, ByVal itemName As String)
     Dim mgr As Object
     Set mgr = GetCustPropMgrOn(model)
     mgr.Add3 CUSTPROP_ITEM_ID, SW_CUSTOM_INFO_TEXT, itemId, SW_CUSTOM_PROPERTY_REPLACE
     mgr.Add3 CUSTPROP_ITEM_NUMBER, SW_CUSTOM_INFO_TEXT, itemNumberText, SW_CUSTOM_PROPERTY_REPLACE
+    ' Zapisywana tak samo jak dwie powyzsze -- razem z nimi, zeby nie dalo sie rozjechac:
+    ' wyczyszczenie powiazania ("", "", "") czysci rowniez nazwe.
+    mgr.Add3 CUSTPROP_ITEM_NAME, SW_CUSTOM_INFO_TEXT, itemName, SW_CUSTOM_PROPERTY_REPLACE
 End Sub
+
+' Sama nazwa pliku dokumentu (bez sciezki), do wyrazen "SW-Mass@@..."/"SW-Material@@...".
+' Czytana z modelu, a nie z wyliczonej wczesniej nazwy: gdyby Save As zawiodl, dokument ma
+' nadal stara nazwe i wyrazenie ma sie odnosic wlasnie do niej, inaczej SolidWorks go nie
+' rozwiaze. Pusty lancuch oznacza dokument jeszcze nigdy niezapisany.
+Private Function DocumentFileNameOf(ByVal model As Object) As String
+    Dim docPath As String
+    On Error Resume Next
+    docPath = model.GetPathName()
+    On Error GoTo 0
+    If Len(docPath) = 0 Then
+        DocumentFileNameOf = ""
+    Else
+        DocumentFileNameOf = Mid(docPath, InStrRev(docPath, "\") + 1)
+    End If
+End Function
+
+' Zapisuje wlasciwosc z wyrazeniem masy. Osobno od SetLinkedItemOn, bo w odroznieniu od
+' powiazania (ktore ma sens dla kazdego dokumentu, takze przy czyszczeniu) ta wlasciwosc
+' dotyczy wylacznie dokumentu wlasnie wysylanego i wymaga jego finalnej nazwy pliku.
+Sub SetMassPropertyOn(ByVal model As Object)
+    Dim docName As String
+    docName = DocumentFileNameOf(model)
+    If Len(docName) = 0 Then
+        LogLine "SetMassPropertyOn: document has no path yet -- mass property NOT set."
+        Exit Sub
+    End If
+
+    Dim mgr As Object
+    Set mgr = GetCustPropMgrOn(model)
+    On Error Resume Next
+    Err.Clear
+    mgr.Add3 CUSTPROP_MASS, SW_CUSTOM_INFO_TEXT, "SW-Mass@@Default@" & docName, SW_CUSTOM_PROPERTY_REPLACE
+    If Err.Number <> 0 Then
+        LogLine "SetMassPropertyOn: could not set " & CUSTPROP_MASS & " (" & Err.Description & ")."
+        Err.Clear
+    Else
+        LogLine "SetMassPropertyOn: " & CUSTPROP_MASS & "=""SW-Mass@@Default@" & docName & """."
+    End If
+    On Error GoTo 0
+End Sub
+
+' Zapisuje wlasciwosc z wyrazeniem materialu -- ten sam mechanizm co przy masie, tylko
+' "SW-Material" zamiast "SW-Mass". Tylko dla Czesci: zlozenie nie ma wlasnego materialu, a
+' wyrazenie wskazujace na .SLDASM nie mialoby czego rozwiazac.
+Sub SetMaterialPropertyOn(ByVal model As Object)
+    If model.GetType() <> SW_DOC_PART Then Exit Sub
+
+    Dim docName As String
+    docName = DocumentFileNameOf(model)
+    If Len(docName) = 0 Then
+        LogLine "SetMaterialPropertyOn: document has no path yet -- material property NOT set."
+        Exit Sub
+    End If
+
+    Dim mgr As Object
+    Set mgr = GetCustPropMgrOn(model)
+    On Error Resume Next
+    Err.Clear
+    mgr.Add3 CUSTPROP_MATERIAL, SW_CUSTOM_INFO_TEXT, "SW-Material@@Default@" & docName, SW_CUSTOM_PROPERTY_REPLACE
+    If Err.Number <> 0 Then
+        LogLine "SetMaterialPropertyOn: could not set " & CUSTPROP_MATERIAL & " (" & Err.Description & ")."
+        Err.Clear
+    Else
+        LogLine "SetMaterialPropertyOn: " & CUSTPROP_MATERIAL & "=""SW-Material@@Default@" & docName & """."
+    End If
+    On Error GoTo 0
+End Sub
+
+' Odczytuje ROZWIAZANA mase i material, i zapisuje oba do wlasciwosci elementu w PDM --
+' JEDNYM PATCH-em, zeby nie robic dwoch zapisow (kazdy i tak przeliczalby prefiks po stronie
+' serwera). Caly krok jest tolerancyjny: pusta albo nieliczbowa masa i brak materialu sa
+' tylko logowane i pomijane -- to informacje dodatkowe, ich brak nie przerywa wysylki.
+Sub PushCadPropertiesToPdm(ByVal model As Object, ByVal itemId As String)
+    If Len(itemId) = 0 Then Exit Sub
+
+    Dim mgr As Object
+    Set mgr = GetCustPropMgrOn(model)
+
+    Dim fields As String
+    fields = ""
+
+    Dim valOut As String, resolvedOut As String
+    On Error Resume Next
+    Err.Clear
+    mgr.Get4 CUSTPROP_MASS, False, valOut, resolvedOut
+    If Err.Number <> 0 Then
+        LogLine "PushCadPropertiesToPdm: could not read " & CUSTPROP_MASS & " (" & Err.Description & ")."
+        Err.Clear
+        resolvedOut = ""
+    End If
+    On Error GoTo 0
+
+    Dim massText As String
+    massText = NormalizeMassText(resolvedOut)
+    If Len(massText) > 0 Then
+        fields = """mass"":" & JsonStr(massText)
+    Else
+        LogLine "PushCadPropertiesToPdm: resolved mass is empty or not numeric (raw=""" & resolvedOut & """) -- mass not sent. SolidWorks evaluates the expression on rebuild/save, so this can be normal on a brand new document."
+    End If
+
+    Dim matValue As String, matResolved As String
+    On Error Resume Next
+    Err.Clear
+    mgr.Get4 CUSTPROP_MATERIAL, False, matValue, matResolved
+    If Err.Number <> 0 Then
+        Err.Clear
+        matResolved = ""
+    End If
+    On Error GoTo 0
+
+    matResolved = Trim(matResolved)
+    If Len(matResolved) > 0 Then
+        If Len(fields) > 0 Then fields = fields & ","
+        fields = fields & """material"":" & JsonStr(matResolved)
+    End If
+
+    If Len(fields) = 0 Then Exit Sub
+
+    On Error Resume Next
+    Err.Clear
+    ApiPatchJson "/items/" & itemId & "/properties", "{" & fields & "}"
+    If Err.Number <> 0 Then
+        LogLine "PushCadPropertiesToPdm: PATCH /properties failed (" & Err.Description & ") -- values not saved in PDM."
+        Err.Clear
+    Else
+        LogLine "PushCadPropertiesToPdm: saved {" & fields & "} on item " & itemId & "."
+    End If
+    On Error GoTo 0
+End Sub
+
+' Rozwiazana masa przychodzi jako tekst w ustawieniach dokumentu -- bywa z jednostka
+' ("1234.56 g") i z przecinkiem dziesietnym w polskiej lokalizacji. Pole Masa w PDM jest
+' liczbowe, wiec zostawiamy same cyfry i JEDNA kropke dziesietna; cokolwiek innego oznacza
+' wartosc, ktorej nie umiemy bezpiecznie zinterpretowac i wtedy nie wysylamy nic.
+Function NormalizeMassText(ByVal raw As String) As String
+    Dim s As String, i As Long, ch As String, result As String, dotSeen As Boolean
+    s = Trim(Replace(raw, ",", "."))
+    For i = 1 To Len(s)
+        ch = Mid(s, i, 1)
+        If ch >= "0" And ch <= "9" Then
+            result = result & ch
+        ElseIf ch = "." And Not dotSeen Then
+            result = result & ch
+            dotSeen = True
+        ElseIf ch = " " Then
+            ' Spacja konczy liczbe -- dalej jest juz jednostka.
+            Exit For
+        Else
+            ' Cokolwiek innego przed pierwsza cyfra (np. znak) albo w srodku -- odrzucamy.
+            If Len(result) > 0 Then Exit For
+        End If
+    Next i
+    If result = "." Then result = ""
+    NormalizeMassText = result
+End Function
 
 ' Thin wrappers over the active document -- kept so the rest of the file (Sub main, which
 ' always deals with swApp.ActiveDoc) does not need to pass it explicitly everywhere.
@@ -2992,8 +3186,8 @@ Function GetLinkedItemId() As String
     GetLinkedItemId = GetLinkedItemIdOn(swApp.ActiveDoc)
 End Function
 
-Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String)
-    SetLinkedItemOn swApp.ActiveDoc, itemId, itemNumberText
+Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String, ByVal itemName As String)
+    SetLinkedItemOn swApp.ActiveDoc, itemId, itemNumberText, itemName
 End Sub
 
 ' Checks whether a linked PDM item still exists on the server -- recovers from a STALE
@@ -3120,7 +3314,7 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
     If linkedItemId <> "" Then
         If Not ItemStillExists(linkedItemId) Then
             LogLine "Linked PDM item " & linkedItemId & " no longer exists on the server (deleted?) -- clearing the stale local link, treating this document as not yet linked."
-            SetLinkedItemOn swModel, "", ""
+            SetLinkedItemOn swModel, "", "", ""
             MsgBox T("StaleLinkCleared"), vbInformation, T("AppTitle")
             linkedItemId = ""
         End If
@@ -3293,7 +3487,7 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
         ' resultInfo above) already set and saved this same Custom Property BEFORE
         ' uploading, so the file actually sent to the server already carries it. Kept here
         ' as cheap insurance for the top-level document specifically.
-        SetLinkedItemOn swModel, linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0))
+        SetLinkedItemOn swModel, linkedItemId, CStr(JsonGetLong(resultInfo, "itemNumber", 0)), JsonGetString(resultInfo, "name", "")
         LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
                 ", revision " & JsonGetString(resultInfo, "revisionLabel", "A") & " ==="
 

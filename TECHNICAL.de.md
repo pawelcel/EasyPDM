@@ -316,11 +316,12 @@ nur, wenn kein vorhandenes Element diese Nummer oder eine höhere bereits hat, s
 der von gelöschten Testelementen hinterlassene Nummern-"Schwanz" ohne Kollisionsrisiko
 zurückgewinnen lässt.
 
-Was der Benutzer sieht, ist diese Nummer, eingekleidet in zwei Dinge, die beide **am
-Element** gespeichert und bei dessen Erstellung eingefroren werden: ein Buchstabenpräfix je
-Art (`item_number_prefix`, aus `item_number_prefixes`) und eine Mindestbreite zum Auffüllen
-mit Nullen (`item_number_digits`, aus `system_state.item_number_digits`). Eine Änderung
-dieser Einstellungen wirkt sich daher nur auf später erstellte Elemente aus. Das ist keine
+Was der Benutzer sieht, ist diese Nummer, eingekleidet in drei Dinge, die alle **am Element**
+gespeichert und bei dessen Erstellung eingefroren werden: ein Buchstabenpräfix je Art
+(`item_number_prefix`, aus `item_number_prefixes`), eine Mindestbreite zum Auffüllen mit
+Nullen (`item_number_digits`) und ob der Name des Elements überhaupt in Klammern angehängt
+wird (`item_number_with_name`) — die letzten beiden aus `system_state`. Eine Änderung dieser
+Einstellungen wirkt sich daher nur auf später erstellte Elemente aus. Das ist keine
 Vorsicht um ihrer selbst willen: Die CAD-Makros bauen aus dieser Nummer den Dateinamen, der
 somit auf der Festplatte und in `item_attachments` liegt, wo ihn nachträglich nichts mehr
 umschreibt. `ItemNumbering.Label` setzt die drei Teile an einer Stelle zusammen, und die API
@@ -338,11 +339,37 @@ und das Element-Objekt führt `kindLocked`, damit die Oberfläche die Schaltflä
 kann. Abgelehnt wird nur eine tatsächliche Änderung — dieselbe Art erneut zu senden geht
 durch. Die Nummer selbst ändert sich nie.
 
-Der vollständige Name eines Elements lautet `Präfix + aufgefüllte Nummer`, unmittelbar
-gefolgt vom Namen in Klammern — `C0001(Platte)` — und für eine Datei auf der Festplatte
-kommen noch der Revisionsbuchstabe und die Erweiterung hinzu: `C0001(Platte).A.sldprt`.
-Dateien, die vor dieser Konvention geschrieben wurden, behalten das Leerzeichen, mit dem sie
-entstanden sind; die Namenszuordnung jedes Makros akzeptiert beide Formen.
+Der vollständige Name eines Elements — sein **Datensatzname**, einmal von
+`ItemNumbering.RecordName` zusammengesetzt und als `recordName` ausgeliefert — lautet
+`Präfix + aufgefüllte Nummer`, unmittelbar gefolgt vom Namen in Klammern: `C0001(Platte)`,
+oder nur `C0001`, wenn der Name abgeschaltet ist. Für eine Datei auf der Festplatte kommen
+noch der Revisionsbuchstabe und die Erweiterung hinzu: `C0001(Platte).A.sldprt`. Die
+Namenszuordnung jedes Makros behandelt sowohl den Namen in Klammern als auch das Leerzeichen
+älterer Dateien als optional und erkennt damit jede frühere Konvention.
+
+Da der Name im Dateinamen fehlen kann, schreiben beide VBA-Makros ihn zusätzlich in eine
+Dokumenteigenschaft, `EasyPDM_Name`, neben die dort bereits gepflegten Verknüpfungs-
+eigenschaften — diese Eigenschaft ist dann die einzige Stelle im Dokument, an der der Name
+überhaupt vorkommt, und Zeichnungsvorlagen können ihn von dort beziehen. Beide schreiben
+außerdem `EasyPDM-Mass` und `EasyPDM_Material` und lesen sie unmittelbar nach dem Speichern
+mit einem einzigen PATCH auf die Eigenschaften `mass`/`material` des Elements zurück.
+
+In SolidWorks enthält keine der beiden einen Wert, sondern einen Ausdruck —
+`SW-Mass@@Default@<Dateiname>` und `SW-Material@@Default@<Dateiname>` —, den SolidWorks beim
+Neuaufbau/Speichern auflöst, sodass beide dem Modell von selbst folgen; das Makro liest den
+*aufgelösten* Wert. Inventor kennt keinen entsprechenden Ausdruck, dort halten beide daher
+eine zum Zeitpunkt des Hochladens aus `ComponentDefinition` gelesene Momentaufnahme und
+werden erst beim nächsten Hochladen aktualisiert. Zeichnungen werden ganz übersprungen, das
+Material nur für Teile geschrieben (eine Baugruppe hat kein eigenes), und eine Masse, die leer
+oder keine schlichte Zahl ist, wird protokolliert und übersprungen — sie wird zuvor auf
+Ziffern und einen Dezimalpunkt normalisiert, da sie mit Einheit und landesüblichem
+Dezimalkomma eintreffen kann.
+
+Ein dem Katalog noch unbekanntes Material legt `PATCH /properties` selbst an
+(`INSERT … ON CONFLICT (name) DO NOTHING`, damit zwei Makros, die dasselbe gleichzeitig
+senden, nicht kollidieren). Die Makros lesen das Material aus dem Dokument statt aus einer
+Liste; ohne dies trüge das Element ein Material, das sich weder erneut auswählen noch als
+Filter nutzen ließe. Angelegt wird nur der Name; Gruppe und Untergruppe bleiben leer.
 
 ### Anmeldung, Rollen und Projektzugriff
 
@@ -433,7 +460,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | Speicherort/-statistiken, Verschieben, Sicherung (pg_dump + Dateien in einem ZIP), Wiederherstellung aus einer Sicherung — **nur Administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | Zeitplan für automatische Sicherung (ein-/ausschalten, Häufigkeit, Tag, Uhrzeit, Anzahl aufbewahrter Kopien) — **nur Administrator** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | Buchstaben-Präfixe der Elementnummer pro Art (die 4 Teile-Arten plus `Zlozenie` = gefertigte Baugruppe; zugekaufte/Kunden-Baugruppen nutzen das Präfix der Teile-Art) — **nur Administrator** |
-| GET/PATCH | `/api/settings/item-number-format` | Mindestanzahl der Stellen, auf die Elementnummern mit Nullen aufgefüllt werden (0 = kein Auffüllen); wird beim Erstellen am Element eingefroren — **nur Administrator** |
+| GET/PATCH | `/api/settings/item-number-format` | Nummernformat für ab jetzt erstellte Elemente: `digits` (Mindestbreite zum Auffüllen mit Nullen, 0 = kein Auffüllen) und `withName` (ob der Elementname in Klammern angehängt wird). Beide bei PATCH optional und unabhängig gespeichert, da es in der Oberfläche zwei getrennte Abschnitte sind; beim Erstellen am Element eingefroren — **nur Administrator** |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | Vorschau/Zurückdrehen der Elementnummern-Sequenz — **nur Administrator** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | Liste der Tage mit gespeichertem Protokoll, die letzten N Zeilen eines bestimmten Tages, Download der vollständigen Datei — **nur Administrator** |
 

@@ -21,6 +21,12 @@ public class ItemNumberFormatTests
         response.EnsureSuccessStatusCode();
     }
 
+    private static async Task SetWithNameAsync(HttpClient client, bool withName)
+    {
+        var response = await client.PatchAsJsonAsync("/api/settings/item-number-format", new { withName });
+        response.EnsureSuccessStatusCode();
+    }
+
     private static async Task SetPrefixAsync(HttpClient client, string rodzaj, string? prefix)
     {
         var response = await client.PatchAsJsonAsync(
@@ -148,6 +154,67 @@ public class ItemNumberFormatTests
 
         await SetDigitsAsync(client, 0);
         await SetPrefixAsync(client, "Klienta", null);
+    }
+
+    [Fact]
+    public async Task Nazwa_elementu_da_sie_wylaczyc_z_nazwy_rekordu()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+        var projectId = await client.CreateProjectAsync($"Format numeru {Guid.NewGuid()}");
+
+        await SetPrefixAsync(client, "Klienta", "C");
+        await SetDigitsAsync(client, 4);
+
+        // Domyślnie nazwa wchodzi: "C0001(Wspornik)".
+        await SetWithNameAsync(client, true);
+        var withNameId = await client.CreateNodeAsync(projectId, "Wspornik", "part");
+        var withNameItem = await GetItemAsync(client, withNameId);
+        var withNameNumber = withNameItem.GetProperty("itemNumber").GetInt32();
+        Assert.Equal($"C{withNameNumber.ToString().PadLeft(4, '0')}(Wspornik)",
+            withNameItem.GetProperty("recordName").GetString());
+
+        // Po wyłączeniu zostaje sam numer.
+        await SetWithNameAsync(client, false);
+        var bareId = await client.CreateNodeAsync(projectId, "Tuleja", "part");
+        var bareItem = await GetItemAsync(client, bareId);
+        var bareNumber = bareItem.GetProperty("itemNumber").GetInt32();
+        Assert.Equal($"C{bareNumber.ToString().PadLeft(4, '0')}", bareItem.GetProperty("recordName").GetString());
+
+        // Element utworzony WCZEŚNIEJ zachowuje swoją postać — ustawienie jest zamrażane na
+        // elemencie, tak samo jak prefiks i dopełnienie.
+        Assert.Equal($"C{withNameNumber.ToString().PadLeft(4, '0')}(Wspornik)",
+            (await GetItemAsync(client, withNameId)).GetProperty("recordName").GetString());
+
+        await SetWithNameAsync(client, true);
+        await SetDigitsAsync(client, 0);
+        await SetPrefixAsync(client, "Klienta", null);
+    }
+
+    [Fact]
+    public async Task Zapis_jednego_ustawienia_nie_rusza_drugiego()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        await SetDigitsAsync(client, 5);
+        await SetWithNameAsync(client, false);
+
+        // Dwie osobne sekcje w interfejsie zapisują się niezależnie — PATCH z samym "withName"
+        // nie może wyzerować liczby cyfr ani odwrotnie.
+        var format = await (await client.GetAsync("/api/settings/item-number-format"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(5, format.GetProperty("digits").GetInt32());
+        Assert.False(format.GetProperty("withName").GetBoolean());
+
+        await SetDigitsAsync(client, 0);
+        format = await (await client.GetAsync("/api/settings/item-number-format"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(format.GetProperty("withName").GetBoolean());
+
+        await SetWithNameAsync(client, true);
     }
 
     [Fact]

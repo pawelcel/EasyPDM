@@ -23,6 +23,9 @@ static class ItemEndpoints
                 itemNumber = state.ItemNumber,
                 itemNumberPrefix = state.ItemNumberPrefix,
                 itemNumberLabel = ItemNumbering.Label(state.ItemNumber, state.ItemNumberPrefix, state.ItemNumberDigits),
+                // Pełna nazwa rekordu -- to JEJ makro używa jako nazwy pliku na dysku.
+                recordName = ItemNumbering.RecordName(state.ItemNumber, state.ItemNumberPrefix,
+                    state.ItemNumberDigits, state.ItemNumberWithName, state.Name),
                 name = state.Name,
                 sanitizedName = FilenameSanitizing.Sanitize(state.Name),
                 exportStep = state.ExportStep,
@@ -53,7 +56,7 @@ static class ItemEndpoints
             if (!await HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
                 return ProjectAccessForbidden();
 
-            const string sql = "SELECT item_number, item_number_prefix, file_name, item_number_digits FROM items WHERE id = @id;";
+            const string sql = "SELECT item_number, item_number_prefix, file_name, item_number_digits, item_number_with_name FROM items WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", body.ItemId);
             await using var reader = await cmd.ExecuteReaderAsync();
@@ -62,8 +65,9 @@ static class ItemEndpoints
             var itemNumberPrefix = reader.IsDBNull(1) ? null : reader.GetString(1);
             var fileName = reader.GetString(2);
             var itemNumberDigits = reader.IsDBNull(3) ? (int?)null : reader.GetInt32(3);
+            var itemNumberWithName = reader.IsDBNull(4) ? (bool?)null : reader.GetBoolean(4);
 
-            createTicketStore.Complete(ticket, body.ItemId, itemNumber, itemNumberPrefix, itemNumberDigits, fileName, body.ExportStep, body.ExportPdf, existing: true);
+            createTicketStore.Complete(ticket, body.ItemId, itemNumber, itemNumberPrefix, itemNumberDigits, itemNumberWithName, fileName, body.ExportStep, body.ExportPdf, existing: true);
             return Results.Ok();
         });
 
@@ -311,7 +315,7 @@ static class ItemEndpoints
             // inaczej pokazywałby się PODWÓJNIE: jako korzeń projektu ORAZ zagnieżdżony pod
             // rodzicem. Element bez rodzica dostaje domyślne true (widoczny jako korzeń).
             const string insertSql = """
-                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, item_number_prefix, item_number_digits, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by, show_in_tree)
+                INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, item_number_prefix, item_number_digits, item_number_with_name, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by, show_in_tree)
                 VALUES (
                     @id, @projectId, @itemType, @name, @props::jsonb,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN nextval('item_number_seq') ELSE NULL END,
@@ -323,6 +327,9 @@ static class ItemEndpoints
                     CASE WHEN @itemType IN ('part', 'assembly')
                          THEN NULLIF((SELECT item_number_digits FROM system_state WHERE id), 0)
                          ELSE NULL END,
+                    CASE WHEN @itemType IN ('part', 'assembly')
+                         THEN (SELECT item_number_with_name FROM system_state WHERE id)
+                         ELSE NULL END,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN 'w_pracy' ELSE NULL END,
                     CASE WHEN @itemType IN ('part', 'assembly') THEN 1 ELSE NULL END,
                     now(),
@@ -332,7 +339,7 @@ static class ItemEndpoints
                     @ownerId,
                     @showInTree
                 )
-                RETURNING item_number, item_number_prefix, item_number_digits;
+                RETURNING item_number, item_number_prefix, item_number_digits, item_number_with_name;
                 """;
             await using var insertCmd = new NpgsqlCommand(insertSql, conn);
             insertCmd.Parameters.AddWithValue("id", itemId);
@@ -349,6 +356,7 @@ static class ItemEndpoints
             int? itemNumber = reader.IsDBNull(0) ? null : reader.GetInt32(0);
             string? itemNumberPrefix = reader.IsDBNull(1) ? null : reader.GetString(1);
             int? itemNumberDigits = reader.IsDBNull(2) ? null : reader.GetInt32(2);
+            bool? itemNumberWithName = reader.IsDBNull(3) ? null : reader.GetBoolean(3);
             await reader.DisposeAsync();
 
             if (body.ParentId is not null)
@@ -370,7 +378,7 @@ static class ItemEndpoints
             // GET /create-tickets/{ticket} — zob. CreateTicketStore.cs. Czysto addytywne,
             // zero zmiany zachowania dla wywołań bez ticketu (czyli normalnego webowego UI).
             if (body.Ticket is not null)
-                createTicketStore.Complete(body.Ticket.Value, itemId, itemNumber, itemNumberPrefix, itemNumberDigits, body.Name.Trim(), body.ExportStep, body.ExportPdf, existing: false);
+                createTicketStore.Complete(body.Ticket.Value, itemId, itemNumber, itemNumberPrefix, itemNumberDigits, itemNumberWithName, body.Name.Trim(), body.ExportStep, body.ExportPdf, existing: false);
 
             return Results.Created($"/api/items/{itemId}", new
             {
@@ -378,6 +386,8 @@ static class ItemEndpoints
                 itemNumber,
                 itemNumberPrefix,
                 itemNumberLabel = ItemNumbering.Label(itemNumber, itemNumberPrefix, itemNumberDigits),
+                recordName = ItemNumbering.RecordName(itemNumber, itemNumberPrefix, itemNumberDigits,
+                    itemNumberWithName, body.Name.Trim()),
             });
         }
 
@@ -453,7 +463,7 @@ static class ItemEndpoints
                         await shiftCmd.ExecuteNonQueryAsync();
                     }
 
-                    var (itemNumber, itemNumberPrefix, itemNumberDigits) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null, showInTree: false);
+                    var (itemNumber, itemNumberPrefix, itemNumberDigits, _) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null, showInTree: false);
 
                     await using (var insertRelCmd = new NpgsqlCommand(
                         """
@@ -496,12 +506,12 @@ static class ItemEndpoints
                     await shiftCmd.ExecuteNonQueryAsync();
                 }
 
-                var (itemNumber, itemNumberPrefix, itemNumberDigits) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: sourceRootPosition + 1, showInTree: true);
+                var (itemNumber, itemNumberPrefix, itemNumberDigits, _) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: sourceRootPosition + 1, showInTree: true);
                 await tx.CommitAsync();
                 return Results.Created($"/api/items/{newId}", new { id = newId, itemNumber, itemNumberPrefix });
             }
 
-            var (appendedItemNumber, appendedItemNumberPrefix, appendedItemNumberDigits) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null, showInTree: true);
+            var (appendedItemNumber, appendedItemNumberPrefix, appendedItemNumberDigits, _) = await InsertDuplicateRowAsync(conn, tx, newId, id, currentUser.Id, rootPosition: null, showInTree: true);
             await tx.CommitAsync();
             return Results.Created($"/api/items/{newId}", new
             {
@@ -567,7 +577,8 @@ static class ItemEndpoints
                        i.item_type, i.item_number, i.item_number_prefix, i.show_in_tree, i.status, i.revision_number,
                        i.root_position, i.owner_id, i.owner_locked, u.display_name, i.item_number_digits,
                        EXISTS (SELECT 1 FROM item_attachments ia
-                               WHERE ia.item_id = i.id AND ia.preview_role IS NOT NULL) AS kind_locked
+                               WHERE ia.item_id = i.id AND ia.preview_role IS NOT NULL) AS kind_locked,
+                       i.item_number_with_name
                 FROM items i
                 LEFT JOIN users u ON u.id = i.owner_id
                 WHERE (@search::text IS NULL OR i.file_name ILIKE '%' || @search || '%'
@@ -615,6 +626,14 @@ static class ItemEndpoints
                         // Czy rodzaju elementu nie da się już zmienić: ma plik w którymś z czterech
                         // wyróżnionych pól, a te noszą jego numer w nazwie (zob. PropertyEndpoints).
                         ["kindLocked"] = reader.GetBoolean(18),
+                        // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego
+                        // na elemencie -- nazwa w nawiasie. Klienci jej nie składają (zob. ItemNumbering).
+                        ["recordName"] = ItemNumbering.RecordName(
+                            reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                            reader.IsDBNull(9) ? null : reader.GetString(9),
+                            reader.IsDBNull(17) ? null : reader.GetInt32(17),
+                            reader.IsDBNull(19) ? null : reader.GetBoolean(19),
+                            reader.GetString(2)),
                         ["showInTree"] = reader.GetBoolean(10),
                         ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
                         ["isLocked"] = IsLocked(reader.GetString(7), reader.IsDBNull(11) ? null : reader.GetString(11)),
@@ -664,7 +683,8 @@ static class ItemEndpoints
                        i.item_type, i.item_number, i.item_number_prefix, i.show_in_tree, i.status, i.revision_number,
                        i.root_position, i.owner_id, i.owner_locked, u.display_name, i.item_number_digits,
                        EXISTS (SELECT 1 FROM item_attachments ia
-                               WHERE ia.item_id = i.id AND ia.preview_role IS NOT NULL) AS kind_locked
+                               WHERE ia.item_id = i.id AND ia.preview_role IS NOT NULL) AS kind_locked,
+                       i.item_number_with_name
                 FROM items i
                 LEFT JOIN users u ON u.id = i.owner_id
                 WHERE i.item_number = @itemNumber;
@@ -699,6 +719,14 @@ static class ItemEndpoints
                     // Czy rodzaju elementu nie da się już zmienić: ma plik w którymś z czterech
                     // wyróżnionych pól, a te noszą jego numer w nazwie (zob. PropertyEndpoints).
                     ["kindLocked"] = reader.GetBoolean(18),
+                    // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego
+                    // na elemencie -- nazwa w nawiasie. Klienci jej nie składają (zob. ItemNumbering).
+                    ["recordName"] = ItemNumbering.RecordName(
+                        reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                        reader.IsDBNull(9) ? null : reader.GetString(9),
+                        reader.IsDBNull(17) ? null : reader.GetInt32(17),
+                        reader.IsDBNull(19) ? null : reader.GetBoolean(19),
+                        reader.GetString(2)),
                     ["showInTree"] = reader.GetBoolean(10),
                     ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
                     ["isLocked"] = IsLocked(reader.GetString(7), reader.IsDBNull(11) ? null : reader.GetString(11)),
@@ -728,7 +756,8 @@ static class ItemEndpoints
                        i.item_type, i.item_number, i.item_number_prefix, i.show_in_tree, i.status, i.revision_number,
                        i.root_position, i.owner_id, i.owner_locked, u.display_name, i.item_number_digits,
                        EXISTS (SELECT 1 FROM item_attachments ia
-                               WHERE ia.item_id = i.id AND ia.preview_role IS NOT NULL) AS kind_locked
+                               WHERE ia.item_id = i.id AND ia.preview_role IS NOT NULL) AS kind_locked,
+                       i.item_number_with_name
                 FROM items i
                 LEFT JOIN users u ON u.id = i.owner_id
                 WHERE i.id = @id;
@@ -765,6 +794,14 @@ static class ItemEndpoints
                     // Czy rodzaju elementu nie da się już zmienić: ma plik w którymś z czterech
                     // wyróżnionych pól, a te noszą jego numer w nazwie (zob. PropertyEndpoints).
                     ["kindLocked"] = reader.GetBoolean(18),
+                    // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego
+                    // na elemencie -- nazwa w nawiasie. Klienci jej nie składają (zob. ItemNumbering).
+                    ["recordName"] = ItemNumbering.RecordName(
+                        reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                        reader.IsDBNull(9) ? null : reader.GetString(9),
+                        reader.IsDBNull(17) ? null : reader.GetInt32(17),
+                        reader.IsDBNull(19) ? null : reader.GetBoolean(19),
+                        reader.GetString(2)),
                     ["showInTree"] = reader.GetBoolean(10),
                     ["status"] = reader.IsDBNull(11) ? null : reader.GetString(11),
                     ["isLocked"] = IsLocked(reader.GetString(7), reader.IsDBNull(11) ? null : reader.GetString(11)),
@@ -1113,7 +1150,7 @@ static class ItemEndpoints
             if (recipientId is not null && recipientId != user.Id)
             {
                 var itemLabel = ItemLabel(info.Value.FileName, info.Value.ItemNumber, info.Value.ItemNumberPrefix,
-                    info.Value.ItemNumberDigits);
+                    info.Value.ItemNumberDigits, info.Value.ItemNumberWithName);
                 var notifyData = new { itemLabel };
                 // body.Status != currentStatus — tak samo jak zapis do historii wyżej — bez
                 // tego zduplikowany/powtórzony request (np. retry po zgubionej odpowiedzi z
@@ -1485,12 +1522,12 @@ static class ItemEndpoints
         _ => false
     };
 
-    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked, Guid? ProjectId, string FileName, int? ItemNumber, string? ItemNumberPrefix, Guid? CreatedBy, int? RevisionNumber, int? ItemNumberDigits)?> GetItemTypeAndStatus(string connectionString, Guid id)
+    internal static async Task<(string ItemType, string? Status, Guid? OwnerId, bool OwnerLocked, Guid? ProjectId, string FileName, int? ItemNumber, string? ItemNumberPrefix, Guid? CreatedBy, int? RevisionNumber, int? ItemNumberDigits, bool? ItemNumberWithName)?> GetItemTypeAndStatus(string connectionString, Guid id)
     {
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync();
 
-        const string sql = "SELECT item_type, status, owner_id, owner_locked, project_id, file_name, item_number, item_number_prefix, created_by, revision_number, item_number_digits FROM items WHERE id = @id;";
+        const string sql = "SELECT item_type, status, owner_id, owner_locked, project_id, file_name, item_number, item_number_prefix, created_by, revision_number, item_number_digits, item_number_with_name FROM items WHERE id = @id;";
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("id", id);
 
@@ -1509,15 +1546,17 @@ static class ItemEndpoints
             reader.IsDBNull(7) ? null : reader.GetString(7),
             reader.IsDBNull(8) ? null : reader.GetGuid(8),
             reader.IsDBNull(9) ? null : reader.GetInt32(9),
-            reader.IsDBNull(10) ? null : reader.GetInt32(10)
+            reader.IsDBNull(10) ? null : reader.GetInt32(10),
+            reader.IsDBNull(11) ? null : reader.GetBoolean(11)
         );
     }
 
     // Etykieta elementu do zapisania w powiadomieniu (data JSONB) -- ten sam format co
     // itemDisplayLabel() po stronie frontu, zamrożony w momencie zdarzenia (przetrwa
     // późniejszą zmianę nazwy/numeru elementu).
-    internal static string ItemLabel(string fileName, int? itemNumber, string? itemNumberPrefix, int? digits = null) =>
-        itemNumber is not null ? $"{ItemNumbering.Label(itemNumber, itemNumberPrefix, digits)}({fileName})" : fileName;
+    internal static string ItemLabel(string fileName, int? itemNumber, string? itemNumberPrefix,
+        int? digits = null, bool? withName = null) =>
+        ItemNumbering.RecordName(itemNumber, itemNumberPrefix, digits, withName, fileName);
 
     // ============================================================
     // Reguła statusu Złożenia względem jego BOM-u (od 0.4.1).
@@ -1747,7 +1786,7 @@ static class ItemEndpoints
     // Wspólny insert dla duplikowania — używany zarówno przy wstawianiu kopii "zaraz pod
     // oryginałem" (rootPosition podany explicite) jak i przy zwykłym dopisaniu na koniec listy
     // korzeni projektu (rootPosition = null, wyliczane tu jako MAX+1).
-    internal static async Task<(int? ItemNumber, string? ItemNumberPrefix, int? ItemNumberDigits)> InsertDuplicateRowAsync(
+    internal static async Task<(int? ItemNumber, string? ItemNumberPrefix, int? ItemNumberDigits, bool? ItemNumberWithName)> InsertDuplicateRowAsync(
         NpgsqlConnection conn, NpgsqlTransaction tx, Guid newId, Guid sourceId, Guid ownerId, int? rootPosition, bool showInTree)
     {
         // Kopia to NOWY rekord — dostaje własnego właściciela (osobę duplikującą), zablokowanego
@@ -1758,11 +1797,12 @@ static class ItemEndpoints
         // jest false, gdy kopia od razu ląduje jako podelement (żeby nie pokazać się PODWÓJNIE:
         // jako korzeń projektu ORAZ zagnieżdżona pod rodzicem) — patrz wywołania.
         const string sql = """
-            INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, item_number_prefix, item_number_digits, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by, show_in_tree)
+            INSERT INTO items (id, project_id, item_type, file_name, properties, item_number, item_number_prefix, item_number_digits, item_number_with_name, status, revision_number, modified_at, root_position, owner_id, owner_locked, created_by, show_in_tree)
             SELECT @newId, src.project_id, src.item_type, src.file_name || ' (kopia)', src.properties,
                    nextval('item_number_seq'),
                    p.prefix,
                    NULLIF((SELECT item_number_digits FROM system_state WHERE id), 0),
+                   (SELECT item_number_with_name FROM system_state WHERE id),
                    'w_pracy', 1, now(),
                    COALESCE(@rootPosition, (SELECT COALESCE(MAX(root_position), 0) + 1 FROM items WHERE project_id = src.project_id)),
                    @ownerId, true, @ownerId, @showInTree
@@ -1775,7 +1815,7 @@ static class ItemEndpoints
                         ELSE 'Zlozenie' END)
                     ELSE src.properties->>'rodzaj' END)
             WHERE src.id = @sourceId
-            RETURNING item_number, item_number_prefix, item_number_digits;
+            RETURNING item_number, item_number_prefix, item_number_digits, item_number_with_name;
             """;
         await using var cmd = new NpgsqlCommand(sql, conn, tx);
         cmd.Parameters.AddWithValue("newId", newId);
@@ -1787,7 +1827,8 @@ static class ItemEndpoints
         await reader.ReadAsync();
         return (reader.IsDBNull(0) ? null : reader.GetInt32(0),
                 reader.IsDBNull(1) ? null : reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetInt32(2));
+                reader.IsDBNull(2) ? null : reader.GetInt32(2),
+                reader.IsDBNull(3) ? null : reader.GetBoolean(3));
     }
 
     internal static async Task<Dictionary<Guid, List<string>>> LoadTagsForItems(string connectionString, List<Guid> ids)

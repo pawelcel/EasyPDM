@@ -35,6 +35,19 @@ static class ItemNumbering
         return (prefix ?? "") + text;
     }
 
+    // Pełna "nazwa rekordu": numer i -- opcjonalnie -- nazwa elementu w nawiasie. To jest to,
+    // co widać w drzewku i co makro CAD nadaje plikowi na dysku (dokładając jeszcze literę
+    // rewizji i rozszerzenie). Folder/Plik nie mają numeru, więc zostaje sama nazwa.
+    //
+    // withName == false odcina nazwę: "C0005" zamiast "C0005(płyta)". NULL znaczy "wchodzi"
+    // -- tak zachowują się wszystkie elementy sprzed wprowadzenia tej opcji.
+    public static string RecordName(int? number, string? prefix, int? digits, bool? withName, string fileName)
+    {
+        var label = Label(number, prefix, digits);
+        if (label is null) return fileName;
+        return withName == false ? label : $"{label}({fileName})";
+    }
+
     // Jedno zapytanie o jednowierszową tabelę. system_state bywa pusta aż do pierwszego
     // zasiania przykładowego projektu, a migracja 054 wstawia ten wiersz — ale brak wiersza
     // (np. baza sprzed migracji w testach) musi dawać 0, a nie wyjątek.
@@ -44,5 +57,15 @@ static class ItemNumbering
             "SELECT item_number_digits FROM system_state WHERE id = true;", conn, tx);
         var value = await cmd.ExecuteScalarAsync();
         return value is int digits ? digits : 0;
+    }
+
+    // Jak wyżej, dla drugiego ustawienia globalnego. Brak wiersza = true, czyli zachowanie
+    // sprzed wprowadzenia tej opcji.
+    public static async Task<bool> GetWithNameAsync(NpgsqlConnection conn, NpgsqlTransaction? tx = null)
+    {
+        await using var cmd = new NpgsqlCommand(
+            "SELECT item_number_with_name FROM system_state WHERE id = true;", conn, tx);
+        var value = await cmd.ExecuteScalarAsync();
+        return value is not bool withName || withName;
     }
 }

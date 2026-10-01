@@ -502,33 +502,50 @@ static class SettingsEndpoints
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
-            return Results.Ok(new { digits = await ItemNumbering.GetDigitsAsync(conn) });
+            return Results.Ok(new
+            {
+                digits = await ItemNumbering.GetDigitsAsync(conn),
+                withName = await ItemNumbering.GetWithNameAsync(conn),
+            });
         });
 
         // PATCH /api/settings/item-number-format   body: { "digits": 4 }
         // W ODRÓŻNIENIU od prefiksu (zamrażanego przy tworzeniu elementu) ta zmiana działa
         // WSTECZ: dopełnienie liczone jest przy wyświetlaniu, więc elementy utworzone wcześniej
         // też zaczną się pokazywać jako 0001. Sam numer w bazie pozostaje liczbą.
+        // Oba pola są OPCJONALNE i zapisywane niezależnie: w interfejsie to dwie osobne
+        // sekcje, więc zapis jednej nie może nadpisywać drugiej wartością domyślną.
         app.MapPatch("/api/settings/item-number-format", async (HttpContext ctx, ItemNumberFormatRequest body) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
-            if (body.Digits < 0 || body.Digits > 10)
+            if (body.Digits is < 0 or > 10)
                 return Results.BadRequest("Liczba cyfr musi mieścić się w zakresie 0-10.");
+            if (body.Digits is null && body.WithName is null)
+                return Results.BadRequest("Podaj przynajmniej jedno z pól: 'digits', 'withName'.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
             // system_state bywa pusta aż do pierwszego zasiania przykładowego projektu --
             // upsert, żeby ustawienie dało się zapisać także na całkiem świeżej bazie.
+            // COALESCE(@x, kolumna) zostawia nietkniętą wartość, której żądanie nie podało.
             await using var cmd = new NpgsqlCommand("""
-                INSERT INTO system_state (id, item_number_digits) VALUES (true, @digits)
-                ON CONFLICT (id) DO UPDATE SET item_number_digits = EXCLUDED.item_number_digits;
+                INSERT INTO system_state (id, item_number_digits, item_number_with_name)
+                VALUES (true, COALESCE(@digits, 0), COALESCE(@withName, true))
+                ON CONFLICT (id) DO UPDATE SET
+                    item_number_digits = COALESCE(@digits, system_state.item_number_digits),
+                    item_number_with_name = COALESCE(@withName, system_state.item_number_with_name);
                 """, conn);
-            cmd.Parameters.AddWithValue("digits", body.Digits);
+            cmd.Parameters.AddWithValue("digits", (object?)body.Digits ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("withName", (object?)body.WithName ?? DBNull.Value);
             await cmd.ExecuteNonQueryAsync();
 
-            return Results.Ok(new { digits = body.Digits });
+            return Results.Ok(new
+            {
+                digits = await ItemNumbering.GetDigitsAsync(conn),
+                withName = await ItemNumbering.GetWithNameAsync(conn),
+            });
         });
 
         // GET /api/settings/item-number-sequence
@@ -783,5 +800,5 @@ record BackupScheduleRequest(
     bool Enabled, string Frequency, int? DayOfWeek, int? DayOfMonth, int Hour, int Minute, int RetentionCount);
 
 record ItemNumberPrefixRequest(string? Prefix);
-record ItemNumberFormatRequest(int Digits);
+record ItemNumberFormatRequest(int? Digits, bool? WithName);
 record ResetItemNumberSequenceRequest(int NextNumber);

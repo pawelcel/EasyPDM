@@ -62,6 +62,7 @@ CREATE TABLE items (
     item_number         INTEGER,                -- numer nadawany automatycznie Częściom i Złożeniom (item_number_seq)
     item_number_prefix  TEXT,                    -- opcjonalny prefiks-litera, zamrożony przy tworzeniu wg rodzaju + item_number_prefixes
     item_number_digits  INTEGER,                 -- dopełnienie numeru zerami, zamrożone przy tworzeniu wg system_state.item_number_digits; NULL = bez dopełniania
+    item_number_with_name BOOLEAN,               -- czy nazwa elementu wchodzi w nazwę rekordu, zamrożone przy tworzeniu; NULL = wchodzi
     file_path           TEXT UNIQUE,             -- ścieżka w wewnętrznym magazynie API; puste dla folderów/Części (to kontenery bez własnego pliku)
     file_name           TEXT NOT NULL,           -- nazwa pliku (dla typu 'file') albo nazwa folderu/Części
     file_type           TEXT,                    -- sldprt, sldasm, slddrw, step, dxf... — puste dla folderów/Części
@@ -515,7 +516,9 @@ CREATE TABLE system_state (
     -- Numer dłuższy niż ta wartość nie jest przycinany. W odróżnieniu od prefiksu (zamrażanego
     -- na elemencie przy tworzeniu) to format WYŚWIETLANIA, liczony przy renderowaniu, więc
     -- zmiana działa wstecz na wszystkie elementy.
-    item_number_digits     INTEGER NOT NULL DEFAULT 0 CHECK (item_number_digits BETWEEN 0 AND 10)
+    item_number_digits     INTEGER NOT NULL DEFAULT 0 CHECK (item_number_digits BETWEEN 0 AND 10),
+    -- Czy nazwa elementu wchodzi w nazwę rekordu: true = "C0005(płyta)", false = "C0005".
+    item_number_with_name  BOOLEAN NOT NULL DEFAULT true
 );
 GRANT SELECT, INSERT, UPDATE ON system_state TO pdm_user;
 

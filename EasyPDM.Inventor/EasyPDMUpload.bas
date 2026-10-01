@@ -122,11 +122,28 @@ Private Const SESSION_COOKIE_NAME As String = "pdm_session"
 Private Const CUSTPROP_ITEM_ID As String = "EasyPDM_LinkId"
 Private Const CUSTPROP_ITEM_NUMBER As String = "EasyPDM_LinkNumber"
 Private Const CUSTPROP_ITEM_ID_LEGACY As String = "EasyPDM_ItemId"
+' Nazwa elementu z PDM, zeby dalo sie ja wciagnac do wlasnych szablonow rysunku/tabelki.
+' Potrzebna zwlaszcza wtedy, gdy nazwa elementu NIE wchodzi w nazwe pliku (Ustawienia ->
+' Numeracja): wtedy plik nazywa sie samym numerem i jest to jedyne miejsce w dokumencie,
+' gdzie nazwa w ogole wystepuje. Ta sama nazwa wlasciwosci co w makrze SolidWorks.
+Private Const CUSTPROP_ITEM_NAME As String = "EasyPDM_Name"
+' Masa i material, odczytane z samego dokumentu i zapisane jako iProperties -- te same nazwy
+' co w makrze SolidWorks, zeby szablony dzialaly tak samo w obu programach.
+'
+' RoZNICA wobec SolidWorksa, warta zapamietania: tam EasyPDM-Mass trzyma WYRAZENIE
+' ("SW-Mass@@Default@plik"), ktore sam program rozwiazuje przy kazdej przebudowie, wiec
+' wartosc nadaza za modelem. Inventor nie ma odpowiednika takiego wyrazenia dla masy, wiec
+' zapisujemy MIGAWKE: liczbe wyliczona w chwili wysylki. Po zmianie geometrii trzeba wyslac
+' ponownie, zeby ja odswiezyc. Szablony Inventora moga zreszta siegac wprost po wbudowana
+' wlasciwosc Mass (Design Tracking Properties) i wtedy nadazaja same.
+Private Const CUSTPROP_MASS As String = "EasyPDM-Mass"
+Private Const CUSTPROP_MATERIAL As String = "EasyPDM_Material"
 
 ' Carry the values for the NEXT SetLinkedItemOn call. Set these immediately before every
 ' call to SetLinkedItemOn oDoc (never left set across unrelated calls).
 Private PendingLinkItemId As String
 Private PendingLinkItemNumberText As String
+Private PendingLinkItemName As String
 
 ' iProperties live in named PropertySets -- "Inventor User Defined Properties" is the
 ' standard set for custom/user-defined properties added by code or by the user (distinct
@@ -1560,19 +1577,20 @@ End Function
 ' the web app can show it under its "CAD attachments" section, separately from ordinary
 ' attachments -- one per revision (unique filename per revision means these ACCUMULATE,
 ' unlike the single-slot "pdf"/"step" roles which replace the previous attachment).
-' Numer elementu TAK, JAK MA WYGLADAC W NAZWIE PLIKU -- gotowa etykieta z serwera
-' (itemNumberLabel: literowy prefiks rodzaju plus zera wiodace, zob. Ustawienia ->
-' Nazewnictwo). Dotad makro sklejalo nazwe z samej liczby, przez co plik na dysku nazywal
-' sie inaczej niz element w bazie, gdy rodzaj mial ustawiony prefiks.
+' Pelna NAZWA REKORDU tak, jak ma wygladac w nazwie pliku -- gotowa z serwera (recordName:
+' literowy prefiks rodzaju, zera wiodace i -- zaleznie od ustawienia zamrozonego na elemencie
+' -- nazwa elementu w nawiasie, zob. Ustawienia -> Numeracja). Dotad makro sklejalo ja z samej
+' liczby, przez co plik na dysku nazywal sie inaczej niz element w bazie.
 '
 ' Pobieramy to tutaj, zamiast przeciagac przez kilkanascie wywolan po drodze: jedno dodatkowe
 ' GET na wysylke jest nieodczuwalne, a sygnatury pozostalych funkcji zostaja nietkniete.
-' Starszy serwer nie zwraca tego pola -- wtedy, jak i przy bledzie, zostaje sama liczba.
-Function ItemNumberLabelFor(ByVal itemId As String, ByVal fallbackNumber As Long) As String
+' Starszy serwer nie zwraca tego pola -- wtedy, jak i przy bledzie, zostaje stara konwencja
+' "numer(nazwa)".
+Function RecordNameFor(ByVal itemId As String, ByVal fallbackNumber As Long, ByVal fallbackName As String) As String
     Dim it As Object
-    Dim labelText As String
+    Dim recordText As String
 
-    ItemNumberLabelFor = CStr(fallbackNumber)
+    RecordNameFor = CStr(fallbackNumber) & "(" & SanitizeFilename(fallbackName) & ")"
     If Len(itemId) = 0 Then Exit Function
 
     On Error Resume Next
@@ -1585,8 +1603,10 @@ Function ItemNumberLabelFor(ByVal itemId As String, ByVal fallbackNumber As Long
     On Error GoTo 0
 
     If it Is Nothing Then Exit Function
-    labelText = JsonGetString(it, "itemNumberLabel", "")
-    If Len(labelText) > 0 Then ItemNumberLabelFor = labelText
+    recordText = JsonGetString(it, "recordName", "")
+    ' Nazwa elementu wchodzi do recordName surowa -- sanityzujemy calosc. SanitizeFilename
+    ' podmienia tylko znaki zakazane w nazwach plikow, nawiasow nie rusza.
+    If Len(recordText) > 0 Then RecordNameFor = SanitizeFilename(recordText)
 End Function
 
 Function RenameAndUpload(ByVal oDoc As Object, ByVal filePath As String, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long, ByVal targetFolder As String, Optional ByVal role As String = "cad") As Boolean
@@ -1608,7 +1628,7 @@ Function RenameAndUpload(ByVal oDoc As Object, ByVal filePath As String, ByVal i
     End If
 
     Dim newFilename As String
-    newFilename = ItemNumberLabelFor(itemId, itemNumber) & "(" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ext
+    newFilename = RecordNameFor(itemId, itemNumber, name) & "." & RevisionLabel(revision) & ext
 
     ' UNVERIFIED against a live Inventor install for this SPECIFIC use (same-format Save As,
     ' as opposed to UploadStepAttachment's format-CONVERTING export) -- written from
@@ -1669,7 +1689,11 @@ Function RenameAndUpload(ByVal oDoc As Object, ByVal filePath As String, ByVal i
     ' even if the file ends up missing the embedded link.
     PendingLinkItemId = itemId
     PendingLinkItemNumberText = CStr(itemNumber)
+    PendingLinkItemName = name
     SetLinkedItemOn oDoc
+
+    ' Tylko dla wlasciwego pliku CAD -- rysunek nie ma ani masy, ani materialu.
+    If role = "cad" Then SetMassAndMaterialOn oDoc
     On Error Resume Next
     Err.Clear
     oDoc.Save
@@ -1677,6 +1701,9 @@ Function RenameAndUpload(ByVal oDoc As Object, ByVal filePath As String, ByVal i
         LogLine "Warning: could not re-save after setting the PDM link iProperty (" & Err.Description & ") -- the uploaded copy may be missing it."
     End If
     On Error GoTo 0
+
+    ' Po zapisie -- wartosci sa juz w dokumencie, wiec czytamy je stamtad i wysylamy do PDM.
+    If role = "cad" Then PushCadPropertiesToPdm oDoc, itemId
 
     LogLine "RenameAndUpload: item #" & itemNumber & ", local file """ & filePath & """, new name """ & newFilename & """"
 
@@ -1923,7 +1950,9 @@ Sub UploadDrawingForActiveDoc(ByVal oDoc As Object, ByVal filePath As String)
     Set re = CreateObject("VBScript.RegExp")
     ' [A-Za-z]*0* przed numerem: nazwa moze miec literowy prefiks rodzaju i zera
     ' wiodace, a pliki sprzed wlaczenia tych ustawien maja sam numer -- oba musza pasowac.
-    re.Pattern = "^[A-Za-z]*0*(\d+)\s*\("
+    ' Po nazwie rekordu moze stac "(" (nazwa elementu) albo od razu "." (gdy nazwa jest
+    ' wylaczona w Ustawieniach -> Numeracja, plik nazywa sie samym numerem).
+    re.Pattern = "^[A-Za-z]*0*(\d+)\s*(?:\(|\.)"
     If Not re.Test(fname) Then
         MsgBox T("Dwg_CannotIdentifyItem"), vbExclamation, T("AppTitle")
         LogLine "Drawing upload: could not parse an item number out of """ & fname & """ -- done."
@@ -1991,6 +2020,7 @@ Function FindLinkedCandidatesInDrawingViews(ByVal oDrawDoc As Object) As Collect
                         LogLine "Drawing upload: view's referenced document had a stale link to deleted item " & linkedId & " -- clearing it, treating as unlinked."
                         PendingLinkItemId = ""
                         PendingLinkItemNumberText = ""
+                        PendingLinkItemName = ""
                         SetLinkedItemOn refDoc
                     End If
                 End If
@@ -2361,7 +2391,7 @@ Sub UploadStepAttachment(ByVal oDoc As Object, ByVal itemId As String, ByVal ite
     ' (see ReplaceExistingRoleAttachmentAsync in AttachmentEndpoints.cs) -- no need to
     ' fetch/delete the old one from here.
     Dim stepDisplayName As String
-    stepDisplayName = ItemNumberLabelFor(itemId, itemNumber) & "(" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".step"
+    stepDisplayName = RecordNameFor(itemId, itemNumber, name) & "." & RevisionLabel(revision) & ".step"
 
     ApiUploadFile "/items/" & itemId & "/attachments", tempPath, stepDisplayName, "role", "step"
     LogLine "Uploaded STEP attachment for item " & itemId & " as """ & stepDisplayName & """ (from " & tempPath & ")."
@@ -2391,7 +2421,7 @@ Sub UploadPdfAttachment(ByVal oDoc As Object, ByVal itemId As String, ByVal item
     ' UploadStepAttachment's comment for why, and ReplaceExistingRoleAttachmentAsync for
     ' why no manual pre-delete of the previous "pdf" attachment is needed here.
     Dim pdfDisplayName As String
-    pdfDisplayName = ItemNumberLabelFor(itemId, itemNumber) & "(" & SanitizeFilename(name) & ")." & RevisionLabel(revision) & ".pdf"
+    pdfDisplayName = RecordNameFor(itemId, itemNumber, name) & "." & RevisionLabel(revision) & ".pdf"
 
     ApiUploadFile "/items/" & itemId & "/attachments", tempPath, pdfDisplayName, "role", "pdf"
     LogLine "Uploaded PDF attachment for item " & itemId & " as """ & pdfDisplayName & """ (from " & tempPath & ")."
@@ -2867,6 +2897,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
                 LogLine "Component's linked PDM item " & existingItemId & " no longer exists (deleted?) -- clearing stale link: " & filePath
                 PendingLinkItemId = ""
                 PendingLinkItemNumberText = ""
+                PendingLinkItemName = ""
                 SetLinkedItemOn childModel
                 existingItemId = ""
             End If
@@ -2962,6 +2993,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
             ' insurance.
             PendingLinkItemId = newItemId
             PendingLinkItemNumberText = CStr(JsonGetLong(created, "itemNumber", 0))
+            PendingLinkItemName = JsonGetString(created, "name", "")
             SetLinkedItemOn childModel
             pathToItemId.Add filePath, newItemId
             newlyCreatedPaths.Add filePath, True
@@ -3120,6 +3152,154 @@ Function GetActiveDocInfo(ByRef filePath As String, ByRef itemTypeGuess As Strin
     GetActiveDocInfo = GetDocInfo(InvApp.ActiveDocument, filePath, itemTypeGuess, defaultName)
 End Function
 
+' Odczytuje mase i material z dokumentu i zapisuje je jako iProperties. Oba kroki sa
+' tolerancyjne i niezalezne: brak materialu (albo zlozenie, ktore go nie ma) nie przeszkadza
+' zapisac masy i odwrotnie.
+'
+' UNVERIFIED na zywym Inventorze: ComponentDefinition.MassProperties.Mass zwraca mase w
+' jednostkach bazy danych Inventora (kilogramy), a NIE w jednostkach wyswietlania dokumentu
+' -- przy pierwszym prawdziwym uruchomieniu warto porownac wartosc w PDM z ta pokazywana w
+' iProperties i, jesli trzeba, przeliczyc tutaj. Material czytany z
+' ComponentDefinition.Material.Name (starsze wersje moga wystawiac to inaczej).
+Sub SetMassAndMaterialOn(ByVal oDoc As Object)
+    Dim compDef As Object
+    On Error Resume Next
+    Err.Clear
+    Set compDef = oDoc.ComponentDefinition
+    If Err.Number <> 0 Or compDef Is Nothing Then
+        LogLine "SetMassAndMaterialOn: no ComponentDefinition on this document -- mass/material not set."
+        Err.Clear
+        On Error GoTo 0
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    Dim massValue As Double, massText As String
+    massText = ""
+    On Error Resume Next
+    Err.Clear
+    massValue = compDef.MassProperties.Mass
+    If Err.Number = 0 Then
+        ' Str() daje kropke dziesietna niezaleznie od ustawien regionalnych -- w odroznieniu
+        ' od CStr(), ktore w polskiej lokalizacji wstawiloby przecinek i rozjechaloby JSON.
+        massText = Trim(Str(massValue))
+    Else
+        LogLine "SetMassAndMaterialOn: could not read MassProperties.Mass (" & Err.Description & ")."
+        Err.Clear
+    End If
+    On Error GoTo 0
+
+    Dim matName As String
+    matName = ""
+    On Error Resume Next
+    Err.Clear
+    matName = Trim(compDef.Material.Name)
+    If Err.Number <> 0 Then
+        Err.Clear
+        matName = ""
+    End If
+    On Error GoTo 0
+
+    Dim oPropSet As Object
+    On Error Resume Next
+    Err.Clear
+    Set oPropSet = oDoc.PropertySets.Item(PROPSET_NAME)
+    If oPropSet Is Nothing Or Err.Number <> 0 Then
+        LogLine "SetMassAndMaterialOn: could not access the """ & PROPSET_NAME & """ property set (" & Err.Description & ") -- mass/material not saved to iProperties."
+        Err.Clear
+        On Error GoTo 0
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    ' "& """ jak przy wlasciwosciach powiazania -- wymusza przekazanie przez wartosc, zob.
+    ' dlugi komentarz w SetLinkedItemOn.
+    If Len(massText) > 0 Then
+        On Error Resume Next
+        Err.Clear
+        oPropSet.Item(CUSTPROP_MASS).Value = massText
+        If Err.Number <> 0 Then
+            Err.Clear
+            oPropSet.Add massText & "", CUSTPROP_MASS
+            If Err.Number <> 0 Then
+                LogLine "SetMassAndMaterialOn: could not set " & CUSTPROP_MASS & " (" & Err.Description & ")."
+                Err.Clear
+            End If
+        End If
+        On Error GoTo 0
+    End If
+
+    If Len(matName) > 0 Then
+        On Error Resume Next
+        Err.Clear
+        oPropSet.Item(CUSTPROP_MATERIAL).Value = matName
+        If Err.Number <> 0 Then
+            Err.Clear
+            oPropSet.Add matName & "", CUSTPROP_MATERIAL
+            If Err.Number <> 0 Then
+                LogLine "SetMassAndMaterialOn: could not set " & CUSTPROP_MATERIAL & " (" & Err.Description & ")."
+                Err.Clear
+            End If
+        End If
+        On Error GoTo 0
+    End If
+
+    LogLine "SetMassAndMaterialOn: mass=""" & massText & """, material=""" & matName & """ on """ & oDoc.FullFileName & """."
+End Sub
+
+' Wysyla odczytana mase i material do wlasciwosci elementu w PDM -- jednym PATCH-em. Material
+' nieznany katalogowi serwer zaklada sam (zob. PropertyEndpoints).
+Sub PushCadPropertiesToPdm(ByVal oDoc As Object, ByVal itemId As String)
+    If Len(itemId) = 0 Then Exit Sub
+
+    Dim oPropSet As Object
+    On Error Resume Next
+    Err.Clear
+    Set oPropSet = oDoc.PropertySets.Item(PROPSET_NAME)
+    If oPropSet Is Nothing Or Err.Number <> 0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    Dim massText As String, matName As String
+    On Error Resume Next
+    Err.Clear
+    massText = Trim(CStr(oPropSet.Item(CUSTPROP_MASS).Value))
+    If Err.Number <> 0 Then
+        Err.Clear
+        massText = ""
+    End If
+    Err.Clear
+    matName = Trim(CStr(oPropSet.Item(CUSTPROP_MATERIAL).Value))
+    If Err.Number <> 0 Then
+        Err.Clear
+        matName = ""
+    End If
+    On Error GoTo 0
+
+    Dim fields As String
+    fields = ""
+    If Len(massText) > 0 Then fields = """mass"":" & JsonStr(massText)
+    If Len(matName) > 0 Then
+        If Len(fields) > 0 Then fields = fields & ","
+        fields = fields & """material"":" & JsonStr(matName)
+    End If
+    If Len(fields) = 0 Then Exit Sub
+
+    On Error Resume Next
+    Err.Clear
+    ApiPatchJson "/items/" & itemId & "/properties", "{" & fields & "}"
+    If Err.Number <> 0 Then
+        LogLine "PushCadPropertiesToPdm: PATCH /properties failed (" & Err.Description & ") -- values not saved in PDM."
+        Err.Clear
+    Else
+        LogLine "PushCadPropertiesToPdm: saved {" & fields & "} on item " & itemId & "."
+    End If
+    On Error GoTo 0
+End Sub
+
 Private Function GetCustPropSetOn(ByVal oDoc As Object) As Object
     Set GetCustPropSetOn = oDoc.PropertySets.Item(PROPSET_NAME)
 End Function
@@ -3243,8 +3423,28 @@ Sub SetLinkedItemOn(ByVal oDoc As Object)
     End If
     On Error GoTo 0
 
+    ' Trzeci zapis, ten sam ksztalt co dwa wyzej -- lacznie z "& """, ktore wymusza
+    ' przekazanie przez WARTOSC (zob. dlugi komentarz nad pierwszym .Add).
+    Dim nameState As String
+    On Error Resume Next
+    Err.Clear
+    oPropSet.Item(CUSTPROP_ITEM_NAME).Value = PendingLinkItemName
+    If Err.Number = 0 Then
+        nameState = "updated"
+    Else
+        Err.Clear
+        oPropSet.Add PendingLinkItemName & "", CUSTPROP_ITEM_NAME
+        If Err.Number = 0 Then
+            nameState = "added"
+        Else
+            nameState = "FAILED (err=" & Err.Number & ": " & Err.Description & "; source=""" & Err.Source & """)"
+        End If
+    End If
+    On Error GoTo 0
+
     LogLine "SetLinkedItemOn: " & CUSTPROP_ITEM_ID & "=""" & PendingLinkItemId & """ -> " & idState & "; " & _
-            CUSTPROP_ITEM_NUMBER & "=""" & PendingLinkItemNumberText & """ -> " & numberState & "; on """ & oDoc.FullFileName & """."
+            CUSTPROP_ITEM_NUMBER & "=""" & PendingLinkItemNumberText & """ -> " & numberState & "; " & _
+            CUSTPROP_ITEM_NAME & "=""" & PendingLinkItemName & """ -> " & nameState & "; on """ & oDoc.FullFileName & """."
 
     ' Diagnostic only, runs ONLY when at least one write above failed outright (both the
     ' update AND the add-fallback failed). The duplicate-name hypothesis (property already
@@ -3257,7 +3457,7 @@ Sub SetLinkedItemOn(ByVal oDoc As Object)
     ' despite simpler property reads on the same object working fine), and (b) some other
     ' automation/security software on the machine is intercepting the call (Err.Source above
     ' would name a non-Inventor component if so).
-    If InStr(idState, "FAILED") > 0 Or InStr(numberState, "FAILED") > 0 Then
+    If InStr(idState, "FAILED") > 0 Or InStr(numberState, "FAILED") > 0 Or InStr(nameState, "FAILED") > 0 Then
         Dim propNames As String
         propNames = ""
         On Error Resume Next
@@ -3284,9 +3484,10 @@ Function GetLinkedItemId() As String
     GetLinkedItemId = GetLinkedItemIdOn(InvApp.ActiveDocument)
 End Function
 
-Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String)
+Sub SetLinkedItem(ByVal itemId As String, ByVal itemNumberText As String, ByVal itemName As String)
     PendingLinkItemId = itemId
     PendingLinkItemNumberText = itemNumberText
+    PendingLinkItemName = itemName
     SetLinkedItemOn InvApp.ActiveDocument
 End Sub
 
@@ -3426,6 +3627,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
             LogLine "Linked PDM item " & linkedItemId & " no longer exists on the server (deleted?) -- clearing the stale local link, treating this document as not yet linked."
             PendingLinkItemId = ""
             PendingLinkItemNumberText = ""
+            PendingLinkItemName = ""
             SetLinkedItemOn oDoc
             MsgBox T("StaleLinkCleared"), vbInformation, T("AppTitle")
             linkedItemId = ""
@@ -3601,6 +3803,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         ' insurance for the top-level document specifically.
         PendingLinkItemId = linkedItemId
         PendingLinkItemNumberText = CStr(JsonGetLong(resultInfo, "itemNumber", 0))
+        PendingLinkItemName = JsonGetString(resultInfo, "name", "")
         SetLinkedItemOn oDoc
         LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
                 ", revision " & JsonGetString(resultInfo, "revisionLabel", "A") & " ==="

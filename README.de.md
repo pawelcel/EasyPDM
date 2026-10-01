@@ -135,6 +135,17 @@ kann optional als PDF exportiert werden. Dokumentiert eine Zeichnung etwas, das 
 hochgeladen wurde, bietet das Makro an, dieses Teil/diese Baugruppe zuerst zu senden, und
 geht anschließend direkt zur Zeichnung über.
 
+Die Makros für SolidWorks und Inventor schreiben den Namen des Elements zusätzlich in eine
+Dokumenteigenschaft namens `EasyPDM_Name`, damit Ihre Zeichnungsvorlagen und Schriftfelder
+ihn übernehmen können. Beide tragen außerdem **Masse und Material**
+selbst ein: Das Makro schreibt sie in das Dokument, liest sie zurück und setzt sie am Element
+in EasyPDM. In SolidWorks enthalten die beiden Eigenschaften einen SolidWorks-Ausdruck statt
+eines Werts und folgen so dem Modell von selbst; in Inventor sind sie eine Momentaufnahme vom
+Zeitpunkt des Hochladens. Ein Material, das EasyPDM noch nicht kennt, wird automatisch in den
+Materialkatalog aufgenommen, damit es sich erneut auswählen und als Filter nutzen
+lässt. Genau das macht das Weglassen des Namens im Dateinamen praktikabel:
+Der Name reist weiterhin mit dem Dokument, nur eben nicht in dessen Dateinamen.
+
 **Download** — Sie klicken auf Download und geben im Browser das abzurufende
 Teil/Baugruppe an. Bei einer Baugruppe wird sofort der GESAMTE Komponentenbaum
 abgerufen, und die Hauptdatei öffnet sich automatisch im CAD-Programm. Eine aktuelle
@@ -212,9 +223,10 @@ Hersteller gewählt ist, Untertyp, bis eine Serie gewählt ist; ein Wechsel des 
 oder der Serie löscht alles darunter.
 
 **Wie die Nummer aussieht**, wird einmal eingestellt, unter Einstellungen → Nummerierung:
-Jede Art kann ihr eigenes Buchstabenpräfix bekommen (etwa `C` für Kundenteile), und Nummern
-lassen sich auf eine feste Breite mit Nullen auffüllen, sodass ein Element `C0001(Platte)`
-statt `1(Platte)` lautet. Beides wird dem Element bei seiner Erstellung aufgeprägt und
+Jede Art kann ihr eigenes Buchstabenpräfix bekommen (etwa `C` für Kundenteile), Nummern
+lassen sich auf eine feste Breite mit Nullen auffüllen, und der Name des Elements lässt sich
+ganz aus dem Datensatznamen entfernen — sodass ein Element `C0001(Platte)` oder nur `C0001`
+statt `1(Platte)` lautet. Alle drei werden dem Element bei seiner Erstellung aufgeprägt und
 danach nie neu berechnet — die CAD-Makros bauen aus dieser Nummer den Namen jeder Datei, und
 eine spätere Änderung würde auf den Laufwerken Dateien zurücklassen, die etwas anderes sagen.
 Es lohnt sich also, das vor dem ersten echten Element einzustellen. Die einzige Ausnahme ist

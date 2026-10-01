@@ -123,6 +123,17 @@ modelu, i opcjonalnie można go wyeksportować do PDF. Jeśli rysunek dokumentuj
 nigdy nie wysłano, makro proponuje najpierw wysłać tę Część/Złożenie, a potem od razu
 przechodzi do rysunku.
 
+Makra SolidWorks i Inventor zapisują dodatkowo nazwę elementu do właściwości dokumentu
+`EasyPDM_Name`, żeby dało się ją wciągnąć do własnych szablonów rysunku i tabelek. Oba
+uzupełniają też same
+**masę i materiał**: makro zapisuje je do dokumentu, odczytuje z powrotem i wpisuje na element
+w EasyPDM. W SolidWorksie obie właściwości trzymają wyrażenie SolidWorksa, a nie wartość, więc
+same nadążają za modelem; w Inventorze są migawką z chwili wysyłki. Materiał, którego EasyPDM
+jeszcze nie zna, trafia automatycznie do katalogu materiałów, żeby dało się go wybrać ponownie
+i filtrować po nim. To ona
+sprawia, że usunięcie nazwy z nazwy pliku jest praktyczne: nazwa dalej wędruje razem z
+dokumentem, tyle że nie w jego nazwie.
+
 **Download** — klikasz Download, w przeglądarce wskazujesz Część/Złożenie do pobrania.
 Dla złożenia od razu ściąga się CAŁE drzewo komponentów, a główny plik otwiera się
 automatycznie w CAD-zie. Aktualny rysunek, jeśli istnieje, zapisuje się obok pliku modelu,
@@ -195,8 +206,9 @@ pola widoczne obok siebie. Seria/Typ jest zablokowana, dopóki nie wybierzesz pr
 Podtyp — dopóki nie wybierzesz serii; zmiana producenta albo serii czyści to, co niżej.
 
 **Jak wygląda numer**, ustawia się raz, w Ustawieniach → Numeracja: każdy rodzaj może dostać
-własny literowy prefiks (np. `C` dla części klienta), a numery można dopełniać zerami do
-stałej szerokości, przez co element czyta się jako `C0001(płyta)` zamiast `1(płyta)`. Oba
+własny literowy prefiks (np. `C` dla części klienta), numery można dopełniać zerami do stałej
+szerokości, a nazwę samego elementu da się z nazwy rekordu całkiem usunąć — przez co element
+czyta się jako `C0001(płyta)` albo samo `C0001`, zamiast `1(płyta)`. Wszystkie trzy
 są odciskane na elemencie przy jego tworzeniu i nigdy potem nieprzeliczane — makra CAD budują
 z tego numeru nazwę każdego pliku, więc późniejsza zmiana zostawiłaby na dyskach pliki
 mówiące coś innego. Warto więc ustawić to przed pierwszym prawdziwym elementem. Jedyny

@@ -594,17 +594,24 @@ class AuthError(RuntimeError):
 # Prefiks i zera sa tu tylko ozdoba -- do odpytania API liczy sie sama liczba, a int() zjada
 # zera wiodace. Stare nazwy bez prefiksu ("5 (Wspornik)") dalej pasuja, bo prefiks jest
 # opcjonalny.
-_REVISION_NAME_PATTERN = re.compile(r"^(?P<prefix>[A-Za-z]*)(?P<number>\d+)\s*\((?P<name>.+)\)(?:\.[A-Za-z]+)?$")
+# Czlon "(nazwa)" jest OPCJONALNY -- po wylaczeniu nazwy elementu w nazwie rekordu dokument
+# nazywa sie samym numerem ("C0005.A"). Gdy nazwy nie ma, nie da sie potwierdzic dopasowania
+# nazwa (zob. match_existing_item) i zostaje sam numer -- ryzyko falszywego trafienia jest tu
+# jednak male, bo "C0005.A" to juz konwencja PDM, a nie przypadkowa nazwa uzytkownika.
+_REVISION_NAME_PATTERN = re.compile(r"^(?P<prefix>[A-Za-z]*)(?P<number>\d+)\s*(?:\((?P<name>.+)\))?(?:\.[A-Za-z]+)?$")
 
 
-def item_number_text(item):
-    """Numer elementu TAK, JAK MA WYGLADAC W NAZWIE PLIKU -- gotowa etykieta z serwera
-    (prefiks rodzaju + zera wiodace, zob. ItemNumbering po stronie API). Zapas na samą liczbę
-    zostaje dla starszego serwera, ktory tego pola jeszcze nie zwraca."""
-    label = item.get("itemNumberLabel")
-    if label:
-        return str(label)
-    return str(item.get("itemNumber", ""))
+def record_name_text(item, fallback_name=""):
+    """Pelna NAZWA REKORDU tak, jak ma wygladac w nazwie pliku -- gotowa z serwera
+    (recordName: prefiks rodzaju, zera wiodace i -- zaleznie od ustawienia zamrozonego na
+    elemencie -- nazwa elementu w nawiasie, zob. ItemNumbering po stronie API). Zapas na
+    stara konwencje "numer(nazwa)" zostaje dla starszego serwera, ktory tego pola nie zwraca."""
+    record = item.get("recordName")
+    if record:
+        return str(record)
+    name = fallback_name or item.get("fileName", "") or item.get("name", "")
+    number = item.get("itemNumberLabel") or item.get("itemNumber", "")
+    return "%s(%s)" % (number, name)
 
 
 def get_base_url():
@@ -1017,9 +1024,14 @@ def match_existing_item(doc, existing_items):
     if not m:
         return None
     item_number = int(m.group("number"))
-    label_name = m.group("name").strip().lower()
+    # Gdy nazwy w etykiecie nie ma (wylaczona w Ustawieniach -> Numeracja), nie ma czego
+    # porownac i zostaje sam numer -- patrz komentarz przy _REVISION_NAME_PATTERN.
+    label_name = m.group("name")
+    label_name = label_name.strip().lower() if label_name else None
     for it in existing_items:
-        if it.get("itemNumber") == item_number and it.get("fileName", "").strip().lower() == label_name:
+        if it.get("itemNumber") != item_number:
+            continue
+        if label_name is None or it.get("fileName", "").strip().lower() == label_name:
             return it
     return None
 
@@ -1036,17 +1048,20 @@ def match_existing_item_single(doc):
     if not m:
         return None
     item_number = int(m.group("number"))
-    label_name = m.group("name").strip().lower()
+    label_name = m.group("name")
+    label_name = label_name.strip().lower() if label_name else None
     try:
         it = api_get(f"/items/by-number/{item_number}")
     except Exception:
         return None
-    if it and it.get("fileName", "").strip().lower() == label_name:
+    if not it:
+        return None
+    if label_name is None or it.get("fileName", "").strip().lower() == label_name:
         return it
     return None
 
 
-def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=None, export_step=True, export_pdf=False):
+def _rename_and_upload(doc, item_id, record_name, name, revision, target_folder=None, export_step=True, export_pdf=False):
     """Wspólna końcówka obu trybów: KOPIUJE bieżący plik dokumentu do PDM pod nazwą
     "numer (nazwa).REWIZJA.rozszerzenie" (ta sama konwencja numer/nazwa co itemDisplayLabel
     we froncie, plus litera rewizji — zob. revision_label) — i teraz TAK SAMO zapisuje
@@ -1091,9 +1106,9 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
     rewizji już przemianowanego pliku) — do komunikatu końcowego w run(), żeby nie sugerować
     przenosin, które się nie odbyły."""
     ext = os.path.splitext(doc.FileName)[1]
-    name_prefix = f"{item_number}({sanitize_filename(name)})"
+    name_prefix = sanitize_filename(record_name)
     new_filename = f"{name_prefix}.{revision_label(revision)}{ext}"
-    new_label = f"{item_number}({name}).{revision_label(revision)}"
+    new_label = f"{record_name}.{revision_label(revision)}"
     new_local_path = os.path.join(target_folder or os.path.dirname(doc.FileName), new_filename)
 
     # KOLEJNOŚĆ JEST TU ISTOTNA: najpierw lokalny Save As pod nazwą PDM (razem z
@@ -1155,7 +1170,7 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
             _upload_pdf_attachment(doc, item_id)
         return {
             "itemId": item_id,
-            "itemNumber": item_number,
+            "itemNumber": record_name,
             "newPath": target_path,
             "localRenamed": local_renamed,
         }
@@ -1191,7 +1206,7 @@ def _rename_and_upload(doc, item_id, item_number, name, revision, target_folder=
         _upload_pdf_attachment(doc, item_id)
     return {
         "itemId": item_id,
-        "itemNumber": item_number,
+        "itemNumber": record_name,
         "newPath": doc.FileName,
         "localRenamed": local_renamed,
     }
@@ -1540,7 +1555,7 @@ def push_to_existing_item(doc, item_id, confirm_new_revision, target_folder=None
 
     try:
         return _rename_and_upload(
-            doc, item_id, item_number_text(item), item["fileName"], revision, target_folder, export_step, export_pdf
+            doc, item_id, record_name_text(item), item["fileName"], revision, target_folder, export_step, export_pdf
         )
     except Exception as exc:
         if status_changed:
@@ -1926,7 +1941,7 @@ def submit_via_browser(doc, target_folder):
         )
 
     return _rename_and_upload(
-        doc, ticket_data["itemId"], item_number_text(ticket_data), ticket_data["name"],
+        doc, ticket_data["itemId"], record_name_text(ticket_data, ticket_data["name"]), ticket_data["name"],
         1, target_folder, export_step, export_pdf,
     )
 
@@ -2141,7 +2156,7 @@ def process_assembly_tree(top_doc, target_folder=None):
                     # pliku; tworzenie kolejnego elementu przez API stworzyłoby DRUGI
                     # rekord.
                     result = _rename_and_upload(
-                        doc, ticket_data["itemId"], item_number_text(ticket_data), ticket_data["name"],
+                        doc, ticket_data["itemId"], record_name_text(ticket_data, ticket_data["name"]), ticket_data["name"],
                         1, target_folder, comp_export_step, comp_export_pdf,
                     )
                     newly_created_paths.add(file_path)

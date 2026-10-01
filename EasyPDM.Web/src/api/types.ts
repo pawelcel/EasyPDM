@@ -121,11 +121,13 @@ export function fileTypeLabel(item: Pick<Item, "itemType" | "fileType">): string
 // Część/Złożenie mają numer z bazy (item_number) — wyświetlamy je zawsze jako "numer (nazwa)".
 // Folder/Plik nie mają numeru, więc pokazują samą nazwę.
 export function itemDisplayLabel(
-  item: Pick<Item, "fileName" | "itemNumber" | "itemNumberPrefix" | "itemNumberLabel">
+  item: Pick<Item, "fileName" | "itemNumber" | "itemNumberPrefix" | "itemNumberLabel" | "recordName">
 ): string {
+  // recordName liczy serwer (ItemNumbering.RecordName) -- uwzględnia prefiks, dopełnienie
+  // zerami ORAZ to, czy nazwa elementu w ogóle wchodzi w nazwę rekordu. Reszta to zapas dla
+  // odpowiedzi, które tego pola jeszcze nie niosą (starszy serwer pod nowym frontem).
+  if (item.recordName) return item.recordName
   if (item.itemNumber === null) return item.fileName
-  // itemNumberLabel pochodzi z serwera i uwzględnia dopełnienie zerami. Złożenie prefiksu z
-  // numerem zostaje jako zapas dla odpowiedzi, które tego pola jeszcze nie niosą.
   const number = item.itemNumberLabel ?? `${item.itemNumberPrefix ?? ""}${item.itemNumber}`
   return `${number}(${item.fileName})`
 }
@@ -175,6 +177,9 @@ export interface Item {
   // (Ustawienia -> Nazewnictwo). Serwer liczy to w jednym miejscu, tak samo jak revisionLabel,
   // żeby frontend i trzy makra CAD nie składały jej każde po swojemu.
   itemNumberLabel: string | null
+  // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego na elemencie
+  // -- nazwa w nawiasie. To jest to, co widać w drzewku i co makro nadaje plikowi.
+  recordName: string | null
   // Rodzaju nie da się już zmienić: element ma plik w którymś z czterech wyróżnionych pól,
   // a ich nazwy zawierają jego numer, który od rodzaju zależy (zob. PropertyEndpoints).
   kindLocked: boolean
@@ -260,6 +265,9 @@ export interface BomEntry {
   // (Ustawienia -> Nazewnictwo). Serwer liczy to w jednym miejscu, tak samo jak revisionLabel,
   // żeby frontend i trzy makra CAD nie składały jej każde po swojemu.
   itemNumberLabel: string | null
+  // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego na elemencie
+  // -- nazwa w nawiasie. To jest to, co widać w drzewku i co makro nadaje plikowi.
+  recordName: string | null
   fileName: string
   revisionNumber: number | null
   revisionLabel: string | null
@@ -282,6 +290,9 @@ export interface UsedInEntry {
   // (Ustawienia -> Nazewnictwo). Serwer liczy to w jednym miejscu, tak samo jak revisionLabel,
   // żeby frontend i trzy makra CAD nie składały jej każde po swojemu.
   itemNumberLabel: string | null
+  // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego na elemencie
+  // -- nazwa w nawiasie. To jest to, co widać w drzewku i co makro nadaje plikowi.
+  recordName: string | null
   fileName: string
   itemType: ItemType
   projectId: string | null
@@ -471,6 +482,9 @@ export interface ClientVerificationSummary {
   // (Ustawienia -> Nazewnictwo). Serwer liczy to w jednym miejscu, tak samo jak revisionLabel,
   // żeby frontend i trzy makra CAD nie składały jej każde po swojemu.
   itemNumberLabel: string | null
+  // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego na elemencie
+  // -- nazwa w nawiasie. To jest to, co widać w drzewku i co makro nadaje plikowi.
+  recordName: string | null
   fileName: string
   itemRevisionNumber: number | null
 }

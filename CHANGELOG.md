@@ -2,6 +2,39 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.4.2]
+
+### Added
+- **The item's name can be left out of the record name.** Until now a record always read
+  `C0001(plate)`, and that is the name the CAD macros give the file on disk. A new switch in
+  Settings → Numbering drops the name, leaving `C0001` — useful where the number alone
+  identifies the part and the name is long or still changing. Like the prefix and the
+  padding, the choice is frozen on an item when it is created, so existing items keep the
+  form their files already carry.
+- **The SolidWorks and Inventor macros now write the item's name into a custom property**,
+  `EasyPDM_Name`, alongside the link properties they already wrote. Drawing templates and
+  title blocks can pull it — `$PRP:"EasyPDM_Name"` in SolidWorks, the iProperty of the same
+  name in Inventor. This matters most with the name left out of the file name: the property
+  is then the only place in the document where the name appears at all.
+
+- **Mass and material now fill themselves in.** On upload the macros add two custom
+  properties, `EasyPDM-Mass` and `EasyPDM_Material`, and read them back into the item's Mass
+  and Material fields in EasyPDM. In SolidWorks neither holds a value but a SolidWorks
+  expression — `SW-Mass@@Default@<file name>` and `SW-Material@@Default@<file name>` — which
+  the program resolves itself, so both keep up with the model. Inventor has no equivalent
+  expression, so there the two properties hold a snapshot taken at upload time. Drawings are
+  skipped, assemblies get no material (they have none of their own), and a value that is
+  empty or not a plain number is logged and left alone rather than guessed at.
+- **A material EasyPDM has never seen is added to the catalog automatically.** The macros
+  read the material off the document, not from a list, so the catalog may not know it yet —
+  without this the item would carry a material that could neither be picked again nor used
+  as a filter. Only the name is created; group and subgroup stay empty for someone to fill
+  in.
+
+### Changed
+- Zero padding now stands on its own in Settings → Numbering, instead of sitting inside the
+  prefix list where it read as if it belonged to one of the kinds.
+
 ## [0.4.1]
 
 ### Added

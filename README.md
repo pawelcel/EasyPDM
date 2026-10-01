@@ -124,6 +124,16 @@ optionally be exported to PDF. If a drawing documents something that has never b
 uploaded, the macro offers to send that Part/Assembly first and then continues straight
 into the drawing.
 
+The SolidWorks and Inventor macros also write the item's name into a document property
+called `EasyPDM_Name`, so your drawing templates and title blocks can pull it in. Both also fill in
+the **mass and the material** by themselves: the macro writes them into the document, reads
+them back and puts them on the item in EasyPDM. In SolidWorks the two properties hold a
+SolidWorks expression rather than a value, so they keep up with the model on their own; in
+Inventor they are a snapshot taken at upload. A material EasyPDM has never seen is added to
+the materials catalog automatically, so you can pick it again and filter by it. That is
+what makes dropping the name from the file name practical: the name still travels with the
+document, just not in its file name.
+
 **Download** — you click Download, and in the browser you point to the Part/Assembly to
 fetch. For an assembly, the ENTIRE component tree is fetched right away, and the main
 file opens automatically in the CAD program. A current drawing, if there is one, is saved
@@ -195,8 +205,9 @@ manufacturer, and Subtype until you pick a series; changing the manufacturer or 
 clears whatever is below.
 
 **How the number looks** is set once, in Settings → Numbering: each kind can get its own
-letter prefix (say `C` for client-supplied parts), and numbers can be zero-padded to a
-fixed width, so an item reads `C0001(plate)` instead of `1(plate)`. Both are stamped onto
+letter prefix (say `C` for client-supplied parts), numbers can be zero-padded to a fixed
+width, and the item's own name can be dropped from the record name altogether — so an item
+reads `C0001(plate)`, or just `C0001`, instead of `1(plate)`. All three are stamped onto
 an item when it is created and never recalculated afterwards — the CAD macros build each
 file's name out of that number, so changing it later would leave the files on disk saying
 something different. Worth setting before the first real item, then. The one exception is

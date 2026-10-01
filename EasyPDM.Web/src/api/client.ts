@@ -687,15 +687,17 @@ export const api = {
 
   getItemNumberFormat: () =>
     fetch(`${BASE}/settings/item-number-format`).then((r) =>
-      handleResponse<{ digits: number }>(r)
+      handleResponse<{ digits: number; withName: boolean }>(r)
     ),
 
-  setItemNumberFormat: (digits: number) =>
+  // Oba pola są opcjonalne i zapisywane niezależnie — w Ustawieniach to dwie osobne sekcje,
+  // więc zapis jednej nie może nadpisać drugiej.
+  setItemNumberFormat: (format: { digits?: number; withName?: boolean }) =>
     fetch(`${BASE}/settings/item-number-format`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ digits }),
-    }).then((r) => handleResponse<{ digits: number }>(r)),
+      body: JSON.stringify(format),
+    }).then((r) => handleResponse<{ digits: number; withName: boolean }>(r)),
 
   getItemNumberSequence: () =>
     fetch(`${BASE}/settings/item-number-sequence`).then((r) =>

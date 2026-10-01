@@ -30,7 +30,12 @@ function ProjectSelect({
       value={value || "none"}
       onValueChange={(v) => onChange(v === "none" ? "" : (v as string))}
     >
-      <SelectTrigger className="min-w-44">
+      {/* Trzykrotnie szerszy niż dawne min-w-44: nazwa projektu bywa długa, a do tego dochodzi
+          klient i druga nazwa w nawiasie (zob. projectLabel), więc ucinało się to, co istotne.
+          Pełna szerokość dopiero od "sm" i z max-w-full -- na wąskim oknie min-width nie da się
+          zmniejszyć i pole wystawałoby poza ekran; belka jest flex-wrap, więc przyciski po
+          prostu schodzą niżej. */}
+      <SelectTrigger className="min-w-44 max-w-full sm:min-w-132">
         <SelectValue>
           {(v: string) => {
             const project = projects.find((p) => p.id === v)

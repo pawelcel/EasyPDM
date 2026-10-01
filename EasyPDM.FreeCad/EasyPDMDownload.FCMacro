@@ -526,7 +526,7 @@ def _revision_attachment_pattern(item_number, name):
     # sam numer -- oba warianty musza pasowac, inaczej pobieranie przestaloby widziec
     # wlasne starsze pliki.
     return re.compile(
-        rf"^[A-Za-z]*0*{item_number}\s*\({re.escape(sanitize_filename(name))}\)\.([A-Za-z]+)\.",
+        rf"^[A-Za-z]*0*{item_number}\s*(?:\({re.escape(sanitize_filename(name))}\))?\.([A-Za-z]+)\.",
         re.IGNORECASE,
     )
 

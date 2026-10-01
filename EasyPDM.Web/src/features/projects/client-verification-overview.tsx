@@ -54,6 +54,7 @@ function VerificationTable({
                       itemNumber: row.itemNumber,
                       itemNumberPrefix: row.itemNumberPrefix,
                       itemNumberLabel: row.itemNumberLabel,
+                      recordName: row.recordName,
                     })}
                   </TableCell>
                   <TableCell className={stale ? "text-destructive" : undefined}>
