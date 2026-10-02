@@ -2465,16 +2465,21 @@ Sub UploadModelImageAttachment(ByVal oDoc As Object, ByVal itemId As String, ByV
     oCamera.Fit
     oCamera.Apply
 
-    ' Czarne tlo. Camera.SaveAsBitmap przyjmuje dwa OPCJONALNE kolory tla (gornego i dolnego
-    ' gradientu) -- podanie obu takich samych daje jednolite tlo. W odroznieniu od SolidWorksa
-    ' nie rusza to zadnego globalnego ustawienia Inventora, kolor dotyczy wylacznie tego zrzutu.
+    ' Jednolite, ciemne tlo. Camera.SaveAsBitmap przyjmuje dwa OPCJONALNE kolory tla (gornego i
+    ' dolnego gradientu) -- podanie obu takich samych daje tlo bez gradientu. W odroznieniu od
+    ' SolidWorksa nie rusza to zadnego globalnego ustawienia Inventora, kolor dotyczy wylacznie
+    ' tego zrzutu.
+    '
+    ' Ciemny szary, NIE czarny: Inventor rysuje krawedzie modelu na czarno, wiec na czarnym tle
+    ' znikalaby sylwetka czesci. Ta sama wartosc co w makrze SolidWorks, zeby zrzuty z obu
+    ' programow wygladaly tak samo.
     ' UNVERIFIED: jesli dana wersja Inventora nie przyjmuje tych argumentow, wywolanie sie
     ' wywroci (polkniete przez On Error Resume Next) i zrzut powstanie ponizej bez nich, czyli
     ' na biezacym tle -- gorzej wygladajacy, ale nadal poprawny obraz.
-    Dim blackBackground As Long
-    blackBackground = 0   ' RGB(0,0,0)
+    Dim screenshotBackground As Long
+    screenshotBackground = 3355443   ' RGB(51, 51, 51) = #333333
     Err.Clear
-    oCamera.SaveAsBitmap tempPath, 1200, 900, blackBackground, blackBackground
+    oCamera.SaveAsBitmap tempPath, 1200, 900, screenshotBackground, screenshotBackground
     If Err.Number <> 0 Or Dir(tempPath) = "" Then
         Err.Clear
         oCamera.SaveAsBitmap tempPath, 1200, 900

@@ -1476,12 +1476,17 @@ def _upload_model_image_attachment(doc, item_id):
         tmp_dir = tempfile.mkdtemp(prefix="easypdm_img_")
         try:
             image_path = os.path.join(tmp_dir, sanitize_filename(doc.Label or "model") + ".png")
-            # "Black" zamiast "Current": zrzut ma wyglądać tak samo niezależnie od tego, jakie
-            # tło roboczy ma akurat ustawione użytkownik (domyślnie FreeCAD daje gradient).
-            # saveImage przyjmuje tu 'Current' | 'White' | 'Black' | 'Transparent' -- w
-            # odróżnieniu od SolidWorksa nie trzeba ruszać żadnego globalnego ustawienia.
-            # Jawny rozmiar, żeby zrzut nie zależał od wielkości okna.
-            view.saveImage(image_path, 1200, 900, "Black")
+            # Zrzut ma wyglądać tak samo niezależnie od tego, jakie tło robocze ma akurat
+            # ustawione użytkownik (domyślnie FreeCAD daje gradient). saveImage przyjmuje tu
+            # tylko nazwy: 'Current' | 'White' | 'Black' | 'Transparent' -- własnego koloru
+            # (tego ciemnoszarego, co makra SolidWorks/Inventor) podać się nie da bez ruszania
+            # globalnych ustawień FreeCAD-a, czego tu nie robimy.
+            #
+            # Dlatego 'Transparent', a nie 'Black': FreeCAD rysuje krawędzie modelu ciemnym
+            # kolorem, więc na czarnym tle ginęłaby sylwetka części. Przezroczyste tło pokazuje
+            # model na tle panelu aplikacji, cokolwiek nim jest -- krawędzie są widoczne
+            # zarówno na jasnym, jak i na ciemnym motywie.
+            view.saveImage(image_path, 1200, 900, "Transparent")
             if not os.path.exists(image_path):
                 return
             api_upload_file(

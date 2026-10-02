@@ -153,11 +153,25 @@ Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAd
 Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
                                                              ' live SolidWorks install, confirm on first real test (see
                                                              ' UploadStepAttachment).
-' swUserPreferenceIntegerValue_e.swSystemColorsViewportBackground. W odroznieniu od stalych
-' wyzej ta NIE jest zgadnieta: odczytana z zywego SolidWorksa (Debug.Print w oknie Immediate),
-' bo dokumentacja Dassault podaje nazwy stalych, ale nie ich wartosci, a modul jest late-bound
-' (bez biblioteki typow), wiec nazwa swSystemColorsViewportBackground jest tu niedostepna.
+' Trzy ustawienia koloru tla widoku. W odroznieniu od stalych wyzej te NIE sa zgadniete:
+' odczytane z zywego SolidWorksa (Debug.Print w oknie Immediate), bo dokumentacja Dassault
+' podaje nazwy stalych bez ich wartosci, a modul jest late-bound (bez biblioteki typow), wiec
+' same nazwy sa tu niedostepne. Ciagly blok 99-101 potwierdza, ze trafilismy we wlasciwa grupe.
+'
+' Ustawiamy WSZYSTKIE TRZY, bo nie da sie stad odczytac, ktory tryb tla jest wlaczony
+' ('Jednolity' uzywa tla widoku, 'Gradient' dwoch kolorow gradientu) -- stala tego trybu nie
+' istnieje pod zadna nazwa, ktora udalo sie potwierdzic. Ustawienie wszystkich trzech daje ten
+' sam efekt w obu trybach i jest tansze niz zgadywanie czwartej stalej. Pierwsza proba
+' zmieniala tylko tlo widoku i nie dawala efektu wlasnie dlatego, ze tlo bylo gradientem.
 Private Const SW_SYSCOLOR_VIEWPORT_BACKGROUND As Long = 99
+Private Const SW_SYSCOLOR_TOP_GRADIENT As Long = 100
+Private Const SW_SYSCOLOR_BOTTOM_GRADIENT As Long = 101
+
+' Tlo zrzutu: ciemny szary #333333, NIE czarny. SolidWorks rysuje krawedzie modelu na czarno,
+' wiec na czarnym tle znikalaby cala sylwetka czesci. Szary ma rowne wartosci trzech kanalow,
+' wiec ta sama liczba wychodzi niezaleznie od tego, czy SolidWorks pakuje kolor jako RGB czy
+' BGR -- jedna niewiadoma mniej przy ustawieniu, ktorego nie da sie tu zweryfikowac.
+Private Const SW_SCREENSHOT_BACKGROUND As Long = 3355443   ' RGB(51, 51, 51)
 
 ' Win32 API used ONLY by WaitForTicket (below) to poll the ticket endpoint while keeping
 ' SolidWorks responsive and letting the user cancel with Escape -- this module has no
@@ -2266,20 +2280,28 @@ Sub UploadModelImageAttachment(ByVal swModel As Object, ByVal itemId As String, 
     swModel.ShowNamedView2 "*Isometric", -1
     swModel.ViewZoomtofit2
 
-    ' Czarne tlo na czas zrzutu. To jest USTAWIENIE SYSTEMOWE SolidWorksa, nie wlasciwosc
-    ' dokumentu -- zostaloby wlaczone po zamknieciu programu, wiec zapamietujemy poprzednia
-    ' wartosc i przywracamy ja NATYCHMIAST po zapisie pliku, jeszcze przed wysylka (ta moze
+    ' Jednolite, ciemne tlo na czas zrzutu. To sa USTAWIENIA SYSTEMOWE SolidWorksa, nie wlasciwosci
+    ' dokumentu -- zostalyby wlaczone po zamknieciu programu, wiec zapamietujemy poprzednie
+    ' wartosci i przywracamy je NATYCHMIAST po zapisie pliku, jeszcze przed wysylka (ta moze
     ' trwac i moze sie wywrocic, a uzytkownik ma w tym czasie pracowac na swoim tle).
-    Dim prevBackground As Long
-    Dim backgroundChanged As Boolean
-    backgroundChanged = False
-    Err.Clear
-    prevBackground = swApp.GetUserPreferenceIntegerValue(SW_SYSCOLOR_VIEWPORT_BACKGROUND)
-    If Err.Number = 0 Then
-        swApp.SetUserPreferenceIntegerValue SW_SYSCOLOR_VIEWPORT_BACKGROUND, 0   ' RGB(0,0,0)
-        backgroundChanged = (Err.Number = 0)
-    End If
-    Err.Clear
+    Dim bgPref(0 To 2) As Long
+    Dim bgPrev(0 To 2) As Long
+    Dim bgChanged(0 To 2) As Boolean
+    bgPref(0) = SW_SYSCOLOR_VIEWPORT_BACKGROUND
+    bgPref(1) = SW_SYSCOLOR_TOP_GRADIENT
+    bgPref(2) = SW_SYSCOLOR_BOTTOM_GRADIENT
+
+    Dim bgIndex As Long
+    For bgIndex = 0 To 2
+        bgChanged(bgIndex) = False
+        Err.Clear
+        bgPrev(bgIndex) = swApp.GetUserPreferenceIntegerValue(bgPref(bgIndex))
+        If Err.Number = 0 Then
+            swApp.SetUserPreferenceIntegerValue bgPref(bgIndex), SW_SCREENSHOT_BACKGROUND
+            bgChanged(bgIndex) = (Err.Number = 0)
+        End If
+        Err.Clear
+    Next bgIndex
 
     swModel.GraphicsRedraw2
 
@@ -2292,11 +2314,11 @@ Sub UploadModelImageAttachment(ByVal swModel As Object, ByVal itemId As String, 
 
     ' Przywrocenie tla PRZED jakimkolwiek wyjsciem z procedury -- takze tym ponizej, gdy
     ' eksport sie nie powiodl. Inaczej nieudany zrzut zostawialby uzytkownika z czarnym tlem.
-    If backgroundChanged Then
-        swApp.SetUserPreferenceIntegerValue SW_SYSCOLOR_VIEWPORT_BACKGROUND, prevBackground
-        swModel.GraphicsRedraw2
-        Err.Clear
-    End If
+    For bgIndex = 0 To 2
+        If bgChanged(bgIndex) Then swApp.SetUserPreferenceIntegerValue bgPref(bgIndex), bgPrev(bgIndex)
+    Next bgIndex
+    Err.Clear
+    swModel.GraphicsRedraw2
 
     If Not saveOk Or Dir(tempPath) = "" Then
         LogLine "Model image export failed for item " & itemId & " (SaveAs errors=" & saveErrors & ", warnings=" & saveWarnings & ")."
