@@ -1177,10 +1177,28 @@ End Sub
 ' parameter of THIS function (the create-correlation ticket, embedded inside the encoded
 ' "redirect"). The login bridge ticket is one-time and short-lived -- the macro's actual,
 ' long-lived session token never appears in the URL, so it can't leak via browser history.
-Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String) As String
+' Material dokumentu odczytany WPROST z Inventora -- tutaj jestesmy PRZED utworzeniem
+' elementu, wiec wlasciwosc EasyPDM_Material jeszcze nie istnieje. Blad jest pochlaniany:
+' pusty material oznacza po prostu niewypelnione pole w przegladarce.
+Function MaterialNameOf(ByVal oDoc As Object) As String
+    MaterialNameOf = ""
+    On Error Resume Next
+    Err.Clear
+    MaterialNameOf = Trim(oDoc.ComponentDefinition.Material.Name)
+    If Err.Number <> 0 Then
+        MaterialNameOf = ""
+        Err.Clear
+    End If
+    On Error GoTo 0
+End Function
+
+Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "") As String
     Dim redirectPath As String
     redirectPath = "/?ticket=" & UrlEncode(ticket)
     If name <> "" Then redirectPath = redirectPath & "&name=" & UrlEncode(name)
+    ' Material jako wartosc poczatkowa pola w przegladarce -- zob. komentarz w makrze
+    ' SolidWorks, powod jest ten sam.
+    If materialName <> "" Then redirectPath = redirectPath & "&material=" & UrlEncode(materialName)
 
     Dim loginTicketResponse As Object
     Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
@@ -2926,7 +2944,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
 
             Dim compTicket As String
             compTicket = NewGuid()
-            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName)
+            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel))
 
             Dim compTicketData As Object
             Set compTicketData = WaitForTicket(compTicket)
@@ -3696,7 +3714,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         ' this macro family. See BuildBrowserCreateUrl/WaitForTicket above.
         Dim ticket As String
         ticket = NewGuid()
-        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName)
+        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(oDoc))
 
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)

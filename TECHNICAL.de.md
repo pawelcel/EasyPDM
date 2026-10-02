@@ -360,13 +360,22 @@ beim Neuaufbau/Speichern auflöst, sodass beide dem Modell von selbst folgen; da
 den *aufgelösten* Wert. Die umschließenden Anführungszeichen gehören zum Wert und sind keine
 Schreibweise: ohne sie lässt SolidWorks den Text unangetastet und wertet ihn nie aus. Ein Wert,
 der weiterhin wie der Ausdruck aussieht (unaufgelöst, etwa bei einem Teil ohne zugewiesenes
-Material), wird protokolliert und verworfen statt gesendet. Inventor kennt keinen entsprechenden Ausdruck, dort halten beide daher
+Material), wird protokolliert und verworfen statt gesendet. Inventor kennt keinen
+entsprechenden Ausdruck, dort halten beide daher
 eine zum Zeitpunkt des Hochladens aus `ComponentDefinition` gelesene Momentaufnahme und
 werden erst beim nächsten Hochladen aktualisiert. Zeichnungen werden ganz übersprungen, das
 Material nur für Teile geschrieben (eine Baugruppe hat kein eigenes), und eine Masse, die leer
 oder keine schlichte Zahl ist, wird protokolliert und übersprungen — sie wird zuvor auf
 Ziffern und einen Dezimalpunkt normalisiert, da sie mit Einheit und landesüblichem
 Dezimalkomma eintreffen kann.
+
+Noch davor übergibt das Makro beim Öffnen des Browsers zum Anlegen eines neuen Elements das
+Material des Dokuments im Deep-Link (`&material=`), direkt aus der CAD-API gelesen und nicht
+aus `EasyPDM_Material` — zu diesem Zeitpunkt wurde noch nichts gespeichert, der Ausdruck
+existiert also nicht. `pending-create-ticket.ts` nimmt es entgegen und `AddNodeDialog`
+verwendet es als Startwert des Feldes Material, sodass es bereits beim Anlegen sichtbar ist,
+statt unmittelbar nach dem Hochladen von selbst aufzutauchen. Ein Duplikat behält die
+Eigenschaften des Quellelements: dort war die Wahl bewusst.
 
 Ein dem Katalog noch unbekanntes Material legt `PATCH /properties` selbst an
 (`INSERT … ON CONFLICT (name) DO NOTHING`, damit zwei Makros, die dasselbe gleichzeitig

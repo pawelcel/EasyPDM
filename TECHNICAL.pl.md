@@ -322,12 +322,21 @@ wartość *rozwiązaną*. Otaczające cudzysłowy są CZĘŚCIĄ WARTOŚCI, a ni
 SolidWorks zostawia tekst w spokoju i nigdy go nie wylicza. Wartość, która wraca wciąż
 wyglądając jak wyrażenie (nierozwiązana, np. Część bez przypisanego materiału), trafia do logu
 i jest odrzucana zamiast wysyłana — tak właśnie `SW-Material@@Default@C0014.A.SLDPRT` trafił
-raz do pola materiału elementu. Inventor nie ma odpowiednika takiego wyrażenia, więc tam obie trzymają
+raz do pola materiału elementu. Inventor nie ma odpowiednika takiego wyrażenia, więc tam
+obie trzymają
 migawkę odczytaną z `ComponentDefinition` w chwili wysyłki i odświeżają się dopiero przy
 kolejnej. Rysunki są pomijane w całości, materiał zapisywany wyłącznie dla Części (złożenie
 nie ma własnego), a masa pusta albo niebędąca zwykłą liczbą trafia do logu i jest pomijana —
 najpierw normalizowana do cyfr i jednej kropki dziesiętnej, bo bywa z jednostką i przecinkiem
 dziesiętnym.
+
+Zanim do tego dojdzie, otwierając przeglądarkę w celu utworzenia nowego elementu makro
+przekazuje materiał dokumentu w deep-linku (`&material=`), odczytany wprost z API CAD-a, a nie
+z `EasyPDM_Material` — w tym momencie nic jeszcze nie zostało zapisane, więc wyrażenie nie
+istnieje. `pending-create-ticket.ts` go odbiera, a `AddNodeDialog` używa jako wartości
+początkowej pola Materiał, dzięki czemu widać go już przy tworzeniu elementu, zamiast żeby
+pojawiał się sam zaraz po wysyłce. Duplikat zachowuje właściwości elementu źródłowego: tam
+wybór był świadomy.
 
 Materiał, którego katalog jeszcze nie zna, zakłada sam `PATCH /properties`
 (`INSERT … ON CONFLICT (name) DO NOTHING`, więc dwa makra wysyłające równolegle ten sam nie

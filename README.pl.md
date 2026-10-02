@@ -128,9 +128,11 @@ Makra SolidWorks i Inventor zapisują dodatkowo nazwę elementu do właściwośc
 uzupełniają też same
 **masę i materiał**: makro zapisuje je do dokumentu, odczytuje z powrotem i wpisuje na element
 w EasyPDM. W SolidWorksie obie właściwości trzymają wyrażenie SolidWorksa, a nie wartość, więc
-same nadążają za modelem; w Inventorze są migawką z chwili wysyłki. Materiał, którego EasyPDM
-jeszcze nie zna, trafia automatycznie do katalogu materiałów, żeby dało się go wybrać ponownie
-i filtrować po nim. To ona
+same nadążają za modelem; w Inventorze są migawką z chwili wysyłki. Materiał wędruje też
+do przeglądarki
+w momencie tworzenia elementu, więc pole Materiał startuje wypełnione, zamiast zostawiać Cię
+ze zgadywaniem — a ten, którego EasyPDM jeszcze nie zna, trafia automatycznie do katalogu
+materiałów, żeby dało się go wybrać ponownie i filtrować po nim. To ona
 sprawia, że usunięcie nazwy z nazwy pliku jest praktyczne: nazwa dalej wędruje razem z
 dokumentem, tyle że nie w jego nazwie.
 

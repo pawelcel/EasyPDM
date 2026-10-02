@@ -2,6 +2,16 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.4.3]
+
+### Changed
+- **The material now shows up in the "Add item" window**, filled in from the CAD document.
+  Until now that field started empty, there was nothing to go on when filling it in, and the
+  material from SolidWorks appeared on the item straight after the upload anyway — as if out
+  of nowhere. The macros read it off the document before opening the browser and pass it
+  along, so it is visible and deliberate from the start. Duplicating an existing item still
+  copies that item's material: there the choice was made explicitly.
+
 ## [0.4.2]
 
 ### Added

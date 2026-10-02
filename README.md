@@ -129,8 +129,10 @@ called `EasyPDM_Name`, so your drawing templates and title blocks can pull it in
 the **mass and the material** by themselves: the macro writes them into the document, reads
 them back and puts them on the item in EasyPDM. In SolidWorks the two properties hold a
 SolidWorks expression rather than a value, so they keep up with the model on their own; in
-Inventor they are a snapshot taken at upload. A material EasyPDM has never seen is added to
-the materials catalog automatically, so you can pick it again and filter by it. That is
+Inventor they are a snapshot taken at upload. The material also comes along when the browser
+opens to create the item, so the Material field starts filled in rather than leaving you to
+guess — and one EasyPDM has never seen is added to the materials catalog automatically, so
+you can pick it again and filter by it. That is
 what makes dropping the name from the file name practical: the name still travels with the
 document, just not in its file name.
 

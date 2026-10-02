@@ -141,7 +141,9 @@ ihn übernehmen können. Beide tragen außerdem **Masse und Material**
 selbst ein: Das Makro schreibt sie in das Dokument, liest sie zurück und setzt sie am Element
 in EasyPDM. In SolidWorks enthalten die beiden Eigenschaften einen SolidWorks-Ausdruck statt
 eines Werts und folgen so dem Modell von selbst; in Inventor sind sie eine Momentaufnahme vom
-Zeitpunkt des Hochladens. Ein Material, das EasyPDM noch nicht kennt, wird automatisch in den
+Zeitpunkt des Hochladens. Das Material wird außerdem beim Öffnen des Browsers zum
+Anlegen des Elements mitgegeben, sodass das Feld Material bereits ausgefüllt startet, statt
+Sie raten zu lassen — und eines, das EasyPDM noch nicht kennt, wird automatisch in den
 Materialkatalog aufgenommen, damit es sich erneut auswählen und als Filter nutzen
 lässt. Genau das macht das Weglassen des Namens im Dateinamen praktikabel:
 Der Name reist weiterhin mit dem Dokument, nur eben nicht in dessen Dateinamen.

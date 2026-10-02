@@ -329,12 +329,21 @@ resolves on rebuild/save, so both track the model by themselves; the macro reads
 them SolidWorks leaves the text alone and never evaluates it. When a value comes back still
 looking like the expression (an unresolved one, e.g. a Part with no material assigned), it is
 logged and dropped rather than sent — that is how `SW-Material@@Default@C0014.A.SLDPRT` once
-reached an item's material field. Inventor has no equivalent expression, so there both properties hold a
+reached an item's material field. Inventor has no equivalent expression, so there both
+properties hold a
 snapshot read from `ComponentDefinition` at upload time and need a re-upload to refresh.
 Drawings are skipped entirely, material is written for Parts only (an Assembly has none of
 its own), and a mass that is empty or not a plain number is logged and skipped — it is
 normalized to digits and one decimal point first, since it can arrive with a unit and a
 locale decimal comma.
+
+Before any of that, when the macro opens the browser to create a new item it passes the
+document's material along in the deep link (`&material=`), read straight from the CAD API
+rather than from `EasyPDM_Material` — at that point nothing has been saved yet, so the
+expression does not exist. `pending-create-ticket.ts` picks it up and `AddNodeDialog` uses it
+as the Material field's starting value, so the value is visible while the item is being
+created instead of appearing by itself right after the upload. A duplicate keeps the source
+item's properties: that choice was explicit.
 
 A material the catalog does not know yet is inserted by `PATCH /properties` itself
 (`INSERT … ON CONFLICT (name) DO NOTHING`, so two macros sending the same one concurrently

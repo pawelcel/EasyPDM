@@ -237,7 +237,13 @@ function PendingTicketBanner() {
           initialOpen
           initialName={pendingTicket.name}
           initialMode={duplicateSource?.itemType === "assembly" ? "assembly" : duplicateSource ? "part" : undefined}
-          initialProperties={duplicateSource?.properties}
+          // Duplikat ma własne właściwości skopiowane ze źródła i one mają pierwszeństwo —
+          // użytkownik świadomie wybrał "skopiuj z istniejącego". Materiał z dokumentu CAD
+          // wchodzi tylko tam, gdzie nie ma czego kopiować, czyli przy nowym elemencie.
+          initialProperties={
+            duplicateSource?.properties ??
+            (pendingTicket.material ? { material: pendingTicket.material } : undefined)
+          }
           ticket={pendingTicket.ticket}
           onOpenChange={(open) => {
             // Zamknięte bez utworzenia (Anuluj/X/Escape) — wraca do wyboru Nowy/Duplikuj/

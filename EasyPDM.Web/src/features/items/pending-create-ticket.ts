@@ -24,6 +24,10 @@ type PendingTicket = {
   // dokumentu pasuje do "numer (nazwa).REWIZJA") — tylko PODPOWIEDŹ do wyboru w
   // PendingTicketBanner przy dogrywaniu do istniejącego, wybór zawsze można zmienić.
   suggestedItemNumber?: number
+  // Materiał odczytany z dokumentu CAD, podstawiany jako wartość POCZĄTKOWA pola Materiał
+  // w oknie dodawania. Bez tego pole startuje puste, nie wiadomo co wpisać, a po wysyłce
+  // materiał z CAD-a i tak się pojawia — jakby wziął się znikąd.
+  material?: string
 } | null
 
 function readFromUrl(): PendingTicket {
@@ -34,12 +38,14 @@ function readFromUrl(): PendingTicket {
   const name = params.get("name") ?? undefined
   const suggestedItemNumberRaw = params.get("suggestedItemNumber")
   const suggestedItemNumber = suggestedItemNumberRaw ? Number(suggestedItemNumberRaw) : undefined
+  const material = params.get("material") ?? undefined
   window.history.replaceState(null, "", window.location.pathname)
   return {
     ticket,
     mode,
     name,
     suggestedItemNumber: Number.isFinite(suggestedItemNumber) ? suggestedItemNumber : undefined,
+    material: material || undefined,
   }
 }
 

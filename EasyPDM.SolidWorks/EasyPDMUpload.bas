@@ -1147,10 +1147,36 @@ End Sub
 ' parameter of THIS function (the create-correlation ticket, embedded inside the encoded
 ' "redirect"). The login bridge ticket is one-time and short-lived -- the macro's actual,
 ' long-lived session token never appears in the URL, so it can't leak via browser history.
-Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String) As String
+' Material dokumentu odczytany WPROST z SolidWorksa, a nie z wlasciwosci EasyPDM_Material --
+' ta trzyma wyrazenie rozwiazywane dopiero przy zapisie, a tutaj jestesmy PRZED utworzeniem
+' elementu, wiec zadnego zapisu jeszcze nie bylo. Zlozenie nie ma wlasnego materialu.
+' UNVERIFIED na zywym SolidWorksie: GetMaterialPropertyName2 istnieje na IPartDoc, a drugi
+' parametr jest wyjsciowy -- late-bound VBA przekazuje zmienna przez referencje. Blad jest
+' pochlaniany: pusty material oznacza po prostu niewypelnione pole w przegladarce.
+Function MaterialNameOf(ByVal model As Object) As String
+    MaterialNameOf = ""
+    On Error Resume Next
+    If model.GetType() <> SW_DOC_PART Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    Dim dbName As String, matName As String
+    Err.Clear
+    matName = model.GetMaterialPropertyName2("", dbName)
+    If Err.Number = 0 Then MaterialNameOf = Trim(matName)
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "") As String
     Dim redirectPath As String
     redirectPath = "/?ticket=" & UrlEncode(ticket)
     If name <> "" Then redirectPath = redirectPath & "&name=" & UrlEncode(name)
+    ' Material trafia do formularza w przegladarce jako wartosc poczatkowa pola Material --
+    ' bez tego pole startuje puste, uzytkownik nie wie, co wpisac, a po wysylce i tak
+    ' pojawia sie material z CAD-a, co wyglada, jakby wzial sie znikad.
+    If materialName <> "" Then redirectPath = redirectPath & "&material=" & UrlEncode(materialName)
 
     Dim loginTicketResponse As Object
     Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
@@ -2767,7 +2793,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
 
             Dim compTicket As String
             compTicket = NewGuid()
-            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName)
+            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel))
 
             Dim compTicketData As Object
             Set compTicketData = WaitForTicket(compTicket)
@@ -3414,7 +3440,7 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
         ' submit_via_browser. See BuildBrowserCreateUrl/WaitForTicket above.
         Dim ticket As String
         ticket = NewGuid()
-        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName)
+        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(swModel))
 
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)
