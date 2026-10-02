@@ -26,7 +26,6 @@ All notable changes to EasyPDM are documented in this file.
   title blocks can pull it — `$PRP:"EasyPDM_Name"` in SolidWorks, the iProperty of the same
   name in Inventor. This matters most with the name left out of the file name: the property
   is then the only place in the document where the name appears at all.
-
 - **Mass and material now fill themselves in.** On upload the macros add two custom
   properties, `EasyPDM-Mass` and `EasyPDM_Material`, and read them back into the item's Mass
   and Material fields in EasyPDM. In SolidWorks neither holds a value but a SolidWorks
@@ -51,6 +50,15 @@ All notable changes to EasyPDM are documented in this file.
   item's kind no longer clears it.
 - Zero padding now stands on its own in Settings → Numbering, instead of sitting inside the
   prefix list where it read as if it belonged to one of the kinds.
+- **The project selector is three times wider.** A project name of any real length was cut
+  off, and the client and Name 2 that follow it made that worse. It keeps its old width on a
+  narrow window, where a wider field would have run off the screen.
+
+### Fixed
+- **The digit count in Settings → Numbering could not be typed into**, only nudged with the
+  arrows. It was clamped on every keystroke, so clearing the field snapped it straight back
+  to the default and there was no way to get a new value in. It now holds what you type and
+  clamps when you leave the field, and accepts whole numbers only.
 
 ## [0.4.1]
 
