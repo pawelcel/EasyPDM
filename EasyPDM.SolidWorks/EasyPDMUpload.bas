@@ -153,6 +153,11 @@ Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAd
 Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
                                                              ' live SolidWorks install, confirm on first real test (see
                                                              ' UploadStepAttachment).
+' swUserPreferenceIntegerValue_e.swSystemColorsViewportBackground. W odroznieniu od stalych
+' wyzej ta NIE jest zgadnieta: odczytana z zywego SolidWorksa (Debug.Print w oknie Immediate),
+' bo dokumentacja Dassault podaje nazwy stalych, ale nie ich wartosci, a modul jest late-bound
+' (bez biblioteki typow), wiec nazwa swSystemColorsViewportBackground jest tu niedostepna.
+Private Const SW_SYSCOLOR_VIEWPORT_BACKGROUND As Long = 99
 
 ' Win32 API used ONLY by WaitForTicket (below) to poll the ticket endpoint while keeping
 ' SolidWorks responsive and letting the user cancel with Escape -- this module has no
@@ -2260,6 +2265,22 @@ Sub UploadModelImageAttachment(ByVal swModel As Object, ByVal itemId As String, 
     ' akurat stal uzytkownik -- zblizenie na fragment albo widok z boku.
     swModel.ShowNamedView2 "*Isometric", -1
     swModel.ViewZoomtofit2
+
+    ' Czarne tlo na czas zrzutu. To jest USTAWIENIE SYSTEMOWE SolidWorksa, nie wlasciwosc
+    ' dokumentu -- zostaloby wlaczone po zamknieciu programu, wiec zapamietujemy poprzednia
+    ' wartosc i przywracamy ja NATYCHMIAST po zapisie pliku, jeszcze przed wysylka (ta moze
+    ' trwac i moze sie wywrocic, a uzytkownik ma w tym czasie pracowac na swoim tle).
+    Dim prevBackground As Long
+    Dim backgroundChanged As Boolean
+    backgroundChanged = False
+    Err.Clear
+    prevBackground = swApp.GetUserPreferenceIntegerValue(SW_SYSCOLOR_VIEWPORT_BACKGROUND)
+    If Err.Number = 0 Then
+        swApp.SetUserPreferenceIntegerValue SW_SYSCOLOR_VIEWPORT_BACKGROUND, 0   ' RGB(0,0,0)
+        backgroundChanged = (Err.Number = 0)
+    End If
+    Err.Clear
+
     swModel.GraphicsRedraw2
 
     Dim tempPath As String
@@ -2268,6 +2289,15 @@ Sub UploadModelImageAttachment(ByVal swModel As Object, ByVal itemId As String, 
     Dim saveErrors As Long, saveWarnings As Long
     Dim saveOk As Boolean
     saveOk = swModel.Extension.SaveAs(tempPath, 0, SW_SAVE_AS_SILENT, Nothing, saveErrors, saveWarnings)
+
+    ' Przywrocenie tla PRZED jakimkolwiek wyjsciem z procedury -- takze tym ponizej, gdy
+    ' eksport sie nie powiodl. Inaczej nieudany zrzut zostawialby uzytkownika z czarnym tlem.
+    If backgroundChanged Then
+        swApp.SetUserPreferenceIntegerValue SW_SYSCOLOR_VIEWPORT_BACKGROUND, prevBackground
+        swModel.GraphicsRedraw2
+        Err.Clear
+    End If
+
     If Not saveOk Or Dir(tempPath) = "" Then
         LogLine "Model image export failed for item " & itemId & " (SaveAs errors=" & saveErrors & ", warnings=" & saveWarnings & ")."
         Exit Sub

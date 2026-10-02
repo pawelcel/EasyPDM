@@ -1476,9 +1476,12 @@ def _upload_model_image_attachment(doc, item_id):
         tmp_dir = tempfile.mkdtemp(prefix="easypdm_img_")
         try:
             image_path = os.path.join(tmp_dir, sanitize_filename(doc.Label or "model") + ".png")
-            # "Current" = bieżący tryb tła okna widoku; podajemy jawny rozmiar, żeby zrzut nie
-            # zależał od tego, jak duże okno ma akurat użytkownik.
-            view.saveImage(image_path, 1200, 900, "Current")
+            # "Black" zamiast "Current": zrzut ma wyglądać tak samo niezależnie od tego, jakie
+            # tło roboczy ma akurat ustawione użytkownik (domyślnie FreeCAD daje gradient).
+            # saveImage przyjmuje tu 'Current' | 'White' | 'Black' | 'Transparent' -- w
+            # odróżnieniu od SolidWorksa nie trzeba ruszać żadnego globalnego ustawienia.
+            # Jawny rozmiar, żeby zrzut nie zależał od wielkości okna.
+            view.saveImage(image_path, 1200, 900, "Black")
             if not os.path.exists(image_path):
                 return
             api_upload_file(

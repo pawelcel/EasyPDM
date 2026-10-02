@@ -5,677 +5,199 @@ All notable changes to EasyPDM are documented in this file.
 ## [0.5]
 
 ### Changed
-- **The 3D preview is now a picture taken by the CAD macro, not a STEP rendered in your
-  browser.** Opening an item used to download its STEP file, parse it with OpenCascade
-  compiled to WebAssembly, tessellate every surface and compute the edges of every solid —
-  all to produce a **still image**: there was never anything to rotate or drag. That work was
-  repeated on every item, for every user, on top of a 7.6 MB WebAssembly binary each browser
-  had to download and compile. It also did not scale with the STEP file's size but with the
-  model's complexity, so a 40 kB part full of fillets could bring a machine to a crawl. The
-  macros now save a PNG of the model at upload time and send it along; the browser just shows
-  it. The published app is **7.8 MB smaller**.
-- **The STEP file itself is unchanged** — still exported, still uploaded, still there to
-  download. It simply no longer drives the display.
-- **Deleting the STEP also deletes its picture.** The screenshot exists only to depict that
-  model, so leaving it behind would fill the store with images nothing shows and nothing can
-  trace back to a model.
-- **A warning appears under the "export STEP" option for models over 10 MB.** That export runs
-  in your CAD program before anything is sent, and at that size it can take minutes with the
-  program busy throughout — worth knowing before confirming the window, not after.
+- **The 3D preview is now a picture taken by the CAD macro, not a STEP rendered in your browser.** Opening an item used to download its STEP file, parse it with OpenCascade compiled to WebAssembly, tessellate every surface and compute the edges of every solid — all to produce a **still image**: there was never anything to rotate or drag. That work was repeated on every item, for every user, on top of a 7.6 MB WebAssembly binary each browser had to download and compile. It also did not scale with the STEP file's size but with the model's complexity, so a 40 kB part full of fillets could bring a machine to a crawl. The macros now save a PNG of the model at upload time and send it along; the browser just shows it. The published app is **7.8 MB smaller**.
+- **The STEP file itself is unchanged** — still exported, still uploaded, still there to download. It simply no longer drives the display.
+- **Deleting the STEP also deletes its picture.** The screenshot exists only to depict that model, so leaving it behind would fill the store with images nothing shows and nothing can trace back to a model.
+- **The model picture is taken on a black background**, so every item's preview looks the same regardless of what each person has their CAD viewport set to. In FreeCAD and Inventor the background is an argument of the screenshot call itself; in SolidWorks it is a system setting, so the macro saves the current one, switches to black for the capture and puts it straight back — before the upload, and also when the export fails, so a bad run never leaves you working on a black background.
+- **A warning appears under the "export STEP" option for models over 10 MB.** That export runs in your CAD program before anything is sent, and at that size it can take minutes with the program busy throughout — worth knowing before confirming the window, not after.
 
 ### Fixed
-- **Deleting an item completely now also removes its client-verification files.** Everything
-  else it owns — the CAD file, the drawing, the PDF, the STEP, the preview picture and any
-  ordinary attachment — was already deleted from storage, but files attached to a client
-  verification were not: their rows vanished with the item while the files stayed behind,
-  with nothing left to find them by.
-- **Deleting a project now also removes the project's own attachments** (the offer and order
-  files) from storage, for the same reason. Items are unaffected: deleting a project does not
-  delete them, it only detaches them, so their files stay in use.
+- **Deleting an item completely now also removes its client-verification files.** Everything else it owns — the CAD file, the drawing, the PDF, the STEP, the preview picture and any ordinary attachment — was already deleted from storage, but files attached to a client verification were not: their rows vanished with the item while the files stayed behind, with nothing left to find them by.
+- **Deleting a project now also removes the project's own attachments** (the offer and order files) from storage, for the same reason. Items are unaffected: deleting a project does not delete them, it only detaches them, so their files stay in use.
 
 ### Removed
-- **STEP, IGES and STL files are no longer previewable in the browser**, in the item box or in
-  the attachment preview window; they get a download button. Items uploaded before this
-  version keep their STEP and show no preview until they are sent up again — there is no
-  renderer left to fall back to, which is the point: keeping one would have meant keeping the
-  7.6 MB dependency for everybody.
+- **STEP, IGES and STL files are no longer previewable in the browser**, in the item box or in the attachment preview window; they get a download button. Items uploaded before this version keep their STEP and show no preview until they are sent up again — there is no renderer left to fall back to, which is the point: keeping one would have meant keeping the 7.6 MB dependency for everybody.
 
 ## [0.4.3]
 
 ### Changed
-- **The material now shows up in the "Add item" window**, filled in from the CAD document.
-  Until now that field started empty, there was nothing to go on when filling it in, and the
-  material from SolidWorks appeared on the item straight after the upload anyway — as if out
-  of nowhere. The macros read it off the document before opening the browser and pass it
-  along, so it is visible and deliberate from the start. Duplicating an existing item still
-  copies that item's material: there the choice was made explicitly.
-- **That material is shown but no longer editable there.** Right after the upload the macro
-  writes the material onto the item from the document anyway, so anything picked in the "Add
-  item" window was overwritten moments later — offering a choice that would not survive was
-  the confusing part. The field now shows the CAD material greyed out, with a note saying
-  where it came from; the deliberate change is made on the item once it exists, where the
-  field works as before. A duplicate's material stays editable, because it was copied from an
-  item someone picked.
+- **The material now shows up in the "Add item" window**, filled in from the CAD document. Until now that field started empty, there was nothing to go on when filling it in, and the material from SolidWorks appeared on the item straight after the upload anyway — as if out of nowhere. The macros read it off the document before opening the browser and pass it along, so it is visible and deliberate from the start. Duplicating an existing item still copies that item's material: there the choice was made explicitly.
+- **That material is shown but no longer editable there.** Right after the upload the macro writes the material onto the item from the document anyway, so anything picked in the "Add item" window was overwritten moments later — offering a choice that would not survive was the confusing part. The field now shows the CAD material greyed out, with a note saying where it came from; the deliberate change is made on the item once it exists, where the field works as before. A duplicate's material stays editable, because it was copied from an item someone picked.
 
 ### Fixed
-- **A material coming from CAD is now added to the materials list when the item is created**,
-  not only after the file has been uploaded. Creating an item carried the material through
-  without registering it, so until the upload finished it was a name the list did not have —
-  impossible to pick again or to filter by. Both paths now go through the same rule.
+- **A material coming from CAD is now added to the materials list when the item is created**, not only after the file has been uploaded. Creating an item carried the material through without registering it, so until the upload finished it was a name the list did not have — impossible to pick again or to filter by. Both paths now go through the same rule.
 
 ## [0.4.2]
 
 ### Added
-- **The item's name can be left out of the record name.** Until now a record always read
-  `C0001(plate)`, and that is the name the CAD macros give the file on disk. A new switch in
-  Settings → Numbering drops the name, leaving `C0001` — useful where the number alone
-  identifies the part and the name is long or still changing. Like the prefix and the
-  padding, the choice is frozen on an item when it is created, so existing items keep the
-  form their files already carry.
-- **The SolidWorks and Inventor macros now write the item's name into a custom property**,
-  `EasyPDM_Name`, alongside the link properties they already wrote. Drawing templates and
-  title blocks can pull it — `$PRP:"EasyPDM_Name"` in SolidWorks, the iProperty of the same
-  name in Inventor. This matters most with the name left out of the file name: the property
-  is then the only place in the document where the name appears at all.
-- **Mass and material now fill themselves in.** On upload the macros add two custom
-  properties, `EasyPDM-Mass` and `EasyPDM_Material`, and read them back into the item's Mass
-  and Material fields in EasyPDM. In SolidWorks neither holds a value but a SolidWorks
-  expression — `"SW-Mass@@Default@<file name>"` and `"SW-Material@@Default@<file name>"`,
-  quotes included, since without them SolidWorks never evaluates it — which the program
-  resolves itself, so both keep up with the model. A value that comes back still looking like
-  the expression is logged and dropped rather than sent. Inventor has no equivalent
-  expression, so there the two properties hold a snapshot taken at upload time. Drawings are
-  skipped, assemblies get no material (they have none of their own), and a value that is
-  empty or not a plain number is logged and left alone rather than guessed at.
-- **A material EasyPDM has never seen is added to the catalog automatically.** The macros
-  read the material off the document, not from a list, so the catalog may not know it yet —
-  without this the item would carry a material that could neither be picked again nor used
-  as a filter. Only the name is created; group and subgroup stay empty for someone to fill
-  in.
+- **The item's name can be left out of the record name.** Until now a record always read `C0001(plate)`, and that is the name the CAD macros give the file on disk. A new switch in Settings → Numbering drops the name, leaving `C0001` — useful where the number alone identifies the part and the name is long or still changing. Like the prefix and the padding, the choice is frozen on an item when it is created, so existing items keep the form their files already carry.
+- **The SolidWorks and Inventor macros now write the item's name into a custom property**, `EasyPDM_Name`, alongside the link properties they already wrote. Drawing templates and title blocks can pull it — `$PRP:"EasyPDM_Name"` in SolidWorks, the iProperty of the same name in Inventor. This matters most with the name left out of the file name: the property is then the only place in the document where the name appears at all.
+- **Mass and material now fill themselves in.** On upload the macros add two custom properties, `EasyPDM-Mass` and `EasyPDM_Material`, and read them back into the item's Mass and Material fields in EasyPDM. In SolidWorks neither holds a value but a SolidWorks expression — `"SW-Mass@@Default@<file name>"` and `"SW-Material@@Default@<file name>"`, quotes included, since without them SolidWorks never evaluates it — which the program resolves itself, so both keep up with the model. A value that comes back still looking like the expression is logged and dropped rather than sent. Inventor has no equivalent expression, so there the two properties hold a snapshot taken at upload time. Drawings are skipped, assemblies get no material (they have none of their own), and a value that is empty or not a plain number is logged and left alone rather than guessed at.
+- **A material EasyPDM has never seen is added to the catalog automatically.** The macros read the material off the document, not from a list, so the catalog may not know it yet — without this the item would carry a material that could neither be picked again nor used as a filter. Only the name is created; group and subgroup stay empty for someone to fill in.
 
 ### Changed
-- **Mass is now a field of every Part and Assembly**, not just a Purchased Part. It used to
-  be a property of one kind only, and on an Assembly it fell through to the raw-properties
-  editor — so the mass the macros now fill in landed somewhere nobody looks. It sits above
-  the kind-specific fields, since it is the one property they all share, and changing an
-  item's kind no longer clears it.
-- Zero padding now stands on its own in Settings → Numbering, instead of sitting inside the
-  prefix list where it read as if it belonged to one of the kinds.
-- **The project selector is three times wider.** A project name of any real length was cut
-  off, and the client and Name 2 that follow it made that worse. It keeps its old width on a
-  narrow window, where a wider field would have run off the screen.
+- **Mass is now a field of every Part and Assembly**, not just a Purchased Part. It used to be a property of one kind only, and on an Assembly it fell through to the raw-properties editor — so the mass the macros now fill in landed somewhere nobody looks. It sits above the kind-specific fields, since it is the one property they all share, and changing an item's kind no longer clears it.
+- Zero padding now stands on its own in Settings → Numbering, instead of sitting inside the prefix list where it read as if it belonged to one of the kinds.
+- **The project selector is three times wider.** A project name of any real length was cut off, and the client and Name 2 that follow it made that worse. It keeps its old width on a narrow window, where a wider field would have run off the screen.
 
 ### Fixed
-- **The digit count in Settings → Numbering could not be typed into**, only nudged with the
-  arrows. It was clamped on every keystroke, so clearing the field snapped it straight back
-  to the default and there was no way to get a new value in. It now holds what you type and
-  clamps when you leave the field, and accepts whole numbers only.
+- **The digit count in Settings → Numbering could not be typed into**, only nudged with the arrows. It was clamped on every keystroke, so clearing the field snapped it straight back to the default and there was no way to get a new value in. It now holds what you type and clamps when you leave the field, and accepts whole numbers only.
 
 ## [0.4.1]
 
 ### Added
-- **An Assembly can no longer get ahead of its own bill of materials.** Moving an Assembly
-  to "In review" now requires every component one level below it to be at least in review,
-  and moving it to "Released" requires every one of them to be released — because an
-  assembly that is "done" while the parts it is made of are still being drawn is a promise
-  nobody can keep. Only the direct children are checked: what sits deeper is guarded by the
-  same rule applied to the sub-assembly when its own turn comes, so the message always
-  names something visible on screen rather than a part five levels down that means nothing
-  to whoever is looking.
-- When components are not there yet, the status change is **offered rather than refused**:
-  a window lists exactly which ones are behind and asks whether to move them along with
-  the assembly. Declining changes nothing at all. Accepting moves the components first and
-  the assembly second, in one transaction — a half-released bill of materials would be
-  worse than not starting. Each component moved this way gets its own history entry and its
-  author gets the same notification they would have had if someone had moved that part on
-  its own.
-- Two cases deliberately stop short of that offer. A **sub-assembly** that is behind has a
-  bill of materials of its own, so it is named and left alone — walking it automatically
-  would cascade changes nobody asked for. A component that is **cancelled, locked by
-  someone else, or in a project the person has no access to** is named together with the
-  reason and nothing is touched: bringing a cancelled part back into circulation is a
-  decision, not a side effect of releasing an assembly.
+- **An Assembly can no longer get ahead of its own bill of materials.** Moving an Assembly to "In review" now requires every component one level below it to be at least in review, and moving it to "Released" requires every one of them to be released — because an assembly that is "done" while the parts it is made of are still being drawn is a promise nobody can keep. Only the direct children are checked: what sits deeper is guarded by the same rule applied to the sub-assembly when its own turn comes, so the message always names something visible on screen rather than a part five levels down that means nothing to whoever is looking.
+- When components are not there yet, the status change is **offered rather than refused**: a window lists exactly which ones are behind and asks whether to move them along with the assembly. Declining changes nothing at all. Accepting moves the components first and the assembly second, in one transaction — a half-released bill of materials would be worse than not starting. Each component moved this way gets its own history entry and its author gets the same notification they would have had if someone had moved that part on its own.
+- Two cases deliberately stop short of that offer. A **sub-assembly** that is behind has a bill of materials of its own, so it is named and left alone — walking it automatically would cascade changes nobody asked for. A component that is **cancelled, locked by someone else, or in a project the person has no access to** is named together with the reason and nothing is touched: bringing a cancelled part back into circulation is a decision, not a side effect of releasing an assembly.
 
-- **The number format is now shown while you set it, not after.** Each prefix field in
-  Settings -> Numbering carries a live example to its left, so typing "C" immediately shows
-  `C0001` instead of leaving you to guess whether the letter is glued to the number or gets
-  a separator.
-- **Numbers can be zero-padded to a fixed width.** Switch padding on, set the digit count,
-  and new numbers read `0001`, `0002`; switched off, everything behaves exactly as before.
-  A number longer than the width is not truncated — it is a minimum, not a fixed-length
-  format. Padding is frozen on an item when it is created, exactly like the prefix, and so
-  applies only to items created after the change: the item's number is also the name its
-  file carries on disk and as an attachment, and those cannot be rewritten after the fact.
-  A database that has been running for a while will therefore hold a mix of `4` and `0005`
-  — the same way it already holds items with and without a prefix.
+- **The number format is now shown while you set it, not after.** Each prefix field in Settings -> Numbering carries a live example to its left, so typing "C" immediately shows `C0001` instead of leaving you to guess whether the letter is glued to the number or gets a separator.
+- **Numbers can be zero-padded to a fixed width.** Switch padding on, set the digit count, and new numbers read `0001`, `0002`; switched off, everything behaves exactly as before. A number longer than the width is not truncated — it is a minimum, not a fixed-length format. Padding is frozen on an item when it is created, exactly like the prefix, and so applies only to items created after the change: the item's number is also the name its file carries on disk and as an attachment, and those cannot be rewritten after the fact. A database that has been running for a while will therefore hold a mix of `4` and `0005` — the same way it already holds items with and without a prefix.
 
 ### Changed
-- **Correcting a Part's kind now corrects its prefix too** — as long as nothing has been
-  uploaded to it yet. Picking "Manufactured" instead of "Purchased" used to leave the item
-  stuck with the wrong letter forever, because the prefix is frozen when the item is
-  created. It is frozen for a reason: the CAD macros build a file's name out of that number,
-  so the file carries it on disk and in the database. The prefix therefore follows the kind
-  only until something lands in one of the four dedicated slots — CAD file, drawing, PDF or
-  3D model. Ordinary attachments (a mill certificate, a photo) keep their own names and
-  block nothing. Once a dedicated slot is filled the kind itself can no longer be changed:
-  the buttons grey out and say why, because a kind that disagrees with the number would be
-  worse than not being able to correct it. The number itself never changes either way.
-- **The space between the number and the name is gone**: an item now reads `C0001(plate)`
-  and its file is written as `C0001(plate).A.sldprt`. This is the same convention
-  everywhere — the tree, the bill-of-materials exports, the folders inside a documentation
-  ZIP and all three CAD macros. Files written before the change keep their space and are
-  still recognized, because the macros' name matching never required one.
+- **Correcting a Part's kind now corrects its prefix too** — as long as nothing has been uploaded to it yet. Picking "Manufactured" instead of "Purchased" used to leave the item stuck with the wrong letter forever, because the prefix is frozen when the item is created. It is frozen for a reason: the CAD macros build a file's name out of that number, so the file carries it on disk and in the database. The prefix therefore follows the kind only until something lands in one of the four dedicated slots — CAD file, drawing, PDF or 3D model. Ordinary attachments (a mill certificate, a photo) keep their own names and block nothing. Once a dedicated slot is filled the kind itself can no longer be changed: the buttons grey out and say why, because a kind that disagrees with the number would be worse than not being able to correct it. The number itself never changes either way.
+- **The space between the number and the name is gone**: an item now reads `C0001(plate)` and its file is written as `C0001(plate).A.sldprt`. This is the same convention everywhere — the tree, the bill-of-materials exports, the folders inside a documentation ZIP and all three CAD macros. Files written before the change keep their space and are still recognized, because the macros' name matching never required one.
 
 ### Fixed
-- **The CAD macros now name files the way the database does.** They built every file name
-  from the bare number, so a Part whose kind had the prefix "C" was `C5` in EasyPDM but
-  `5 (Name).A.sldprt` on disk — the prefix existed only in the database. All three macros
-  now take the ready-made number from the server (prefix and padding included), for the CAD
-  file, the STEP and the PDF alike, and their name-matching accepts both the new names and
-  the ones they wrote before.
-- Rows of buttons no longer spill outside their panel in English and German. Several rows —
-  the kind of a Part/Assembly in the "Add item" window, the four statuses, the item and
-  project toolbars, and the client header — were laid out without wrapping, which held as
-  long as the labels were the short Polish ones. "Standard part", "Dokumentation
-  herunterladen" or "Aus der Struktur entfernen" did not fit, and since the detail panel's
-  width is dragged by the person using it, a narrow panel could push the buttons out of the
-  frame in Polish too.
+- **The CAD macros now name files the way the database does.** They built every file name from the bare number, so a Part whose kind had the prefix "C" was `C5` in EasyPDM but `5 (Name).A.sldprt` on disk — the prefix existed only in the database. All three macros now take the ready-made number from the server (prefix and padding included), for the CAD file, the STEP and the PDF alike, and their name-matching accepts both the new names and the ones they wrote before.
+- Rows of buttons no longer spill outside their panel in English and German. Several rows — the kind of a Part/Assembly in the "Add item" window, the four statuses, the item and project toolbars, and the client header — were laid out without wrapping, which held as long as the labels were the short Polish ones. "Standard part", "Dokumentation herunterladen" or "Aus der Struktur entfernen" did not fit, and since the detail panel's width is dragged by the person using it, a narrow panel could push the buttons out of the frame in Polish too.
 
 ## [0.4]
 
 ### Added
-- **Client verification** for released Parts/Assemblies. With a released item selected, a
-  "Client verification" button in the toolbar opens a window holding the running record of
-  what the client said: each entry has a result (Verified / Needs work), an optional
-  comment and its own attachments (e.g. the confirmation e-mail). Entries accumulate — a
-  round of remarks followed by an acceptance stays visible as history, with who added it
-  and when. The latest result also shows as a marker next to the item in the project tree
-  and as a section in its properties panel. Verification belongs to the pair (item,
-  project), not to the item alone: the same Part used in two projects is accepted by two
-  different clients, so each project keeps its own record and none of it shows up in
-  "Whole database", where there is no project context. Each entry remembers the revision
-  it applied to, so after a new revision is released the old acceptance stays visible but
-  is clearly marked as no longer covering what the item is now.
-- The project panel now carries a **client verification overview**: three tables, one per
-  result — needs work first (that is what requires action), then in progress, then verified.
-  Each row names the item, the revision the entry covered and when it was made, with an
-  arrow that jumps straight to that item in the structure. Until now the only view of
-  verification was per item, so answering "what is still with the client?" on a project of
-  any size meant clicking through parts one by one.
-- Client verification now raises **notifications**: one when the client comes back with
-  remarks, another when they accept. They go to the item's author — verification only
-  applies to released items, and a released item never has an owner, so the author is the
-  only person the system can point at. Each type can be switched off separately in Settings,
-  and an entry with no result picked ("in progress") deliberately stays silent: it records
-  that something went out, not that anyone needs to act.
-- **Order documents on a project**: a quote and an order confirmation each get their own
-  highlighted slot in the project panel — the same shape as the CAD file slots on an item
-  — plus a third, open category for everything else that arrives with a job
-  (correspondence, the client's specifications, meeting notes). Both highlighted roles
-  accept several files rather than replacing the previous one: a quote gets revised and
-  re-sent, and the earlier version is worth keeping. Unlike "Whole database", which is
-  deliberately open to every logged-in user, these are commercial terms — so both reading
-  and uploading require access to the project itself.
-- Each project attachment now shows when it was uploaded and by whom, under the file name.
-  Nothing forces attachment names to be unique — and rightly so, since a revised quote is
-  usually named exactly like the one before it — so two entries could look identical with
-  no way to tell which was which.
-- A project can now have a "Project lead" — a contact picked from the client's own contact
-  list (either a contact belonging to the client directly, or one belonging to the
-  specific Name 2 the project is linked to), shown right in the project's properties panel
-  next to Client/Name 2.
+- **Client verification** for released Parts/Assemblies. With a released item selected, a "Client verification" button in the toolbar opens a window holding the running record of what the client said: each entry has a result (Verified / Needs work), an optional comment and its own attachments (e.g. the confirmation e-mail). Entries accumulate — a round of remarks followed by an acceptance stays visible as history, with who added it and when. The latest result also shows as a marker next to the item in the project tree and as a section in its properties panel. Verification belongs to the pair (item, project), not to the item alone: the same Part used in two projects is accepted by two different clients, so each project keeps its own record and none of it shows up in "Whole database", where there is no project context. Each entry remembers the revision it applied to, so after a new revision is released the old acceptance stays visible but is clearly marked as no longer covering what the item is now.
+- The project panel now carries a **client verification overview**: three tables, one per result — needs work first (that is what requires action), then in progress, then verified. Each row names the item, the revision the entry covered and when it was made, with an arrow that jumps straight to that item in the structure. Until now the only view of verification was per item, so answering "what is still with the client?" on a project of any size meant clicking through parts one by one.
+- Client verification now raises **notifications**: one when the client comes back with remarks, another when they accept. They go to the item's author — verification only applies to released items, and a released item never has an owner, so the author is the only person the system can point at. Each type can be switched off separately in Settings, and an entry with no result picked ("in progress") deliberately stays silent: it records that something went out, not that anyone needs to act.
+- **Order documents on a project**: a quote and an order confirmation each get their own highlighted slot in the project panel — the same shape as the CAD file slots on an item — plus a third, open category for everything else that arrives with a job (correspondence, the client's specifications, meeting notes). Both highlighted roles accept several files rather than replacing the previous one: a quote gets revised and re-sent, and the earlier version is worth keeping. Unlike "Whole database", which is deliberately open to every logged-in user, these are commercial terms — so both reading and uploading require access to the project itself.
+- Each project attachment now shows when it was uploaded and by whom, under the file name. Nothing forces attachment names to be unique — and rightly so, since a revised quote is usually named exactly like the one before it — so two entries could look identical with no way to tell which was which.
+- A project can now have a "Project lead" — a contact picked from the client's own contact list (either a contact belonging to the client directly, or one belonging to the specific Name 2 the project is linked to), shown right in the project's properties panel next to Client/Name 2.
 ### Changed
-- The "Close project" button moved from the project's properties into the toolbar above the
-  tree, next to the other project actions. It also stopped sending the whole project on
-  every toggle — closing now touches that one flag through its own endpoint, so clicking it
-  right after editing a field can no longer race that field's own save and quietly undo it.
-- Updating an existing Windows installation no longer asks for the `postgres` superuser
-  password, and no longer changes the `pdm_user` role's password. The installer reads the
-  existing password out of the previous installation's `appsettings.Production.json` and
-  leaves the role and database untouched — so anything else connecting to that database
-  (backup scripts, pgAdmin with a saved password) keeps working across updates, and an
-  update is now just "next, next" with no credentials to hunt down.
-- The Windows installer refuses to install an older version over a newer one, explaining
-  why instead of failing obscurely afterwards: database migrations only ever move forward,
-  so an older build cannot read a schema that has already been migrated.
+- The "Close project" button moved from the project's properties into the toolbar above the tree, next to the other project actions. It also stopped sending the whole project on every toggle — closing now touches that one flag through its own endpoint, so clicking it right after editing a field can no longer race that field's own save and quietly undo it.
+- Updating an existing Windows installation no longer asks for the `postgres` superuser password, and no longer changes the `pdm_user` role's password. The installer reads the existing password out of the previous installation's `appsettings.Production.json` and leaves the role and database untouched — so anything else connecting to that database (backup scripts, pgAdmin with a saved password) keeps working across updates, and an update is now just "next, next" with no credentials to hunt down.
+- The Windows installer refuses to install an older version over a newer one, explaining why instead of failing obscurely afterwards: database migrations only ever move forward, so an older build cannot read a schema that has already been migrated.
 
 ### Fixed
-- "Delete completely" on an Assembly deleted its components along with it. A Part/Assembly
-  is a first-class catalog entry (own number, revisions, history, attachments) that can be
-  used in any other assembly, so deleting one assembly it happened to sit in must not take
-  it down. Deletion now recurses **only through Folders** (a Folder owns its contents; an
-  Assembly only *uses* its components), so removing an assembly deletes just that record
-  and leaves every component in place, losing only that one BOM relation.
-- The FreeCAD upload macro sent assemblies to the PDM still pointing at their components'
-  pre-upload filenames, so downloading such an assembly again produced a wall of "Link
-  broken". Three separate causes, all found from a live Report View log:
-  - The copy into the PDM ran *before* the local Save As under the PDM name, so the file
-    that reached the server was always the pre-rename one. The order is now reversed — the
-    document is renamed (and every link pointing at it refreshed) first, and only the
-    finished file is copied/uploaded.
-  - A component opened only as a link dependency is loaded *partially* by FreeCAD, and a
-    partially loaded document silently refuses to save ("Partial loaded document ...
-    cannot be saved"), so the renamed file never actually appeared on disk. Such documents
-    are now pulled in fully before saving, and a save that produces no file is reported
-    instead of being counted as a success.
-  - Links to an `App::VarSet` (shared parameters, which two documents often point at in
-    both directions) were treated as assembly components — that fabricated a cycle in the
-    BOM, which the backend then rightly rejected, and inflated component quantities. The
-    tree walk now skips them.
-- The project's Nazwa/Opis/date fields saved on every blur regardless of whether they'd
-  actually changed, which could race a genuinely intended change made right after (e.g.
-  picking a Project lead immediately after clicking away from another field) and silently
-  revert it if the stale, unrelated save happened to finish second.
-- A Part/Assembly shared as a component under an item in a *different* project (via "Add
-  existing item") showed up in that project's tree as a leaf, with its own
-  already-existing sub-components missing — `GET /api/projects/{id}/relations` filtered
-  relations by the *parent's* `project_id`, which excluded the shared component's own
-  children (their parent is the shared component itself, filed under its original
-  project). Now walks the structure recursively from the project's own items, the same
-  pattern already used for a single item's BOM.
+- "Delete completely" on an Assembly deleted its components along with it. A Part/Assembly is a first-class catalog entry (own number, revisions, history, attachments) that can be used in any other assembly, so deleting one assembly it happened to sit in must not take it down. Deletion now recurses **only through Folders** (a Folder owns its contents; an Assembly only *uses* its components), so removing an assembly deletes just that record and leaves every component in place, losing only that one BOM relation.
+- The FreeCAD upload macro sent assemblies to the PDM still pointing at their components' pre-upload filenames, so downloading such an assembly again produced a wall of "Link broken". Three separate causes, all found from a live Report View log:
+  - The copy into the PDM ran *before* the local Save As under the PDM name, so the file that reached the server was always the pre-rename one. The order is now reversed — the document is renamed (and every link pointing at it refreshed) first, and only the finished file is copied/uploaded.
+  - A component opened only as a link dependency is loaded *partially* by FreeCAD, and a partially loaded document silently refuses to save ("Partial loaded document ... cannot be saved"), so the renamed file never actually appeared on disk. Such documents are now pulled in fully before saving, and a save that produces no file is reported instead of being counted as a success.
+  - Links to an `App::VarSet` (shared parameters, which two documents often point at in both directions) were treated as assembly components — that fabricated a cycle in the BOM, which the backend then rightly rejected, and inflated component quantities. The tree walk now skips them.
+- The project's Nazwa/Opis/date fields saved on every blur regardless of whether they'd actually changed, which could race a genuinely intended change made right after (e.g. picking a Project lead immediately after clicking away from another field) and silently revert it if the stale, unrelated save happened to finish second.
+- A Part/Assembly shared as a component under an item in a *different* project (via "Add existing item") showed up in that project's tree as a leaf, with its own already-existing sub-components missing — `GET /api/projects/{id}/relations` filtered relations by the *parent's* `project_id`, which excluded the shared component's own children (their parent is the shared component itself, filed under its original project). Now walks the structure recursively from the project's own items, the same pattern already used for a single item's BOM.
 
 ## [0.3]
 
 ### Added
-- Technical drawings are now handled properly instead of being confused with a rendered
-  3D-view PDF. FreeCAD detects an actual TechDraw drawing page in the document (activating
-  it first if needed) and exports the PDF from that page instead of guessing from raw
-  shapes. SolidWorks recognizes an open Drawing (.SLDDRW) and matches it to the Part/
-  Assembly it documents by reading its views' own references to already-linked models
-  first, falling back to the item number in the drawing's filename only when that finds
-  nothing — if the drawing's views point at more than one distinct item (e.g. an assembly
-  drawing with a detail view of a single part), a browser window opens to pick the right
-  one (with a Cancel button, and a clear message if none of the candidates could actually
-  be found), with an "export PDF" option right there too. Either way it uploads as its own
-  "Rysunki"/"Drawings" attachment — separate from, and accumulating alongside, the part's
-  own CAD file (one drawing per revision) — and can optionally export/upload the drawing
-  sheet itself as the item's PDF, upgrading it from a rendered 3D-view snapshot to a real
-  print-quality drawing. Downloading a Part/Assembly now also fetches its current drawing
-  (if any) and saves it next to the model file, without opening it. If the drawing
-  documents a Part/Assembly that has never itself been uploaded to EasyPDM, the macro now
-  offers to upload that Part/Assembly first (full flow, including picking its
-  number/name/revision in the browser) and then continues straight into the drawing
-  upload, instead of requiring a separate macro run on the part first. If the drawing
-  instead documents SEVERAL distinct elements and only some of them are already in EasyPDM
-  (e.g. an assembly drawing with an extra detail view of one of its own components that
-  was never uploaded on its own), the upload is now blocked with a message listing what's
-  missing, rather than silently  attaching the drawing to just the linked item(s) and
-  leaving the rest untracked — this also catches a component whose local link is stale
-  (the item it used to point at was since deleted from EasyPDM), which previously still
-  counted as "linked" and let the upload through.
-- Clients tab: hovering a client's row in the list now reveals a small "+" button next to
-  its name — a shortcut to add another Name 2 to that client without going through the
-  regular "Add client" dialog's search. The client's own name comes pre-filled and locked;
-  only the new Name 2 needs typing. A Name 2's own detail panel now shows which client it
-  belongs to right at the top, and its delete button moved out of the list (no more trash
-  icon next to each Name 2 row) into the panel itself, in the same spot the client's own
-  delete button already sits. Its confirmation dialog no longer says "Name 2" (a term with
-  no meaning to most users) — just a plain "Delete?" naming the entry itself, with "No"/
-  "Delete" buttons.
-- SolidWorks: uploading a document that has never been saved no longer just fails with
-  "save it first" — the macro now asks whether to save it as a new item (name/revision
-  picked in the browser, same as any other new upload) and, on confirmation, gives it its
-  first location on disk itself once that's resolved, instead of requiring a manual Ctrl+S
-  beforehand. If an assembly being uploaded contains several such never-saved (virtual)
-  components, a single warning now lists all of them upfront — they still won't be
-  uploaded (there's nothing to read them from), but at least it's no longer silent.
-- A project can now optionally point at one specific Name 2 of its client (not just the
-  client itself), picked right next to the Client field in the project's own form. The
-  project selector dropdown and the project's own row at the top of its structure now show
-  "Project (Client, Name 2)" instead of the item count in parentheses, which wasn't
-  particularly useful there.
-- A project can now be closed (and reopened) with a single button in its own properties. A
-  closed project drops out of the project selector, "My projects", and the picker shown
-  when adding a new item — but nothing about it actually changes: its items stay fully
-  searchable through "Whole database", and the button flips it back open at any time. The
-  project list everywhere is also now sorted by client name, then the client's Name 2,
-  then the project's own name, instead of just alphabetically by project name.
-- New CAD integration: `EasyPDM.Inventor/EasyPDMUpload.bas` and `EasyPDMDownload.bas`, VBA
-  macros for Autodesk Inventor, ported from `EasyPDM.SolidWorks/` with the same
-  browser-based upload/download flow, STEP/PDF export, and automatic assembly-tree
-  detection, and PDM-link tracking via custom iProperties
-  (`EasyPDM_LinkId`/`EasyPDM_LinkNumber`). Live-tested end to end on Autodesk Inventor
-  2027.1, including two install-specific COM automation quirks worth knowing about if this
-  ever needs touching again — see `EasyPDM.Inventor/README.md`'s "Known risks" section:
-  `PropertySet.Add` rejects a value passed as a bare variable (must be forced by-value,
-  e.g. `value & ""`), and the `kFileBrowseIOMechanism` translator constant is `13059`, not
-  a small number as its name might suggest.
-- The "New item" dialog (both the plain web-UI one and the CAD-macro browser-ticket popup)
-  now has an "Add to a project" checkbox, checked by default, next to the project picker —
-  unchecking it creates the Part/Assembly in the database without assigning it to any
-  project (same state as "Remove from structure" + detaching from a project: reachable
-  only through "Whole database"). Meant for assembly components a CAD macro creates
-  automatically while uploading: the macro attaches each new component to the parent
-  assembly's BOM in a separate call regardless of the component's own project, so
-  unchecking this for those avoids every one of them also cluttering some project's tree
-  as an independent root item — they end up visible only as BOM entries under the
-  assembly. Only shown for Part/Assembly (a project-less Folder wouldn't have anywhere to
-  exist).
+- Technical drawings are now handled properly instead of being confused with a rendered 3D-view PDF. FreeCAD detects an actual TechDraw drawing page in the document (activating it first if needed) and exports the PDF from that page instead of guessing from raw shapes. SolidWorks recognizes an open Drawing (.SLDDRW) and matches it to the Part/ Assembly it documents by reading its views' own references to already-linked models first, falling back to the item number in the drawing's filename only when that finds nothing — if the drawing's views point at more than one distinct item (e.g. an assembly drawing with a detail view of a single part), a browser window opens to pick the right one (with a Cancel button, and a clear message if none of the candidates could actually be found), with an "export PDF" option right there too. Either way it uploads as its own "Rysunki"/"Drawings" attachment — separate from, and accumulating alongside, the part's own CAD file (one drawing per revision) — and can optionally export/upload the drawing sheet itself as the item's PDF, upgrading it from a rendered 3D-view snapshot to a real print-quality drawing. Downloading a Part/Assembly now also fetches its current drawing (if any) and saves it next to the model file, without opening it. If the drawing documents a Part/Assembly that has never itself been uploaded to EasyPDM, the macro now offers to upload that Part/Assembly first (full flow, including picking its number/name/revision in the browser) and then continues straight into the drawing upload, instead of requiring a separate macro run on the part first. If the drawing instead documents SEVERAL distinct elements and only some of them are already in EasyPDM (e.g. an assembly drawing with an extra detail view of one of its own components that was never uploaded on its own), the upload is now blocked with a message listing what's missing, rather than silently  attaching the drawing to just the linked item(s) and leaving the rest untracked — this also catches a component whose local link is stale (the item it used to point at was since deleted from EasyPDM), which previously still counted as "linked" and let the upload through.
+- Clients tab: hovering a client's row in the list now reveals a small "+" button next to its name — a shortcut to add another Name 2 to that client without going through the regular "Add client" dialog's search. The client's own name comes pre-filled and locked; only the new Name 2 needs typing. A Name 2's own detail panel now shows which client it belongs to right at the top, and its delete button moved out of the list (no more trash icon next to each Name 2 row) into the panel itself, in the same spot the client's own delete button already sits. Its confirmation dialog no longer says "Name 2" (a term with no meaning to most users) — just a plain "Delete?" naming the entry itself, with "No"/ "Delete" buttons.
+- SolidWorks: uploading a document that has never been saved no longer just fails with "save it first" — the macro now asks whether to save it as a new item (name/revision picked in the browser, same as any other new upload) and, on confirmation, gives it its first location on disk itself once that's resolved, instead of requiring a manual Ctrl+S beforehand. If an assembly being uploaded contains several such never-saved (virtual) components, a single warning now lists all of them upfront — they still won't be uploaded (there's nothing to read them from), but at least it's no longer silent.
+- A project can now optionally point at one specific Name 2 of its client (not just the client itself), picked right next to the Client field in the project's own form. The project selector dropdown and the project's own row at the top of its structure now show "Project (Client, Name 2)" instead of the item count in parentheses, which wasn't particularly useful there.
+- A project can now be closed (and reopened) with a single button in its own properties. A closed project drops out of the project selector, "My projects", and the picker shown when adding a new item — but nothing about it actually changes: its items stay fully searchable through "Whole database", and the button flips it back open at any time. The project list everywhere is also now sorted by client name, then the client's Name 2, then the project's own name, instead of just alphabetically by project name.
+- New CAD integration: `EasyPDM.Inventor/EasyPDMUpload.bas` and `EasyPDMDownload.bas`, VBA macros for Autodesk Inventor, ported from `EasyPDM.SolidWorks/` with the same browser-based upload/download flow, STEP/PDF export, and automatic assembly-tree detection, and PDM-link tracking via custom iProperties (`EasyPDM_LinkId`/`EasyPDM_LinkNumber`). Live-tested end to end on Autodesk Inventor 2027.1, including two install-specific COM automation quirks worth knowing about if this ever needs touching again — see `EasyPDM.Inventor/README.md`'s "Known risks" section: `PropertySet.Add` rejects a value passed as a bare variable (must be forced by-value, e.g. `value & ""`), and the `kFileBrowseIOMechanism` translator constant is `13059`, not a small number as its name might suggest.
+- The "New item" dialog (both the plain web-UI one and the CAD-macro browser-ticket popup) now has an "Add to a project" checkbox, checked by default, next to the project picker — unchecking it creates the Part/Assembly in the database without assigning it to any project (same state as "Remove from structure" + detaching from a project: reachable only through "Whole database"). Meant for assembly components a CAD macro creates automatically while uploading: the macro attaches each new component to the parent assembly's BOM in a separate call regardless of the component's own project, so unchecking this for those avoids every one of them also cluttering some project's tree as an independent root item — they end up visible only as BOM entries under the assembly. Only shown for Part/Assembly (a project-less Folder wouldn't have anywhere to exist).
 
 ### Fixed
-- `EasyPDM.SolidWorks/EasyPDMUpload.bas`/`EasyPDMDownload.bas` had Unix line endings (LF
-  only) — SolidWorks' VBA "Import File" expects Windows-style CRLF and fails outright with
-  "Input past end of file" on LF-only source, so these macro files failed to import at
-  all. Content is otherwise unchanged.
-- All three CAD macros (SolidWorks, Inventor, FreeCAD): uploading to an item already
-  linked to PDM asked "export STEP?"/"export PDF?" before checking whether the item's
-  status even allows the upload to proceed — a "wydany" item's own "create a new
-  revision?" confirmation (or a "sprawdzany" item's hard block) came AFTER those export
-  questions, so answering them was wasted whenever the user then declined the revision or
-  the upload turned out to be blocked. The export questions now come last, only once the
-  status/revision check has actually passed.
-- Item properties: the CAD and drawing attachment lists (each accumulates one entry per
-  revision) now show the newest revision at the top, with a small visual gap before the
-  older revisions below, instead of listing them in upload order (oldest first) with no
-  distinction between the current file and its history.
-- FreeCAD: declining to create new components while sending an assembly ("No" on the "N
-  new components detected" prompt) used to drop the ENTIRE component tree, including
-  components already linked to PDM that only needed a BOM relation, not a new upload. "No"
-  now does what it always said it did — skips creating/uploading not-yet-linked components
-  only; already-linked ones (regardless of their status) still get attached to the
-  structure, matching the SolidWorks/Inventor macros' existing, correct behavior.
-- The "pending request from a CAD macro" new-item dialog now shows which local file it's
-  currently for (`Zapisywany plik: …`) — an assembly upload can pop this dialog once per
-  newly-discovered component, and without a reminder of which file is currently open it
-  was easy to lose track partway through picking the item kind.
-- Every CAD macro's download flow (SolidWorks, Inventor, FreeCAD) now asks the server
-  directly which attachment matches an item's current revision, instead of guessing it by
-  parsing attachment filenames against the macros' own naming convention. Attachments now
-  carry the item's revision number from the moment they're uploaded
-  (`item_attachments.revision_number`); the old filename-parsing guess stays only as a
-  fallback for attachments uploaded before this change. This closes the same category of
-  bug fixed earlier in this release (a PDF export attachment being picked instead of the
-  real CAD file) at the source, rather than only patching around it.
-- Item responses now carry two more server-computed fields the CAD macros (and, for
-  `isLocked`, the web frontend) previously each recomputed on their own:
-  `sanitizedFileName`/`sanitizedName` (the Windows-illegal-character stripping every macro
-  used to do independently before building a target filename, with a previously-diverging
-  fallback for an empty name — now one shared implementation) and `isLocked` (the "does
-  attaching a file to this item require a new revision" rule, now read from the server
-  instead of re-derived from the raw status string in three separate macro files).
-- FreeCAD: matching the active document against an already-existing PDM item (the "this
-  file looks like it was already sent before" check on upload) no longer downloads the
-  entire item table just to check one document — it now looks the parsed item number up
-  directly, the same targeted endpoint SolidWorks/Inventor already use for their
-  drawing-to-item matching. The assembly-tree scan (checking many components at once)
-  still fetches the full list once and reuses it, since that stays cheaper than one
-  request per component for a non-trivial assembly.
-- SolidWorks: downloading an item whose name contains characters outside the Windows
-  machine's current ANSI code page — e.g. Polish diacritics on a non-Polish system — could
-  fail outright with "Bad file name or number", since VBA's legacy file I/O statements
-  convert the path through that code page before touching disk. Local file writes for
-  downloaded attachment bytes now go through ADODB.Stream instead, which handles the full
-  Unicode filename correctly.
-- SolidWorks: uploading a file whose PDM-derived name contains non-ASCII characters (e.g.
-  Polish diacritics) sent that name mangled through the Windows machine's current ANSI
-  code page inside the upload's multipart HTTP request, arriving at the server (which
-  assumes UTF-8 throughout) as invalid byte sequences — visible as literal replacement
-  characters wherever that file's name was shown afterward. It's now encoded as UTF-8
-  instead. Existing attachments already uploaded with a mangled name need re-uploading to
-  pick up the fix.
+- `EasyPDM.SolidWorks/EasyPDMUpload.bas`/`EasyPDMDownload.bas` had Unix line endings (LF only) — SolidWorks' VBA "Import File" expects Windows-style CRLF and fails outright with "Input past end of file" on LF-only source, so these macro files failed to import at all. Content is otherwise unchanged.
+- All three CAD macros (SolidWorks, Inventor, FreeCAD): uploading to an item already linked to PDM asked "export STEP?"/"export PDF?" before checking whether the item's status even allows the upload to proceed — a "wydany" item's own "create a new revision?" confirmation (or a "sprawdzany" item's hard block) came AFTER those export questions, so answering them was wasted whenever the user then declined the revision or the upload turned out to be blocked. The export questions now come last, only once the status/revision check has actually passed.
+- Item properties: the CAD and drawing attachment lists (each accumulates one entry per revision) now show the newest revision at the top, with a small visual gap before the older revisions below, instead of listing them in upload order (oldest first) with no distinction between the current file and its history.
+- FreeCAD: declining to create new components while sending an assembly ("No" on the "N new components detected" prompt) used to drop the ENTIRE component tree, including components already linked to PDM that only needed a BOM relation, not a new upload. "No" now does what it always said it did — skips creating/uploading not-yet-linked components only; already-linked ones (regardless of their status) still get attached to the structure, matching the SolidWorks/Inventor macros' existing, correct behavior.
+- The "pending request from a CAD macro" new-item dialog now shows which local file it's currently for (`Zapisywany plik: …`) — an assembly upload can pop this dialog once per newly-discovered component, and without a reminder of which file is currently open it was easy to lose track partway through picking the item kind.
+- Every CAD macro's download flow (SolidWorks, Inventor, FreeCAD) now asks the server directly which attachment matches an item's current revision, instead of guessing it by parsing attachment filenames against the macros' own naming convention. Attachments now carry the item's revision number from the moment they're uploaded (`item_attachments.revision_number`); the old filename-parsing guess stays only as a fallback for attachments uploaded before this change. This closes the same category of bug fixed earlier in this release (a PDF export attachment being picked instead of the real CAD file) at the source, rather than only patching around it.
+- Item responses now carry two more server-computed fields the CAD macros (and, for `isLocked`, the web frontend) previously each recomputed on their own: `sanitizedFileName`/`sanitizedName` (the Windows-illegal-character stripping every macro used to do independently before building a target filename, with a previously-diverging fallback for an empty name — now one shared implementation) and `isLocked` (the "does attaching a file to this item require a new revision" rule, now read from the server instead of re-derived from the raw status string in three separate macro files).
+- FreeCAD: matching the active document against an already-existing PDM item (the "this file looks like it was already sent before" check on upload) no longer downloads the entire item table just to check one document — it now looks the parsed item number up directly, the same targeted endpoint SolidWorks/Inventor already use for their drawing-to-item matching. The assembly-tree scan (checking many components at once) still fetches the full list once and reuses it, since that stays cheaper than one request per component for a non-trivial assembly.
+- SolidWorks: downloading an item whose name contains characters outside the Windows machine's current ANSI code page — e.g. Polish diacritics on a non-Polish system — could fail outright with "Bad file name or number", since VBA's legacy file I/O statements convert the path through that code page before touching disk. Local file writes for downloaded attachment bytes now go through ADODB.Stream instead, which handles the full Unicode filename correctly.
+- SolidWorks: uploading a file whose PDM-derived name contains non-ASCII characters (e.g. Polish diacritics) sent that name mangled through the Windows machine's current ANSI code page inside the upload's multipart HTTP request, arriving at the server (which assumes UTF-8 throughout) as invalid byte sequences — visible as literal replacement characters wherever that file's name was shown afterward. It's now encoded as UTF-8 instead. Existing attachments already uploaded with a mangled name need re-uploading to pick up the fix.
 
 ## [0.2]
 
 ### Added
-- Notifications: a bell icon (top right, next to your name) shows a scrollable list of
-  events — an item you own waiting for review/released/reverted to "In progress", a new
-  revision on your item, being assigned to or removed from a project, an assigned project
-  being deleted, your password being changed by an admin, or (admins only) low disk space
-  on the file storage. Each type can be turned off individually in Settings →
-  Notifications, and each notification can be marked as read or deleted individually (an
-  "X" button next to each one in the bell's dropdown).
-- Item detail panel now shows a "Used in" section (right above History): every assembly
-  that contains the item, directly or through a sub-assembly, across projects — with a
-  button to jump straight to it. Scrollable, capped at 5 visible rows like History.
-- Assemblies now have a kind of their own — Manufactured, Purchased or Client's — picked
-  when creating one and changeable later, just like a Part's kind. Purchased and client
-  assemblies are numbered with the prefix of the matching Part kind; only manufactured
-  assemblies keep their own prefix (the existing "Assembly" one, now labelled accordingly
-  in Settings → Numbering).
-- Manufacturers can now have a two-level catalog of what they supply: Series/Types, and
-  Subtypes within a series, added from one row (a series picker plus a subtype field plus
-  Add) and listed in a filterable table below (Manufacturers tab). On a purchased item —
-  Part or Assembly — the "Series/Type" and "Subtype" fields sit next to Manufacturer,
-  always visible, side by side; each is simply disabled until the level above it is set
-  (Series/Type needs a manufacturer, Subtype needs a series/type) and offers exactly the
-  entries belonging to it, and changing a higher level clears the lower ones. In "Whole
-  database" the kind filter now covers Parts and Assemblies together (choosing "Purchased"
-  lists both), and the same Manufacturer → Series/Type → Subtype chain appears as
-  dependent filters next to it.
-- Client detail panel now lists the Projects assigned to that client (with a button to
-  jump straight to each one), scoped to what the current user can actually see.
-- A brand new, empty database now gets one sample project on first startup (an assembly
-  with two parts in different statuses, forming a small BOM, plus a tag) — something to
-  explore instead of a blank slate. A notification points it out and reminds you to clear
-  it (Settings → File storage → Danger zone) before real use. Only ever created once, on a
-  genuinely empty database.
-- An assembly's BOM table (and both its CSV exports) now shows a "Norm" column, filled in
-  from a Standard part's own Norm field.
-- "Whole database" gained a "Clear filters" button next to the other filters — resets
-  search, tag, and every filter dropdown in one click. Disabled when nothing is currently
-  filtered.
-- New item status, "Cancelled" — for a released Part/Assembly that turns out not to be
-  needed. Selectable only from "Released", and reversible back to "In progress" (same
-  revision bump + comment as coming back from "Released"). An assembly can't itself become
-  "Released" while anything in its BOM — at any nesting depth — is cancelled; the attempt
-  names the cancelled item(s) right in the status confirmation dialog. Cancelled items are
-  always ownerless, same as released ones, and their icon in the tree/list turns red.
-- The Client-supplied kind (Part or Assembly) now has a "Client" field, picked from the
-  Clients catalog — previously there was no way to record which client a client-supplied
-  item actually belongs to. Next to it, on the same line, "Name 2" — one of that client's
-  second names/trade variants, offered only once a client is picked and cleared again if
-  you change it. A client can now have any number of Name 2 entries instead of just one —
-  so ten trade names for the same client no longer means ten disconnected "Client" catalog
-  entries to pick from. The Clients tab's left-hand list now shows every client as a
-  header row with its Name 2 entries indented underneath, and the "Add client" dialog is
-  dynamic: its name field is a picker over existing clients, and typing/selecting one that
-  already exists switches the dialog to adding that client a new Name 2 (confirmed with a
-  single "OK") instead of creating a duplicate entry. Deleting a Name 2 is a one-click
-  action right on its row in that list. Each Name 2 can now also have its own address, its
-  own contacts, and its own files (e.g. different norms for "Bosch Rexroth" than for
-  "Bosch Tabory"), all kept separate from the client's — its detail panel shows the
-  client's own contacts and files read-only (inherited by every Name 2) above a second,
-  fully editable section for the ones added directly under that Name 2.
+- Notifications: a bell icon (top right, next to your name) shows a scrollable list of events — an item you own waiting for review/released/reverted to "In progress", a new revision on your item, being assigned to or removed from a project, an assigned project being deleted, your password being changed by an admin, or (admins only) low disk space on the file storage. Each type can be turned off individually in Settings → Notifications, and each notification can be marked as read or deleted individually (an "X" button next to each one in the bell's dropdown).
+- Item detail panel now shows a "Used in" section (right above History): every assembly that contains the item, directly or through a sub-assembly, across projects — with a button to jump straight to it. Scrollable, capped at 5 visible rows like History.
+- Assemblies now have a kind of their own — Manufactured, Purchased or Client's — picked when creating one and changeable later, just like a Part's kind. Purchased and client assemblies are numbered with the prefix of the matching Part kind; only manufactured assemblies keep their own prefix (the existing "Assembly" one, now labelled accordingly in Settings → Numbering).
+- Manufacturers can now have a two-level catalog of what they supply: Series/Types, and Subtypes within a series, added from one row (a series picker plus a subtype field plus Add) and listed in a filterable table below (Manufacturers tab). On a purchased item — Part or Assembly — the "Series/Type" and "Subtype" fields sit next to Manufacturer, always visible, side by side; each is simply disabled until the level above it is set (Series/Type needs a manufacturer, Subtype needs a series/type) and offers exactly the entries belonging to it, and changing a higher level clears the lower ones. In "Whole database" the kind filter now covers Parts and Assemblies together (choosing "Purchased" lists both), and the same Manufacturer → Series/Type → Subtype chain appears as dependent filters next to it.
+- Client detail panel now lists the Projects assigned to that client (with a button to jump straight to each one), scoped to what the current user can actually see.
+- A brand new, empty database now gets one sample project on first startup (an assembly with two parts in different statuses, forming a small BOM, plus a tag) — something to explore instead of a blank slate. A notification points it out and reminds you to clear it (Settings → File storage → Danger zone) before real use. Only ever created once, on a genuinely empty database.
+- An assembly's BOM table (and both its CSV exports) now shows a "Norm" column, filled in from a Standard part's own Norm field.
+- "Whole database" gained a "Clear filters" button next to the other filters — resets search, tag, and every filter dropdown in one click. Disabled when nothing is currently filtered.
+- New item status, "Cancelled" — for a released Part/Assembly that turns out not to be needed. Selectable only from "Released", and reversible back to "In progress" (same revision bump + comment as coming back from "Released"). An assembly can't itself become "Released" while anything in its BOM — at any nesting depth — is cancelled; the attempt names the cancelled item(s) right in the status confirmation dialog. Cancelled items are always ownerless, same as released ones, and their icon in the tree/list turns red.
+- The Client-supplied kind (Part or Assembly) now has a "Client" field, picked from the Clients catalog — previously there was no way to record which client a client-supplied item actually belongs to. Next to it, on the same line, "Name 2" — one of that client's second names/trade variants, offered only once a client is picked and cleared again if you change it. A client can now have any number of Name 2 entries instead of just one — so ten trade names for the same client no longer means ten disconnected "Client" catalog entries to pick from. The Clients tab's left-hand list now shows every client as a header row with its Name 2 entries indented underneath, and the "Add client" dialog is dynamic: its name field is a picker over existing clients, and typing/selecting one that already exists switches the dialog to adding that client a new Name 2 (confirmed with a single "OK") instead of creating a duplicate entry. Deleting a Name 2 is a one-click action right on its row in that list. Each Name 2 can now also have its own address, its own contacts, and its own files (e.g. different norms for "Bosch Rexroth" than for "Bosch Tabory"), all kept separate from the client's — its detail panel shows the client's own contacts and files read-only (inherited by every Name 2) above a second, fully editable section for the ones added directly under that Name 2.
 
 ### Changed
-- Admins can now bypass another user's item lock for three actions: changing its status,
-  taking over the lock (locking it to themselves), and releasing it — useful when a
-  coworker is away and their in-progress item needs to move forward. Editing properties
-  still requires actually being the owner.
-- Deleting a project no longer deletes its Parts/Assemblies. It now only removes the
-  project itself — the items become project-less (same state as "Remove from structure"),
-  still fully intact with their files, attachments, tags, history, and BOM relations,
-  reachable through "Whole database". This also protects items shared into another
-  project's BOM: deleting the owning project used to silently remove that shared item from
-  the other project's BOM too — it no longer does.
+- Admins can now bypass another user's item lock for three actions: changing its status, taking over the lock (locking it to themselves), and releasing it — useful when a coworker is away and their in-progress item needs to move forward. Editing properties still requires actually being the owner.
+- Deleting a project no longer deletes its Parts/Assemblies. It now only removes the project itself — the items become project-less (same state as "Remove from structure"), still fully intact with their files, attachments, tags, history, and BOM relations, reachable through "Whole database". This also protects items shared into another project's BOM: deleting the owning project used to silently remove that shared item from the other project's BOM too — it no longer does.
 
 ### Fixed
-- Switching a Part or Assembly's kind (e.g. Purchased → Standard) didn't clear the fields
-  that belonged only to the old kind — a Manufacturer typed in under "Purchased" stayed in
-  the item's data even after switching away, invisible in the UI but still turning up in
-  "Whole database" search. Now cleared as part of the kind change, both when editing an
-  existing item and while still filling in the "New item" dialog.
-- An Assembly's generic Properties editor duplicated its kind, Manufacturer, Series/Type
-  and Subtype as plain, freely-editable rows underneath the dedicated fields for them
-  further up — redundant, and easy to accidentally desync from the real fields.
-- Adding a *new* item under a locked assembly bypassed the owner lock entirely — anyone
-  with project access could insert a new BOM row under someone else's locked assembly,
-  even though every other change to that assembly was correctly blocked.
-- Editing a BOM row's quantity had no error handling — a failed save (e.g. the parent got
-  locked by someone else) silently left the input showing the unsaved value with no
-  indication anything went wrong.
-- Deleting a Material had no confirmation dialog and no error handling — the only
-  one-click, unconfirmed delete left in the app.
-- The automatic backup schedule wrote a local-time timestamp into a column that expects
-  UTC. If that write failed (or silently stored the wrong time), the "did it already run
-  today" check could never engage, and the service would keep retrying — creating a fresh
-  backup every 15 minutes and pruning older, legitimate ones well within a day.
-- Deleting a contact (Clients/Manufacturers) had no confirmation dialog and no error
-  handling — the last one-click, unconfirmed delete left in the app besides Materials
-  (fixed above).
-- A number of inline "save on blur"/"save on click" fields had no error handling — item
-  name, custom properties, price/currency, part kind, removing a tag, saved filters, and
-  per-project user access checkboxes. A failed save could look like it went through with
-  no indication anything was wrong.
-- Dragging to reorder items in the project tree, and "Remove from structure" there,
-  silently swallowed errors with no feedback (the equivalent actions inside a BOM already
-  showed errors correctly).
-- Deleting or demoting the last administrator had a narrow race: two near-simultaneous
-  requests (e.g. two admins demoting each other, or one deleting the other at the same
-  moment) could both pass a stale "is this the last admin" check and leave the system with
-  zero administrators.
-- Releasing an item's owner lock as part of releasing it to "Released" status wasn't
-  recorded in the item's History (unlike releasing it explicitly).
-- Quickly switching the selected project while adding a new item without a fixed project
-  could show parent-folder options from the previously selected project.
-- The Logs page could show content for the wrong date if you switched dates or hit
-  "Refresh" again before the previous request finished.
-- Re-sending a status change that didn't actually change anything (e.g. re-confirming
-  "Released" on an item already Released) could still fire a duplicate notification.
-- The status-change confirmation dialog showed two buttons, "Cancel" and "Confirm", even
-  when it was only displaying a blocking error (e.g. an assembly rejected from "Released"
-  because it contains a cancelled item) — "Confirm" did nothing in that case. Now shows a
-  single "OK" button instead.
-- Deleting an item completely could silently corrupt a shared assembly's BOM: if a
-  descendant of the deleted item was also used elsewhere (correctly kept), a part
-  reachable ONLY through that surviving descendant could still get deleted along with it,
-  breaking the surviving assembly's structure with no error or warning.
-- Adding or removing a tag never checked the item's owner lock or status — anyone with
-  project access could tag/untag an item locked by someone else, or one outside "In
-  progress", unlike every other property of the item.
-- The BOM CSV export didn't guard against formula/CSV injection: a manufacturer/
-  material/order-number value starting with `=`, `+`, `-` or `@` could execute as a
-  formula when the exported file was opened in Excel/Sheets.
-- Login had no rate limiting — the shipped default `admin`/`admin` account could be
-  brute-forced with unlimited attempts. Now locks out after repeated failures.
+- Switching a Part or Assembly's kind (e.g. Purchased → Standard) didn't clear the fields that belonged only to the old kind — a Manufacturer typed in under "Purchased" stayed in the item's data even after switching away, invisible in the UI but still turning up in "Whole database" search. Now cleared as part of the kind change, both when editing an existing item and while still filling in the "New item" dialog.
+- An Assembly's generic Properties editor duplicated its kind, Manufacturer, Series/Type and Subtype as plain, freely-editable rows underneath the dedicated fields for them further up — redundant, and easy to accidentally desync from the real fields.
+- Adding a *new* item under a locked assembly bypassed the owner lock entirely — anyone with project access could insert a new BOM row under someone else's locked assembly, even though every other change to that assembly was correctly blocked.
+- Editing a BOM row's quantity had no error handling — a failed save (e.g. the parent got locked by someone else) silently left the input showing the unsaved value with no indication anything went wrong.
+- Deleting a Material had no confirmation dialog and no error handling — the only one-click, unconfirmed delete left in the app.
+- The automatic backup schedule wrote a local-time timestamp into a column that expects UTC. If that write failed (or silently stored the wrong time), the "did it already run today" check could never engage, and the service would keep retrying — creating a fresh backup every 15 minutes and pruning older, legitimate ones well within a day.
+- Deleting a contact (Clients/Manufacturers) had no confirmation dialog and no error handling — the last one-click, unconfirmed delete left in the app besides Materials (fixed above).
+- A number of inline "save on blur"/"save on click" fields had no error handling — item name, custom properties, price/currency, part kind, removing a tag, saved filters, and per-project user access checkboxes. A failed save could look like it went through with no indication anything was wrong.
+- Dragging to reorder items in the project tree, and "Remove from structure" there, silently swallowed errors with no feedback (the equivalent actions inside a BOM already showed errors correctly).
+- Deleting or demoting the last administrator had a narrow race: two near-simultaneous requests (e.g. two admins demoting each other, or one deleting the other at the same moment) could both pass a stale "is this the last admin" check and leave the system with zero administrators.
+- Releasing an item's owner lock as part of releasing it to "Released" status wasn't recorded in the item's History (unlike releasing it explicitly).
+- Quickly switching the selected project while adding a new item without a fixed project could show parent-folder options from the previously selected project.
+- The Logs page could show content for the wrong date if you switched dates or hit "Refresh" again before the previous request finished.
+- Re-sending a status change that didn't actually change anything (e.g. re-confirming "Released" on an item already Released) could still fire a duplicate notification.
+- The status-change confirmation dialog showed two buttons, "Cancel" and "Confirm", even when it was only displaying a blocking error (e.g. an assembly rejected from "Released" because it contains a cancelled item) — "Confirm" did nothing in that case. Now shows a single "OK" button instead.
+- Deleting an item completely could silently corrupt a shared assembly's BOM: if a descendant of the deleted item was also used elsewhere (correctly kept), a part reachable ONLY through that surviving descendant could still get deleted along with it, breaking the surviving assembly's structure with no error or warning.
+- Adding or removing a tag never checked the item's owner lock or status — anyone with project access could tag/untag an item locked by someone else, or one outside "In progress", unlike every other property of the item.
+- The BOM CSV export didn't guard against formula/CSV injection: a manufacturer/ material/order-number value starting with `=`, `+`, `-` or `@` could execute as a formula when the exported file was opened in Excel/Sheets.
+- Login had no rate limiting — the shipped default `admin`/`admin` account could be brute-forced with unlimited attempts. Now locks out after repeated failures.
 - The session cookie was missing the `Secure` flag when served over HTTPS.
-- Resetting the item-number sequence (Settings → Numbering) had a narrow race: a
-  concurrently created item could grab a number just as the sequence was being rewound,
-  risking a future duplicate `item_number`. Now serialized behind a transaction and table
-  lock.
-- In the "Add item" dialog, changing the selected parent could leave the create-mode
-  selector on a mode the new parent doesn't accept (e.g. Folder under an Assembly), which
-  the backend then rejected with a raw error instead of the UI preventing it.
-- The CAD-macro "log the browser in automatically" bridge put the macro's actual, 30-day
-  session token directly in the URL opened in the system browser, where it could persist
-  in browser history. It now goes through a one-time, short-lived exchange ticket instead
-  — the real session token never appears in a URL.
+- Resetting the item-number sequence (Settings → Numbering) had a narrow race: a concurrently created item could grab a number just as the sequence was being rewound, risking a future duplicate `item_number`. Now serialized behind a transaction and table lock.
+- In the "Add item" dialog, changing the selected parent could leave the create-mode selector on a mode the new parent doesn't accept (e.g. Folder under an Assembly), which the backend then rejected with a raw error instead of the UI preventing it.
+- The CAD-macro "log the browser in automatically" bridge put the macro's actual, 30-day session token directly in the URL opened in the system browser, where it could persist in browser history. It now goes through a one-time, short-lived exchange ticket instead — the real session token never appears in a URL.
 
 ## [0.1.1]
 
 ### Added
 - "Whole database" view: filter/search items and projects by Client.
-- Clearing the database now lets you pick which categories to wipe (Whole
-  database/Projects, Materials, Manufacturers, Clients) instead of all-or-nothing — each
-  is its own checkbox in the confirmation dialog, all checked by default.
-- Docker images now have a real release process: `:latest` (what `docker-compose.yml`
-  pulls) only moves when a version tag (`vX.Y.Z`) is pushed, via the new
-  `publish-docker-release.yml` workflow, which also tags the exact version (`:v0.1.1`,
-  etc.). Every push to `main` still publishes a separate `:edge` tag for checking the
-  newest state before cutting a release — it no longer touches `:latest`. Previously
-  `:latest` was republished on every push to `main`, so a Docker deployment had no way to
-  get a specific, deliberately released version.
+- Clearing the database now lets you pick which categories to wipe (Whole database/Projects, Materials, Manufacturers, Clients) instead of all-or-nothing — each is its own checkbox in the confirmation dialog, all checked by default.
+- Docker images now have a real release process: `:latest` (what `docker-compose.yml` pulls) only moves when a version tag (`vX.Y.Z`) is pushed, via the new `publish-docker-release.yml` workflow, which also tags the exact version (`:v0.1.1`, etc.). Every push to `main` still publishes a separate `:edge` tag for checking the newest state before cutting a release — it no longer touches `:latest`. Previously `:latest` was republished on every push to `main`, so a Docker deployment had no way to get a specific, deliberately released version.
 
 ### Fixed
-- Clearing the database ("Danger zone") didn't delete project-less items (items with no
-  project, only reachable via "Whole database" search) — they were left behind and could
-  collide with the item-numbering sequence after a reset.
-- Clearing the database didn't reset the item-numbering sequence, so the first item
-  created afterwards continued the old numbering instead of starting at 1.
-- Clearing the database left the Clients, Materials, and Manufacturers catalogs (contacts,
-  groups/subgroups, and Clients' own file structure) untouched even though everything else
-  was wiped.
-- Selecting a Material on a Part didn't update the Group/Subgroup dropdowns shown right
-  below it — they stayed on "All groups"/"All subgroups" instead of reflecting the chosen
-  material's actual group/subgroup.
-- Moving the storage location didn't rewrite file paths for Clients' own documents
-  (`client_nodes`), only for items/attachments — after a move with "migrate existing
-  files", every Client document permanently 404'd even though a copy existed at the new
-  location.
-- Adding a child to a BOM only checked project access for the parent item, never the child
-  — a user with access only to project A could pull in an item from a private project B
-  they have no access to.
-- `PATCH /api/items/{id}/properties` and `POST /api/saved-filters` returned a raw 500
-  instead of a clean 400 for malformed request bodies (missing/wrong-shaped JSON).
-- Deleting/demoting a nonexistent user threw a 500 instead of a 404 (`IsLastAdmin`
-  DBNull/null cast bug, same class already fixed elsewhere).
-- Closed two race conditions (TOCTOU) that could let two near-simultaneous requests
-  double-bump an item's revision number or grant two different users a false sense of
-  owning the same lock.
-- Fast repeated clicks on "go to item" from a BOM row could show the wrong item if
-  responses arrived out of order.
-- Bulk delete (and other confirm-delete dialogs) had no error handling — a mid-batch
-  failure left the dialog stuck open with no message and no refresh, and allowed
-  double-submitting.
-- Uploading a file into a folder that has no project (e.g. after "Remove from structure")
-  silently failed — the button now shows an explanatory hint instead, since the backend
-  has no route to create an item with no project directly.
-- The project/item action buttons above the tree/list could render off-screen on a narrow
-  window with a wide resized panel, and could visually overlap the bulk-selection controls
-  when those wrapped to a second line.
-- BOM child quantity wasn't validated server-side (zero/negative values could corrupt
-  aggregated CSV totals).
-- Database schema drift: `item_relations.position` had a default value on a fresh install
-  but not on a database upgraded through the migration chain (migration 010 never set it)
-  — added migration 035 to fix upgraded installs.
-- `uninstall-easypdm-linux.sh` aborted partway through (skipping the rest of the cleanup)
-  if run a second time, because of an unguarded command under `set -e`.
-- "Change storage location" persisted the new path to `appsettings.json`, but on every
-  deployment path (Windows installer's `appsettings.Production.json`, Docker/Linux's
-  `StorageRoot` environment variable, or a developer's `appsettings.Local.json`) a
-  higher-precedence config source still had the *old* path — so the change silently
-  reverted to the old, already-deleted location on the next restart even though the
-  database and files had already moved. Now persisted to `appsettings.Local.json`, which
-  this app always loads last (highest precedence) regardless of deployment.
-- The automatic backup schedule's "already ran today" check compared a UTC timestamp from
-  the database against the server's local clock — for schedules close to midnight in a
-  non-UTC timezone, the guard could never engage, so the service kept re-running the
-  backup every minute until local time caught up with the UTC offset.
-- Six confirm-delete dialogs (delete manufacturer, delete client, delete a client
-  file/folder, change item status, delete user, reset item-numbering sequence) had the
-  same missing error-handling issue already fixed elsewhere: a failed request left the
-  dialog open with no feedback (or closed it before the result was known), with no guard
-  against double-submitting.
-- Manually editing a BOM row's L.p. (position) had a race: two near-simultaneous edits
-  could both pass the "is this number free?" check and end up giving two different parts
-  the same position. Added a database-level unique constraint (migration 036, deferred so
-  the drag-to-reorder feature's temporary in-flight swaps still work) and made the
-  check-and-update atomic.
-- `AddTagRow` (adding a tag to an item, or to several at once in bulk) cleared the input
-  and moved on regardless of whether the request actually succeeded — a failed add (e.g. a
-  duplicate tag) silently discarded what you typed with no error shown.
-- Fixed the same "stale response overwrites the screen" race (already fixed once for BOM
-  cross-navigation) in the search behind "Whole database", the Manufacturers list, the
-  Clients list, and a client's file search — fast typing could show results for an older,
-  broader query instead of the latest one.
-- The attachments panel and the item preview box could briefly show a previous item's
-  attachments/preview for a moment after switching to a different item.
-- `db/schema.sql` was missing the `GRANT` on the `sessions` table that migration 012
-  already has — harmless on both official install paths (where `pdm_user` owns the
-  database outright) but a real drift from a fresh schema-only install.
-- The Windows installer's PostgreSQL-version detection compared version folder names as
-  plain text, which would pick an old PostgreSQL 9.x install over a newer 10+ one if both
-  existed on the same machine (`"9.6" > "18"` alphabetically). Now compares the leading
-  version number instead.
+- Clearing the database ("Danger zone") didn't delete project-less items (items with no project, only reachable via "Whole database" search) — they were left behind and could collide with the item-numbering sequence after a reset.
+- Clearing the database didn't reset the item-numbering sequence, so the first item created afterwards continued the old numbering instead of starting at 1.
+- Clearing the database left the Clients, Materials, and Manufacturers catalogs (contacts, groups/subgroups, and Clients' own file structure) untouched even though everything else was wiped.
+- Selecting a Material on a Part didn't update the Group/Subgroup dropdowns shown right below it — they stayed on "All groups"/"All subgroups" instead of reflecting the chosen material's actual group/subgroup.
+- Moving the storage location didn't rewrite file paths for Clients' own documents (`client_nodes`), only for items/attachments — after a move with "migrate existing files", every Client document permanently 404'd even though a copy existed at the new location.
+- Adding a child to a BOM only checked project access for the parent item, never the child — a user with access only to project A could pull in an item from a private project B they have no access to.
+- `PATCH /api/items/{id}/properties` and `POST /api/saved-filters` returned a raw 500 instead of a clean 400 for malformed request bodies (missing/wrong-shaped JSON).
+- Deleting/demoting a nonexistent user threw a 500 instead of a 404 (`IsLastAdmin` DBNull/null cast bug, same class already fixed elsewhere).
+- Closed two race conditions (TOCTOU) that could let two near-simultaneous requests double-bump an item's revision number or grant two different users a false sense of owning the same lock.
+- Fast repeated clicks on "go to item" from a BOM row could show the wrong item if responses arrived out of order.
+- Bulk delete (and other confirm-delete dialogs) had no error handling — a mid-batch failure left the dialog stuck open with no message and no refresh, and allowed double-submitting.
+- Uploading a file into a folder that has no project (e.g. after "Remove from structure") silently failed — the button now shows an explanatory hint instead, since the backend has no route to create an item with no project directly.
+- The project/item action buttons above the tree/list could render off-screen on a narrow window with a wide resized panel, and could visually overlap the bulk-selection controls when those wrapped to a second line.
+- BOM child quantity wasn't validated server-side (zero/negative values could corrupt aggregated CSV totals).
+- Database schema drift: `item_relations.position` had a default value on a fresh install but not on a database upgraded through the migration chain (migration 010 never set it) — added migration 035 to fix upgraded installs.
+- `uninstall-easypdm-linux.sh` aborted partway through (skipping the rest of the cleanup) if run a second time, because of an unguarded command under `set -e`.
+- "Change storage location" persisted the new path to `appsettings.json`, but on every deployment path (Windows installer's `appsettings.Production.json`, Docker/Linux's `StorageRoot` environment variable, or a developer's `appsettings.Local.json`) a higher-precedence config source still had the *old* path — so the change silently reverted to the old, already-deleted location on the next restart even though the database and files had already moved. Now persisted to `appsettings.Local.json`, which this app always loads last (highest precedence) regardless of deployment.
+- The automatic backup schedule's "already ran today" check compared a UTC timestamp from the database against the server's local clock — for schedules close to midnight in a non-UTC timezone, the guard could never engage, so the service kept re-running the backup every minute until local time caught up with the UTC offset.
+- Six confirm-delete dialogs (delete manufacturer, delete client, delete a client file/folder, change item status, delete user, reset item-numbering sequence) had the same missing error-handling issue already fixed elsewhere: a failed request left the dialog open with no feedback (or closed it before the result was known), with no guard against double-submitting.
+- Manually editing a BOM row's L.p. (position) had a race: two near-simultaneous edits could both pass the "is this number free?" check and end up giving two different parts the same position. Added a database-level unique constraint (migration 036, deferred so the drag-to-reorder feature's temporary in-flight swaps still work) and made the check-and-update atomic.
+- `AddTagRow` (adding a tag to an item, or to several at once in bulk) cleared the input and moved on regardless of whether the request actually succeeded — a failed add (e.g. a duplicate tag) silently discarded what you typed with no error shown.
+- Fixed the same "stale response overwrites the screen" race (already fixed once for BOM cross-navigation) in the search behind "Whole database", the Manufacturers list, the Clients list, and a client's file search — fast typing could show results for an older, broader query instead of the latest one.
+- The attachments panel and the item preview box could briefly show a previous item's attachments/preview for a moment after switching to a different item.
+- `db/schema.sql` was missing the `GRANT` on the `sessions` table that migration 012 already has — harmless on both official install paths (where `pdm_user` owns the database outright) but a real drift from a fresh schema-only install.
+- The Windows installer's PostgreSQL-version detection compared version folder names as plain text, which would pick an old PostgreSQL 9.x install over a newer 10+ one if both existed on the same machine (`"9.6" > "18"` alphabetically). Now compares the leading version number instead.
 
 ### Changed
-- Clearing the database now shows a single dialog that walks through confirming → in
-  progress → done, and reloads the page after confirmation to avoid leftover stale state
-  in the browser.
+- Clearing the database now shows a single dialog that walks through confirming → in progress → done, and reloads the page after confirmation to avoid leftover stale state in the browser.
 
 ## [0.1]
 
 Initial public release.
 
 ### Added
-- Parts and Assemblies with automatic numbering, revisions, status (In progress / Under
-  review / Released), and full change history.
+- Parts and Assemblies with automatic numbering, revisions, status (In progress / Under review / Released), and full change history.
 - Automatic bill of materials (BOM) for assemblies, exportable to CSV.
 - Shared, company-wide catalogs of materials, manufacturers, and clients.
 - Search across the whole database, not just the current project.
 - Item locking while working on something, so nobody else overwrites changes.
 - STEP/PDF file preview in the browser.
-- CAD macros for FreeCAD and SolidWorks — upload/download files straight from the CAD
-  program.
+- CAD macros for FreeCAD and SolidWorks — upload/download files straight from the CAD program.
 - Admin panel, users, and per-project permissions.
 - Docker, Windows installer, and native Linux install paths.
