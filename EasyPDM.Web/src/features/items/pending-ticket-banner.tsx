@@ -244,6 +244,11 @@ function PendingTicketBanner() {
             duplicateSource?.properties ??
             (pendingTicket.material ? { material: pendingTicket.material } : undefined)
           }
+          // Materiał z dokumentu CAD jest do obejrzenia, nie do zmiany: po wysyłce makro
+          // zapisuje go z właściwości EasyPDM_Material i nadpisałoby tu zrobiony wybór.
+          // Duplikat ma materiał skopiowany ze źródła, czyli wybrany świadomie — ten zostaje
+          // edytowalny.
+          materialLocked={!duplicateSource && !!pendingTicket.material}
           ticket={pendingTicket.ticket}
           onOpenChange={(open) => {
             // Zamknięte bez utworzenia (Anuluj/X/Escape) — wraca do wyboru Nowy/Duplikuj/

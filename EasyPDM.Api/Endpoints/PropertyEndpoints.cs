@@ -92,25 +92,9 @@ static class PropertyEndpoints
                 await cmd.ExecuteNonQueryAsync();
             }
 
-            // Materiał przysłany przez makro CAD bierze się z dokumentu, a nie z listy wyboru,
-            // więc katalog może go jeszcze nie znać. Zakładamy go wtedy sam -- inaczej element
-            // miałby materiał, którego nie da się wybrać przy następnej edycji ani użyć jako
-            // filtra w "Całej bazie". Katalogi są wiązane z elementami PO NAZWIE (zob.
-            // TECHNICAL, "Data model"), więc sam wpis wystarczy; grupa/podgrupa zostają puste
-            // do uzupełnienia ręcznie. ON CONFLICT DO NOTHING zamiast sprawdzania "czy jest":
-            // dwa makra wysyłające równolegle ten sam materiał nie mogą się wywrócić na wyścigu.
-            if (body.TryGetProperty("material", out var materialValue)
-                && materialValue.ValueKind == JsonValueKind.String)
-            {
-                var materialName = materialValue.GetString()?.Trim();
-                if (!string.IsNullOrEmpty(materialName))
-                {
-                    await using var materialCmd = new NpgsqlCommand(
-                        "INSERT INTO materials (name) VALUES (@name) ON CONFLICT (name) DO NOTHING;", conn, tx);
-                    materialCmd.Parameters.AddWithValue("name", materialName);
-                    await materialCmd.ExecuteNonQueryAsync();
-                }
-            }
+            // Nieznany materiał z makra CAD zakłada się sam -- zob. MaterialCatalog, gdzie
+            // leży powód i dlaczego to samo robi ścieżka tworzenia elementu.
+            await MaterialCatalog.EnsureFromPropertiesAsync(body, conn, tx);
 
             var prefixRecalculated = false;
             if (newRodzaj is not null)

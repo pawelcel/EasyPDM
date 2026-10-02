@@ -359,6 +359,12 @@ static class ItemEndpoints
             bool? itemNumberWithName = reader.IsDBNull(3) ? null : reader.GetBoolean(3);
             await reader.DisposeAsync();
 
+            // Materiał mógł przyjść z dokumentu CAD (okno dodawania wypełnione przez makro) i
+            // wtedy katalog może go jeszcze nie znać -- zob. MaterialCatalog. Po utworzeniu, bo
+            // wpis w katalogu ma sens tylko dla elementu, który naprawdę powstał.
+            if (body.Properties.HasValue)
+                await MaterialCatalog.EnsureFromPropertiesAsync(body.Properties.Value, conn);
+
             if (body.ParentId is not null)
             {
                 await using var relCmd = new NpgsqlCommand(

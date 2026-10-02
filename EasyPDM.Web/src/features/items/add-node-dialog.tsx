@@ -77,6 +77,7 @@ function AddNodeDialog({
   initialName,
   initialMode,
   initialProperties,
+  materialLocked,
   ticket,
   onOpenChange,
   onCreated,
@@ -104,6 +105,11 @@ function AddNodeDialog({
   // ZE WSKAZANEGO elementu, bez kopiowania żadnych plików — dalej można je tu edytować przed
   // zapisem, to zwykłe tworzenie NOWEGO elementu, tylko wstępnie wypełnione.
   initialProperties?: Record<string, unknown>
+  // Materiał w initialProperties przyszedł z dokumentu CAD, nie z wyboru użytkownika — pole
+  // Materiał pokazuje go wtedy, ale nie daje go zmienić (zob. MaterialField). Ustawia to
+  // PendingTicketBanner tylko dla materiału z biletu; materiał skopiowany przez "Duplikuj"
+  // został wybrany świadomie i zostaje edytowalny.
+  materialLocked?: boolean
   // Bilet z makra CAD (zob. EasyPDM.FreeCad/EasyPDMUpload.FCMacro) — doklejany do POST
   // /nodes, żeby makro mogło się dowiedzieć (GET /create-tickets/{ticket}), że element
   // powstał. Podawany JAWNIE przez wywołującego (PendingTicketBanner), nie czytany z
@@ -641,7 +647,12 @@ function AddNodeDialog({
             <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} />
 
             {(rodzaj === "Wykonywana" || rodzaj === "Normalia") && (
-              <MaterialField value={extraProps.material ?? ""} onSave={setExtraField} disabled={false} />
+              <MaterialField
+                value={extraProps.material ?? ""}
+                onSave={setExtraField}
+                disabled={false}
+                locked={materialLocked}
+              />
             )}
             {rodzaj === "Zakupowa" && (
               <>

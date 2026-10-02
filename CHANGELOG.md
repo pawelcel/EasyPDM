@@ -11,6 +11,19 @@ All notable changes to EasyPDM are documented in this file.
   of nowhere. The macros read it off the document before opening the browser and pass it
   along, so it is visible and deliberate from the start. Duplicating an existing item still
   copies that item's material: there the choice was made explicitly.
+- **That material is shown but no longer editable there.** Right after the upload the macro
+  writes the material onto the item from the document anyway, so anything picked in the "Add
+  item" window was overwritten moments later — offering a choice that would not survive was
+  the confusing part. The field now shows the CAD material greyed out, with a note saying
+  where it came from; the deliberate change is made on the item once it exists, where the
+  field works as before. A duplicate's material stays editable, because it was copied from an
+  item someone picked.
+
+### Fixed
+- **A material coming from CAD is now added to the materials list when the item is created**,
+  not only after the file has been uploaded. Creating an item carried the material through
+  without registering it, so until the upload finished it was a name the list did not have —
+  impossible to pick again or to filter by. Both paths now go through the same rule.
 
 ## [0.4.2]
 

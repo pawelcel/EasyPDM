@@ -56,6 +56,36 @@ public class MaterialAutoCreateTests
     }
 
     [Fact]
+    public async Task Material_podany_przy_tworzeniu_trafia_do_katalogu()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+        var projectId = await client.CreateProjectAsync($"Materia\u0142y {Guid.NewGuid()}");
+
+        // Materia\u0142 z dokumentu CAD dochodzi do okna dodawania JU\u017b przy tworzeniu (makro doklei\u0142o
+        // go do biletu), a nie dopiero przy PATCH-u po wysy\u0142ce. Dop\u00f3ki zak\u0142ada\u0142 go tylko PATCH,
+        // element powstawa\u0142 z materia\u0142em, kt\u00f3rego w katalogu jeszcze nie by\u0142o -- a wi\u0119c i nie
+        // da\u0142o si\u0119 go wybra\u0107 ani u\u017cy\u0107 jako filtr.
+        var name = $"Stal {Guid.NewGuid():N}";
+        Assert.DoesNotContain(name, await MaterialNamesAsync(client));
+
+        var response = await client.PostAsJsonAsync($"/api/projects/{projectId}/nodes", new
+        {
+            name = $"Element {Guid.NewGuid()}",
+            itemType = "part",
+            properties = new { rodzaj = "Wykonywana", material = name },
+            parentId = (Guid?)null,
+        });
+        response.EnsureSuccessStatusCode();
+        var itemId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        Assert.Contains(name, await MaterialNamesAsync(client));
+        var item = await (await client.GetAsync($"/api/items/{itemId}")).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(name, item.GetProperty("properties").GetProperty("material").GetString());
+    }
+
+    [Fact]
     public async Task Znany_material_nie_jest_duplikowany()
     {
         await using var factory = new EasyPDMWebApplicationFactory();

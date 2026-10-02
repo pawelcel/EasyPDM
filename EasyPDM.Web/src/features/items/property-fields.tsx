@@ -50,11 +50,18 @@ function MaterialField({
   value,
   onSave,
   disabled,
+  locked,
   onError,
 }: {
   value: string
   onSave: (key: string, value: string) => void | Promise<void>
   disabled: boolean
+  // Materiał przyszedł z dokumentu CAD (makro dokleiło go do biletu) — pokazujemy go, ale bez
+  // możliwości zmiany. Po wysyłce makro i tak zapisuje go w elemencie z właściwości
+  // EasyPDM_Material, więc wybór zrobiony tutaj zostałby po chwili zdeptany; dawanie wyboru,
+  // który za moment zniknie, było właśnie tym, co myliło. Świadomą zmianę robi się na JUŻ
+  // utworzonym elemencie, gdzie to pole jest normalnie edytowalne.
+  locked?: boolean
   onError?: (message: string | null) => void
 }) {
   const { t } = useLanguage()
@@ -108,6 +115,19 @@ function MaterialField({
       (m) => (!groupFilter || m.group === groupFilter) && (!subgroupFilter || m.subgroup === subgroupFilter)
     )
     .map((m) => m.name)
+
+  // Celowo NIE jest to wyłączony Combobox: materiału z CAD-a może jeszcze nie być w katalogu w
+  // chwili otwarcia okna (serwer zakłada go dopiero przy zapisie — zob. MaterialCatalog), a
+  // Combobox nie pokazuje wartości, której nie ma na swojej liście, więc pole wyglądałoby na
+  // puste. Zwykły wyłączony Input pokazuje nazwę niezależnie od stanu katalogu.
+  if (locked)
+    return (
+      <>
+        <Label>{t("part.material")}</Label>
+        <Input value={value} disabled readOnly />
+        <Hint>{t("part.materialFromCad")}</Hint>
+      </>
+    )
 
   return (
     <>

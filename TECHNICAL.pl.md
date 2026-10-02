@@ -333,16 +333,26 @@ dziesiętnym.
 Zanim do tego dojdzie, otwierając przeglądarkę w celu utworzenia nowego elementu makro
 przekazuje materiał dokumentu w deep-linku (`&material=`), odczytany wprost z API CAD-a, a nie
 z `EasyPDM_Material` — w tym momencie nic jeszcze nie zostało zapisane, więc wyrażenie nie
-istnieje. `pending-create-ticket.ts` go odbiera, a `AddNodeDialog` używa jako wartości
-początkowej pola Materiał, dzięki czemu widać go już przy tworzeniu elementu, zamiast żeby
-pojawiał się sam zaraz po wysyłce. Duplikat zachowuje właściwości elementu źródłowego: tam
-wybór był świadomy.
+istnieje. `pending-create-ticket.ts` go odbiera, a `AddNodeDialog` pokazuje go w polu Materiał,
+dzięki czemu widać go już przy tworzeniu elementu, zamiast żeby pojawiał się sam zaraz po
+wysyłce. Duplikat zachowuje właściwości elementu źródłowego: tam wybór był świadomy.
 
-Materiał, którego katalog jeszcze nie zna, zakłada sam `PATCH /properties`
+To pole jest wtedy **tylko do odczytu** (`materialLocked`, przekazywane do `MaterialField`):
+makro i tak zapisuje materiał na elemencie z `EasyPDM_Material` zaraz po wysyłce, więc wybór
+zrobiony tutaj zostałby po chwili nadpisany — i to właśnie dawanie takiego wyboru myliło.
+Świadomą zmianę robi się na już utworzonym elemencie, gdzie pole jest normalnie edytowalne.
+Materiał duplikatu zostaje edytowalny, bo pochodzi z elementu, który ktoś wskazał. Zablokowany
+wariant to zwykły wyłączony `Input`, a nie wyłączony `Combobox`: materiału może jeszcze nie być
+w katalogu w chwili otwarcia okna, a `Combobox` nie pokazuje wartości spoza swojej listy.
+
+Materiał, którego katalog jeszcze nie zna, zakłada `MaterialCatalog`
 (`INSERT … ON CONFLICT (name) DO NOTHING`, więc dwa makra wysyłające równolegle ten sam nie
-mogą się zderzyć). Makra czytają materiał z dokumentu, a nie z listy wyboru, więc bez tego
-element miałby materiał, którego nie da się ani wybrać ponownie, ani użyć jako filtr.
-Zakładana jest sama nazwa; grupa i podgrupa zostają puste.
+mogą się zderzyć), wołany z **obu** ścieżek, którymi materiał może przyjść: `PATCH /properties`
+(makro po wysyłce) oraz `POST /nodes` (tworzenie, gdzie materiał pochodzi z okna wypełnionego
+przez makro). Dopóki robił to tylko `PATCH`, element utworzony z materiałem z CAD-a nosił
+nazwę, której katalog nie miał aż do zakończenia wysyłki. Makra czytają materiał z dokumentu,
+a nie z listy wyboru, więc bez tego element miałby materiał, którego nie da się ani wybrać
+ponownie, ani użyć jako filtr. Zakładana jest sama nazwa; grupa i podgrupa zostają puste.
 
 ### Logowanie, role i dostęp do projektów
 

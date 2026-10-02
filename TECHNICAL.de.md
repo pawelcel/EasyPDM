@@ -372,14 +372,28 @@ Dezimalkomma eintreffen kann.
 Noch davor übergibt das Makro beim Öffnen des Browsers zum Anlegen eines neuen Elements das
 Material des Dokuments im Deep-Link (`&material=`), direkt aus der CAD-API gelesen und nicht
 aus `EasyPDM_Material` — zu diesem Zeitpunkt wurde noch nichts gespeichert, der Ausdruck
-existiert also nicht. `pending-create-ticket.ts` nimmt es entgegen und `AddNodeDialog`
-verwendet es als Startwert des Feldes Material, sodass es bereits beim Anlegen sichtbar ist,
-statt unmittelbar nach dem Hochladen von selbst aufzutauchen. Ein Duplikat behält die
-Eigenschaften des Quellelements: dort war die Wahl bewusst.
+existiert also nicht. `pending-create-ticket.ts` nimmt es entgegen und `AddNodeDialog` zeigt es
+im Feld Material, sodass es bereits beim Anlegen sichtbar ist, statt unmittelbar nach dem
+Hochladen von selbst aufzutauchen. Ein Duplikat behält die Eigenschaften des Quellelements:
+dort war die Wahl bewusst.
 
-Ein dem Katalog noch unbekanntes Material legt `PATCH /properties` selbst an
+Dieses Feld ist dann **schreibgeschützt** (`materialLocked`, an `MaterialField` durchgereicht):
+Das Makro schreibt das Material ohnehin unmittelbar nach dem Hochladen aus `EasyPDM_Material`
+auf das Element, eine hier getroffene Wahl würde also Augenblicke später überschrieben — und
+genau das Anbieten dieser Wahl war das Verwirrende. Die bewusste Änderung erfolgt am bereits
+angelegten Element, wo das Feld wie gewohnt bearbeitbar ist. Das Material eines Duplikats
+bleibt bearbeitbar, denn es stammt aus einem Element, das jemand ausgewählt hat. Die gesperrte
+Variante ist ein schlichtes deaktiviertes `Input` und keine deaktivierte `Combobox`: Das
+Material steht beim Öffnen des Fensters womöglich noch nicht im Katalog, und eine `Combobox`
+zeigt einen Wert außerhalb ihrer Liste nicht an.
+
+Ein dem Katalog noch unbekanntes Material legt `MaterialCatalog` an
 (`INSERT … ON CONFLICT (name) DO NOTHING`, damit zwei Makros, die dasselbe gleichzeitig
-senden, nicht kollidieren). Die Makros lesen das Material aus dem Dokument statt aus einer
+senden, nicht kollidieren), aufgerufen aus **beiden** Pfaden, die eines mitbringen können:
+`PATCH /properties` (das Makro nach dem Hochladen) und `POST /nodes` (das Anlegen, wo das
+Material aus dem vom Makro vorausgefüllten Fenster stammt). Solange dies nur `PATCH` tat, trug
+ein mit CAD-Material angelegtes Element einen Namen, den der Katalog bis zum Abschluss des
+Hochladens nicht kannte. Die Makros lesen das Material aus dem Dokument statt aus einer
 Liste; ohne dies trüge das Element ein Material, das sich weder erneut auswählen noch als
 Filter nutzen ließe. Angelegt wird nur der Name; Gruppe und Untergruppe bleiben leer.
 

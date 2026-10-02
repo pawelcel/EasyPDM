@@ -340,16 +340,29 @@ locale decimal comma.
 Before any of that, when the macro opens the browser to create a new item it passes the
 document's material along in the deep link (`&material=`), read straight from the CAD API
 rather than from `EasyPDM_Material` — at that point nothing has been saved yet, so the
-expression does not exist. `pending-create-ticket.ts` picks it up and `AddNodeDialog` uses it
-as the Material field's starting value, so the value is visible while the item is being
-created instead of appearing by itself right after the upload. A duplicate keeps the source
-item's properties: that choice was explicit.
+expression does not exist. `pending-create-ticket.ts` picks it up and `AddNodeDialog` shows it
+in the Material field, so the value is visible while the item is being created instead of
+appearing by itself right after the upload. A duplicate keeps the source item's properties:
+that choice was explicit.
 
-A material the catalog does not know yet is inserted by `PATCH /properties` itself
+That field is then **read-only** (`materialLocked`, handed down to `MaterialField`): the macro
+writes the material onto the item from `EasyPDM_Material` right after the upload anyway, so a
+choice made here would be overwritten moments later — offering one was the confusing part. The
+deliberate change is made on the item once it exists, where the field is editable as usual. A
+duplicate's material stays editable, because it was copied from an item someone picked. The
+locked variant is a plain disabled `Input`, not a disabled `Combobox`: the material may not be
+in the catalog yet when the dialog opens, and a `Combobox` shows nothing for a value outside
+its list.
+
+A material the catalog does not know yet is inserted by `MaterialCatalog`
 (`INSERT … ON CONFLICT (name) DO NOTHING`, so two macros sending the same one concurrently
-cannot collide). The macros read the material off the document rather than from a list, so
-without this the item would carry a material that could neither be picked again nor used as
-a filter. Only the name is created; group and subgroup stay empty.
+cannot collide), called from **both** paths that can carry one: `PATCH /properties` (the macro
+after an upload) and `POST /nodes` (creation, where the material comes from the dialog the
+macro pre-filled). While only `PATCH` did it, an item created with a CAD material carried a
+name the catalog did not have until the upload landed. The macros read the material off the
+document rather than from a list, so without this the item would carry a material that could
+neither be picked again nor used as a filter. Only the name is created; group and subgroup
+stay empty.
 
 ### Login, roles, and project access
 
