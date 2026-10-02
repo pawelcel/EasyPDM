@@ -185,6 +185,23 @@ Private Const SW_SCREENSHOT_BACKGROUND As Long = 3355443   ' RGB(51, 51, 51)
 Private Const SW_SYSPREF_BACKGROUND_APPEARANCE As Long = 305
 Private Const SW_BACKGROUND_APPEARANCE_PLAIN As Long = 0     ' 3 = tlo sceny dokumentu
 
+' Opcje eksportu obrazu (Opcje systemowe -> Eksport -> TIF/PSD/JPG/PNG). Zawiera m.in. 'Usun
+' tlo', ktore dziala WYLACZNIE dla PNG i daje plik z przezroczystym tlem -- a przezroczysty
+' zrzut dopasowuje sie do motywu aplikacji sam, zamiast niesc zapieczony kolor.
+'
+' Ustalone empirycznie, tak samo jak 305: wlaczenie 'Usun tlo' w Opcjach zmienilo DOKLADNIE
+' jedna wartosc, 9: 1 -> 50. To nie jest przelacznik 0/1 -- 50 = 2+16+32, wiec 9 jest polem
+' bitowym pakujacym kilka opcji eksportu naraz, a ktory bit odpowiada za przezroczystosc,
+' tego stad nie widac. Zapisujemy wiec CALA wartosc, o ktorej wiadomo, ze daje przezroczyste
+' tlo, i przywracamy poprzednia. Na innej maszynie moze to na chwile podmienic pozostale
+' opcje eksportu obrazu -- dlatego przywrocenie jest tu rownie wazne jak przy kolorach.
+'
+' Publiczne zrodla twierdza, ze tej opcji NIE da sie ruszyc z API. Pomiar na zywym
+' SolidWorksie pokazal, ze da sie -- tamte opisy dotyczyly zapisu do rejestru, nie
+' SetUserPreferenceIntegerValue.
+Private Const SW_SYSPREF_IMAGE_EXPORT_OPTIONS As Long = 9
+Private Const SW_IMAGE_EXPORT_REMOVE_BACKGROUND As Long = 50
+
 ' Win32 API used ONLY by WaitForTicket (below) to poll the ticket endpoint while keeping
 ' SolidWorks responsive and letting the user cancel with Escape -- this module has no
 ' UserForm (see file header), so there is no button to click during the wait; Escape is
@@ -2296,20 +2313,26 @@ Sub UploadModelImageAttachment(ByVal swModel As Object, ByVal itemId As String, 
     ' dokumentu -- zostalyby wlaczone po zamknieciu programu, wiec zapamietujemy poprzednie
     ' wartosci i przywracamy je NATYCHMIAST po zapisie pliku, jeszcze przed wysylka (ta moze
     ' trwac i moze sie wywrocic, a uzytkownik ma w tym czasie pracowac na swoim tle).
-    ' Tryb tla MUSI isc pierwszy: dopoki stoi na scenie dokumentu, kolory ponizej nie maja
+    ' Przezroczyste tlo jest WLASCIWYM celem -- zrzut dopasowuje sie wtedy do motywu aplikacji
+    ' sam. Kolory ponizej zostaja mimo to jako zabezpieczenie: jesli zapis opcji eksportu sie
+    ' nie powiedzie (starsza wersja, inne pole bitowe), tlo bedzie przynajmniej jednolite
+    ' i ciemne zamiast przypadkowego tla roboczego uzytkownika.
+    '
+    ' Tryb tla MUSI isc przed kolorami: dopoki stoi na scenie dokumentu, kolory nie maja
     ' zadnego znaczenia. Kolory gradientu ustawiamy mimo wymuszenia trybu 'jednolite' -- sa
     ' tanie, a chronia przed sytuacja, w ktorej zapis trybu sie nie powiedzie.
-    Dim bgPref(0 To 3) As Long
-    Dim bgWant(0 To 3) As Long
-    Dim bgPrev(0 To 3) As Long
-    Dim bgChanged(0 To 3) As Boolean
-    bgPref(0) = SW_SYSPREF_BACKGROUND_APPEARANCE:  bgWant(0) = SW_BACKGROUND_APPEARANCE_PLAIN
-    bgPref(1) = SW_SYSCOLOR_VIEWPORT_BACKGROUND:   bgWant(1) = SW_SCREENSHOT_BACKGROUND
-    bgPref(2) = SW_SYSCOLOR_TOP_GRADIENT:          bgWant(2) = SW_SCREENSHOT_BACKGROUND
-    bgPref(3) = SW_SYSCOLOR_BOTTOM_GRADIENT:       bgWant(3) = SW_SCREENSHOT_BACKGROUND
+    Dim bgPref(0 To 4) As Long
+    Dim bgWant(0 To 4) As Long
+    Dim bgPrev(0 To 4) As Long
+    Dim bgChanged(0 To 4) As Boolean
+    bgPref(0) = SW_SYSPREF_IMAGE_EXPORT_OPTIONS:   bgWant(0) = SW_IMAGE_EXPORT_REMOVE_BACKGROUND
+    bgPref(1) = SW_SYSPREF_BACKGROUND_APPEARANCE:  bgWant(1) = SW_BACKGROUND_APPEARANCE_PLAIN
+    bgPref(2) = SW_SYSCOLOR_VIEWPORT_BACKGROUND:   bgWant(2) = SW_SCREENSHOT_BACKGROUND
+    bgPref(3) = SW_SYSCOLOR_TOP_GRADIENT:          bgWant(3) = SW_SCREENSHOT_BACKGROUND
+    bgPref(4) = SW_SYSCOLOR_BOTTOM_GRADIENT:       bgWant(4) = SW_SCREENSHOT_BACKGROUND
 
     Dim bgIndex As Long
-    For bgIndex = 0 To 3
+    For bgIndex = 0 To 4
         bgChanged(bgIndex) = False
         Err.Clear
         bgPrev(bgIndex) = swApp.GetUserPreferenceIntegerValue(bgPref(bgIndex))
@@ -2331,7 +2354,7 @@ Sub UploadModelImageAttachment(ByVal swModel As Object, ByVal itemId As String, 
 
     ' Przywrocenie tla PRZED jakimkolwiek wyjsciem z procedury -- takze tym ponizej, gdy
     ' eksport sie nie powiodl. Inaczej nieudany zrzut zostawialby uzytkownika z czarnym tlem.
-    For bgIndex = 0 To 3
+    For bgIndex = 0 To 4
         If bgChanged(bgIndex) Then swApp.SetUserPreferenceIntegerValue bgPref(bgIndex), bgPrev(bgIndex)
     Next bgIndex
     Err.Clear
