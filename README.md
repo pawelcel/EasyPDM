@@ -110,7 +110,7 @@ Installation and details:
 properties, no files), or attach a new version to an already-existing item. You choose,
 confirm in the browser — the macro detects completion on its own and finishes the upload
 (renames the local file to the PDM number, attaches the file, and — if you tick the boxes
-in the browser — exports a STEP and/or PDF preview). For a whole assembly with new,
+in the browser — exports a STEP and/or a PDF, and saves a picture of the model). For a whole assembly with new,
 not-yet-uploaded components: the macro detects them on its own and walks through each one
 before sending the main file. Each of those components can be created without assigning it
 to any project, so that a part which only exists as a BOM entry does not clutter the
@@ -220,6 +220,32 @@ something different. Worth setting before the first real item, then. The one exc
 an early mistake: correcting a Part's kind also corrects its prefix — but only while its
 CAD/drawing/PDF/3D slots are still empty. Once a file is in one of them the kind is fixed
 too, since the file on disk already carries the number that the kind decides.
+
+### The model preview
+
+Above an item's properties sits a preview box with a **2D/3D** switch: 2D shows the PDF
+drawing, 3D shows a **picture of the model** that the CAD macro takes when you upload.
+
+That picture replaces what used to happen here. The STEP file was downloaded and rendered in
+your browser every time you opened an item — which produced a still image anyway, since there
+was never anything to rotate. It was slow, it got slower the more detailed the model was
+(regardless of how small the file looked), and it made the whole machine struggle when the
+server ran on the same computer. Taking one picture at upload time, on the machine that
+already has the model open, does the same job once instead of over and over.
+
+Two things follow from that:
+
+- **The picture comes with the STEP.** If you clear "Export and upload STEP model" in the
+  upload window, there is no picture either, and the box tells you so.
+- **Deleting the STEP deletes the picture.** It only ever depicted that model.
+
+The STEP file itself is unchanged — exported, uploaded and downloadable exactly as before. It
+simply no longer has to be rendered to show you what the part looks like. Items uploaded
+before this version keep their STEP but show no picture until you send them up again.
+
+For large models the upload window warns you before you confirm: exporting a STEP happens
+inside your CAD program, and for a big assembly that can take minutes with the program busy
+throughout.
 
 ### Status and revisions
 

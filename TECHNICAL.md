@@ -142,6 +142,17 @@ first-class catalog entry (its own number, revisions, history, owner, attachment
 join any other assembly later, so it is never deleted as a side effect of deleting an
 assembly it happened to be used in. Within a deleted Folder subtree, anything that also
 has a parent outside it survives as well (see `survivors` in `ItemEndpoints.cs`).
+
+Deleting completely also removes the item's **files from storage**, not just its rows.
+`ON DELETE CASCADE` clears the database but never touches the disk, so the endpoint collects
+every path *before* the `DELETE`: the item's own file, everything in `item_attachments` (CAD
+file, drawing, PDF, STEP, preview picture, ordinary attachments) and the attachments hanging
+off its client verifications — those live in their own table keyed by verification rather
+than by item, which is exactly why they were missed at first and left behind with nothing
+remaining to find them by. Deleting a Project does the same for `project_attachments`, after
+the transaction commits, so a failed delete cannot take the files of a project that still
+exists.
+
 A Part/Assembly can also be **duplicated** (the copy
 gets a new number, a fresh status and owner) — from the tree, the copy lands right
 under the original.

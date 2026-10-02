@@ -156,7 +156,19 @@ Baugruppe ist ein eigenständiger Katalogeintrag (eigene Nummer, Revisionen, His
 Eigentümer, Anhänge) und kann später jeder anderen Baugruppe beitreten, wird also nie als
 Nebeneffekt gelöscht. Innerhalb eines gelöschten Ordner-Teilbaums überlebt zusätzlich
 alles, was auch einen Elternteil außerhalb davon hat (siehe `survivors` in
-`ItemEndpoints.cs`). Ein Teil/eine Baugruppe kann auch **dupliziert** werden (die Kopie
+`ItemEndpoints.cs`).
+
+Das vollständige Löschen entfernt auch die **Dateien des Elements aus dem Speicher**, nicht nur
+seine Zeilen. `ON DELETE CASCADE` räumt die Datenbank auf, rührt die Festplatte aber nie an,
+deshalb sammelt der Endpunkt alle Pfade *vor* dem `DELETE`: die eigene Datei des Elements, den
+gesamten Inhalt von `item_attachments` (CAD-Datei, Zeichnung, PDF, STEP, Vorschaubild, gewöhnliche
+Anhänge) sowie die Anhänge an seinen Kundenprüfungen — diese liegen in einer eigenen Tabelle, die
+nach Prüfung und nicht nach Element verschlüsselt ist, und wurden genau deshalb zunächst übersehen
+und blieben ohne jede Zeile zurück, über die man sie hätte finden können. Das Löschen eines
+Projekts tut dasselbe mit `project_attachments`, und zwar nach dem Commit der Transaktion, damit
+ein fehlgeschlagenes Löschen nicht die Dateien eines weiterhin bestehenden Projekts mitnimmt.
+
+Ein Teil/eine Baugruppe kann auch **dupliziert** werden (die Kopie
 erhält eine neue Nummer, einen frischen Status und Eigentümer) — im Baum landet die Kopie
 direkt unter dem Original.
 

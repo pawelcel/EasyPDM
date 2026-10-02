@@ -110,7 +110,7 @@ Instalacja i szczegóły:
 właściwości, bez plików) czy dogranie nowej wersji do już istniejącego elementu. Wybierasz,
 zatwierdzasz w przeglądarce — makro samo wykrywa zakończenie i kończy wysyłkę (zmienia
 nazwę lokalnego pliku na numer z PDM, dogrywa plik i — jeśli zaznaczysz to w przeglądarce —
-eksportuje podgląd STEP i/lub PDF). Dla całego złożenia z nowymi, jeszcze niewysłanymi
+eksportuje STEP i/lub PDF, i zapisuje zdjęcie modelu). Dla całego złożenia z nowymi, jeszcze niewysłanymi
 komponentami: makro samo je wykrywa i przeprowadza przez każdy z osobna, zanim wyśle główny
 plik. Każdy taki komponent można utworzyć bez przypisania do jakiegokolwiek projektu — żeby
 część istniejąca wyłącznie jako pozycja w BOM nie zaśmiecała drzewka projektu.
@@ -221,6 +221,32 @@ mówiące coś innego. Warto więc ustawić to przed pierwszym prawdziwym elemen
 wyjątek to pomyłka złapana wcześnie: poprawienie rodzaju Części poprawia też jej prefiks —
 ale tylko dopóki jej pola CAD/rysunek/PDF/3D są puste. Gdy w którymś leży już plik, rodzaj
 też jest przesądzony, bo plik na dysku nosi numer, o którym rodzaj decyduje.
+
+### Podgląd modelu
+
+Nad właściwościami elementu jest box podglądu z przełącznikiem **2D/3D**: 2D pokazuje rysunek
+PDF, a 3D — **zdjęcie modelu**, które makro CAD robi w momencie wysyłki.
+
+To zdjęcie zastępuje to, co działo się tu wcześniej. Plik STEP był pobierany i renderowany w
+przeglądarce przy każdym otwarciu elementu — i tak dając nieruchomy obraz, bo nigdy nie było
+czym obracać. Było to wolne, tym wolniejsze, im bardziej szczegółowy model (niezależnie od
+tego, jak mały wydawał się plik), i potrafiło zamulić całą maszynę, gdy serwer stał na tym
+samym komputerze. Zrobienie jednego zdjęcia przy wysyłce, na maszynie, która i tak ma model
+otwarty, załatwia to samo raz zamiast w kółko.
+
+Wynikają z tego dwie rzeczy:
+
+- **Zdjęcie przychodzi razem ze STEP-em.** Jeśli odznaczysz „Eksportuj i wyślij model STEP"
+  w oknie wysyłki, zdjęcia też nie będzie — i box wprost to napisze.
+- **Usunięcie STEP-a kasuje zdjęcie.** Przedstawiało wyłącznie ten model.
+
+Sam plik STEP się nie zmienia — eksportuje się, wgrywa i da się pobrać dokładnie jak dotąd.
+Po prostu nie musi już być renderowany, żebyś zobaczył, jak część wygląda. Elementy wysłane
+przed tą wersją zachowują swój STEP, ale nie mają zdjęcia do czasu ponownej wysyłki.
+
+Przy dużych modelach okno wysyłki ostrzega, zanim zatwierdzisz: eksport STEP-a robi Twój
+program CAD i przy dużym złożeniu potrafi to zająć minuty, z programem zajętym przez cały ten
+czas.
 
 ### Status i rewizje
 

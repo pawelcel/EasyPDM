@@ -120,7 +120,7 @@ eines vorhandenen (kopiert dessen Eigenschaften, ohne Dateien) oder eine neue Ve
 ein bereits vorhandenes Element anhängen. Sie wählen, bestätigen im Browser — das Makro
 erkennt den Abschluss selbstständig und beendet den Upload (benennt die lokale Datei in
 die PDM-Nummer um, hängt die Datei an und exportiert — wenn Sie es im Browser ankreuzen —
-eine STEP- und/oder PDF-Vorschau). Für eine ganze Baugruppe mit neuen, noch nicht
+ein STEP und/oder ein PDF und speichert ein Bild des Modells). Für eine ganze Baugruppe mit neuen, noch nicht
 hochgeladenen Komponenten: Das Makro erkennt sie selbstständig und führt Sie durch jede
 einzelne, bevor die Hauptdatei gesendet wird. Jede dieser Komponenten lässt sich anlegen,
 ohne sie einem Projekt zuzuordnen — damit ein Teil, das nur als Stücklistenposition
@@ -240,6 +240,34 @@ ein früh bemerkter Fehler: Wird die Art eines Teils korrigiert, wird auch sein 
 korrigiert — aber nur, solange seine Felder CAD/Zeichnung/PDF/3D leer sind. Liegt in einem
 davon bereits eine Datei, steht auch die Art fest, denn die Datei auf der Festplatte trägt
 die Nummer, über die die Art entscheidet.
+
+### Die Modellvorschau
+
+Über den Eigenschaften eines Elements liegt ein Vorschaufeld mit einem **2D/3D**-Schalter: 2D
+zeigt die PDF-Zeichnung, 3D ein **Bild des Modells**, das das CAD-Makro beim Hochladen aufnimmt.
+
+Dieses Bild ersetzt das, was hier früher geschah. Die STEP-Datei wurde bei jedem Öffnen eines
+Elements heruntergeladen und im Browser gerendert — und ergab ohnehin ein unbewegtes Bild, denn
+es gab nie etwas zu drehen. Das war langsam, wurde umso langsamer, je detaillierter das Modell
+war (unabhängig davon, wie klein die Datei wirkte), und ließ den ganzen Rechner ins Stocken
+geraten, wenn der Server auf demselben Computer lief. Ein Bild beim Hochladen aufzunehmen, auf
+dem Rechner, der das Modell ohnehin geöffnet hat, erledigt dieselbe Aufgabe einmal statt immer
+wieder.
+
+Daraus folgen zwei Dinge:
+
+- **Das Bild kommt mit dem STEP.** Entfernen Sie im Upload-Fenster das Häkchen bei
+  „STEP-Modell exportieren und hochladen", gibt es auch kein Bild — und das Feld sagt Ihnen das.
+- **Das Löschen des STEP löscht das Bild.** Es stellte nur dieses Modell dar.
+
+Die STEP-Datei selbst bleibt unverändert — sie wird exportiert, hochgeladen und kann genau wie
+bisher heruntergeladen werden. Sie muss nur nicht mehr gerendert werden, damit Sie sehen, wie
+das Teil aussieht. Vor dieser Version hochgeladene Elemente behalten ihr STEP, zeigen aber kein
+Bild, bis sie erneut hochgeladen werden.
+
+Bei großen Modellen warnt das Upload-Fenster, bevor Sie bestätigen: Der STEP-Export läuft in
+Ihrem CAD-Programm, und bei einer großen Baugruppe kann das Minuten dauern, währenddessen ist
+das Programm belegt.
 
 ### Status und Revisionen
 

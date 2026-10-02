@@ -138,6 +138,16 @@ zostają, tracąc jedynie tę jedną relację. Część/Złożenie to samodzieln
 innego złożenia także później, więc nigdy nie jest kasowane jako efekt uboczny usunięcia
 złożenia, w którym akurat było użyte. Wewnątrz usuwanego poddrzewa Folderów przeżywa
 dodatkowo wszystko, co ma rodzica także poza nim (zob. `survivors` w `ItemEndpoints.cs`).
+
+Całkowite usunięcie kasuje też **pliki elementu z magazynu**, nie tylko jego wiersze.
+`ON DELETE CASCADE` czyści bazę, ale dysku nie rusza, więc endpoint zbiera wszystkie ścieżki
+*przed* `DELETE`: własny plik elementu, całą zawartość `item_attachments` (plik CAD, rysunek,
+PDF, STEP, zrzut podglądu, zwykłe załączniki) oraz załączniki wiszące przy jego weryfikacjach
+klienta — te leżą we własnej tabeli, kluczowanej weryfikacją, a nie elementem, i właśnie
+dlatego zostały najpierw przeoczone i zostawały na dysku, bez żadnego wiersza, po którym dałoby
+się je odnaleźć. Usunięcie Projektu robi to samo z `project_attachments`, już po zatwierdzeniu
+transakcji, żeby nieudane usunięcie nie zabrało plików projektu, który nadal istnieje.
+
 Część/Złożenie da się też **zduplikować** (kopia dostaje nowy numer, świeży status i
 właściciela) — z poziomu drzewka kopia ląduje zaraz pod oryginałem.
 
