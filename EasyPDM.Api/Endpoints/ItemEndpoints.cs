@@ -1495,6 +1495,26 @@ static class ItemEndpoints
                     filePaths.Add(reader.GetString(0));
             }
 
+            // Weryfikacja klienta ma WLASNA tabele zalacznikow (item_client_verification_attachments,
+            // podpieta pod item_client_verifications, nie pod items) i wlasne pliki w magazynie.
+            // W bazie znikaja kaskada, ale pliki -- tak samo jak wyzej -- trzeba skasowac jawnie,
+            // inaczej zostawaly na dysku na zawsze: zaden ekran ich juz nie pokazuje, a wiersza,
+            // po ktorym mozna by je odnalezc, tez juz nie ma. Zapytanie MUSI polecic przed
+            // DELETE FROM items.
+            await using (var verificationFilesCmd = new NpgsqlCommand(
+                """
+                SELECT a.file_path
+                FROM item_client_verification_attachments a
+                JOIN item_client_verifications v ON v.id = a.verification_id
+                WHERE v.item_id = ANY(@ids);
+                """, conn))
+            {
+                verificationFilesCmd.Parameters.AddWithValue("ids", idsToDelete.ToArray());
+                await using var reader = await verificationFilesCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    filePaths.Add(reader.GetString(0));
+            }
+
             await using (var deleteCmd = new NpgsqlCommand("DELETE FROM items WHERE id = ANY(@ids);", conn))
             {
                 deleteCmd.Parameters.AddWithValue("ids", idsToDelete.ToArray());

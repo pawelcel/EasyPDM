@@ -23,6 +23,16 @@ All notable changes to EasyPDM are documented in this file.
   in your CAD program before anything is sent, and at that size it can take minutes with the
   program busy throughout — worth knowing before confirming the window, not after.
 
+### Fixed
+- **Deleting an item completely now also removes its client-verification files.** Everything
+  else it owns — the CAD file, the drawing, the PDF, the STEP, the preview picture and any
+  ordinary attachment — was already deleted from storage, but files attached to a client
+  verification were not: their rows vanished with the item while the files stayed behind,
+  with nothing left to find them by.
+- **Deleting a project now also removes the project's own attachments** (the offer and order
+  files) from storage, for the same reason. Items are unaffected: deleting a project does not
+  delete them, it only detaches them, so their files stay in use.
+
 ### Removed
 - **STEP, IGES and STL files are no longer previewable in the browser**, in the item box or in
   the attachment preview window; they get a download button. Items uploaded before this

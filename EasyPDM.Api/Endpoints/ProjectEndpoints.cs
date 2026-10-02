@@ -231,6 +231,21 @@ static class ProjectEndpoints
                     assignedUserIds.Add(reader.GetGuid(0));
             }
 
+            // Zalaczniki projektu (oferta/zlecenie i zwykle) znikaja z bazy kaskada, ale ich pliki
+            // w magazynie trzeba skasowac jawnie -- tak samo jak przy calkowitym usunieciu elementu
+            // (zob. ItemEndpoints). Sciezki zbieramy PRZED DELETE, bo potem nie ma juz wierszy, po
+            // ktorych mozna by te pliki odnalezc. Elementow to nie dotyczy: projekt ich nie kasuje,
+            // tylko odpina (UPDATE ponizej), wiec ich pliki zostaja uzywane.
+            var attachmentPaths = new List<string>();
+            await using (var pathsCmd = new NpgsqlCommand(
+                "SELECT file_path FROM project_attachments WHERE project_id = @id;", conn))
+            {
+                pathsCmd.Parameters.AddWithValue("id", id);
+                await using var reader = await pathsCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    attachmentPaths.Add(reader.GetString(0));
+            }
+
             await using (var tx = await conn.BeginTransactionAsync())
             {
                 await using (var detachCmd = new NpgsqlCommand("UPDATE items SET project_id = NULL WHERE project_id = @id;", conn, tx))
@@ -246,6 +261,13 @@ static class ProjectEndpoints
                 }
 
                 await tx.CommitAsync();
+            }
+
+            // Dopiero po udanym commicie -- nieudane usuniecie nie moze zabrac plikow projektu,
+            // ktory nadal istnieje.
+            foreach (var path in attachmentPaths)
+            {
+                try { File.Delete(path); } catch (IOException) { /* magazyn i tak jest sierocy -- nie blokujemy usuniecia */ }
             }
 
             foreach (var userId in assignedUserIds)
