@@ -28,6 +28,11 @@ type PendingTicket = {
   // w oknie dodawania. Bez tego pole startuje puste, nie wiadomo co wpisać, a po wysyłce
   // materiał z CAD-a i tak się pojawia — jakby wziął się znikąd.
   material?: string
+  // Rozmiar dokumentu CAD w bajtach, odczytany przez makro z pliku na dysku. Służy TYLKO do
+  // ostrzeżenia przy opcji eksportu STEP: dla dużych modeli ten eksport robi sam CAD i potrafi
+  // trwać bardzo długo, a użytkownik nie ma o tym skąd wiedzieć, zanim zatwierdzi okno.
+  // Serwer tej liczby nie zna -- w tym momencie nic jeszcze nie zostało zapisane ani wysłane.
+  documentSize?: number
 } | null
 
 function readFromUrl(): PendingTicket {
@@ -39,6 +44,8 @@ function readFromUrl(): PendingTicket {
   const suggestedItemNumberRaw = params.get("suggestedItemNumber")
   const suggestedItemNumber = suggestedItemNumberRaw ? Number(suggestedItemNumberRaw) : undefined
   const material = params.get("material") ?? undefined
+  const documentSizeRaw = params.get("documentSize")
+  const documentSize = documentSizeRaw ? Number(documentSizeRaw) : undefined
   window.history.replaceState(null, "", window.location.pathname)
   return {
     ticket,
@@ -46,6 +53,7 @@ function readFromUrl(): PendingTicket {
     name,
     suggestedItemNumber: Number.isFinite(suggestedItemNumber) ? suggestedItemNumber : undefined,
     material: material || undefined,
+    documentSize: Number.isFinite(documentSize) && documentSize! > 0 ? documentSize : undefined,
   }
 }
 

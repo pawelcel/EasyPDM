@@ -2,6 +2,34 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.5]
+
+### Changed
+- **The 3D preview is now a picture taken by the CAD macro, not a STEP rendered in your
+  browser.** Opening an item used to download its STEP file, parse it with OpenCascade
+  compiled to WebAssembly, tessellate every surface and compute the edges of every solid —
+  all to produce a **still image**: there was never anything to rotate or drag. That work was
+  repeated on every item, for every user, on top of a 7.6 MB WebAssembly binary each browser
+  had to download and compile. It also did not scale with the STEP file's size but with the
+  model's complexity, so a 40 kB part full of fillets could bring a machine to a crawl. The
+  macros now save a PNG of the model at upload time and send it along; the browser just shows
+  it. The published app is **7.8 MB smaller**.
+- **The STEP file itself is unchanged** — still exported, still uploaded, still there to
+  download. It simply no longer drives the display.
+- **Deleting the STEP also deletes its picture.** The screenshot exists only to depict that
+  model, so leaving it behind would fill the store with images nothing shows and nothing can
+  trace back to a model.
+- **A warning appears under the "export STEP" option for models over 10 MB.** That export runs
+  in your CAD program before anything is sent, and at that size it can take minutes with the
+  program busy throughout — worth knowing before confirming the window, not after.
+
+### Removed
+- **STEP, IGES and STL files are no longer previewable in the browser**, in the item box or in
+  the attachment preview window; they get a download button. Items uploaded before this
+  version keep their STEP and show no preview until they are sent up again — there is no
+  renderer left to fall back to, which is the point: keeping one would have meant keeping the
+  7.6 MB dependency for everybody.
+
 ## [0.4.3]
 
 ### Changed

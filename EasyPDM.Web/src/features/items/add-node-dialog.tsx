@@ -43,6 +43,13 @@ import { useLanguage } from "@/i18n/use-language"
 
 type Mode = ItemType | "existing"
 
+// Próg, powyżej którego ostrzegamy, że eksport STEP potrwa. 10 MB to nie jest granica
+// "pliku dużego" w sensie transferu -- sam upload tyle nie boli. Chodzi o to, co robi CAD,
+// ZANIM cokolwiek wyśle: przeliczenie geometrii do STEP-a przy modelu tej wielkości potrafi
+// zająć minuty, a przy złożeniu idzie przez całe drzewo. Użytkownik widzi wtedy tylko
+// "zawieszony" CAD i nie wie, że sam to zlecił tym checkboxem.
+const STEP_SLOW_EXPORT_BYTES = 10 * 1024 * 1024
+
 const MODE_LABEL_KEYS: Record<Mode, TranslationKey> = {
   folder: "itemType.folder",
   part: "itemType.part",
@@ -78,6 +85,7 @@ function AddNodeDialog({
   initialMode,
   initialProperties,
   materialLocked,
+  documentSize,
   ticket,
   onOpenChange,
   onCreated,
@@ -110,6 +118,9 @@ function AddNodeDialog({
   // PendingTicketBanner tylko dla materiału z biletu; materiał skopiowany przez "Duplikuj"
   // został wybrany świadomie i zostaje edytowalny.
   materialLocked?: boolean
+  // Rozmiar dokumentu CAD w bajtach (z biletu makra) -- tylko po to, żeby ostrzec przy opcji
+  // eksportu STEP, że dla dużego modelu potrwa to długo. Zob. STEP_SLOW_EXPORT_BYTES.
+  documentSize?: number
   // Bilet z makra CAD (zob. EasyPDM.FreeCad/EasyPDMUpload.FCMacro) — doklejany do POST
   // /nodes, żeby makro mogło się dowiedzieć (GET /create-tickets/{ticket}), że element
   // powstał. Podawany JAWNIE przez wywołującego (PendingTicketBanner), nie czytany z
@@ -718,6 +729,19 @@ function AddNodeDialog({
                   />
                   {t("addNode.exportStepOptional")}
                 </label>
+                {/* Eksport STEP robi sam CAD, zanim cokolwiek poleci na serwer, i dla dużego
+                    modelu potrafi trwać bardzo długo -- przy złożeniu idzie przez całe drzewo.
+                    Ostrzegamy ZANIM użytkownik zatwierdzi okno, bo potem jest już tylko czekanie
+                    przy zajętym CAD-zie. Ostrzeżenie, nie blokada: czasem ten STEP jest po prostu
+                    potrzebny. Tylko przy ZAZNACZONEJ opcji -- przy odznaczonej nic się nie
+                    eksportuje, więc nie ma przed czym ostrzegać. */}
+                {exportStep && documentSize !== undefined && documentSize > STEP_SLOW_EXPORT_BYTES && (
+                  <Hint>
+                    {t("addNode.exportStepSlowWarning", {
+                      size: Math.round(documentSize / (1024 * 1024)).toString(),
+                    })}
+                  </Hint>
+                )}
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -820,6 +844,19 @@ function AddNodeDialog({
                   />
                   {t("addNode.exportStepOptional")}
                 </label>
+                {/* Eksport STEP robi sam CAD, zanim cokolwiek poleci na serwer, i dla dużego
+                    modelu potrafi trwać bardzo długo -- przy złożeniu idzie przez całe drzewo.
+                    Ostrzegamy ZANIM użytkownik zatwierdzi okno, bo potem jest już tylko czekanie
+                    przy zajętym CAD-zie. Ostrzeżenie, nie blokada: czasem ten STEP jest po prostu
+                    potrzebny. Tylko przy ZAZNACZONEJ opcji -- przy odznaczonej nic się nie
+                    eksportuje, więc nie ma przed czym ostrzegać. */}
+                {exportStep && documentSize !== undefined && documentSize > STEP_SLOW_EXPORT_BYTES && (
+                  <Hint>
+                    {t("addNode.exportStepSlowWarning", {
+                      size: Math.round(documentSize / (1024 * 1024)).toString(),
+                    })}
+                  </Hint>
+                )}
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input
                     type="checkbox"

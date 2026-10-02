@@ -64,8 +64,8 @@ static class AttachmentEndpoints
 
             var role = form["role"].ToString();
             if (role == "") role = null;
-            if (role is not null && role is not ("pdf" or "step" or "cad" or "drawing"))
-                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad', 'drawing' albo puste.");
+            if (role is not null && role is not ("pdf" or "step" or "cad" or "drawing" or "image"))
+                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad', 'drawing', 'image' albo puste.");
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
@@ -142,8 +142,8 @@ static class AttachmentEndpoints
         // "podpiąć" jako załącznik dowolny plik z dysku serwera.
         app.MapPost("/api/items/{itemId:guid}/attachments/register", async (Guid itemId, RegisterAttachmentRequest body, HttpContext ctx) =>
         {
-            if (body.Role is not null && body.Role is not ("pdf" or "step" or "cad" or "drawing"))
-                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad', 'drawing' albo puste.");
+            if (body.Role is not null && body.Role is not ("pdf" or "step" or "cad" or "drawing" or "image"))
+                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad', 'drawing', 'image' albo puste.");
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
@@ -260,9 +260,10 @@ static class AttachmentEndpoints
             Guid? ownerId;
             bool ownerLocked;
             Guid projectId;
+            string? role;
             await using (var selectCmd = new NpgsqlCommand(
                 """
-                SELECT ia.file_path, ia.item_id, ia.file_name, i.item_type, i.status, i.owner_id, i.owner_locked, i.project_id
+                SELECT ia.file_path, ia.item_id, ia.file_name, i.item_type, i.status, i.owner_id, i.owner_locked, i.project_id, ia.preview_role
                 FROM item_attachments ia JOIN items i ON i.id = ia.item_id WHERE ia.id = @id;
                 """, conn))
             {
@@ -279,6 +280,7 @@ static class AttachmentEndpoints
                 ownerId = reader.IsDBNull(5) ? (Guid?)null : reader.GetGuid(5);
                 ownerLocked = reader.GetBoolean(6);
                 projectId = reader.GetGuid(7);
+                role = reader.IsDBNull(8) ? null : reader.GetString(8);
             }
 
             if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, projectId))
@@ -302,6 +304,13 @@ static class AttachmentEndpoints
 
             try { File.Delete(filePath); } catch (IOException) { /* magazyn i tak jest sierocy — nie blokujemy usunięcia rekordu */ }
 
+            // Zrzut modelu (rola "image") istnieje WYŁĄCZNIE po to, żeby pokazać ten model —
+            // powstaje razem ze STEP-em przy wysyłce z CAD-a i bez niego nie ma czego
+            // przedstawiać. Usuwany razem, inaczej zostawałby w bazie i w magazynie obrazek,
+            // którego nic już nie wyświetla ani nie da się z niczym powiązać.
+            if (role == "step")
+                await DeleteRoleAttachmentsAsync(conn, itemId, "image", userId);
+
             return Results.Ok();
         });
     }
@@ -317,9 +326,21 @@ static class AttachmentEndpoints
     private static async Task ReplaceExistingRoleAttachmentAsync(
         NpgsqlConnection conn, Guid itemId, string? role, Guid userId)
     {
-        if (role is not ("pdf" or "step"))
+        // "image" dochodzi do jednoslotowych: zrzut przedstawia BIEŻĄCĄ postać modelu, więc
+        // kolejna wysyłka ma go zastąpić, a nie odkładać obok (inaczej każdy upload zostawiałby
+        // nieosiągalny plik na dysku -- RoleSlot i podgląd biorą pierwszy znaleziony).
+        if (role is not ("pdf" or "step" or "image"))
             return;
 
+        await DeleteRoleAttachmentsAsync(conn, itemId, role, userId);
+    }
+
+    // Kasuje WSZYSTKIE załączniki danej roli na elemencie -- wiersze, pliki w magazynie i wpis
+    // w historii. Używane w dwóch miejscach: przy zastępowaniu slotu nowym plikiem (wyżej)
+    // oraz przy usuwaniu STEP-a, które zabiera ze sobą zrzut modelu (zob. MapDelete).
+    private static async Task DeleteRoleAttachmentsAsync(
+        NpgsqlConnection conn, Guid itemId, string role, Guid userId)
+    {
         var existing = new List<(Guid Id, string FileName, string FilePath)>();
         await using (var selectCmd = new NpgsqlCommand(
             "SELECT id, file_name, file_path FROM item_attachments WHERE item_id = @itemId AND preview_role = @role;", conn))

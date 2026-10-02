@@ -1169,7 +1169,7 @@ Function MaterialNameOf(ByVal model As Object) As String
     On Error GoTo 0
 End Function
 
-Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "") As String
+Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "", Optional ByVal documentSizeBytes As Long = 0) As String
     Dim redirectPath As String
     redirectPath = "/?ticket=" & UrlEncode(ticket)
     If name <> "" Then redirectPath = redirectPath & "&name=" & UrlEncode(name)
@@ -1177,6 +1177,10 @@ Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Opt
     ' bez tego pole startuje puste, uzytkownik nie wie, co wpisac, a po wysylce i tak
     ' pojawia sie material z CAD-a, co wyglada, jakby wzial sie znikad.
     If materialName <> "" Then redirectPath = redirectPath & "&material=" & UrlEncode(materialName)
+    ' Rozmiar dokumentu sluzy WYLACZNIE do ostrzezenia pod opcja eksportu STEP: ten eksport
+    ' robi CAD, zanim cokolwiek poleci na serwer, i przy duzym modelu trwa minuty. Serwer tej
+    ' liczby nie zna -- w tym momencie nic jeszcze nie zostalo zapisane ani wyslane.
+    If documentSizeBytes > 0 Then redirectPath = redirectPath & "&documentSize=" & CStr(documentSizeBytes)
 
     Dim loginTicketResponse As Object
     Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
@@ -1184,6 +1188,21 @@ Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Opt
     loginTicket = JsonGetString(loginTicketResponse, "ticket")
 
     BuildBrowserCreateUrl = GetBaseUrl() & "/auth/browser-login?ticket=" & UrlEncode(loginTicket) & "&redirect=" & UrlEncode(redirectPath)
+End Function
+
+' Rozmiar pliku dokumentu na dysku w bajtach, 0 gdy dokument nie byl jeszcze zapisany (wtedy
+' nie ma czego mierzyc) albo gdy pliku z jakiegos powodu nie da sie odczytac. Uzywane tylko
+' do ostrzezenia o dlugim eksporcie STEP -- blad tutaj nie moze zatrzymac wysylki, wiec
+' wszystko jest polkniete przez On Error Resume Next.
+Function DocumentSizeOf(ByVal swModel As Object) As Long
+    On Error Resume Next
+    DocumentSizeOf = 0
+    Dim path As String
+    path = swModel.GetPathName()
+    If path <> "" Then
+        If Dir(path) <> "" Then DocumentSizeOf = FileLen(path)
+    End If
+    On Error GoTo 0
 End Function
 
 ' Same two-ticket nesting as BuildBrowserCreateUrl above (login-bridge ticket wrapping the
@@ -2208,6 +2227,60 @@ Sub UploadStepAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal 
     LogLine "Uploaded STEP attachment for item " & itemId & " as """ & stepDisplayName & """ (from " & tempPath & ")."
 
     Kill tempPath
+
+    ' Zrzut modelu idzie RAZEM ze STEP-em i tylko z nim: to on jest podgladem tego modelu w
+    ' aplikacji, a bez STEP-a nie mialby czego przedstawiac. Usuniecie STEP-a kasuje go po
+    ' stronie serwera (zob. MapDelete w AttachmentEndpoints.cs), wiec nie zostaja sieroty.
+    UploadModelImageAttachment swModel, itemId, itemNumber, name, revision
+
+    On Error GoTo 0
+End Sub
+
+' Zapisuje widok modelu do PNG i wysyla go jako zalacznik role="image" -- to JEST podglad
+' modelu pokazywany w aplikacji. Wczesniej aplikacja renderowala w przegladarce sam plik STEP
+' (occt-import-js + three.js), zeby otrzymac NIERUCHOMY obraz: bez obracania, jedno
+' renderer.render(). Cena byla placona przy KAZDYM otwarciu elementu, u kazdego uzytkownika --
+' pobranie bryly, teselacja przez OpenCascade w WebAssembly i liczenie krawedzi dla kazdej
+' bryly. Tutaj robi sie to RAZ, na maszynie, ktora i tak ma model otwarty i policzony.
+'
+' Tak samo tolerancyjne na bledy jak UploadStepAttachment/UploadPdfAttachment: wlasciwy plik
+' jest juz dawno wyslany, wiec nieudany zrzut (np. dokument bez widocznej geometrii) nie moze
+' wygladac jak niepowodzenie calej operacji.
+'
+' UNVERIFIED against a live SolidWorks install -- confirm on the first real run:
+'   - ShowNamedView2 "*Isometric" ustawia widok izometryczny; nazwa widoku jest zalezna od
+'     wersji jezykowej SolidWorksa, wiec blad jest tu polykany i zrzut powstaje z biezacego
+'     widoku zamiast z izometrycznego -- gorszy kadr, ale nadal uzyteczny obraz.
+'   - IModelDocExtension.SaveAs do pliku .png: rozdzielczosc bierze sie z ustawien
+'     SolidWorksa (Narzedzia -> Opcje -> Eksport -> PNG), domyslnie z rozmiaru okna.
+Sub UploadModelImageAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long)
+    On Error Resume Next
+
+    ' Ustawiony kadr: izometria i dopasowanie do okna. Bez tego zrzut pokazalby to, na czym
+    ' akurat stal uzytkownik -- zblizenie na fragment albo widok z boku.
+    swModel.ShowNamedView2 "*Isometric", -1
+    swModel.ViewZoomtofit2
+    swModel.GraphicsRedraw2
+
+    Dim tempPath As String
+    tempPath = Environ$("TEMP") & "\EasyPDM_img_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".png"
+
+    Dim saveErrors As Long, saveWarnings As Long
+    Dim saveOk As Boolean
+    saveOk = swModel.Extension.SaveAs(tempPath, 0, SW_SAVE_AS_SILENT, Nothing, saveErrors, saveWarnings)
+    If Not saveOk Or Dir(tempPath) = "" Then
+        LogLine "Model image export failed for item " & itemId & " (SaveAs errors=" & saveErrors & ", warnings=" & saveWarnings & ")."
+        Exit Sub
+    End If
+
+    ' Ta sama konwencja nazwy co STEP/PDF -- "numer (nazwa).REWIZJA.png".
+    Dim imageDisplayName As String
+    imageDisplayName = RecordNameFor(itemId, itemNumber, name) & "." & RevisionLabel(revision) & ".png"
+
+    ApiUploadFile "/items/" & itemId & "/attachments", tempPath, imageDisplayName, "role", "image"
+    LogLine "Uploaded model image for item " & itemId & " as """ & imageDisplayName & """ (from " & tempPath & ")."
+
+    Kill tempPath
     On Error GoTo 0
 End Sub
 
@@ -2793,7 +2866,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
 
             Dim compTicket As String
             compTicket = NewGuid()
-            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel))
+            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel))
 
             Dim compTicketData As Object
             Set compTicketData = WaitForTicket(compTicket)
@@ -3440,7 +3513,7 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
         ' submit_via_browser. See BuildBrowserCreateUrl/WaitForTicket above.
         Dim ticket As String
         ticket = NewGuid()
-        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(swModel))
+        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(swModel), DocumentSizeOf(swModel))
 
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)

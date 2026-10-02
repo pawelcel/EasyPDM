@@ -572,5 +572,8 @@ export interface Attachment {
   fileName: string
   fileSize: number | null
   uploadedAt: string | null
-  role: "pdf" | "step" | "cad" | "drawing" | null
+  // "image" — zrzut modelu zrobiony przez makro CAD przy wysyłce, to on jest podglądem 3D
+  // w panelu elementu (wcześniej renderowaliśmy w tym celu plik STEP w przeglądarce).
+  // Wgrywany RAZEM ze STEP-em i razem z nim kasowany, zob. AttachmentEndpoints.cs.
+  role: "pdf" | "step" | "cad" | "drawing" | "image" | null
 }

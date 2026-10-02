@@ -1192,13 +1192,16 @@ Function MaterialNameOf(ByVal oDoc As Object) As String
     On Error GoTo 0
 End Function
 
-Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "") As String
+Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "", Optional ByVal documentSizeBytes As Long = 0) As String
     Dim redirectPath As String
     redirectPath = "/?ticket=" & UrlEncode(ticket)
     If name <> "" Then redirectPath = redirectPath & "&name=" & UrlEncode(name)
     ' Material jako wartosc poczatkowa pola w przegladarce -- zob. komentarz w makrze
     ' SolidWorks, powod jest ten sam.
     If materialName <> "" Then redirectPath = redirectPath & "&material=" & UrlEncode(materialName)
+    ' Rozmiar dokumentu sluzy WYLACZNIE do ostrzezenia pod opcja eksportu STEP -- zob.
+    ' komentarz w makrze SolidWorks, powod jest ten sam.
+    If documentSizeBytes > 0 Then redirectPath = redirectPath & "&documentSize=" & CStr(documentSizeBytes)
 
     Dim loginTicketResponse As Object
     Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
@@ -1207,6 +1210,21 @@ Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Opt
 
     BuildBrowserCreateUrl = GetBaseUrl() & "/auth/browser-login?ticket=" & UrlEncode(loginTicket) & "&redirect=" & UrlEncode(redirectPath)
 End Function
+
+' Rozmiar pliku dokumentu na dysku w bajtach, 0 gdy dokument nie byl jeszcze zapisany albo
+' pliku nie da sie odczytac. Tylko do ostrzezenia o dlugim eksporcie STEP -- blad tutaj nie
+' moze zatrzymac wysylki.
+Function DocumentSizeOf(ByVal oDoc As Object) As Long
+    On Error Resume Next
+    DocumentSizeOf = 0
+    Dim path As String
+    path = oDoc.FullFileName
+    If path <> "" Then
+        If Dir(path) <> "" Then DocumentSizeOf = FileLen(path)
+    End If
+    On Error GoTo 0
+End Function
+
 
 ' Same two-ticket nesting as BuildBrowserCreateUrl above (login-bridge ticket wrapping the
 ' real redirect), but for the "pick which item this drawing belongs to" popup -- used when
@@ -2415,6 +2433,52 @@ Sub UploadStepAttachment(ByVal oDoc As Object, ByVal itemId As String, ByVal ite
     LogLine "Uploaded STEP attachment for item " & itemId & " as """ & stepDisplayName & """ (from " & tempPath & ")."
 
     Kill tempPath
+
+    ' Zrzut modelu idzie RAZEM ze STEP-em i tylko z nim -- zob. komentarz w makrze SolidWorks.
+    UploadModelImageAttachment oDoc, itemId, itemNumber, name, revision
+
+    On Error GoTo 0
+End Sub
+
+' Zapisuje widok modelu do PNG i wysyla go jako zalacznik role="image" -- to JEST podglad
+' modelu w aplikacji. Wczesniej aplikacja renderowala plik STEP w przegladarce, zeby
+' otrzymac nieruchomy obraz; teraz robi sie to raz, tutaj, na maszynie z otwartym modelem.
+' Zob. rownolegly UploadModelImageAttachment w makrze SolidWorks.
+'
+' UNVERIFIED against a live Inventor install -- confirm on the first real run:
+'   - Camera.SaveAsBitmap(path, width, height) zapisuje PNG, gdy sciezka ma rozszerzenie
+'     .png (starsze wersje potrafia zapisac BMP niezaleznie od rozszerzenia -- wtedy serwer
+'     dostanie plik BMP pod nazwa .png i przegladarka go NIE wyswietli; w takim razie
+'     zmienic rozszerzenie na .bmp i dodac 'bmp' do previewKindOf po stronie web).
+'   - kIsoTopRightViewOrientation = 10796 (ViewOrientationEnum).
+Sub UploadModelImageAttachment(ByVal oDoc As Object, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long)
+    On Error Resume Next
+
+    Dim tempPath As String
+    tempPath = ExportTempDirFor(oDoc) & "EasyPDM_img_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".png"
+
+    ' Ustawiony kadr: izometria i dopasowanie do okna, zeby zrzut nie zalezal od tego, na czym
+    ' akurat stal uzytkownik.
+    Dim oCamera As Object
+    Set oCamera = InvApp.ActiveView.Camera
+    oCamera.ViewOrientationType = 10796
+    oCamera.Fit
+    oCamera.Apply
+
+    oCamera.SaveAsBitmap tempPath, 1200, 900
+    If Dir(tempPath) = "" Then
+        LogLine "Model image export failed for item " & itemId & "."
+        Exit Sub
+    End If
+
+    ' Ta sama konwencja nazwy co STEP/PDF -- "numer (nazwa).REWIZJA.png".
+    Dim imageDisplayName As String
+    imageDisplayName = RecordNameFor(itemId, itemNumber, name) & "." & RevisionLabel(revision) & ".png"
+
+    ApiUploadFile "/items/" & itemId & "/attachments", tempPath, imageDisplayName, "role", "image"
+    LogLine "Uploaded model image for item " & itemId & " as """ & imageDisplayName & """ (from " & tempPath & ")."
+
+    Kill tempPath
     On Error GoTo 0
 End Sub
 
@@ -2944,7 +3008,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
 
             Dim compTicket As String
             compTicket = NewGuid()
-            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel))
+            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel))
 
             Dim compTicketData As Object
             Set compTicketData = WaitForTicket(compTicket)
@@ -3714,7 +3778,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         ' this macro family. See BuildBrowserCreateUrl/WaitForTicket above.
         Dim ticket As String
         ticket = NewGuid()
-        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(oDoc))
+        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(oDoc), DocumentSizeOf(oDoc))
 
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)

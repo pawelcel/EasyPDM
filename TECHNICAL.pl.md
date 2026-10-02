@@ -294,8 +294,8 @@ co `revisionLabel`, żeby frontend i trzy makra CAD nigdy nie składały tego sa
 nie rozjechały).
 
 Jedyny wyjątek to pomyłka złapana wcześnie: zmiana rodzaju Części/Złożenia przelicza prefiks
-dopóty, dopóki element nie ma załącznika w żadnym z czterech wyróżnionych pól (`preview_role`
-= `cad`, `drawing`, `pdf`, `step`). To są pliki, których nazwy makra wyprowadzają z numeru;
+dopóty, dopóki element nie ma załącznika w żadnym z wyróżnionych pól (`preview_role`
+= `cad`, `drawing`, `pdf`, `step`, `image`). To są pliki, których nazwy makra wyprowadzają z numeru;
 zwykłe załączniki zachowują własne nazwy i niczego nie blokują. Gdy wyróżnione pole jest już
 zajęte, `PATCH /properties` ODRZUCA zmianę rodzaju, zamiast przyjąć ją ze starym prefiksem, a
 obiekt elementu niesie `kindLocked`, żeby interfejs mógł wyszarzyć przyciski. Odrzucana jest
@@ -353,6 +353,44 @@ przez makro). Dopóki robił to tylko `PATCH`, element utworzony z materiałem z
 nazwę, której katalog nie miał aż do zakończenia wysyłki. Makra czytają materiał z dokumentu,
 a nie z listy wyboru, więc bez tego element miałby materiał, którego nie da się ani wybrać
 ponownie, ani użyć jako filtr. Zakładana jest sama nazwa; grupa i podgrupa zostają puste.
+
+### Podgląd modelu to obrazek, a nie renderowany STEP
+
+Box podglądu nad właściwościami elementu pokazuje **zrzut PNG**, który makro CAD robi w chwili
+wysyłki i wysyła jako załącznik z `preview_role = 'image'`. Plik STEP eksportuje się i wgrywa
+dokładnie jak dotąd (`preview_role = 'step'`) — jest do pobrania, po prostu nie zasila już
+wyświetlania.
+
+Kiedyś zasilał. Przeglądarka pobierała STEP, parsowała go przez `occt-import-js` (OpenCascade
+skompilowany do WebAssembly), teselowała każdą powierzchnię, puszczała `THREE.EdgesGeometry` po
+każdej powstałej bryle i renderowała całość przez three.js. Wszystko po to, żeby otrzymać
+**nieruchomy obraz**: jedno `renderer.render()`, bez pętli animacji, bez obracania, bez niczego,
+co dałoby się przeciągnąć. Cena była płacona przy każdym otwartym elemencie, przez każdego
+użytkownika, i nie zależała od rozmiaru pliku STEP, tylko od złożoności geometrii — plik 40 kB
+pełen zaokrągleń i powierzchni swobodnych teseluje się na setki tysięcy trójkątów. Usunięcie
+tego zabrało **7,8 MB** z publikowanej paczki, w tym 7,6 MB samego binarnego OpenCascade
+`.wasm`, który każda przeglądarka pobierała i kompilowała.
+
+Z tego, skąd bierze się zrzut, wynikają dwie rzeczy:
+
+- **Nie ma STEP-a, nie ma obrazka.** Makro robi zrzut wewnątrz swojego kroku wysyłki STEP-a,
+  więc odznaczenie opcji „eksportuj STEP" zostawia element bez podglądu, a box wprost to mówi
+  zamiast pokazywać pustą ramkę.
+- **Usunięcie STEP-a kasuje zrzut.** Istnieje on wyłącznie po to, żeby przedstawić ten model,
+  więc `DELETE /api/attachments/{id}` na załączniku `step` usuwa też załącznik `image` tego
+  elementu (`DeleteRoleAttachmentsAsync`). Bez tego w magazynie zbierałyby się obrazki, których
+  nic nie wyświetla i których nie da się powiązać z żadnym modelem.
+
+`image` jest jednoslotowe jak `pdf`/`step` (nie kumuluje się jak `cad`/`drawing`): zrzut
+przedstawia bieżącą postać modelu, więc nowa wysyłka zastępuje poprzedni.
+
+Elementy wgrane przed tą zmianą zachowują swój STEP i tracą podgląd do czasu ponownej wysyłki —
+nie ma już renderera, do którego można by się cofnąć. To była świadoma decyzja: zostawienie go
+oznaczałoby trzymanie tej zależności 7,6 MB dla wszystkich.
+
+STEP/IGES/STL nie są więc już podglądalne nigdzie w aplikacji, łącznie z okienkiem podglądu
+załącznika — dostają przycisk pobierania. `previewKindOf` rozpoznaje teraz wyłącznie PDF-y i
+obrazy rastrowe.
 
 ### Logowanie, role i dostęp do projektów
 

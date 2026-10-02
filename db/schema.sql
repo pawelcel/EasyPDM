@@ -345,7 +345,7 @@ CREATE TABLE item_attachments (
     --   drawing — plik rysunku technicznego SolidWorks (.SLDDRW) wgrany przez makro OBOK
     --     własnego pliku "cad" Części/Złożenia, którego dotyczy. Tak jak "cad" -- WIELE na
     --     element dozwolone, jeden na rewizję, ta sama konwencja nazwy pliku.
-    preview_role    TEXT CHECK (preview_role IN ('pdf', 'step', 'cad', 'drawing')),
+    preview_role    TEXT CHECK (preview_role IN ('pdf', 'step', 'cad', 'drawing', 'image')),
     -- Numer rewizji elementu (items.revision_number) obowiązujący w chwili wgrania TEGO
     -- konkretnego załącznika -- NULL dla załączników sprzed tej kolumny i dla ról innych niż
     -- "cad"/"drawing" (dla nich to pole jest bez znaczenia, bo "pdf"/"step" mają zawsze tylko

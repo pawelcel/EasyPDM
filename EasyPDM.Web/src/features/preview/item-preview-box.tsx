@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { api } from "@/api/client"
 import type { Item } from "@/api/types"
@@ -8,22 +8,27 @@ import { previewKindOf } from "@/lib/file-preview"
 
 import { PdfPreview } from "@/features/preview/pdf-preview"
 
-const StepPreview = lazy(() => import("@/features/preview/step-preview").then((m) => ({ default: m.StepPreview })))
-
 interface PreviewSource {
   fileName: string
   url: string
 }
 
 // Złożenie/Część nie mają własnego pliku (mają go dopiero załączniki) — Plik ma dokładnie
-// jeden. Dla załączników bierzemy TE oznaczone jawnie jako rolę "pdf"/"step" (sloty
-// PDF/STEP w panelu Załączniki) — nie zgadujemy po rozszerzeniu, żeby było jednoznaczne,
-// który plik zasila podgląd. Panel Załączników pilnuje, żeby na rolę przypadał najwyżej
-// jeden załącznik (nowy zastępuje stary), więc szukanie pierwszego pasującego wystarczy.
-function usePreviewSources(item: Item, refreshSignal: number): { pdf: PreviewSource | null; step: PreviewSource | null } {
-  const [attachmentSources, setAttachmentSources] = useState<{ pdf: PreviewSource | null; step: PreviewSource | null }>({
+// jeden. Dla załączników bierzemy TE oznaczone jawnie jako rolę "pdf"/"image" (slot PDF i
+// zrzut modelu) — nie zgadujemy po rozszerzeniu, żeby było jednoznaczne, który plik zasila
+// podgląd. Panel Załączników pilnuje, żeby na rolę przypadał najwyżej jeden załącznik (nowy
+// zastępuje stary), więc szukanie pierwszego pasującego wystarczy.
+//
+// Model 3D pokazujemy jako GOTOWY OBRAZEK (rola "image", PNG zrobiony przez makro CAD przy
+// wysyłce), a nie renderując STEP w przeglądarce. Podgląd i tak był nieruchomy — jedno
+// renderer.render(), bez obracania — więc pobieranie bryły, teselacja przez OpenCascade w
+// WebAssembly i liczenie krawędzi dla każdej bryły były płacone przy KAŻDYM otwarciu
+// elementu, u każdego użytkownika, po to, żeby dostać nieruchomy obraz. Sam STEP wgrywa się
+// bez zmian (rola "step") — jest do pobrania, po prostu nie służy już do wyświetlania.
+function usePreviewSources(item: Item, refreshSignal: number): { pdf: PreviewSource | null; image: PreviewSource | null } {
+  const [attachmentSources, setAttachmentSources] = useState<{ pdf: PreviewSource | null; image: PreviewSource | null }>({
     pdf: null,
-    step: null,
+    image: null,
   })
   // Do wykrycia PRAWDZIWEJ zmiany elementu (w odróżnieniu od samego odświeżenia
   // refreshSignal na TYM SAMYM elemencie) — zob. reset stanu niżej.
@@ -36,7 +41,7 @@ function usePreviewSources(item: Item, refreshSignal: number): { pdf: PreviewSou
     // załącznika na TYM SAMYM elemencie — tam podgląd ma zostać widoczny do czasu
     // odświeżenia, bez zbędnego mignięcia).
     if (prevItemIdRef.current !== item.id) {
-      setAttachmentSources({ pdf: null, step: null })
+      setAttachmentSources({ pdf: null, image: null })
       prevItemIdRef.current = item.id
     }
     if (item.itemType !== "part" && item.itemType !== "assembly") return
@@ -44,10 +49,12 @@ function usePreviewSources(item: Item, refreshSignal: number): { pdf: PreviewSou
     api.getAttachments(item.id).then((attachments) => {
       if (cancelled) return
       const pdfAttachment = attachments.find((a) => a.role === "pdf")
-      const stepAttachment = attachments.find((a) => a.role === "step")
+      const imageAttachment = attachments.find((a) => a.role === "image")
       setAttachmentSources({
         pdf: pdfAttachment ? { fileName: pdfAttachment.fileName, url: api.attachmentDownloadUrl(pdfAttachment.id) } : null,
-        step: stepAttachment ? { fileName: stepAttachment.fileName, url: api.attachmentDownloadUrl(stepAttachment.id) } : null,
+        image: imageAttachment
+          ? { fileName: imageAttachment.fileName, url: api.attachmentDownloadUrl(imageAttachment.id) }
+          : null,
       })
     })
     return () => {
@@ -62,28 +69,31 @@ function usePreviewSources(item: Item, refreshSignal: number): { pdf: PreviewSou
   if (item.itemType === "file" && item.filePath) {
     const kind = previewKindOf(item.fileName)
     const source = kind ? { fileName: item.fileName, url: api.fileDownloadUrl(item.id) } : null
-    return { pdf: kind === "pdf" ? source : null, step: kind === "step" ? source : null }
+    // Element typu Plik niesie JEDEN plik — podgląd ma więc tylko wtedy, gdy to PDF.
+    // Wgrany ręcznie STEP nie ma zrzutu (robi go makro przy wysyłce z CAD-a), a renderowania
+    // w przeglądarce już nie ma.
+    return { pdf: kind === "pdf" ? source : null, image: null }
   }
 
   return attachmentSources
 }
 
-// Miniaturowy podgląd u góry panelu właściwości — domyślnie model 3D, z przełącznikiem na
-// rysunek PDF (2D). Dla Części/Złożenia box jest widoczny ZAWSZE (nawet bez wgranego
-// pliku) — brak pliku dla wybranego trybu pokazuje podpowiedź "wgraj w Załącznikach"
+// Miniaturowy podgląd u góry panelu właściwości — domyślnie model (zrzut z CAD-a), z
+// przełącznikiem na rysunek PDF (2D). Dla Części/Złożenia box jest widoczny ZAWSZE (nawet bez
+// wgranego pliku) — brak pliku dla wybranego trybu pokazuje podpowiedź "wgraj w Załącznikach"
 // zamiast całkiem znikać, żeby użytkownik od razu widział, gdzie i co dodać.
 function ItemPreviewBox({ item, refreshSignal = 0 }: { item: Item; refreshSignal?: number }) {
   const { t } = useLanguage()
-  const { pdf, step } = usePreviewSources(item, refreshSignal)
+  const { pdf, image } = usePreviewSources(item, refreshSignal)
   const [mode, setMode] = useState<"2d" | "3d">("3d")
 
   useEffect(() => setMode("3d"), [item.id])
 
   const isAttachmentDriven = item.itemType === "part" || item.itemType === "assembly"
-  if (!isAttachmentDriven && !pdf && !step) return null
+  if (!isAttachmentDriven && !pdf && !image) return null
 
-  const active = mode === "2d" ? pdf : step
-  const missingHint = mode === "2d" ? t("preview.missingPdfHint") : t("preview.missingStepHint")
+  const active = mode === "2d" ? pdf : image
+  const missingHint = mode === "2d" ? t("preview.missingPdfHint") : t("preview.missingImageHint")
 
   return (
     <div className="flex w-[32rem] shrink-0 flex-col gap-1.5">
@@ -92,15 +102,9 @@ function ItemPreviewBox({ item, refreshSignal = 0 }: { item: Item; refreshSignal
           mode === "2d" ? (
             <PdfPreview url={active.url} />
           ) : (
-            <Suspense
-              fallback={
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  {t("preview.loading")}
-                </div>
-              }
-            >
-              <StepPreview url={active.url} fileName={active.fileName} />
-            </Suspense>
+            // object-contain, bo zrzut ma proporcje okna CAD-a, a box jest stały — przycięcie
+            // ucięłoby część modelu, a rozciągnięcie zniekształciło go.
+            <img src={active.url} alt={active.fileName} className="h-full w-full object-contain" />
           )
         ) : (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">

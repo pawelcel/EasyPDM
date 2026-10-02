@@ -871,7 +871,18 @@ def get_storage_root():
         return None
 
 
-def build_browser_create_url(name, ticket, suggested_item_number=None):
+def _document_size(doc):
+    """Rozmiar pliku dokumentu na dysku w bajtach, albo None gdy dokument nie był jeszcze
+    zapisany (wtedy nie ma czego mierzyć). Tylko do ostrzeżenia o długim eksporcie STEP —
+    błąd tutaj nie może zatrzymać wysyłki."""
+    try:
+        path = getattr(doc, "FileName", "") or ""
+        return os.path.getsize(path) if path and os.path.exists(path) else None
+    except Exception:
+        return None
+
+
+def build_browser_create_url(name, ticket, suggested_item_number=None, document_size=None):
     """Adres, pod którym otwiera się przeglądarka systemowa zamiast natywnego formularza
     właściwości (zob. WaitForTicketDialog/submit_via_browser) — most logowania
     bilet->ciasteczko (GET /api/auth/browser-login) plus deep-link
@@ -901,6 +912,11 @@ def build_browser_create_url(name, ticket, suggested_item_number=None):
         deep_link_params["name"] = name
     if suggested_item_number is not None:
         deep_link_params["suggestedItemNumber"] = str(suggested_item_number)
+    # Rozmiar dokumentu służy WYŁĄCZNIE do ostrzeżenia pod opcją eksportu STEP: ten eksport
+    # robi CAD, zanim cokolwiek poleci na serwer, i przy dużym modelu trwa minuty. Serwer tej
+    # liczby nie zna — w tym momencie nic jeszcze nie zostało zapisane ani wysłane.
+    if document_size:
+        deep_link_params["documentSize"] = str(document_size)
     redirect_path = "/?" + urlencode(deep_link_params)
 
     login_ticket = api_post_json("/auth/browser-bridge-ticket", {})["ticket"]
@@ -1422,6 +1438,56 @@ def _upload_step_attachment(doc, item_id):
             )
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        # Zrzut modelu idzie RAZEM ze STEP-em i tylko z nim: to on jest podglądem tego modelu
+        # w aplikacji, a bez STEP-a nie miałby czego przedstawiać. Usunięcie STEP-a kasuje go
+        # po stronie serwera (zob. MapDelete w AttachmentEndpoints.cs), więc nie zostają
+        # sieroty. Wywoływane PO zamknięciu tmp_dir, bo zrzut ma własny katalog tymczasowy.
+        _upload_model_image_attachment(doc, item_id)
+    except Exception:
+        pass
+
+
+def _upload_model_image_attachment(doc, item_id):
+    """Zapisuje widok modelu do PNG i wgrywa jako załącznik z rolą "image" — to JEST podgląd
+    modelu pokazywany w aplikacji webowej.
+
+    Wcześniej aplikacja renderowała w przeglądarce sam plik STEP (occt-import-js + three.js),
+    żeby otrzymać NIERUCHOMY obraz: bez obracania, jedno renderer.render(). Cena była płacona
+    przy KAŻDYM otwarciu elementu, u każdego użytkownika — pobranie bryły, teselacja przez
+    OpenCascade w WebAssembly i liczenie krawędzi dla każdej bryły. Tutaj robi się to RAZ, na
+    maszynie, która i tak ma model otwarty i policzony.
+
+    Błędy nie przerywają niczego — tak samo jak w _upload_step_attachment: właściwy plik jest
+    już w tym momencie wysłany, więc nieudany zrzut (np. FreeCAD uruchomiony bez GUI) nie
+    powinien wyglądać jak porażka całej operacji."""
+    try:
+        import FreeCADGui as Gui
+
+        view = Gui.ActiveDocument.ActiveView
+        # Ustawiony kadr: aksonometria i dopasowanie do okna. Bez tego zrzut pokazałby to, na
+        # czym akurat stał użytkownik — zbliżenie na fragment albo widok z boku.
+        try:
+            view.viewAxonometric()
+            Gui.SendMsgToActiveView("ViewFit")
+        except Exception:
+            pass
+
+        tmp_dir = tempfile.mkdtemp(prefix="easypdm_img_")
+        try:
+            image_path = os.path.join(tmp_dir, sanitize_filename(doc.Label or "model") + ".png")
+            # "Current" = bieżący tryb tła okna widoku; podajemy jawny rozmiar, żeby zrzut nie
+            # zależał od tego, jak duże okno ma akurat użytkownik.
+            view.saveImage(image_path, 1200, 900, "Current")
+            if not os.path.exists(image_path):
+                return
+            api_upload_file(
+                f"/items/{item_id}/attachments", image_path,
+                override_filename=os.path.basename(image_path),
+                extra_fields={"role": "image"},
+            )
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
     except Exception:
         pass
 
@@ -1910,7 +1976,7 @@ def submit_via_browser(doc, target_folder):
 
     ticket = str(uuid.uuid4())
     try:
-        url = build_browser_create_url(doc.Label, ticket, suggested_item_number)
+        url = build_browser_create_url(doc.Label, ticket, suggested_item_number, _document_size(doc))
         webbrowser.open(url)
     except Exception as e:
         QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
@@ -2114,7 +2180,7 @@ def process_assembly_tree(top_doc, target_folder=None):
 
             ticket = str(uuid.uuid4())
             try:
-                url = build_browser_create_url(suggested_name, ticket)
+                url = build_browser_create_url(suggested_name, ticket, None, _document_size(doc))
                 webbrowser.open(url)
             except Exception as e:
                 QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))

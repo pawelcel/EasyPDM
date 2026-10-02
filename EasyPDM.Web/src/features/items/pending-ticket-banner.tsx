@@ -249,6 +249,7 @@ function PendingTicketBanner() {
           // Duplikat ma materiał skopiowany ze źródła, czyli wybrany świadomie — ten zostaje
           // edytowalny.
           materialLocked={!duplicateSource && !!pendingTicket.material}
+          documentSize={pendingTicket.documentSize}
           ticket={pendingTicket.ticket}
           onOpenChange={(open) => {
             // Zamknięte bez utworzenia (Anuluj/X/Escape) — wraca do wyboru Nowy/Duplikuj/

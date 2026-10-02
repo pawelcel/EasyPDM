@@ -331,7 +331,7 @@ zusammensetzen (und nie voneinander abweichen).
 
 Die einzige Ausnahme ist ein früh bemerkter Fehler: Das Ändern der Art eines Teils/einer
 Baugruppe berechnet das Präfix neu, solange das Element in keinem der vier hervorgehobenen
-Felder einen Anhang hat (`preview_role` = `cad`, `drawing`, `pdf`, `step`). Das sind die
+Felder einen Anhang hat (`preview_role` = `cad`, `drawing`, `pdf`, `step`, `image`). Das sind die
 Dateien, deren Namen die Makros aus der Nummer ableiten; gewöhnliche Anhänge behalten ihre
 eigenen Namen und blockieren nichts. Ist ein hervorgehobenes Feld belegt, LEHNT
 `PATCH /properties` eine Änderung der Art ab, statt sie mit veraltetem Präfix zu übernehmen,
@@ -396,6 +396,46 @@ ein mit CAD-Material angelegtes Element einen Namen, den der Katalog bis zum Abs
 Hochladens nicht kannte. Die Makros lesen das Material aus dem Dokument statt aus einer
 Liste; ohne dies trüge das Element ein Material, das sich weder erneut auswählen noch als
 Filter nutzen ließe. Angelegt wird nur der Name; Gruppe und Untergruppe bleiben leer.
+
+### Die Modellvorschau ist ein Bild, kein gerendertes STEP
+
+Das Vorschaufeld über den Eigenschaften eines Elements zeigt einen **PNG-Schnappschuss**, den das
+CAD-Makro beim Hochladen aufnimmt und als Anhang mit `preview_role = 'image'` sendet. Die
+STEP-Datei wird weiterhin genau wie bisher exportiert und hochgeladen (`preview_role = 'step'`) —
+sie steht zum Herunterladen bereit, steuert aber die Anzeige nicht mehr.
+
+Früher tat sie das. Der Browser holte das STEP, parste es mit `occt-import-js` (OpenCascade nach
+WebAssembly kompiliert), tesselierte jede Fläche, ließ `THREE.EdgesGeometry` über jeden
+entstandenen Körper laufen und rendete das Ganze mit three.js. All das ergab ein **unbewegtes
+Bild**: ein `renderer.render()`, keine Animationsschleife, kein Drehen, nichts zum Ziehen. Der
+Preis fiel bei jedem geöffneten Element an, bei jedem Benutzer, und richtete sich nicht nach der
+Größe der STEP-Datei, sondern nach der Komplexität der Geometrie — eine 40-kB-Datei voller
+Verrundungen und Freiformflächen tesselliert zu Hunderttausenden Dreiecken. Das Entfernen nahm
+**7,8 MB** aus dem veröffentlichten Bundle, davon 7,6 MB allein die OpenCascade-`.wasm`-Binärdatei,
+die jeder Browser herunterlud und kompilierte.
+
+Daraus, woher der Schnappschuss stammt, folgen zwei Dinge:
+
+- **Kein STEP, kein Bild.** Das Makro erstellt den Schnappschuss innerhalb seines
+  STEP-Upload-Schritts; wird das Häkchen „STEP exportieren" entfernt, bleibt das Element ohne
+  Vorschau, und das Feld sagt das auch, statt einen leeren Rahmen zu zeigen.
+- **Das Löschen des STEP löscht den Schnappschuss.** Er existiert nur, um dieses Modell
+  darzustellen, deshalb entfernt `DELETE /api/attachments/{id}` auf einem `step`-Anhang auch den
+  `image`-Anhang des Elements (`DeleteRoleAttachmentsAsync`). Sonst sammelten sich im Speicher
+  Bilder, die nichts anzeigt und die sich keinem Modell zuordnen lassen.
+
+`image` belegt einen einzelnen Slot wie `pdf`/`step` (sammelt sich nicht an wie `cad`/`drawing`):
+Ein Schnappschuss zeigt die aktuelle Gestalt des Modells, ein neuer Upload ersetzt also den
+vorherigen.
+
+Vor dieser Änderung hochgeladene Elemente behalten ihr STEP und verlieren die Vorschau, bis sie
+erneut hochgeladen werden — es gibt keinen Renderer mehr, auf den zurückgefallen werden könnte.
+Das war eine bewusste Entscheidung: Ihn zu behalten hätte bedeutet, die 7,6-MB-Abhängigkeit für
+alle zu behalten.
+
+STEP/IGES/STL sind daher nirgends in der Anwendung mehr vorschaubar, auch nicht im
+Anhang-Vorschaudialog; sie erhalten eine Schaltfläche zum Herunterladen. `previewKindOf` erkennt
+jetzt ausschließlich PDFs und Rasterbilder.
 
 ### Anmeldung, Rollen und Projektzugriff
 

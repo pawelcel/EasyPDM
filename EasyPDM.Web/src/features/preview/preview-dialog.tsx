@@ -1,16 +1,11 @@
-import { lazy, Suspense } from "react"
-
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import type { PreviewKind } from "@/lib/file-preview"
 
 import { PdfPreview } from "@/features/preview/pdf-preview"
-import { useLanguage } from "@/i18n/use-language"
 
-// three.js (renderer STEP-a) waży kilkaset KB — ładujemy go dopiero, gdy ktoś faktycznie
-// otworzy podgląd STEP, żeby nie obciążać startowego bundla dla wszystkich użytkowników,
-// którzy z podglądu STEP nigdy nie skorzystają.
-const StepPreview = lazy(() => import("@/features/preview/step-preview").then((m) => ({ default: m.StepPreview })))
-
+// Podgląd modelu to zwykły obrazek (zrzut zrobiony przez makro CAD przy wysyłce), więc nie
+// ma tu już nic do leniwego ładowania — renderer STEP-a (three.js + occt-import-js, kilkaset
+// KB) został usunięty razem z samym renderowaniem. Zob. lib/file-preview.ts po powód.
 function PreviewDialog({
   open,
   onOpenChange,
@@ -24,7 +19,6 @@ function PreviewDialog({
   url: string
   kind: PreviewKind
 }) {
-  const { t } = useLanguage()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[85vh] max-w-4xl flex-col sm:max-w-4xl">
@@ -33,15 +27,7 @@ function PreviewDialog({
           {kind === "pdf" ? (
             <PdfPreview url={url} />
           ) : (
-            <Suspense
-              fallback={
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  {t("preview.loading")}
-                </div>
-              }
-            >
-              <StepPreview url={url} fileName={fileName} />
-            </Suspense>
+            <img src={url} alt={fileName} className="h-full w-full object-contain" />
           )}
         </div>
       </DialogContent>

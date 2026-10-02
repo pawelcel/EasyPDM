@@ -300,8 +300,8 @@ parts in one place and the API ships the result as `itemNumberLabel` next to
 frontend and the three CAD macros never compose it themselves (and never disagree).
 
 The one exception is a mistake caught early: changing a Part/Assembly's kind recomputes
-the prefix for as long as the item has no attachment in any of the four dedicated slots
-(`preview_role` of `cad`, `drawing`, `pdf` or `step`). Those are the files whose names the
+the prefix for as long as the item has no attachment in any of the dedicated slots
+(`preview_role` of `cad`, `drawing`, `pdf`, `step` or `image`). Those are the files whose names the
 macros derive from the number; ordinary attachments keep their own names and block
 nothing. Once a dedicated slot is filled, `PATCH /properties` REFUSES a kind change
 outright rather than applying it with a stale prefix, and the item payload carries
@@ -363,6 +363,43 @@ name the catalog did not have until the upload landed. The macros read the mater
 document rather than from a list, so without this the item would carry a material that could
 neither be picked again nor used as a filter. Only the name is created; group and subgroup
 stay empty.
+
+### The model preview is a picture, not a rendered STEP
+
+The preview box above an item's properties shows a **PNG screenshot** that the CAD macro takes
+at upload time and sends as an attachment with `preview_role = 'image'`. The STEP file is still
+exported and uploaded exactly as before (`preview_role = 'step'`) — it is there to be
+downloaded; it simply no longer drives the display.
+
+It used to. The browser fetched the STEP, parsed it with `occt-import-js` (OpenCascade compiled
+to WebAssembly), tessellated every surface, ran `THREE.EdgesGeometry` over each resulting solid
+and rendered the lot with three.js. All of that produced a **still image**: one
+`renderer.render()`, no animation loop, no orbit controls, nothing to drag. The cost was paid on
+every item a user opened, by every user, and it did not scale with the STEP file's size but with
+the geometry's complexity — a 40 kB file full of fillets and splines tessellates into hundreds of
+thousands of triangles. Dropping it removed **7.8 MB** from the published bundle, 7.6 MB of which
+was the OpenCascade `.wasm` binary that every browser downloaded and compiled.
+
+Two consequences follow from where the screenshot comes from:
+
+- **No STEP, no picture.** The macro takes the screenshot inside its STEP-upload step, so
+  clearing the "export STEP" checkbox leaves the item without a preview, and the box says so
+  rather than showing an empty frame.
+- **Deleting the STEP deletes the screenshot.** It exists only to depict that model, so
+  `DELETE /api/attachments/{id}` on a `step` attachment also removes the item's `image` one
+  (`DeleteRoleAttachmentsAsync`). Without that, the store would accumulate pictures nothing
+  displays and nothing can be traced back to a model.
+
+`image` is single-slot like `pdf`/`step` (not accumulating like `cad`/`drawing`): a screenshot
+shows the model's current shape, so a new upload replaces the previous one.
+
+Items uploaded before this change keep their STEP and lose the preview until they are sent up
+again — there is no renderer left to fall back to, which was a deliberate choice: keeping one
+would have meant keeping the 7.6 MB dependency for everyone.
+
+STEP/IGES/STL are therefore no longer previewable anywhere in the app, including the attachment
+preview dialog; they get a download button. `previewKindOf` now recognizes PDFs and raster
+images only.
 
 ### Login, roles, and project access
 
