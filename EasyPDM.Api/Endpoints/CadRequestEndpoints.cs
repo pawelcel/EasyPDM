@@ -18,8 +18,11 @@ static class CadRequestEndpoints
             if (body.Mode is not ("create" or "download"))
                 return Results.BadRequest("Pole 'mode' musi być 'create' albo 'download'.");
 
+            if (string.IsNullOrWhiteSpace(body.RunId))
+                return Results.BadRequest("Pole 'runId' nie może być puste.");
+
             store.Publish(user.Id, new CadRequest(
-                DateTime.UtcNow, null, body.Ticket, body.Mode,
+                DateTime.UtcNow, null, body.RunId, body.Ticket, body.Mode,
                 body.Name, body.ItemType, body.Material, body.DocumentSize, body.SuggestedItemNumber));
             return Results.Ok();
         });
@@ -37,6 +40,9 @@ static class CadRequestEndpoints
             {
                 request = new
                 {
+                    // Karta porownuje to ze swoim wlasnym runId i podejmuje prosbe tylko gdy
+                    // sie zgadza -- zob. CadRequest.RunId.
+                    runId = request.RunId,
                     ticket = request.Ticket,
                     mode = request.Mode,
                     name = request.Name,
@@ -79,7 +85,7 @@ static class CadRequestEndpoints
     }
 
     record PublishCadRequest(
-        string Ticket, string Mode, string? Name, string? ItemType,
+        string RunId, string Ticket, string Mode, string? Name, string? ItemType,
         string? Material, long? DocumentSize, int? SuggestedItemNumber);
 
     record TicketRequest(string? Ticket);

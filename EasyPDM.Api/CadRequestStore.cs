@@ -79,6 +79,14 @@ class CadRequestStore
 record CadRequest(
     DateTime CreatedAt,
     DateTime? TakenAt,
+    // Identyfikator JEDNEGO biegu makra, wygenerowany po stronie CAD-a i przekazany karcie,
+    // ktora ten bieg otworzyl. Karta podejmuje WYLACZNIE prosby ze swoim wlasnym runId.
+    //
+    // Bez tego wystarczylo, ze to samo konto bylo zalogowane w przegladarce na DRUGIM
+    // komputerze: prosba z komputera A trafiala do karty na komputerze B, ktora pokazywala
+    // formularz zupelnie komus innemu (zgloszone z praktyki). Kluczowanie samym uzytkownikiem
+    // zakladalo jeden bieg na osobe -- zalozenie falszywe, gdy ktos pracuje na dwoch maszynach.
+    string RunId,
     string Ticket,
     string Mode,
     string? Name,

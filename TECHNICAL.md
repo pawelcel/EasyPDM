@@ -343,6 +343,12 @@ logged and dropped rather than sent — that is how `SW-Material@@Default@C0014.
 reached an item's material field. Inventor has no equivalent expression, so there both
 properties hold a
 snapshot read from `ComponentDefinition` at upload time and need a re-upload to refresh.
+Taking the picture needs the document to be **active**: saving an image captures the active
+viewport rather than the document the call names, so while an assembly is being sent every
+component would otherwise be given a picture of the assembly. SolidWorks and Inventor therefore
+activate the document, capture, and activate the previous one again; FreeCAD can take a named
+document's view without switching anything, so nothing moves on screen there.
+
 Drawings are skipped entirely, material is written for Parts only (an Assembly has none of
 its own), and a mass that is empty or not a plain number is logged and skipped — it is
 normalized to digits and one decimal point first, since it can arrive with a unit and a

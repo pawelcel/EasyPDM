@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 
 import { api } from "@/api/client"
-import { acceptPendingCreateTicket } from "@/features/items/pending-create-ticket"
+import { acceptPendingCreateTicket, currentRunId } from "@/features/items/pending-create-ticket"
 
 // Podejmowanie próśb, które makro CAD zostawia na serwerze zamiast otwierać nową kartę.
 //
@@ -32,6 +32,12 @@ export function useCadRequests() {
         const result = await api.getCadRequest()
         const request = result?.request
         if (cancelled || !request || handled.current.has(request.ticket)) return
+
+        // Podejmujemy WYŁĄCZNIE prośby z tego samego biegu makra, który otworzył tę kartę.
+        // Inaczej karta zalogowana tym samym kontem na innym komputerze przechwytywałaby
+        // formularze z cudzej wysyłki — zdarzyło się w praktyce.
+        const mine = currentRunId()
+        if (!mine || request.runId !== mine) return
 
         handled.current.add(request.ticket)
         // Najpierw bierzemy na siebie, potem pokazujemy. Odwrotna kolejność znaczyłaby, że

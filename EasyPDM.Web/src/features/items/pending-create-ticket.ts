@@ -51,6 +51,14 @@ function readFromUrl(): PendingTicket {
   const name = params.get("name") ?? undefined
   const suggestedItemNumberRaw = params.get("suggestedItemNumber")
   const suggestedItemNumber = suggestedItemNumberRaw ? Number(suggestedItemNumberRaw) : undefined
+  // Identyfikator biegu makra. Zapamiętujemy go dla TEJ karty: dalsze komponenty tego samego
+  // biegu makro zostawia na serwerze, a karta podejmuje wyłącznie prośby ze swoim runId.
+  //
+  // Bez tego wystarczyło, że to samo konto było zalogowane w przeglądarce na DRUGIM
+  // komputerze — prośba z komputera A trafiała do karty na komputerze B i pokazywała formularz
+  // komuś zupełnie innemu (zgłoszone z praktyki).
+  const runId = params.get("runId")
+  if (runId) rememberRunId(runId)
   const cadItemTypeRaw = params.get("itemType")
   const cadItemType = cadItemTypeRaw === "assembly" || cadItemTypeRaw === "part" ? cadItemTypeRaw : undefined
   const material = params.get("material") ?? undefined
@@ -71,6 +79,28 @@ function readFromUrl(): PendingTicket {
 // Czytane RAZ, przy pierwszym imporcie tego modułu (a więc raz na wczytanie strony) —
 // każdy kolejny import w ramach tej samej sesji JS dostaje ten sam, już zainicjalizowany
 // moduł (semantyka singletona modułów ES).
+// Przeżywa odświeżenie strony (sessionStorage), ale NIE przenosi się na inną kartę ani na
+// inny komputer — dokładnie tego tu potrzeba. Każdy dostęp w try/catch: w trybie prywatnym
+// albo przy zablokowanych danych witryny sessionStorage potrafi rzucić wyjątkiem.
+const RUN_ID_KEY = "pdm_cad_run_id"
+
+function rememberRunId(runId: string) {
+  try {
+    sessionStorage.setItem(RUN_ID_KEY, runId)
+  } catch {
+    // Brak pamięci sesji to nie błąd — po prostu ta karta nie podejmie dalszych próśb i
+    // makro wróci do otwierania nowej na każdy komponent, czyli do zachowania sprzed zmiany.
+  }
+}
+
+function currentRunId(): string | null {
+  try {
+    return sessionStorage.getItem(RUN_ID_KEY)
+  } catch {
+    return null
+  }
+}
+
 let current: PendingTicket = readFromUrl()
 const listeners = new Set<() => void>()
 
@@ -110,5 +140,5 @@ function usePendingCreateTicket(): PendingTicket {
   return useSyncExternalStore(subscribe, getSnapshot)
 }
 
-export { acceptPendingCreateTicket, clearPendingCreateTicket, usePendingCreateTicket }
+export { acceptPendingCreateTicket, clearPendingCreateTicket, currentRunId, usePendingCreateTicket }
 export type { PendingTicket }

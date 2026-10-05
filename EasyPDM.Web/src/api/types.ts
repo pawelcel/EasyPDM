@@ -604,6 +604,7 @@ export interface TransferProgress {
 // nie jest prawdą, makro po chwili wraca do otwierania karty (przeglądarka może być
 // zamknięta).
 export interface CadRequest {
+  runId: string
   ticket: string
   mode: "create" | "download"
   name: string | null

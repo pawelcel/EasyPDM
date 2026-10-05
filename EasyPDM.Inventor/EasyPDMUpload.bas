@@ -98,6 +98,17 @@ Option Explicit
 ' niz dodawany do listy (ProcessAssemblyTree), wiec stala zamiast literalu w dwoch miejscach.
 Private Const TOP_DOCUMENT_PROGRESS_KEY As String = "__top__"
 
+' Identyfikator JEDNEGO biegu makra i informacja, czy jakas karta przegladarki na TEJ
+' maszynie juz go zna. Karta podejmuje wylacznie prosby ze swoim runId -- bez tego
+' wystarczylo, ze to samo konto bylo zalogowane w przegladarce na DRUGIM komputerze, zeby
+' prosba stad trafila do karty tam i pokazala formularz komus innemu (zgloszone z praktyki).
+'
+' Dlatego PIERWSZY komponent biegu zawsze otwiera karte (to otwarcie i tak przejmuje fokus,
+' bo jest pierwsze w biegu) -- i dopiero ta karta, znajac runId, obsluguje reszte bez
+' kolejnych kart.
+Private gRunId As String
+Private gRunTabOpened As Boolean
+
 Private Const APP_SETTINGS_NAME As String = "EasyPDM"
 Private Const SETTINGS_SECTION As String = "Connection"
 Private Const DEFAULT_BASE_URL As String = "http://localhost:5000/api"
@@ -1210,14 +1221,25 @@ End Function
 ' (OK + nowa karta). Bez tego makro czekaloby na formularz, ktorego nikt nigdy nie zobaczy.
 ' ============================================================================
 
+' Identyfikator biegu, tworzony przy pierwszym uzyciu i staly do konca uruchomienia makra.
+Function RunId() As String
+    If gRunId = "" Then gRunId = NewGuid()
+    RunId = gRunId
+End Function
+
 ' Zwraca True, gdy otwarta karta podjela prosbe -- wtedy NIE otwieramy nowej.
 Function PublishCadRequest(ByVal ticket As String, ByVal name As String, ByVal itemType As String, _
                            ByVal materialName As String, ByVal documentSizeBytes As Long) As Boolean
     On Error Resume Next
     PublishCadRequest = False
 
+    ' Dopoki zadna karta na TEJ maszynie nie zna runId tego biegu, nie ma komu podac prosby
+    ' -- a podanie jej 'komukolwiek' trafialoby w przegladarke na innym komputerze
+    ' zalogowana tym samym kontem. Pierwszy komponent biegu idzie wiec stara sciezka.
+    If Not gRunTabOpened Then Exit Function
+
     Dim body As String
-    body = "{""ticket"":""" & JsonStringEscape(ticket) & """,""mode"":""create"""
+    body = "{""runId"":""" & JsonStringEscape(RunId()) & """,""ticket"":""" & JsonStringEscape(ticket) & """,""mode"":""create"""
     If name <> "" Then body = body & ",""name"":""" & JsonStringEscape(name) & """"
     If itemType <> "" Then body = body & ",""itemType"":""" & JsonStringEscape(itemType) & """"
     If materialName <> "" Then body = body & ",""material"":""" & JsonStringEscape(materialName) & """"
@@ -1259,7 +1281,25 @@ Function PublishCadRequest(ByVal ticket As String, ByVal name As String, ByVal i
         If Err.Number = 0 And Not probe Is Nothing Then
             If JsonGetLong(probe, "taken", 0) = 1 Then
                 PublishCadRequest = True
+
+                ' Oddajemy fokus przegladarce. Bez tego uzytkownik zostaje w CAD-zie i musi
+                ' sam przelaczyc okno, zeby zobaczyc formularz -- a CAD wyszedl na wierzch
+                ' chwile wczesniej nie bez powodu: dla POPRZEDNIEGO komponentu zapisywal plik,
+                ' eksportowal STEP i robil zrzut modelu (ViewZoomtofit2/GraphicsRedraw2
+                ' przerysowuja okno graficzne).
+                '
+                ' Dziala, bo Windows pozwala oddac fokus aplikacji, ktora AKTUALNIE go ma -- a
+                ' ma go teraz CAD. To ta sama regula, ktora wczesniej wymuszala klikanie OK,
+                ' tylko uzyta w druga strone.
+                '
+                ' Dopasowanie po POCZATKU tytulu okna (AppActivate tak dziala): strona ma
+                ' <title> zaczynajacy sie od "EasyPDM", a przegladarki doklejaja wlasna nazwe
+                ' na koncu. Gdy EasyPDM jest w karcie W TLE, tytul okna jest inny i nic sie nie
+                ' stanie -- blad jest polykany, bo to wygoda, a nie czesc wysylki.
+                On Error Resume Next
+                AppActivate "EasyPDM"
                 Err.Clear
+
                 On Error GoTo 0
                 Exit Function
             End If
@@ -1293,6 +1333,10 @@ Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Opt
     ' a do Czesci nie da sie nic podpiac w strukturze, wiec podpinanie komponentow konczylo
     ' sie bledem 400 i struktura BOM nie powstawala.
     If itemType <> "" Then redirectPath = redirectPath & "&itemType=" & UrlEncode(itemType)
+    ' Identyfikator biegu: karta go zapamietuje i od tej chwili podejmuje prosby tego biegu
+    ' bez otwierania kolejnych kart. Zob. gRunId.
+    redirectPath = redirectPath & "&runId=" & UrlEncode(RunId())
+    gRunTabOpened = True
 
     Dim loginTicketResponse As Object
     Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
@@ -2613,6 +2657,18 @@ Sub UploadModelImageAttachment(ByVal oDoc As Object, ByVal itemId As String, ByV
     Dim tempPath As String
     tempPath = ExportTempDirFor(oDoc) & "EasyPDM_img_" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000)) & ".png"
 
+    ' Dokument MUSI byc aktywny, zanim zrobimy zrzut: ActiveView to widok AKTYWNEGO dokumentu,
+    ' a nie tego, ktory dostalismy w argumencie -- przy wysylce zlozenia aktywne jest zlozenie,
+    ' wiec kazdy komponent dostawalby obraz zlozenia zamiast wlasnego (tak wlasnie zachowywal
+    ' sie odpowiednik tej funkcji w SolidWorksie, zgloszone z praktyki). Poprzedni dokument
+    ' przywracamy nizej, zeby nie zostawic uzytkownika w innym oknie niz to, w ktorym pracowal.
+    Dim prevActiveDoc As Object
+    Set prevActiveDoc = InvApp.ActiveDocument
+    If Not oDoc Is prevActiveDoc Then
+        oDoc.Activate
+        Err.Clear
+    End If
+
     ' Ustawiony kadr: izometria i dopasowanie do okna, zeby zrzut nie zalezal od tego, na czym
     ' akurat stal uzytkownik.
     Dim oCamera As Object
@@ -2653,6 +2709,14 @@ Sub UploadModelImageAttachment(ByVal oDoc As Object, ByVal itemId As String, ByV
     LogLine "Uploaded model image for item " & itemId & " as """ & imageDisplayName & """ (from " & tempPath & ")."
 
     Kill tempPath
+
+    ' Wracamy do dokumentu aktywnego przed zrzutem -- makro nie ma zostawiac po sobie
+    ' zmienionego stanu CAD-a.
+    If Not prevActiveDoc Is Nothing Then
+        If Not oDoc Is prevActiveDoc Then prevActiveDoc.Activate
+        Err.Clear
+    End If
+
     On Error GoTo 0
 End Sub
 
@@ -3209,7 +3273,11 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
             ' podjal -- czyli gdy przegladarka jest zamknieta. Zob. CadRequestStore.cs.
             If Not PublishCadRequest(compTicket, compSuggestedName, DocKind(childModel), _
                                      MaterialNameOf(childModel), DocumentSizeOf(childModel)) Then
-                MsgBox T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
+                ' Okno TYLKO wtedy, gdy karta tego biegu juz raz powstala. PIERWSZE otwarcie
+                ' przegladarki w biegu i tak przejmuje fokus (to wlasnie ta regula Windows
+                ' kazala klikac OK przed KOLEJNYMI), wiec dla pierwszego komponentu okno jest
+                ' zbedne -- a to on otwiera karte, ktora obsluzy cala reszte bez kart i okien.
+                If gRunTabOpened Then MsgBox T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
                 OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel), DocKind(childModel))
             End If
 

@@ -176,6 +176,17 @@ Private Const SW_SYSCOLOR_BOTTOM_GRADIENT As Long = 101
 ' rozjechalby sie przy pierwszej zmianie.
 Private Const TOP_DOCUMENT_PROGRESS_KEY As String = "__top__"
 
+' Identyfikator JEDNEGO biegu makra i informacja, czy jakas karta przegladarki na TEJ
+' maszynie juz go zna. Karta podejmuje wylacznie prosby ze swoim runId -- bez tego
+' wystarczylo, ze to samo konto bylo zalogowane w przegladarce na DRUGIM komputerze, zeby
+' prosba stad trafila do karty tam i pokazala formularz komus innemu (zgloszone z praktyki).
+'
+' Dlatego PIERWSZY komponent biegu zawsze otwiera karte (to otwarcie i tak przejmuje fokus,
+' bo jest pierwsze w biegu) -- i dopiero ta karta, znajac runId, obsluguje reszte bez
+' kolejnych kart.
+Private gRunId As String
+Private gRunTabOpened As Boolean
+
 Private Const SW_SCREENSHOT_BACKGROUND As Long = 3355443   ' RGB(51, 51, 51)
 
 ' Tryb tla widoku ('Wyglad tla' na stronie Kolory w Opcjach systemowych). Dopoki stal na 3,
@@ -1241,14 +1252,25 @@ End Function
 ' (OK + nowa karta). Bez tego makro czekaloby na formularz, ktorego nikt nigdy nie zobaczy.
 ' ============================================================================
 
+' Identyfikator biegu, tworzony przy pierwszym uzyciu i staly do konca uruchomienia makra.
+Function RunId() As String
+    If gRunId = "" Then gRunId = NewGuid()
+    RunId = gRunId
+End Function
+
 ' Zwraca True, gdy otwarta karta podjela prosbe -- wtedy NIE otwieramy nowej.
 Function PublishCadRequest(ByVal ticket As String, ByVal name As String, ByVal itemType As String, _
                            ByVal materialName As String, ByVal documentSizeBytes As Long) As Boolean
     On Error Resume Next
     PublishCadRequest = False
 
+    ' Dopoki zadna karta na TEJ maszynie nie zna runId tego biegu, nie ma komu podac prosby
+    ' -- a podanie jej 'komukolwiek' trafialoby w przegladarke na innym komputerze
+    ' zalogowana tym samym kontem. Pierwszy komponent biegu idzie wiec stara sciezka.
+    If Not gRunTabOpened Then Exit Function
+
     Dim body As String
-    body = "{""ticket"":""" & JsonStringEscape(ticket) & """,""mode"":""create"""
+    body = "{""runId"":""" & JsonStringEscape(RunId()) & """,""ticket"":""" & JsonStringEscape(ticket) & """,""mode"":""create"""
     If name <> "" Then body = body & ",""name"":""" & JsonStringEscape(name) & """"
     If itemType <> "" Then body = body & ",""itemType"":""" & JsonStringEscape(itemType) & """"
     If materialName <> "" Then body = body & ",""material"":""" & JsonStringEscape(materialName) & """"
@@ -1290,7 +1312,25 @@ Function PublishCadRequest(ByVal ticket As String, ByVal name As String, ByVal i
         If Err.Number = 0 And Not probe Is Nothing Then
             If JsonGetLong(probe, "taken", 0) = 1 Then
                 PublishCadRequest = True
+
+                ' Oddajemy fokus przegladarce. Bez tego uzytkownik zostaje w CAD-zie i musi
+                ' sam przelaczyc okno, zeby zobaczyc formularz -- a CAD wyszedl na wierzch
+                ' chwile wczesniej nie bez powodu: dla POPRZEDNIEGO komponentu zapisywal plik,
+                ' eksportowal STEP i robil zrzut modelu (ViewZoomtofit2/GraphicsRedraw2
+                ' przerysowuja okno graficzne).
+                '
+                ' Dziala, bo Windows pozwala oddac fokus aplikacji, ktora AKTUALNIE go ma -- a
+                ' ma go teraz CAD. To ta sama regula, ktora wczesniej wymuszala klikanie OK,
+                ' tylko uzyta w druga strone.
+                '
+                ' Dopasowanie po POCZATKU tytulu okna (AppActivate tak dziala): strona ma
+                ' <title> zaczynajacy sie od "EasyPDM", a przegladarki doklejaja wlasna nazwe
+                ' na koncu. Gdy EasyPDM jest w karcie W TLE, tytul okna jest inny i nic sie nie
+                ' stanie -- blad jest polykany, bo to wygoda, a nie czesc wysylki.
+                On Error Resume Next
+                AppActivate "EasyPDM"
                 Err.Clear
+
                 On Error GoTo 0
                 Exit Function
             End If
@@ -1324,6 +1364,10 @@ Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Opt
     ' Typ rozpoznany z samego pliku -- przegladarka zaznacza wtedy wlasciwy przycisk zamiast
     ' startowac bez wyboru. Zob. ItemTypeOf.
     If itemType <> "" Then redirectPath = redirectPath & "&itemType=" & UrlEncode(itemType)
+    ' Identyfikator biegu: karta go zapamietuje i od tej chwili podejmuje prosby tego biegu
+    ' bez otwierania kolejnych kart. Zob. gRunId.
+    redirectPath = redirectPath & "&runId=" & UrlEncode(RunId())
+    gRunTabOpened = True
 
     Dim loginTicketResponse As Object
     Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
@@ -2469,6 +2513,25 @@ End Sub
 Sub UploadModelImageAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long)
     On Error Resume Next
 
+    ' Dokument MUSI byc aktywny, zanim zrobimy zrzut. SaveAs do obrazu zapisuje AKTYWNE okno
+    ' graficzne, a NIE dokument, na ktorym wywolano metode -- przy wysylce zlozenia aktywne
+    ' jest zlozenie, wiec kazdy komponent dostawal obraz zlozenia zamiast wlasnego (zgloszone
+    ' z praktyki). Poprzednio aktywny dokument przywracamy nizej, zeby makro nie zostawilo
+    ' uzytkownika w innym oknie niz to, w ktorym pracowal.
+    '
+    ' UNVERIFIED: dokladna sygnatura ActivateDoc2(nazwa, silent, errors) -- potwierdzic przy
+    ' pierwszym uruchomieniu. Nieudana aktywacja psuje tylko kadr zrzutu, nic wiecej.
+    Dim prevActiveTitle As String
+    prevActiveTitle = ""
+    If Not swApp.ActiveDoc Is Nothing Then prevActiveTitle = swApp.ActiveDoc.GetTitle()
+    Dim thisTitle As String
+    thisTitle = swModel.GetTitle()
+    Dim activateErrors As Long
+    If thisTitle <> "" And thisTitle <> prevActiveTitle Then
+        swApp.ActivateDoc2 thisTitle, True, activateErrors
+        Err.Clear
+    End If
+
     ' Ustawiony kadr: izometria i dopasowanie do okna. Bez tego zrzut pokazalby to, na czym
     ' akurat stal uzytkownik -- zblizenie na fragment albo widok z boku.
     swModel.ShowNamedView2 "*Isometric", -1
@@ -2518,6 +2581,13 @@ Sub UploadModelImageAttachment(ByVal swModel As Object, ByVal itemId As String, 
     Next bgIndex
     Err.Clear
     swModel.GraphicsRedraw2
+
+    ' Wracamy do dokumentu aktywnego przed zrzutem -- razem z kolorami tla i z tego samego
+    ' powodu: makro nie ma zostawiac po sobie zmienionego stanu CAD-a.
+    If prevActiveTitle <> "" And prevActiveTitle <> thisTitle Then
+        swApp.ActivateDoc2 prevActiveTitle, True, activateErrors
+        Err.Clear
+    End If
 
     If Not saveOk Or Dir(tempPath) = "" Then
         LogLine "Model image export failed for item " & itemId & " (SaveAs errors=" & saveErrors & ", warnings=" & saveWarnings & ")."
@@ -3151,7 +3221,11 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             ' podjal -- czyli gdy przegladarka jest zamknieta. Zob. CadRequestStore.cs.
             If Not PublishCadRequest(compTicket, compSuggestedName, ItemTypeOf(childModel), _
                                      MaterialNameOf(childModel), DocumentSizeOf(childModel)) Then
-                MsgBox T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
+                ' Okno TYLKO wtedy, gdy karta tego biegu juz raz powstala. PIERWSZE otwarcie
+                ' przegladarki w biegu i tak przejmuje fokus (to wlasnie ta regula Windows
+                ' kazala klikac OK przed KOLEJNYMI), wiec dla pierwszego komponentu okno jest
+                ' zbedne -- a to on otwiera karte, ktora obsluzy cala reszte bez kart i okien.
+                If gRunTabOpened Then MsgBox T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
                 OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel), ItemTypeOf(childModel))
             End If
 

@@ -17,9 +17,13 @@ public class CadRequestTests
     private const string AdminUsername = "admin";
     private const string AdminPassword = "admin";
 
-    private static async Task<HttpResponseMessage> PublishAsync(HttpClient client, string ticket, string mode = "create") =>
+    private const string RunId = "run-1";
+
+    private static async Task<HttpResponseMessage> PublishAsync(
+        HttpClient client, string ticket, string mode = "create", string runId = RunId) =>
         await client.PutAsJsonAsync("/api/cad-requests", new
         {
+            runId,
             ticket,
             mode,
             name = "wspornik",
@@ -140,6 +144,27 @@ public class CadRequestTests
     }
 
     [Fact]
+    public async Task Prosba_niesie_identyfikator_biegu()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        var ticket = Guid.NewGuid().ToString();
+        (await PublishAsync(client, ticket, runId: "bieg-z-komputera-A")).EnsureSuccessStatusCode();
+
+        // Karta porównuje to ze swoim własnym runId i podejmuje prośbę tylko gdy się zgadza.
+        // Bez tego wystarczyło, że to samo konto było zalogowane w przeglądarce na DRUGIM
+        // komputerze: prośba z komputera A trafiała do karty na komputerze B i pokazywała
+        // formularz komuś zupełnie innemu. Kluczowanie samym użytkownikiem zakładało jeden bieg
+        // na osobę — założenie fałszywe, gdy ktoś pracuje na dwóch maszynach.
+        var request = await ReadAsync(client);
+        Assert.Equal("bieg-z-komputera-A", request.GetProperty("runId").GetString());
+
+        (await client.DeleteAsync("/api/cad-requests")).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
     public async Task Odrzuca_bledne_zadania()
     {
         await using var factory = new EasyPDMWebApplicationFactory();
@@ -147,8 +172,12 @@ public class CadRequestTests
         await client.LoginAsync(AdminUsername, AdminPassword);
 
         Assert.Equal(HttpStatusCode.BadRequest,
-            (await client.PutAsJsonAsync("/api/cad-requests", new { ticket = "", mode = "create" })).StatusCode);
+            (await client.PutAsJsonAsync("/api/cad-requests", new { runId = RunId, ticket = "", mode = "create" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,
-            (await client.PutAsJsonAsync("/api/cad-requests", new { ticket = "abc", mode = "cos-innego" })).StatusCode);
+            (await client.PutAsJsonAsync("/api/cad-requests", new { runId = RunId, ticket = "abc", mode = "cos-innego" })).StatusCode);
+        // Bez identyfikatora biegu prośby nie da się przypisać do konkretnej karty, więc nie ma
+        // komu jej podać -- odrzucamy zamiast puszczać ją "do kogokolwiek".
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await client.PutAsJsonAsync("/api/cad-requests", new { runId = "", ticket = "abc", mode = "create" })).StatusCode);
     }
 }
