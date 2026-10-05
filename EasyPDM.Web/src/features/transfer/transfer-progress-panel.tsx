@@ -91,8 +91,13 @@ function TransferProgressPanel() {
     }
   }
 
+  // z-[60], czyli PONAD oknami dialogowymi (Dialog i jego przyciemnienie siedzą na z-50).
+  // Przy remisie wygrywa to, co renderuje się później w DOM, a dialogi idą przez portal — panel
+  // lądował więc pod ich przyciemnieniem i pod backdrop-blur, czyli był nieczytelny dokładnie
+  // wtedy, kiedy jest najbardziej potrzebny: makro wysyła złożenie, co komponent otwiera okno
+  // "Żądanie z makra CAD", a użytkownik chce w tej chwili widzieć, ile jeszcze zostało.
   return (
-    <div className="fixed right-4 top-20 z-50 w-[22rem] overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+    <div className="fixed right-4 top-20 z-[60] w-[22rem] overflow-hidden rounded-xl border border-border bg-card shadow-xl">
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">
