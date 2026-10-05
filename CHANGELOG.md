@@ -2,6 +2,18 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.6]
+
+### Added
+- **A list of every file being sent or fetched, ticking itself off as the macro works.** It sits on the right of the app, shows each file with the one in progress spinning and the finished ones struck through, counts "3 of 7", and turns the bar red if something fails. Until now an upload of a whole assembly was a wait with nothing to look at: you could not tell whether it was on the second component or the last one, nor which file it was chewing on. The list appears within about a second and a half of the macro starting, and stays for a moment after the end with every tick in place — that complete list is the confirmation that everything went up.
+- It works the same from SolidWorks, Inventor and FreeCAD, and in both directions. The panel itself knows nothing about any CAD program: the macros report what they are doing and the app only displays it, so all three behave identically rather than each growing its own progress window.
+
+### Changed
+- **Downloading an assembly now asks the server for the whole subtree in one go** instead of walking it level by level. That is what makes the list possible at all — walking as it went, the macro could not know how many files there would be, so the counter would have kept growing. A part used in several places still appears once, so the count reaches its end.
+
+### Notes
+- Progress reporting can never interrupt a transfer. It goes over its own quiet path that swallows every failure: no connection, a restarted server, or an older server without these endpoints leaves the upload or download running exactly as before, just without the list.
+
 ## [0.5]
 
 ### Changed

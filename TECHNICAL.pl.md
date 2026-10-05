@@ -402,6 +402,21 @@ STEP/IGES/STL nie są więc już podglądalne nigdzie w aplikacji, łącznie z o
 załącznika — dostają przycisk pobierania. `previewKindOf` rozpoznaje teraz wyłącznie PDF-y i
 obrazy rastrowe.
 
+### Lista postępu wysyłki i pobierania
+
+Gdy makro CAD wysyła albo pobiera, aplikacja pokazuje po prawej listę plików i odhacza je w trakcie. Stan siedzi w `TransferProgressStore` — w pamięci, bez tabeli, ten sam wybór i to samo uzasadnienie co przy `CreateTicketStore`: żyje sekundy do minut, po fakcie nikomu niepotrzebny, a utrata przy restarcie nic nie kosztuje, bo postęp jest informacją O pracy, a nie jej częścią.
+
+Kluczem jest **użytkownik**, nie identyfikator sesji. Dzięki temu przeglądarka pyta po prostu „co robi moje makro?" (`GET /api/progress`), nie musząc skądkolwiek poznać identyfikatora — działa to też wtedy, gdy kartę otwarto przed uruchomieniem makra. Jeden bieg na osobę w danej chwili to założenie bezpieczne (nikt nie klika „Upload" w dwóch CAD-ach naraz), a nowy bieg po prostu zastępuje poprzedni.
+
+Makro zgłasza **całą listę z góry** i dopiero potem odhacza pozycje. Bez pełnej listy od początku licznik by kłamał: „3 z 3" zamieniałoby się w „3 z 9", gdy znalazłby się kolejny poziom drzewa.
+
+- **Wysyłka** zna listę: `DiscoverComponentTree` przechodzi złożenie, zanim poleci pierwszy plik, a kolejność jest liśćmi do góry, bo rodzic nie może dostać relacji BOM do dziecka, którego jeszcze nie ma w PDM.
+- **Pobieranie** nie znało. `DownloadChildrenRecursive` schodzi poziom po poziomie i na starcie nie wie, ile plików będzie — stąd `GET /items/{id}/descendants`: jedno zapytanie rekurencyjne zwracające element i całe jego poddrzewo. Deduplikacja po stronie serwera odpowiada zbiorowi `seen` w makrze, więc część użyta w kilku złożeniach liczy się raz i licznik dochodzi do końca. Lista jest uporządkowana rodzic-przed-dzieckiem, bo w takiej kolejności makro FAKTYCZNIE pobiera; posortowanie inaczej sprawiłoby, że pozycje odhaczałyby się nie po kolei. Przy pobieraniu kolejność i tak nie wpływa na poprawność — wszystkie pliki lądują na dysku, zanim cokolwiek zostanie otwarte.
+
+**Raportowanie postępu nie ma prawa przerwać transferu.** Całość idzie własną, cichą ścieżką HTTP w każdym makrze, a nie przez `ApiPostJson`/`api_post_json`, które rzucają wyjątkiem. Brak połączenia, restart serwera czy starszy serwer bez tych endpointów nie mogą zatrzymać tego, o co użytkownik faktycznie poprosił. Z tego samego powodu serwer na nieznany klucz odpowiada `matched: false`, a nie błędem.
+
+Przeglądarka odpytuje co 1,5 s zwykłym `setInterval` — wzorcem sprawdzonym już w `use-notifications.ts`. Pierwsze podejście dobierało interwał dynamicznie przez `setTimeout` planujący sam siebie; okazało się mierzalnie kruche (jedno przemontowanie urywało łańcuch i nic go nie wznawiało), a oszczędność nie była tego warta, bo jedno odpytanie to odczyt ze słownika i kilkadziesiąt bajtów, bez dotykania bazy. Zakończony bieg przestaje być wydawany po dwóch minutach, żeby lista sprzed godziny nie witała kolejnej osoby otwierającej aplikację.
+
 ### Logowanie, role i dostęp do projektów
 
 Każde żądanie do `/api/*` (poza `/api/auth/login`) wymaga zalogowania — sesja to losowy

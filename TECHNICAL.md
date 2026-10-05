@@ -412,6 +412,49 @@ STEP/IGES/STL are therefore no longer previewable anywhere in the app, including
 preview dialog; they get a download button. `previewKindOf` now recognizes PDFs and raster
 images only.
 
+### The transfer progress list
+
+While a CAD macro uploads or downloads, the app shows a list of the files involved on the right,
+ticking them off as they go. The state lives in `TransferProgressStore` — in memory, no table,
+the same choice and the same reasoning as `CreateTicketStore`: it is worth seconds to minutes,
+nobody needs it afterwards, and a restart losing it costs nothing, because progress is
+information about the work rather than part of it.
+
+It is keyed by **user**, not by a session id. The browser therefore asks plainly "what is my
+macro doing?" (`GET /api/progress`) without having to learn an identifier from anywhere, which
+also works when the tab was opened before the macro ran. One run per person at a time is a safe
+assumption — nobody clicks Upload in two CAD programs at once — and a new run simply replaces
+the old one.
+
+The macro declares the **whole list up front** and then marks entries off. Without the complete
+list from the start the counter would lie: "3 of 3" would turn into "3 of 9" as another level of
+the tree appeared.
+
+- **Uploading** already knows the list: `DiscoverComponentTree` walks the assembly before the
+  first file is sent, and the order is leaves-first because a parent cannot be given a BOM
+  relation to a child that does not exist in the PDM yet.
+- **Downloading** did not. `DownloadChildrenRecursive` descends level by level and at the start
+  has no idea how many files there will be, so `GET /items/{id}/descendants` was added: one
+  recursive query returning the item and its whole subtree. Its de-duplication matches the
+  macro's own `seen` set, so a part used in several assemblies is counted once and the counter
+  reaches its end. The list is ordered parent-first because that is the order the macro actually
+  downloads in; sorting it any other way would make entries tick off out of sequence. For
+  downloading, order has no bearing on correctness anyway — every file lands on disk before the
+  top document is opened.
+
+**Progress reporting must never break a transfer.** All of it goes through a private, silent HTTP
+path in each macro rather than through `ApiPostJson`/`api_post_json`, which raise on failure. A
+missing connection, a restarted server or an older server without these endpoints has no business
+stopping the thing the user actually asked for. On an unknown key the server answers
+`matched: false` rather than an error, for the same reason.
+
+The browser polls every 1.5 s with a plain `setInterval`, the pattern already proven by
+`use-notifications.ts`. An earlier attempt picked the interval dynamically through a `setTimeout`
+that rescheduled itself; it was measurably fragile — one remount broke the chain and it never
+resumed — and the saving was not worth it, since a poll is a dictionary lookup and a few dozen
+bytes, never touching the database. A finished run stops being served after two minutes, so a
+list from an hour ago does not greet whoever opens the app next.
+
 ### Login, roles, and project access
 
 Every request to `/api/*` (except `/api/auth/login`) requires being logged in — a

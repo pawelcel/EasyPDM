@@ -94,6 +94,10 @@ Option Explicit
 ' preferences store, nothing about it is SolidWorks- or Inventor-specific.
 ' ============================================================================
 
+' Klucz pozycji dokumentu nadrzednego na liscie postepu -- odhaczany w innym miejscu (main)
+' niz dodawany do listy (ProcessAssemblyTree), wiec stala zamiast literalu w dwoch miejscach.
+Private Const TOP_DOCUMENT_PROGRESS_KEY As String = "__top__"
+
 Private Const APP_SETTINGS_NAME As String = "EasyPDM"
 Private Const SETTINGS_SECTION As String = "Connection"
 Private Const DEFAULT_BASE_URL As String = "http://localhost:5000/api"
@@ -1269,6 +1273,71 @@ End Function
 ' progress is shown in Inventor's own status bar instead of a dialog. Uses tick/poll
 ' COUNTERS rather than Timer()/Now() on purpose -- Timer() resets at midnight, which would
 ' misfire the 10-minute timeout for a wait that happens to straddle it.
+' ============================================================================
+' Postep wysylki/pobierania pokazywany w aplikacji webowej jako lista plikow odhaczana w
+' trakcie pracy makra (zob. TransferProgressStore.cs / TransferProgressPanel.tsx).
+' Blizniacze do tych samych funkcji w makrach SolidWorks.
+'
+' CELOWO nie korzysta z ApiPostJson/ApiGet: tamte wolaja RaiseForStatus i rzucaja wyjatkiem,
+' a raportowanie postepu NIE MOZE przerwac transferu. Zadna awaria tutaj -- brak polaczenia,
+' zrestartowany serwer, starsza wersja bez tych endpointow -- nie ma prawa zatrzymac tego,
+' po co uzytkownik uruchomil makro.
+' ============================================================================
+
+Private Sub ProgressSend(ByVal method As String, ByVal path As String, ByVal bodyJson As String)
+    On Error Resume Next
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open method, GetBaseUrl() & path, False
+    http.setRequestHeader "Content-Type", "application/json"
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+    http.send bodyJson
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Sub ProgressStart(ByVal kind As String, ByRef keys As Collection, ByRef labels As Collection)
+    On Error Resume Next
+    If keys Is Nothing Then Exit Sub
+    If keys.Count = 0 Then Exit Sub
+    Dim body As String, i As Long
+    body = "{""kind"":""" & kind & """,""entries"":["
+    For i = 1 To keys.Count
+        If i > 1 Then body = body & ","
+        body = body & "{""key"":""" & JsonStringEscape(CStr(keys(i))) & _
+               """,""label"":""" & JsonStringEscape(CStr(labels(i))) & """}"
+    Next i
+    body = body & "]}"
+    ProgressSend "PUT", "/progress", body
+    LogLine "Progress: started " & kind & " with " & keys.Count & " entry(ies)."
+    On Error GoTo 0
+End Sub
+
+' status: "active" | "done" | "failed" | "skipped"
+Sub ProgressMark(ByVal key As String, ByVal status As String)
+    On Error Resume Next
+    If key = "" Then Exit Sub
+    ProgressSend "PATCH", "/progress", "{""key"":""" & JsonStringEscape(key) & """,""status"":""" & status & """}"
+    On Error GoTo 0
+End Sub
+
+Sub ProgressFinish()
+    On Error Resume Next
+    ProgressSend "POST", "/progress/finish", "{}"
+    On Error GoTo 0
+End Sub
+
+' Sama nazwa pliku z rozszerzeniem -- pelna sciezka nie zmiesci sie w panelu i nic nie wnosi.
+Function ProgressLabelFor(ByVal path As String) As String
+    If path = "" Then
+        ProgressLabelFor = "(bez nazwy)"
+    Else
+        ProgressLabelFor = Mid(path, InStrRev(path, "\") + 1)
+    End If
+End Function
+
 Function WaitForTicket(ByVal ticket As String, Optional ByVal endpointPath As String = "/create-tickets/") As Object
     Const TICK_MS As Long = 400
     Const POLL_EVERY_MS As Long = 2000
@@ -2967,6 +3036,20 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
     Dim sendNewComponents As Boolean
     sendNewComponents = (choice = vbYes)
 
+    ' Lista do panelu postepu w przegladarce -- zglaszana TERAZ, bo dopiero teraz wiadomo, ze
+    ' uzytkownik potwierdzil. Komponenty w kolejnosci wysylki (liscmi do gory), a na koncu sam
+    ' dokument nadrzedny, ktory leci po nich.
+    Dim progKeys As New Collection
+    Dim progLabels As New Collection
+    Dim progPath As Variant
+    For Each progPath In order
+        progKeys.Add CStr(progPath)
+        progLabels.Add ProgressLabelFor(CStr(progPath))
+    Next progPath
+    progKeys.Add TOP_DOCUMENT_PROGRESS_KEY
+    progLabels.Add ProgressLabelFor(topModel.FullFileName)
+    ProgressStart "upload", progKeys, progLabels
+
     Dim edges As Collection
     Set edges = tree("edges")
 
@@ -2985,8 +3068,16 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
     Dim newlyCreatedPaths As Object
     Set newlyCreatedPaths = CreateObject("Scripting.Dictionary")
 
+    ' Poprzednia pozycja jest odhaczana na POCZATKU nastepnej, a ostatnia tuz za petla -- cialo
+    ' petli ma kilkanascie sciezek wyjscia i kazda musialaby inaczej o tym pamietac.
+    Dim progPrevKey As String
+    progPrevKey = ""
+
     Dim filePath As Variant
     For Each filePath In order
+        If progPrevKey <> "" Then ProgressMark progPrevKey, "done"
+        ProgressMark CStr(filePath), "active"
+        progPrevKey = CStr(filePath)
         Dim childModel As Object
         Set childModel = models(filePath)
 
@@ -3153,6 +3244,8 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
             Next edge2
         End If
     Next filePath
+
+    If progPrevKey <> "" Then ProgressMark progPrevKey, "done"
 
     ' Relations where topDoc itself is the parent could not be attached above (topDoc does
     ' not have an item id yet -- that is decided by the rest of main()) -- return them for
@@ -3667,10 +3760,16 @@ Sub main()
     ' document itself becomes/updates a top-level item.
     If DocKind(InvApp.ActiveDocument) = "drawing" Then
         UploadDrawingForActiveDoc InvApp.ActiveDocument, filePath
+        ProgressFinish
         Exit Sub
     End If
 
     UploadPartOrAssemblyDoc InvApp.ActiveDocument, filePath, itemTypeGuess, defaultName
+
+    ' Dokument nadrzedny leci jako ostatni, juz po calym drzewie. Gdy listy nie ma
+    ' (pojedynczy dokument), serwer odpowiada matched=false i nic sie nie dzieje.
+    ProgressMark TOP_DOCUMENT_PROGRESS_KEY, "done"
+    ProgressFinish
 End Sub
 
 ' Runs the full "upload this Part/Assembly document to EasyPDM" flow -- target folder

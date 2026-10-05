@@ -12,6 +12,74 @@ static class StructureEndpoints
         // relacji z góry, np. "Cała baza" (item-list.tsx), gdzie zaznaczony element może
         // być z dowolnego projektu. Odczyt elementu — świadomie otwarty dla KAŻDEGO
         // zalogowanego użytkownika (zob. GET /api/items), bez sprawdzenia dostępu do projektu.
+        // GET /api/items/{id}/descendants — element i CAŁE jego poddrzewo, spłaszczone jednym
+        // zapytaniem. Istnieje po to, żeby makro pobierania mogło pokazać listę plików ZANIM
+        // zacznie ściągać: samo makro schodzi poziom po poziomie (DownloadChildrenRecursive)
+        // i w momencie startu nie wie, ile tego będzie, więc pasek postępu kłamałby.
+        //
+        // Lekki rozmyślnie: tylko to, co potrzebne na etykietę pozycji na liście, bez
+        // właściwości, załączników i reszty, którą zwraca /children. Deduplikacja przez UNION
+        // odpowiada deduplikacji po "seen" w makrze, więc obie strony liczą tyle samo pozycji
+        // nawet wtedy, gdy ta sama część wchodzi w kilka podzespołów.
+        app.MapGet("/api/items/{id:guid}/descendants", async (Guid id, HttpContext ctx) =>
+        {
+            var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
+            if (info is null)
+                return Results.NotFound();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
+                return ItemEndpoints.ProjectAccessForbidden();
+
+            // depth pilnuje kolejności "rodzic przed dzieckiem" -- tej samej, w której makro
+            // faktycznie pobiera, więc lista odhacza się z góry na dół, a nie na przeskok.
+            const string sql = """
+                WITH RECURSIVE tree AS (
+                    SELECT i.id, i.file_name, i.item_type, i.item_number, i.item_number_prefix,
+                           i.item_number_digits, i.item_number_with_name, 0 AS depth
+                    FROM items i WHERE i.id = @id
+                    UNION
+                    SELECT i.id, i.file_name, i.item_type, i.item_number, i.item_number_prefix,
+                           i.item_number_digits, i.item_number_with_name, t.depth + 1
+                    FROM item_relations ir
+                    JOIN tree t ON ir.parent_id = t.id
+                    JOIN items i ON i.id = ir.child_id
+                )
+                SELECT DISTINCT ON (id) id, file_name, item_type, item_number, item_number_prefix,
+                       item_number_digits, item_number_with_name, depth
+                FROM tree ORDER BY id, depth;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("id", id);
+
+            var rows = new List<(int Depth, string RecordName, object Row)>();
+            await using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var recordName = ItemNumbering.RecordName(
+                        reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                        reader.IsDBNull(4) ? null : reader.GetString(4),
+                        reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                        reader.IsDBNull(6) ? null : reader.GetBoolean(6),
+                        reader.GetString(1));
+                    rows.Add((reader.GetInt32(7), recordName, new
+                    {
+                        id = reader.GetGuid(0),
+                        fileName = reader.GetString(1),
+                        itemType = reader.GetString(2),
+                        recordName,
+                    }));
+                }
+            }
+
+            // Sortowanie poza SQL-em, bo DISTINCT ON wymusza ORDER BY po kluczu deduplikacji.
+            return Results.Ok(rows.OrderBy(r => r.Depth).ThenBy(r => r.RecordName, StringComparer.Ordinal)
+                                  .Select(r => r.Row));
+        });
+
         app.MapGet("/api/items/{id:guid}/children", async (Guid id, HttpContext ctx) =>
         {
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);

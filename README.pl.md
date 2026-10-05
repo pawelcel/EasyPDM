@@ -248,6 +248,14 @@ Przy dużych modelach okno wysyłki ostrzega, zanim zatwierdzisz: eksport STEP-a
 program CAD i przy dużym złożeniu potrafi to zająć minuty, z programem zajętym przez cały ten
 czas.
 
+### Podgląd wysyłki i pobierania
+
+Gdy makro wysyła pliki do PDM albo je pobiera, aplikacja pokazuje po prawej stronie listę tych plików. Każdy jest odhaczany po zakończeniu, bieżący się kręci, a licznik mówi „3 z 7". Jeśli coś się nie uda, pozycja jest zaznaczona na czerwono, a reszta leci dalej.
+
+Najbardziej przydaje się to przy złożeniu. Wysyłka takiego do tej pory była czekaniem bez żadnej informacji — nie dało się stwierdzić, czy makro jest przy drugim komponencie, czy przy ostatnim, ani nad którym plikiem akurat pracuje. Lista pojawia się około sekundy po starcie makra i zostaje chwilę na koniec z kompletem ptaszków, co jest potwierdzeniem, że całość poszła.
+
+Działa tak samo z SolidWorksa, Inventora i FreeCAD-a, w obie strony. Jeśli w trakcie padnie połączenie albo serwer się zrestartuje, lista po prostu przestaje się odświeżać — sama wysyłka czy pobieranie lecą dalej, nietknięte.
+
 ### Status i rewizje
 
 Część/Złożenie przechodzą przez cztery statusy: **w pracy → sprawdzany → wydany**, a z

@@ -269,6 +269,14 @@ Bei großen Modellen warnt das Upload-Fenster, bevor Sie bestätigen: Der STEP-E
 Ihrem CAD-Programm, und bei einer großen Baugruppe kann das Minuten dauern, währenddessen ist
 das Programm belegt.
 
+### Hoch- und Herunterladen mitverfolgen
+
+Während ein Makro Dateien ins PDM sendet oder zurückholt, zeigt die Anwendung rechts eine Liste dieser Dateien. Jede wird nach Abschluss abgehakt, die laufende dreht sich, und ein Zähler sagt „3 von 7". Schlägt etwas fehl, wird der Eintrag rot markiert und der Rest läuft weiter.
+
+Am meisten bringt das bei einer Baugruppe. Deren Versand war bisher ein Warten ohne jede Rückmeldung — man konnte nicht erkennen, ob das Makro beim zweiten Bauteil oder beim letzten war, noch an welcher Datei es gerade arbeitete. Die Liste erscheint etwa eine Sekunde nach dem Start des Makros und bleibt am Ende einen Moment mit allen Haken stehen, was die Bestätigung ist, dass alles hochgegangen ist.
+
+Aus SolidWorks, Inventor und FreeCAD verhält es sich identisch, und in beide Richtungen. Bricht unterwegs die Verbindung ab oder startet der Server neu, hört die Liste einfach auf sich zu aktualisieren — das Hoch- oder Herunterladen selbst läuft unberührt weiter.
+
 ### Status und Revisionen
 
 Teile/Baugruppen durchlaufen vier Status: **in Bearbeitung → in Prüfung → freigegeben**,

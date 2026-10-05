@@ -171,6 +171,11 @@ Private Const SW_SYSCOLOR_BOTTOM_GRADIENT As Long = 101
 ' wiec na czarnym tle znikalaby cala sylwetka czesci. Szary ma rowne wartosci trzech kanalow,
 ' wiec ta sama liczba wychodzi niezaleznie od tego, czy SolidWorks pakuje kolor jako RGB czy
 ' BGR -- jedna niewiadoma mniej przy ustawieniu, ktorego nie da sie tu zweryfikowac.
+' Klucz pozycji dokumentu nadrzednego na liscie postepu. Stala, bo odhaczany jest w innym
+' miejscu (main) niz dodawany do listy (ProcessAssemblyTree), a literal w dwoch miejscach
+' rozjechalby sie przy pierwszej zmianie.
+Private Const TOP_DOCUMENT_PROGRESS_KEY As String = "__top__"
+
 Private Const SW_SCREENSHOT_BACKGROUND As Long = 3355443   ' RGB(51, 51, 51)
 
 ' Tryb tla widoku ('Wyglad tla' na stronie Kolory w Opcjach systemowych). Dopoki stal na 3,
@@ -1289,6 +1294,76 @@ End Function
 ' progress is shown in SolidWorks's own status bar instead of a dialog. Uses tick/poll
 ' COUNTERS rather than Timer()/Now() on purpose -- Timer() resets at midnight, which would
 ' misfire the 10-minute timeout for a wait that happens to straddle it.
+' ============================================================================
+' Postep wysylki/pobierania pokazywany w aplikacji webowej jako lista plikow odhaczana w
+' trakcie pracy makra (zob. TransferProgressStore.cs / TransferProgressPanel.tsx).
+'
+' CELOWO nie korzysta z ApiPostJson/ApiPatchJson: tamte wolaja RaiseForStatus i rzucaja
+' wyjatkiem, a raportowanie postepu NIE MOZE przerwac wysylki. Zadna awaria tutaj -- brak
+' polaczenia, zrestartowany serwer, starsza wersja bez tych endpointow -- nie ma prawa
+' zatrzymac tego, po co uzytkownik uruchomil makro. Dlatego wlasny, cichy wariant.
+' ============================================================================
+
+Private Sub ProgressSend(ByVal method As String, ByVal path As String, ByVal bodyJson As String)
+    On Error Resume Next
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open method, GetBaseUrl() & path, False
+    http.setRequestHeader "Content-Type", "application/json"
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+    http.send bodyJson
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' Zglasza CALA liste, zanim cokolwiek poleci. Klucze musza byc unikalne (serwer odrzuca
+' duplikaty) -- przy wysylce kluczem jest sciezka pliku, ktora w kolekcji 'order' jest
+' juz zdeduplikowana przez VisitAssemblyComponents.
+Sub ProgressStart(ByVal kind As String, ByRef keys As Collection, ByRef labels As Collection)
+    On Error Resume Next
+    If keys Is Nothing Then Exit Sub
+    If keys.Count = 0 Then Exit Sub
+    Dim body As String, i As Long
+    body = "{""kind"":""" & kind & """,""entries"":["
+    For i = 1 To keys.Count
+        If i > 1 Then body = body & ","
+        body = body & "{""key"":""" & JsonStringEscape(CStr(keys(i))) & _
+               """,""label"":""" & JsonStringEscape(CStr(labels(i))) & """}"
+    Next i
+    body = body & "]}"
+    ProgressSend "PUT", "/progress", body
+    LogLine "Progress: started " & kind & " with " & keys.Count & " entry(ies)."
+    On Error GoTo 0
+End Sub
+
+' status: "active" | "done" | "failed" | "skipped"
+Sub ProgressMark(ByVal key As String, ByVal status As String)
+    On Error Resume Next
+    If key = "" Then Exit Sub
+    ProgressSend "PATCH", "/progress", "{""key"":""" & JsonStringEscape(key) & """,""status"":""" & status & """}"
+    On Error GoTo 0
+End Sub
+
+' Sama nazwa pliku z rozszerzeniem: "C:\prj\bracket.SLDPRT" -> "bracket.SLDPRT". W
+' odroznieniu od BaseNameFromPath ZOSTAWIA rozszerzenie -- na liscie plikow to wlasnie ono
+' mowi uzytkownikowi, czy patrzy na czesc, zlozenie czy rysunek.
+Function ProgressLabelFor(ByVal path As String) As String
+    If path = "" Then
+        ProgressLabelFor = "(bez nazwy)"
+    Else
+        ProgressLabelFor = Mid(path, InStrRev(path, "\") + 1)
+    End If
+End Function
+
+Sub ProgressFinish()
+    On Error Resume Next
+    ProgressSend "POST", "/progress/finish", "{}"
+    On Error GoTo 0
+End Sub
+
+
 Function WaitForTicket(ByVal ticket As String, Optional ByVal endpointPath As String = "/create-tickets/") As Object
     Const TICK_MS As Long = 400
     Const POLL_EVERY_MS As Long = 2000
@@ -2888,6 +2963,21 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     Dim sendNewComponents As Boolean
     sendNewComponents = (choice = vbYes)
 
+    ' Lista do panelu postepu w przegladarce -- zglaszana TERAZ, bo dopiero teraz wiadomo,
+    ' ze uzytkownik potwierdzil. Komponenty w kolejnosci wysylki (liscmi do gory), a na
+    ' koncu sam dokument nadrzedny, ktory leci po nich (zob. main). Etykieta to sama nazwa
+    ' pliku, bez sciezki -- pelna sciezka nie zmiesci sie w panelu i nic nie wnosi.
+    Dim progKeys As New Collection
+    Dim progLabels As New Collection
+    Dim progPath As Variant
+    For Each progPath In order
+        progKeys.Add CStr(progPath)
+        progLabels.Add ProgressLabelFor(CStr(progPath))
+    Next progPath
+    progKeys.Add TOP_DOCUMENT_PROGRESS_KEY
+    progLabels.Add ProgressLabelFor(topModel.GetPathName())
+    ProgressStart "upload", progKeys, progLabels
+
     Dim edges As Collection
     Set edges = tree("edges")
 
@@ -2907,8 +2997,18 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     Dim newlyCreatedPaths As Object
     Set newlyCreatedPaths = CreateObject("Scripting.Dictionary")
 
+    ' Poprzednia pozycja jest odhaczana na POCZATKU nastepnej, a ostatnia tuz za petla.
+    ' Dzieki temu wpiecie w te procedure to dwa pojedyncze miejsca, a nie rozsiane po calym
+    ' ciele petli -- ktore ma kilkanascie sciezek wyjscia i kazda musialaby pamietac o
+    ' odhaczeniu.
+    Dim progPrevKey As String
+    progPrevKey = ""
+
     Dim filePath As Variant
     For Each filePath In order
+        If progPrevKey <> "" Then ProgressMark progPrevKey, "done"
+        ProgressMark CStr(filePath), "active"
+        progPrevKey = CStr(filePath)
         Dim childModel As Object
         Set childModel = models(filePath)
 
@@ -3069,6 +3169,8 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             Next edge2
         End If
     Next filePath
+
+    If progPrevKey <> "" Then ProgressMark progPrevKey, "done"
 
     ' Relations where topModel itself is the parent could not be attached above (topModel
     ' does not have an item id yet -- that is decided by the rest of main()) -- return them
@@ -3466,10 +3568,18 @@ Sub main()
     ' active document itself becomes/updates a top-level item.
     If swApp.ActiveDoc.GetType() = SW_DOC_DRAWING Then
         UploadDrawingForActiveDoc swApp.ActiveDoc, filePath
+        ProgressFinish
         Exit Sub
     End If
 
     UploadPartOrAssemblyDoc swApp.ActiveDoc, filePath, itemTypeGuess, defaultName
+
+    ' Dokument nadrzedny leci jako ostatni, juz po calym drzewie -- odhaczany tutaj, bo
+    ' UploadPartOrAssemblyDoc ma wiele sciezek wyjscia i kazda musialaby o tym pamietac.
+    ' Gdy listy nie ma (pojedyncza czesc, bez drzewa zlozenia), serwer odpowiada
+    ' matched=false i nic sie nie dzieje.
+    ProgressMark TOP_DOCUMENT_PROGRESS_KEY, "done"
+    ProgressFinish
 End Sub
 
 ' Runs the full "upload this Part/Assembly document to EasyPDM" flow -- target folder

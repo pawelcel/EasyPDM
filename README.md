@@ -247,6 +247,14 @@ For large models the upload window warns you before you confirm: exporting a STE
 inside your CAD program, and for a big assembly that can take minutes with the program busy
 throughout.
 
+### Watching an upload or a download
+
+While a macro is sending files to the PDM or fetching them back, the app shows a list of those files on the right. Each one is ticked off as it completes, the one in progress spins, and a counter says "3 of 7". If something fails it is marked in red and the rest carries on.
+
+This matters most for an assembly. Sending one used to be a wait with nothing to look at — no way to tell whether the macro was on the second component or the last, or which file it was working on. The list appears about a second after the macro starts and stays for a moment at the end with everything ticked, which is your confirmation that the whole thing went up.
+
+It behaves identically from SolidWorks, Inventor and FreeCAD, and in both directions. If the connection drops or the server restarts mid-way, the list simply stops updating — the upload or download itself carries on untouched.
+
 ### Status and revisions
 
 Parts/Assemblies move through four statuses: **in progress → under review → released**,

@@ -117,6 +117,9 @@ Private g_Lang As String
 ' here, grouped with the module's other Private declarations, all BEFORE any Sub/Function.
 Private gLogText As String
 
+' Klucz pozycji odhaczanej na liscie postepu jako NASTEPNA -- zob. ProgressAdvance.
+Private gProgressPrevKey As String
+
 Private Function DetectLanguage() As String
     Dim langId As Integer
     Dim primaryLang As Integer
@@ -611,6 +614,66 @@ Private Sub RaiseForStatus(ByVal status As Long, ByVal responseText As String)
         Err.Raise ERR_API, "EasyPDM", T("ServerErrorPrefix") & status & "): " & responseText
     End If
 End Sub
+
+' ============================================================================
+' Postep pobierania pokazywany w aplikacji webowej jako lista plikow odhaczana w trakcie.
+' Blizniacze do tych samych funkcji w makrach SolidWorks/FreeCAD. CELOWO nie korzysta z
+' ApiGet -- tamto rzuca wyjatkiem, a postep nie moze przerwac pobierania.
+' ============================================================================
+
+Private Sub ProgressSend(ByVal method As String, ByVal path As String, ByVal bodyJson As String)
+    On Error Resume Next
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open method, GetBaseUrl() & path, False
+    http.setRequestHeader "Content-Type", "application/json"
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+    http.send bodyJson
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Sub ProgressStart(ByVal kind As String, ByRef keys As Collection, ByRef labels As Collection)
+    On Error Resume Next
+    If keys Is Nothing Then Exit Sub
+    If keys.Count = 0 Then Exit Sub
+    Dim body As String, i As Long
+    body = "{""kind"":""" & kind & """,""entries"":["
+    For i = 1 To keys.Count
+        If i > 1 Then body = body & ","
+        body = body & "{""key"":""" & JsonStringEscape(CStr(keys(i))) & _
+               """,""label"":""" & JsonStringEscape(CStr(labels(i))) & """}"
+    Next i
+    body = body & "]}"
+    ProgressSend "PUT", "/progress", body
+    On Error GoTo 0
+End Sub
+
+Sub ProgressMark(ByVal key As String, ByVal status As String)
+    On Error Resume Next
+    If key = "" Then Exit Sub
+    ProgressSend "PATCH", "/progress", "{""key"":""" & JsonStringEscape(key) & """,""status"":""" & status & """}"
+    On Error GoTo 0
+End Sub
+
+Sub ProgressFinish()
+    On Error Resume Next
+    ProgressSend "POST", "/progress/finish", "{}"
+    On Error GoTo 0
+End Sub
+
+' Odhacza poprzednia pozycje i zaznacza biezaca jako aktywna -- DownloadItem jest wolane z
+' dwoch miejsc i ma kilka sciezek wyjscia, wiec jedno miejsce zamiast pilnowania kazdej.
+Sub ProgressAdvance(ByVal key As String)
+    On Error Resume Next
+    If gProgressPrevKey <> "" Then ProgressMark gProgressPrevKey, "done"
+    ProgressMark key, "active"
+    gProgressPrevKey = key
+    On Error GoTo 0
+End Sub
+
 
 Function ApiGet(ByVal path As String) As Object
     Dim http As Object
@@ -1294,6 +1357,7 @@ End Sub
 ' they already have), or "" if nothing could be resolved. Progress is reported via
 ' AppendLog (module-level, see Sub main()).
 Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
+    ProgressAdvance JsonGetString(item, "id", "")
     Dim number As Long
     number = JsonGetLong(item, "itemNumber", 0)
     Dim name As String
@@ -1558,11 +1622,35 @@ Sub main()
     Set seen = CreateObject("Scripting.Dictionary")
     seen.Add JsonGetString(topItem, "id", ""), True
 
+    ' Lista do panelu postepu. W odroznieniu od wysylki makro NIE zna jej z gory --
+    ' DownloadChildrenRecursive schodzi poziom po poziomie i nie wie, ile plikow bedzie.
+    ' Serwer zwraca cale poddrzewo jednym zapytaniem rekurencyjnym.
+    On Error Resume Next
+    Dim progRows As Object
+    Set progRows = ApiGet("/items/" & JsonGetString(topItem, "id", "") & "/descendants")
+    If Not progRows Is Nothing Then
+        Dim progKeys As New Collection
+        Dim progLabels As New Collection
+        Dim progRow As Variant
+        For Each progRow In progRows
+            progKeys.Add JsonGetString(progRow, "id", "")
+            progLabels.Add JsonGetString(progRow, "recordName", JsonGetString(progRow, "fileName", ""))
+        Next progRow
+        ProgressStart "download", progKeys, progLabels
+    End If
+    gProgressPrevKey = ""
+    Err.Clear
+    On Error GoTo 0
+
     Dim topPath As String
     topPath = DownloadItem(topItem, targetDir)
     If JsonGetString(topItem, "itemType", "") = "assembly" Then
         DownloadChildrenRecursive topItem, targetDir, seen
     End If
+
+    ' Ostatnia pobrana pozycja nie ma juz nastepnej, ktora by ja odhaczyla.
+    If gProgressPrevKey <> "" Then ProgressMark gProgressPrevKey, "done"
+    ProgressFinish
 
     If topPath <> "" And Dir(topPath) <> "" Then
         ' InvApp.Documents.Open infers the document type from the file itself (unlike

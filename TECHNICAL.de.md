@@ -449,6 +449,21 @@ STEP/IGES/STL sind daher nirgends in der Anwendung mehr vorschaubar, auch nicht 
 Anhang-Vorschaudialog; sie erhalten eine Schaltfläche zum Herunterladen. `previewKindOf` erkennt
 jetzt ausschließlich PDFs und Rasterbilder.
 
+### Die Fortschrittsliste für Hoch- und Herunterladen
+
+Während ein CAD-Makro hoch- oder herunterlädt, zeigt die Anwendung rechts eine Liste der beteiligten Dateien und hakt sie nach und nach ab. Der Zustand liegt in `TransferProgressStore` — im Arbeitsspeicher, ohne Tabelle, dieselbe Entscheidung und dieselbe Begründung wie bei `CreateTicketStore`: Er lebt Sekunden bis Minuten, danach braucht ihn niemand, und sein Verlust bei einem Neustart kostet nichts, denn Fortschritt ist eine Information ÜBER die Arbeit, nicht ein Teil davon.
+
+Geschlüsselt wird nach **Benutzer**, nicht nach einer Sitzungskennung. Der Browser fragt damit schlicht „was macht mein Makro?" (`GET /api/progress`), ohne irgendwoher eine Kennung erfahren zu müssen — das funktioniert auch, wenn der Tab schon vor dem Makrolauf offen war. Ein Lauf pro Person zur selben Zeit ist eine sichere Annahme, und ein neuer Lauf ersetzt den alten einfach.
+
+Das Makro meldet die **gesamte Liste im Voraus** und hakt erst danach ab. Ohne vollständige Liste von Anfang an würde der Zähler lügen: Aus „3 von 3" würde „3 von 9", sobald eine weitere Ebene des Baums auftaucht.
+
+- **Das Hochladen** kennt die Liste bereits: `DiscoverComponentTree` durchläuft die Baugruppe, bevor die erste Datei gesendet wird, und die Reihenfolge ist blattweise von unten, weil eine Baugruppe keine Stücklistenbeziehung zu einem Teil bekommen kann, das es im PDM noch nicht gibt.
+- **Das Herunterladen** kannte sie nicht. `DownloadChildrenRecursive` steigt Ebene für Ebene ab und weiß zu Beginn nicht, wie viele Dateien es werden — daher `GET /items/{id}/descendants`: eine rekursive Abfrage, die das Element und seinen gesamten Teilbaum liefert. Ihre Entduplizierung entspricht der Menge `seen` im Makro, sodass ein mehrfach verwendetes Teil einmal gezählt wird und der Zähler sein Ende erreicht. Die Liste ist Eltern-vor-Kind sortiert, weil das Makro TATSÄCHLICH in dieser Reihenfolge herunterlädt; jede andere Sortierung ließe die Einträge durcheinander abhaken. Beim Herunterladen spielt die Reihenfolge für die Korrektheit ohnehin keine Rolle — alle Dateien liegen auf der Platte, bevor überhaupt etwas geöffnet wird.
+
+**Die Fortschrittsmeldung darf eine Übertragung niemals abbrechen.** Sie läuft in jedem Makro über einen eigenen, stillen HTTP-Pfad und nicht über `ApiPostJson`/`api_post_json`, die im Fehlerfall eine Ausnahme werfen. Eine fehlende Verbindung, ein neu gestarteter Server oder ein älterer Server ohne diese Endpunkte haben nichts damit zu tun, das zu stoppen, worum der Benutzer tatsächlich gebeten hat. Aus demselben Grund antwortet der Server auf einen unbekannten Schlüssel mit `matched: false` statt mit einem Fehler.
+
+Der Browser fragt alle 1,5 s mit einem schlichten `setInterval` ab — das Muster, das sich in `use-notifications.ts` bereits bewährt hat. Ein erster Versuch wählte das Intervall dynamisch über ein `setTimeout`, das sich selbst neu plante; das erwies sich als messbar fragil (ein einziges Neueinhängen zerriss die Kette, und nichts setzte sie fort), und die Ersparnis war es nicht wert, denn eine Abfrage ist ein Wörterbuchzugriff und ein paar Dutzend Bytes, ohne die Datenbank zu berühren. Ein beendeter Lauf wird nach zwei Minuten nicht mehr ausgeliefert, damit eine Liste von vor einer Stunde nicht die nächste Person begrüßt, die die Anwendung öffnet.
+
 ### Anmeldung, Rollen und Projektzugriff
 
 Jede Anfrage an `/api/*` (außer `/api/auth/login`) erfordert eine Anmeldung — eine

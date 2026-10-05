@@ -397,6 +397,45 @@ def _raise_for_http_error(e):
     raise RuntimeError(_read_error_body(e))
 
 
+# ============================================================================
+# Postęp pobierania pokazywany w aplikacji webowej jako lista plików odhaczana w trakcie
+# (zob. TransferProgressStore.cs / TransferProgressPanel.tsx). Bliźniacze do tych samych
+# funkcji w EasyPDMUpload.FCMacro.
+#
+# CELOWO nie korzysta z api_get: tamto rzuca wyjątkiem przy błędzie HTTP, a raportowanie
+# postępu NIE MOŻE przerwać pobierania.
+# ============================================================================
+
+def _progress_send(method, path, payload):
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        headers.update(_auth_headers())
+        req = request.Request(get_base_url() + path, data=data, method=method, headers=headers)
+        with request.urlopen(req, timeout=10):
+            pass
+    except Exception:
+        pass
+
+
+def progress_start(kind, entries):
+    if not entries:
+        return
+    _progress_send("PUT", "/progress", {
+        "kind": kind,
+        "entries": [{"key": k, "label": l} for k, l in entries],
+    })
+
+
+def progress_mark(key, status):
+    if key:
+        _progress_send("PATCH", "/progress", {"key": key, "status": status})
+
+
+def progress_finish():
+    _progress_send("POST", "/progress/finish", {})
+
+
 def api_get(path):
     req = request.Request(get_base_url() + path, method="GET", headers=_auth_headers())
     try:
@@ -597,6 +636,23 @@ def _local_revision_files(target_dir, item_number, name):
 
 
 def _download_item(item, target_dir, log):
+    """Cienka nakładka na właściwe pobieranie, pilnująca wyłącznie listy postępu.
+
+    Kluczem pozycji jest ID elementu — to samo, które zwrócił serwer w /descendants.
+    Nakładka zamiast wstawek w środku, bo _download_item_inner ma pięć punktów wyjścia i
+    może rzucić wyjątkiem; tutaj każda z tych ścieżek odhacza pozycję dokładnie raz, a
+    nieudane pobranie zostaje na liście oznaczone jako błąd zamiast wisieć jako "w toku"."""
+    progress_mark(item["id"], "active")
+    try:
+        result = _download_item_inner(item, target_dir, log)
+    except Exception:
+        progress_mark(item["id"], "failed")
+        raise
+    progress_mark(item["id"], "done" if result else "failed")
+    return result
+
+
+def _download_item_inner(item, target_dir, log):
     """Pobiera aktualny plik CAD Części/Złożenia `item` do target_dir (patrz reguły 3 i 4
     w docstringu modułu). Zwraca ścieżkę do pliku, który finalnie jest/zostaje w folderze
     (świeżo pobrany, już tam był, albo — gdy użytkownik odmówił pobrania nowszej rewizji —
@@ -896,9 +952,23 @@ def _run_download(top_item, target_dir, log):
     log(t("log_downloading_top", number=top_item["itemNumber"], name=top_item["fileName"], dir=target_dir))
 
     seen = {top_item["id"]}
+
+    # Lista do panelu postępu. W odróżnieniu od wysyłki makro NIE zna jej z góry —
+    # _download_children_recursive schodzi poziom po poziomie i w tym momencie nie wie, ile
+    # plików będzie. Dlatego pytamy serwer o całe poddrzewo jednym zapytaniem; deduplikacja
+    # po jego stronie odpowiada tej po "seen" tutaj, więc liczby się zgadzają.
+    try:
+        rows = api_get(f"/items/{top_item['id']}/descendants") or []
+        progress_start("download",
+                       [(r["id"], r.get("recordName") or r.get("fileName", "")) for r in rows])
+    except Exception:
+        pass
+
     top_path = _download_item(top_item, target_dir, log)
     if top_item["itemType"] == "assembly":
         _download_children_recursive(top_item, target_dir, log, seen)
+
+    progress_finish()
 
     if top_path and os.path.exists(top_path):
         try:

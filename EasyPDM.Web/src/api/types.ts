@@ -577,3 +577,24 @@ export interface Attachment {
   // Wgrywany RAZEM ze STEP-em i razem z nim kasowany, zob. AttachmentEndpoints.cs.
   role: "pdf" | "step" | "cad" | "drawing" | "image" | null
 }
+
+// Postęp wysyłki/pobierania prowadzonego przez makro CAD — stan żyje w pamięci serwera,
+// kluczowany zalogowanym użytkownikiem, więc przeglądarka pyta po prostu "co teraz robi
+// moje makro?" bez znajomości jakiegokolwiek identyfikatora. Zob. TransferProgressStore.cs.
+export type TransferProgressStatus = "pending" | "active" | "done" | "failed" | "skipped"
+
+export interface TransferProgressEntry {
+  key: string
+  label: string
+  status: TransferProgressStatus
+}
+
+export interface TransferProgress {
+  kind: "upload" | "download"
+  finished: boolean
+  startedAt: string
+  // Liczone po stronie serwera, nie tutaj — ta sama zasada co przy itemNumberLabel.
+  total: number
+  done: number
+  entries: TransferProgressEntry[]
+}

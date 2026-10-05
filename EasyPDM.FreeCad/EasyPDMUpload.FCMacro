@@ -577,6 +577,10 @@ def t(key, **kwargs):
 PARAM_GROUP = "User parameter:BaseApp/EasyPDM"
 DEFAULT_BASE_URL = "http://localhost:5000/api"
 SESSION_COOKIE_NAME = "pdm_session"
+# Klucz pozycji dokumentu nadrzędnego na liście postępu. Stała, bo odhaczany jest w innym
+# miejscu (koniec run()) niż dodawany do listy (process_assembly_tree), a literał w dwóch
+# miejscach rozjechałby się przy pierwszej zmianie.
+TOP_DOCUMENT_PROGRESS_KEY = "__top__"
 
 
 class AuthError(RuntimeError):
@@ -762,6 +766,55 @@ def api_register_attachment(item_id, file_path, role=None):
     if role:
         body["role"] = role
     return api_post_json(f"/items/{item_id}/attachments/register", body)
+
+
+# ============================================================================
+# Postęp wysyłki/pobierania pokazywany w aplikacji webowej jako lista plików odhaczana w
+# trakcie pracy makra (zob. TransferProgressStore.cs / TransferProgressPanel.tsx).
+#
+# CELOWO nie korzysta z api_post_json/api_patch_json: tamte rzucają wyjątkiem przy błędzie
+# HTTP, a raportowanie postępu NIE MOŻE przerwać wysyłki. Żadna awaria tutaj — brak
+# połączenia, zrestartowany serwer, starsza wersja bez tych endpointów — nie ma prawa
+# zatrzymać tego, po co użytkownik uruchomił makro. Stąd własny, cichy wariant.
+# ============================================================================
+
+def _progress_send(method, path, payload):
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        headers.update(_auth_headers())
+        req = request.Request(get_base_url() + path, data=data, method=method, headers=headers)
+        with request.urlopen(req, timeout=10):
+            pass
+    except Exception:
+        pass
+
+
+def progress_start(kind, entries):
+    """entries: lista par (klucz, etykieta). Zgłaszana w CAŁOŚCI, zanim cokolwiek poleci —
+    bez pełnej listy od początku pasek postępu kłamałby ("3 z 3" zamieniałoby się w "3 z 9",
+    gdy znajdzie się kolejny poziom drzewa)."""
+    if not entries:
+        return
+    _progress_send("PUT", "/progress", {
+        "kind": kind,
+        "entries": [{"key": k, "label": l} for k, l in entries],
+    })
+
+
+def progress_mark(key, status):
+    """status: "active" | "done" | "failed" | "skipped" """
+    if key:
+        _progress_send("PATCH", "/progress", {"key": key, "status": status})
+
+
+def progress_finish():
+    _progress_send("POST", "/progress/finish", {})
+
+
+def progress_label_for(path):
+    """Sama nazwa pliku z rozszerzeniem — pełna ścieżka nie mieści się w panelu i nic nie wnosi."""
+    return os.path.basename(path) if path else "(bez nazwy)"
 
 
 def api_login(username, password):
@@ -2158,8 +2211,22 @@ def process_assembly_tree(top_doc, target_folder=None):
     # dopiero w podsumowaniu na końcu run() (patrz docstring wyżej).
     locked_matches = []
 
+    # Lista do panelu postępu w przeglądarce — zgłaszana TERAZ, bo dopiero teraz wiadomo, że
+    # użytkownik potwierdził. Komponenty w kolejności wysyłki (liście najpierw), a na końcu
+    # sam dokument nadrzędny, który leci po nich.
+    progress_start("upload",
+                   [(fp, progress_label_for(fp)) for fp in order]
+                   + [(TOP_DOCUMENT_PROGRESS_KEY, progress_label_for(getattr(top_doc, "FileName", "")))])
+    # Poprzednia pozycja jest odhaczana na POCZĄTKU następnej, a ostatnia tuż za pętlą — ciało
+    # pętli ma kilka ścieżek wyjścia (continue) i każda musiałaby inaczej o tym pamiętać.
+    progress_prev = [None]
+
     doc_to_item_id = {}
     for file_path in order:
+        if progress_prev[0]:
+            progress_mark(progress_prev[0], "done")
+        progress_mark(file_path, "active")
+        progress_prev[0] = file_path
         doc = docs[file_path]
         matched = match_existing_item(doc, existing_items)
         if matched:
@@ -2287,6 +2354,10 @@ def process_assembly_tree(top_doc, target_folder=None):
                     api_patch_json(f"/items/{child_item_id}/visibility", {"showInTree": False})
                 except Exception:
                     pass
+
+    # Ostatni komponent nie ma już następnego, który by go odhaczył.
+    if progress_prev[0]:
+        progress_mark(progress_prev[0], "done")
 
     # Relacje, w których rodzicem jest top_doc SAMO W SOBIE, nie mogły zostać podpięte
     # w pętli powyżej (top_doc celowo nie jest częścią "order" — nie ma jeszcze własnego
@@ -2430,6 +2501,12 @@ def run():
         + t("upload_success_tail", path=info["newPath"], local=local_line)
         + locked_tail,
     )
+
+    # Dokument nadrzędny leci jako ostatni, już po całym drzewie. Gdy listy nie ma
+    # (pojedynczy dokument, bez drzewa złożenia), serwer odpowiada "matched": false i nic
+    # się nie dzieje.
+    progress_mark(TOP_DOCUMENT_PROGRESS_KEY, "done")
+    progress_finish()
 
 
 # Odpala się tylko, gdy faktycznie działa GUI FreeCAD (a nie np. freecadcmd/import

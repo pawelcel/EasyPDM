@@ -32,6 +32,7 @@ import type {
   StatusPrecheck,
   StorageInfo,
   Tag,
+  TransferProgress,
   UsedInEntry,
   UserRole,
 } from "./types"
@@ -830,4 +831,10 @@ export const api = {
     ),
 
   logDownloadUrl: (date: string) => `${BASE}/settings/logs/${date}/download`,
+
+  getTransferProgress: () =>
+    fetch(`${BASE}/progress`).then((r) => handleResponse<{ progress: TransferProgress | null }>(r)),
+
+  dismissTransferProgress: () =>
+    fetch(`${BASE}/progress`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 }
