@@ -103,6 +103,7 @@ function PendingTicketBanner() {
         isDownload ? undefined : exportStep,
         isDownload ? undefined : exportPdf
       )
+      void api.clearCadRequest(pendingTicket!.ticket)
       clearPendingCreateTicket()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("addNode.addFailed"))
@@ -272,7 +273,11 @@ function PendingTicketBanner() {
             }
           }}
           onCreated={async () => {
-            clearPendingCreateTicket()
+            // Prośba znika też z serwera — inaczej po odświeżeniu strony ta sama karta
+            // podjęłaby ją ponownie i pokazała formularz dla komponentu, który już powstał.
+            void api.clearCadRequest(pendingTicket.ticket)
+            void api.clearCadRequest(pendingTicket.ticket)
+      clearPendingCreateTicket()
           }}
         />
       )}

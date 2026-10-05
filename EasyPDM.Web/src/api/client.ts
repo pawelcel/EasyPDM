@@ -31,6 +31,7 @@ import type {
   SavedFilter,
   StatusPrecheck,
   StorageInfo,
+  CadRequest,
   Tag,
   TransferProgress,
   UsedInEntry,
@@ -837,4 +838,19 @@ export const api = {
 
   dismissTransferProgress: () =>
     fetch(`${BASE}/progress`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  getCadRequest: () =>
+    fetch(`${BASE}/cad-requests`).then((r) => handleResponse<{ request: CadRequest | null }>(r)),
+
+  takeCadRequest: (ticket: string) =>
+    fetch(`${BASE}/cad-requests/take`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket }),
+    }).then((r) => handleResponse<{ matched: boolean }>(r)),
+
+  clearCadRequest: (ticket: string) =>
+    fetch(`${BASE}/cad-requests?ticket=${encodeURIComponent(ticket)}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
+    ),
 }

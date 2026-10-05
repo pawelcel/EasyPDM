@@ -598,3 +598,18 @@ export interface TransferProgress {
   done: number
   entries: TransferProgressEntry[]
 }
+
+// Prośba makra CAD o formularz, zostawiona na serwerze zamiast otwierania nowej karty —
+// zob. CadRequestStore.cs. "taken" mówi makru, że jakaś otwarta karta ją podjęła; dopóki
+// nie jest prawdą, makro po chwili wraca do otwierania karty (przeglądarka może być
+// zamknięta).
+export interface CadRequest {
+  ticket: string
+  mode: "create" | "download"
+  name: string | null
+  itemType: string | null
+  material: string | null
+  documentSize: number | null
+  suggestedItemNumber: number | null
+  taken: boolean
+}

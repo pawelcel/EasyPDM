@@ -412,6 +412,31 @@ STEP/IGES/STL are therefore no longer previewable anywhere in the app, including
 preview dialog; they get a download button. `previewKindOf` now recognizes PDFs and raster
 images only.
 
+### Asking the browser for a form without opening a tab
+
+Sending an assembly needs a form for every new component. The macro used to open a tab for
+each one, preceded by a native message box — not to confirm anything, but because Windows'
+foreground-stealing protection lets only the **first** programmatic browser-open of a run take
+focus and opens every later one silently in the background. Without a click in between, the
+form appeared in a tab nobody could see while `WaitForTicket` polled for input that could not
+be given. On an assembly with forty parts that was forty clicks and forty tabs.
+
+The browser is already open and already polling, so no new tab is needed. The macro leaves its
+request in `CadRequestStore` (in memory, keyed by user, same reasoning as `CreateTicketStore`)
+and the open tab picks it up through `use-cad-requests.ts`, handing it to the very same
+`PendingTicketBanner` and `AddNodeDialog` that a URL-borne ticket feeds. Nothing about the form
+itself changed.
+
+The one thing that cannot be assumed is that a browser is watching at all — it may be closed,
+or the server unreachable. So the macro publishes, then polls `GET /api/cad-requests/taken` for
+a few seconds; the tab marks the request taken the moment it claims it. No signal means nobody
+is there, and the macro falls back to the old path — message box, new tab — rather than waiting
+on a form nobody will see. That fallback is why the message box still exists in the code.
+
+`taken` is returned as a flat `1`/`0` rather than a boolean inside a nested object, because the
+JSON parsers inside the VBA macros only have `JsonGetString` and `JsonGetLong`; a flat number is
+the only shape they can read without being given a parser.
+
 ### The transfer progress list
 
 While a CAD macro uploads or downloads, the app shows a list of the files involved on the right,

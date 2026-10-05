@@ -247,6 +247,12 @@ For large models the upload window warns you before you confirm: exporting a STE
 inside your CAD program, and for a big assembly that can take minutes with the program busy
 throughout.
 
+### Sending an assembly
+
+The macro needs one form per new component. It no longer opens a browser tab for each of them, and no longer asks you to click OK before each one: the tab you already have open picks the request up and shows the form in place. On an assembly with forty parts that used to be forty clicks and forty tabs.
+
+If no browser is open, the macro notices within a few seconds and falls back to the old way — a message and a new tab — so nothing is lost either way.
+
 ### Watching an upload or a download
 
 While a macro is sending files to the PDM or fetching them back, the app shows a list of those files on the right. Each one is ticked off as it completes, the one in progress spins, and a counter says "3 of 7". If something fails it is marked in red and the rest carries on.

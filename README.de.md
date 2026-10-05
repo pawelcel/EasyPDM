@@ -269,6 +269,12 @@ Bei großen Modellen warnt das Upload-Fenster, bevor Sie bestätigen: Der STEP-E
 Ihrem CAD-Programm, und bei einer großen Baugruppe kann das Minuten dauern, währenddessen ist
 das Programm belegt.
 
+### Eine Baugruppe hochladen
+
+Das Makro braucht für jede neue Komponente ein Formular. Es öffnet dafür keinen eigenen Browser-Tab mehr und bittet auch nicht mehr vor jedem um einen Klick auf OK: Der bereits offene Tab nimmt die Anfrage an und zeigt das Formular an Ort und Stelle. Bei einer Baugruppe mit vierzig Teilen waren das bisher vierzig Klicks und vierzig Tabs.
+
+Ist kein Browser offen, bemerkt das Makro das binnen weniger Sekunden und kehrt zum alten Weg zurück — Meldung und neuer Tab —, sodass in keinem Fall etwas verloren geht.
+
 ### Hoch- und Herunterladen mitverfolgen
 
 Während ein Makro Dateien ins PDM sendet oder zurückholt, zeigt die Anwendung rechts eine Liste dieser Dateien. Jede wird nach Abschluss abgehakt, die laufende dreht sich, und ein Zähler sagt „3 von 7". Schlägt etwas fehl, wird der Eintrag rot markiert und der Rest läuft weiter.

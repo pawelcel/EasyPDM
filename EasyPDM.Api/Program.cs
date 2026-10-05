@@ -103,6 +103,7 @@ var createTicketStore = new CreateTicketStore();
 var drawingTicketStore = new DrawingTicketStore();
 var browserBridgeTicketStore = new BrowserBridgeTicketStore();
 var transferProgressStore = new TransferProgressStore();
+var cadRequestStore = new CadRequestStore();
 
 app.MapAuthEndpoints(connectionString, browserBridgeTicketStore);
 app.MapUserEndpoints(connectionString);
@@ -127,6 +128,7 @@ app.MapSettingsEndpoints(connectionString, storage, appSettingsPath);
 app.MapLogEndpoints(logRoot);
 app.MapNotificationEndpoints(connectionString);
 app.MapTransferProgressEndpoints(transferProgressStore);
+app.MapCadRequestEndpoints(cadRequestStore);
 
 // Bez rejestracji w DI (patrz komentarz w ScheduledBackupService.cs) — uruchamiane ręcznie,
 // z tokenem powiązanym z zamykaniem aplikacji, żeby pętla zatrzymała się razem z serwerem.

@@ -449,6 +449,16 @@ STEP/IGES/STL sind daher nirgends in der Anwendung mehr vorschaubar, auch nicht 
 Anhang-Vorschaudialog; sie erhalten eine Schaltfläche zum Herunterladen. `previewKindOf` erkennt
 jetzt ausschließlich PDFs und Rasterbilder.
 
+### Ein Formular anfordern, ohne einen Tab zu öffnen
+
+Das Hochladen einer Baugruppe braucht für jede neue Komponente ein Formular. Bisher öffnete das Makro dafür einen eigenen Tab, und vor jedem erschien ein natives Meldungsfenster — nicht zur Bestätigung, sondern weil der Windows-Schutz gegen Fokusdiebstahl nur dem **ersten** programmatischen Browseraufruf eines Laufs den Fokus zugesteht und jeden weiteren still im Hintergrund öffnet. Ohne Klick dazwischen erschien das Formular in einem Tab, den niemand sah, während `WaitForTicket` auf Eingaben wartete, die sich nicht machen ließen. Bei einer Baugruppe mit vierzig Teilen waren das vierzig Klicks und vierzig Tabs.
+
+Der Browser ist bereits offen und fragt den Server ohnehin ab, ein neuer Tab ist also überflüssig. Das Makro hinterlegt seine Anfrage in `CadRequestStore` (im Arbeitsspeicher, nach Benutzer geschlüsselt, dieselbe Begründung wie bei `CreateTicketStore`), und der offene Tab nimmt sie über `use-cad-requests.ts` an und reicht sie an genau dieselben `PendingTicketBanner` und `AddNodeDialog` weiter, die auch ein Ticket aus der URL bedienen. Am Formular selbst hat sich nichts geändert.
+
+Eines lässt sich nicht voraussetzen: dass überhaupt jemand zusieht. Der Browser kann geschlossen, der Server nicht erreichbar sein. Deshalb veröffentlicht das Makro die Anfrage und fragt dann einige Sekunden lang `GET /api/cad-requests/taken` ab; der Tab markiert die Anfrage in dem Moment als angenommen, in dem er sie übernimmt. Kein Signal heißt, dass niemand da ist — und das Makro kehrt zum alten Weg samt Fenster und neuem Tab zurück, statt auf ein Formular zu warten, das niemand sehen wird. Dieser Rückfallweg ist der einzige Grund, warum das Fenster im Code noch existiert.
+
+`taken` kommt als flache `1`/`0` zurück und nicht als Wahrheitswert in einem verschachtelten Objekt, denn die JSON-Parser in den VBA-Makros kennen nur `JsonGetString` und `JsonGetLong` — eine flache Zahl ist die einzige Form, die sie ohne zusätzlichen Parser lesen können.
+
 ### Die Fortschrittsliste für Hoch- und Herunterladen
 
 Während ein CAD-Makro hoch- oder herunterlädt, zeigt die Anwendung rechts eine Liste der beteiligten Dateien und hakt sie nach und nach ab. Der Zustand liegt in `TransferProgressStore` — im Arbeitsspeicher, ohne Tabelle, dieselbe Entscheidung und dieselbe Begründung wie bei `CreateTicketStore`: Er lebt Sekunden bis Minuten, danach braucht ihn niemand, und sein Verlust bei einem Neustart kostet nichts, denn Fortschritt ist eine Information ÜBER die Arbeit, nicht ein Teil davon.

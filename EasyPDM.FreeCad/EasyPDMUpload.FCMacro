@@ -183,7 +183,7 @@ import tempfile
 import uuid
 import webbrowser
 from urllib import error, request
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import FreeCAD as App
 
@@ -950,6 +950,66 @@ def _cad_item_type(doc):
         return "assembly" if _iter_external_link_targets(doc) else "part"
     except Exception:
         return ""
+
+
+def publish_cad_request(ticket, name, item_type=None, material=None, document_size=None):
+    """Zostawia na serwerze prośbę o formularz dla JUŻ OTWARTEJ karty przeglądarki i czeka
+    chwilę na sygnał, że ktoś ją podjął. Zwraca True, gdy podjęta — wtedy NIE otwieramy
+    nowej karty.
+
+    Po co: wysyłając złożenie, makro potrzebuje formularza dla każdego nowego komponentu.
+    Dotąd otwierało na to osobną kartę, a przed każdą musiało pokazać okno "OK" — nie dla
+    potwierdzenia, lecz dlatego, że Windows przepuszcza przejęcie fokusu tylko PIERWSZEMU
+    programowemu otwarciu przeglądarki w danym biegu. Przy kilkudziesięciu częściach to
+    kilkadziesiąt kliknięć i tyleż kart. Otwarta karta i tak odpytuje serwer, więc wystarczy
+    jej prośbę podać.
+
+    Czekanie jest krótkie: sprawdzamy tylko, CZY KTOŚ PATRZY, a nie czy wypełnił formularz —
+    tym zajmuje się WaitForTicketDialog. Gdy nikt nie podejmie (przeglądarka zamknięta),
+    kasujemy prośbę i wracamy do starej ścieżki.
+
+    Błąd tutaj nie może niczego zatrzymać: w najgorszym razie zwracamy False i wszystko idzie
+    jak przed tą zmianą."""
+    import time
+
+    payload = {"ticket": ticket, "mode": "create"}
+    if name:
+        payload["name"] = name
+    if item_type:
+        payload["itemType"] = item_type
+    if material:
+        payload["material"] = material
+    if document_size:
+        payload["documentSize"] = document_size
+
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        headers.update(_auth_headers())
+        req = request.Request(get_base_url() + "/cad-requests", data=data, method="PUT", headers=headers)
+        with request.urlopen(req, timeout=10):
+            pass
+    except Exception:
+        return False
+
+    deadline = time.time() + 6.0
+    while time.time() < deadline:
+        time.sleep(0.4)
+        try:
+            probe = api_get(f"/cad-requests/taken?ticket={quote(ticket)}")
+            if probe and probe.get("taken") == 1:
+                return True
+        except Exception:
+            pass
+
+    try:
+        headers = _auth_headers()
+        req = request.Request(get_base_url() + f"/cad-requests?ticket={quote(ticket)}", method="DELETE", headers=headers)
+        with request.urlopen(req, timeout=10):
+            pass
+    except Exception:
+        pass
+    return False
 
 
 def build_browser_create_url(name, ticket, suggested_item_number=None, document_size=None, item_type=None):
@@ -2270,17 +2330,22 @@ def process_assembly_tree(top_doc, target_folder=None):
             # analogicznym mechanizmie w makrze SolidWorks) -- kliknięcie OK tutaj liczy
             # się jako świeża interakcja.
             suggested_name = doc.Label
-            QtWidgets.QMessageBox.information(
-                None, t("pdm_title"), t("new_component_browser_prompt", name=suggested_name)
-            )
-
             ticket = str(uuid.uuid4())
-            try:
-                url = build_browser_create_url(suggested_name, ticket, None, _document_size(doc), _cad_item_type(doc))
-                webbrowser.open(url)
-            except Exception as e:
-                QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
-                return [], True, locked_matches
+
+            # Najpierw zostawiamy prośbę już otwartej karcie. Nowa karta — i okno, które
+            # przywraca możliwość przejęcia fokusu — tylko wtedy, gdy nikt jej nie podjął,
+            # czyli gdy przeglądarka jest zamknięta.
+            if not publish_cad_request(ticket, suggested_name, _cad_item_type(doc),
+                                       None, _document_size(doc)):
+                QtWidgets.QMessageBox.information(
+                    None, t("pdm_title"), t("new_component_browser_prompt", name=suggested_name)
+                )
+                try:
+                    url = build_browser_create_url(suggested_name, ticket, None, _document_size(doc), _cad_item_type(doc))
+                    webbrowser.open(url)
+                except Exception as e:
+                    QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
+                    return [], True, locked_matches
 
             wait_dlg = WaitForTicketDialog(ticket)
             if wait_dlg.exec() != QtWidgets.QDialog.Accepted:

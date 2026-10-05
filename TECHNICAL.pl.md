@@ -402,6 +402,16 @@ STEP/IGES/STL nie są więc już podglądalne nigdzie w aplikacji, łącznie z o
 załącznika — dostają przycisk pobierania. `previewKindOf` rozpoznaje teraz wyłącznie PDF-y i
 obrazy rastrowe.
 
+### Prośba o formularz bez otwierania karty
+
+Wysyłka złożenia potrzebuje formularza dla każdego nowego komponentu. Dotąd makro otwierało na to osobną kartę, a przed każdą pokazywało natywne okno — nie dla potwierdzenia, lecz dlatego, że ochrona Windows przed kradzieżą fokusu przepuszcza tylko **pierwsze** programowe otwarcie przeglądarki w danym biegu, a każde kolejne otwiera po cichu w tle. Bez kliknięcia pomiędzy formularz pojawiał się w karcie, której nikt nie widział, a `WaitForTicket` czekał na dane, których nie dało się wpisać. Przy złożeniu na czterdzieści części to czterdzieści kliknięć i czterdzieści kart.
+
+Przeglądarka jest już otwarta i już odpytuje serwer, więc żadna nowa karta nie jest potrzebna. Makro zostawia prośbę w `CadRequestStore` (w pamięci, kluczowane użytkownikiem, to samo uzasadnienie co przy `CreateTicketStore`), a otwarta karta podejmuje ją przez `use-cad-requests.ts` i podaje dokładnie temu samemu `PendingTicketBanner` i `AddNodeDialog`, które obsługują bilet z adresu URL. W samym formularzu nic się nie zmieniło.
+
+Jednego nie da się założyć: że ktokolwiek patrzy. Przeglądarka może być zamknięta, serwer nieosiągalny. Dlatego makro publikuje prośbę, a potem przez kilka sekund odpytuje `GET /api/cad-requests/taken`; karta oznacza prośbę jako podjętą w chwili, gdy ją przejmuje. Brak sygnału znaczy, że nikogo nie ma — i makro wraca do starej ścieżki, z oknem i nową kartą, zamiast czekać na formularz, którego nikt nie zobaczy. Ta ścieżka awaryjna jest jedynym powodem, dla którego okno nadal istnieje w kodzie.
+
+`taken` wraca jako płaskie `1`/`0`, a nie wartość logiczna w zagnieżdżonym obiekcie, bo parsery JSON w makrach VBA mają tylko `JsonGetString` i `JsonGetLong` — płaska liczba to jedyna postać, którą potrafią odczytać bez dokładania im parsera.
+
 ### Lista postępu wysyłki i pobierania
 
 Gdy makro CAD wysyła albo pobiera, aplikacja pokazuje po prawej listę plików i odhacza je w trakcie. Stan siedzi w `TransferProgressStore` — w pamięci, bez tabeli, ten sam wybór i to samo uzasadnienie co przy `CreateTicketStore`: żyje sekundy do minut, po fakcie nikomu niepotrzebny, a utrata przy restarcie nic nie kosztuje, bo postęp jest informacją O pracy, a nie jej częścią.

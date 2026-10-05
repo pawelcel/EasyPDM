@@ -24,9 +24,6 @@ type PendingTicket = {
   // dokumentu pasuje do "numer (nazwa).REWIZJA") — tylko PODPOWIEDŹ do wyboru w
   // PendingTicketBanner przy dogrywaniu do istniejącego, wybór zawsze można zmienić.
   suggestedItemNumber?: number
-  // Materiał odczytany z dokumentu CAD, podstawiany jako wartość POCZĄTKOWA pola Materiał
-  // w oknie dodawania. Bez tego pole startuje puste, nie wiadomo co wpisać, a po wysyłce
-  // materiał z CAD-a i tak się pojawia — jakby wziął się znikąd.
   // Typ dokumentu rozpoznany przez makro z samego pliku (.SLDASM/.iam/złożenie FreeCAD ->
   // "assembly", reszta -> "part"). Wstępnie zaznacza przycisk w oknie dodawania.
   //
@@ -35,6 +32,9 @@ type PendingTicket = {
   // więc makro zaraz potem dostawało 400 i cała struktura BOM nie powstawała. Zgłoszone z
   // praktyki: "nie zbudował struktury, tylko wszystko zapisał osobno".
   cadItemType?: "part" | "assembly"
+  // Materiał odczytany z dokumentu CAD, podstawiany jako wartość pola Materiał w oknie
+  // dodawania (tylko do odczytu — zob. MaterialField). Bez tego pole startuje puste, nie
+  // wiadomo co wpisać, a po wysyłce materiał z CAD-a i tak się pojawia — jakby znikąd.
   material?: string
   // Rozmiar dokumentu CAD w bajtach, odczytany przez makro z pliku na dysku. Służy TYLKO do
   // ostrzeżenia przy opcji eksportu STEP: dla dużych modeli ten eksport robi sam CAD i potrafi
@@ -91,8 +91,24 @@ function clearPendingCreateTicket() {
   listeners.forEach((listener) => listener())
 }
 
+// Drugi sposób, w jaki bilet może tu trafić: makro zostawia prośbę NA SERWERZE, a ta karta
+// — już otwarta i mająca fokus — sama ją podejmuje (zob. CadRequestStore.cs i
+// use-cad-requests.ts). Pierwszy sposób, czyli odczyt z adresu URL, wymaga nowej karty na
+// każdy komponent, a każda kolejna karta otwiera się w tle, bo Windows blokuje przejmowanie
+// fokusu — dlatego dotąd przed każdą trzeba było kliknąć "OK".
+//
+// Prośba z serwera jest ignorowana, gdy jakiś bilet już czeka: użytkownik ma przed sobą
+// jeden formularz na raz, a makro i tak zgłasza komponenty pojedynczo.
+function acceptPendingCreateTicket(next: NonNullable<PendingTicket>): boolean {
+  if (current !== null) return false
+  current = next
+  listeners.forEach((listener) => listener())
+  return true
+}
+
 function usePendingCreateTicket(): PendingTicket {
   return useSyncExternalStore(subscribe, getSnapshot)
 }
 
-export { clearPendingCreateTicket, usePendingCreateTicket }
+export { acceptPendingCreateTicket, clearPendingCreateTicket, usePendingCreateTicket }
+export type { PendingTicket }

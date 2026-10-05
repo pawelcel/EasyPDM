@@ -16,6 +16,7 @@ import { ItemList } from "@/features/items/item-list"
 import { PendingDrawingTicketBanner } from "@/features/items/pending-drawing-ticket-banner"
 import { PendingTicketBanner } from "@/features/items/pending-ticket-banner"
 import { TransferProgressPanel } from "@/features/transfer/transfer-progress-panel"
+import { useCadRequests } from "@/features/items/use-cad-requests"
 import { useItems } from "@/features/items/use-items"
 import { MaterialsView } from "@/features/materials/materials-view"
 import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
@@ -61,6 +62,11 @@ function readUrlState() {
 function App() {
   const { user, loading: authLoading, refetch: refetchAuth, logout } = useAuth()
   const { t } = useLanguage()
+
+  // Podejmuje prośby, które makro CAD zostawia na serwerze zamiast otwierać nową kartę na
+  // każdy komponent złożenia — zob. use-cad-requests.ts. Tu, a nie w PendingTicketBanner,
+  // bo ma działać niezależnie od tego, czy jakikolwiek bilet akurat czeka.
+  useCadRequests()
   const [initialUrlState] = useState(readUrlState)
   const [view, setView] = useState<View>(initialUrlState.view)
   const [settingsSection, setSettingsSection] = useState(initialUrlState.settingsSection)

@@ -248,6 +248,12 @@ Przy dużych modelach okno wysyłki ostrzega, zanim zatwierdzisz: eksport STEP-a
 program CAD i przy dużym złożeniu potrafi to zająć minuty, z programem zajętym przez cały ten
 czas.
 
+### Wysyłka złożenia
+
+Makro potrzebuje jednego formularza na każdy nowy komponent. Nie otwiera już na to osobnej karty przeglądarki ani nie prosi o kliknięcie OK przed każdą z nich: prośbę podejmuje karta, którą masz już otwartą, i pokazuje formularz na miejscu. Przy złożeniu na czterdzieści części było to czterdzieści kliknięć i czterdzieści kart.
+
+Jeśli żadna przeglądarka nie jest otwarta, makro zauważa to w kilka sekund i wraca do starego sposobu — komunikat i nowa karta — więc nic nie przepada.
+
 ### Podgląd wysyłki i pobierania
 
 Gdy makro wysyła pliki do PDM albo je pobiera, aplikacja pokazuje po prawej stronie listę tych plików. Każdy jest odhaczany po zakończeniu, bieżący się kręci, a licznik mówi „3 z 7". Jeśli coś się nie uda, pozycja jest zaznaczona na czerwono, a reszta leci dalej.

@@ -1227,6 +1227,88 @@ Function ItemTypeOf(ByVal model As Object) As String
 End Function
 
 
+' ============================================================================
+' Prosba o formularz podawana JUZ OTWARTEJ karcie przegladarki, zamiast otwierania nowej.
+' Zob. CadRequestStore.cs po pelne uzasadnienie.
+'
+' Skrot: Windows przepuszcza przejecie fokusu tylko PIERWSZEMU programowemu otwarciu
+' przegladarki w danym biegu, kazde kolejne otwiera sie po cichu w tle -- dlatego przed
+' kazda karta trzeba bylo klikac OK. Jesli jednak karta juz jest otwarta i odpytuje serwer,
+' zadna nowa nie jest potrzebna i problem znika razem z klikaniem.
+'
+' Zabezpieczenie: przegladarka moze byc zamknieta. Dlatego po zostawieniu prosby czekamy
+' chwile na sygnal 'ktos to podjal' i dopiero gdy go nie ma, wracamy do starej sciezki
+' (OK + nowa karta). Bez tego makro czekaloby na formularz, ktorego nikt nigdy nie zobaczy.
+' ============================================================================
+
+' Zwraca True, gdy otwarta karta podjela prosbe -- wtedy NIE otwieramy nowej.
+Function PublishCadRequest(ByVal ticket As String, ByVal name As String, ByVal itemType As String, _
+                           ByVal materialName As String, ByVal documentSizeBytes As Long) As Boolean
+    On Error Resume Next
+    PublishCadRequest = False
+
+    Dim body As String
+    body = "{""ticket"":""" & JsonStringEscape(ticket) & """,""mode"":""create"""
+    If name <> "" Then body = body & ",""name"":""" & JsonStringEscape(name) & """"
+    If itemType <> "" Then body = body & ",""itemType"":""" & JsonStringEscape(itemType) & """"
+    If materialName <> "" Then body = body & ",""material"":""" & JsonStringEscape(materialName) & """"
+    If documentSizeBytes > 0 Then body = body & ",""documentSize"":" & CStr(documentSizeBytes)
+    body = body & "}"
+
+    Dim http As Object
+    Set http = NewHttpRequest()
+    http.Open "PUT", GetBaseUrl() & "/cad-requests", False
+    http.setRequestHeader "Content-Type", "application/json"
+    Dim cookie As String
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.setRequestHeader "Cookie", cookie
+    http.send body
+    If Err.Number <> 0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    If http.Status < 200 Or http.Status > 299 Then
+        On Error GoTo 0
+        Exit Function
+    End If
+
+    ' Czekamy na 'taken'. Krotko -- to tylko sprawdzenie, czy ktos patrzy, a nie czekanie
+    ' na wypelnienie formularza (tym zajmuje sie WaitForTicket).
+    Const TAKE_TIMEOUT_MS As Long = 6000
+    Const TAKE_TICK_MS As Long = 400
+    Dim waited As Long
+    waited = 0
+    Do While waited < TAKE_TIMEOUT_MS
+        Sleep TAKE_TICK_MS
+        waited = waited + TAKE_TICK_MS
+        ' Plaska liczba zamiast wartosci logicznej w zagniezdzonym obiekcie -- parser JSON
+        ' w tym module ma tylko JsonGetString i JsonGetLong (zob. endpoint /cad-requests/taken).
+        Dim probe As Object
+        Err.Clear
+        Set probe = ApiGet("/cad-requests/taken?ticket=" & UrlEncode(ticket))
+        If Err.Number = 0 And Not probe Is Nothing Then
+            If JsonGetLong(probe, "taken", 0) = 1 Then
+                PublishCadRequest = True
+                Err.Clear
+                On Error GoTo 0
+                Exit Function
+            End If
+        End If
+        Err.Clear
+    Loop
+
+    ' Nikt nie podjal -- prosba zostaje skasowana, zeby karta otwarta pozniej nie pokazala
+    ' formularza dla komponentu, ktory tymczasem przeszedl stara sciezka.
+    Dim del As Object
+    Set del = NewHttpRequest()
+    del.Open "DELETE", GetBaseUrl() & "/cad-requests?ticket=" & UrlEncode(ticket), False
+    If cookie <> "" Then del.setRequestHeader "Cookie", cookie
+    del.send ""
+    Err.Clear
+    On Error GoTo 0
+End Function
+
 Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "", Optional ByVal documentSizeBytes As Long = 0, Optional ByVal itemType As String = "") As String
     Dim redirectPath As String
     redirectPath = "/?ticket=" & UrlEncode(ticket)
@@ -3047,20 +3129,31 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
             ' leaves-first order as everything else here (never several tabs at once --
             ' confusing to juggle). Cancelling any single ticket aborts the whole
             ' remaining tree walk, same as every other hiccup in this loop.
-            ' A native MsgBox right before opening each browser tab -- confirmed necessary
-            ' in practice: Windows' foreground-stealing protection lets the FIRST
-            ' programmatic browser-open of a run take focus, but silently opens the SECOND
-            ' one (and later) in a background tab with no visible cue, leaving WaitForTicket
-            ' polling forever with nothing for the user to see or fill in. Clicking OK here
-            ' counts as fresh user input, which lets the immediately-following browser-open
-            ' take focus reliably.
+            ' Formularz dla komponentu pokazuje JUZ OTWARTA karta przegladarki -- makro tylko
+            ' zostawia prosbe na serwerze (PublishCadRequest). Nowa karta powstaje wylacznie
+            ' wtedy, gdy nikt tej prosby nie podjal, czyli gdy przegladarka jest zamknieta.
+            '
+            ' Dlaczego ta sciezka awaryjna ma natywne okno MsgBox: ochrona Windows przed
+            ' kradzieza fokusu przepuszcza PIERWSZE programowe otwarcie przegladarki w danym
+            ' biegu, ale kolejne otwiera po cichu w tle, bez zadnego sygnalu -- WaitForTicket
+            ' czekalby wtedy na formularz, ktorego nikt nie widzi. Kliniecie OK liczy sie jako
+            ' swieza interakcja uzytkownika i przywraca mozliwosc przejecia fokusu.
+            '
+            ' Przy otwartej karcie nie ma ani okna, ani nowej karty -- a przy zlozeniu na
+            ' kilkadziesiat czesci bylo to kilkadziesiat klikniec i tylez kart.
             Dim compSuggestedName As String
             compSuggestedName = BaseNameFromPath(CStr(filePath))
-            MsgBox T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
 
             Dim compTicket As String
             compTicket = NewGuid()
-            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel), ItemTypeOf(childModel))
+            ' Najpierw zostawiamy prosbe juz otwartej karcie. Nowa karta (i natywne okno,
+            ' ktore przywraca mozliwosc przejecia fokusu) tylko wtedy, gdy nikt jej nie
+            ' podjal -- czyli gdy przegladarka jest zamknieta. Zob. CadRequestStore.cs.
+            If Not PublishCadRequest(compTicket, compSuggestedName, ItemTypeOf(childModel), _
+                                     MaterialNameOf(childModel), DocumentSizeOf(childModel)) Then
+                MsgBox T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
+                OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel), ItemTypeOf(childModel))
+            End If
 
             Dim compTicketData As Object
             Set compTicketData = WaitForTicket(compTicket)
