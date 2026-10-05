@@ -842,6 +842,30 @@ Function UrlEncode(ByVal s As String) As String
     UrlEncode = result
 End Function
 
+' Okno komunikatu, ktore na pewno BEDZIE WIDOCZNE, nawet gdy fokus ma przegladarka.
+'
+' Zgloszone z praktyki: po zapisaniu ostatniego elementu koncowy raport pojawial sie w Inventor,
+' ale ekran zostawal na przegladarce -- czyli uzytkownik patrzyl na karte, a makro czekalo na
+' klikniecie w oknie, ktorego nie widzial ("nie wiadomo co sie dzieje").
+'
+' Powod: po oddaniu fokusu karcie (zob. AppActivate "EasyPDM" przy prosbie o formularz) Inventor
+' stoi w TLE, a okno utworzone przez proces w tle powstaje ZA oknem aktywnej aplikacji.
+'
+' vbSystemModal (4096) nadaje oknu atrybut "zawsze na wierzchu" -- i to dziala rowniez dla
+' procesu w tle, w odroznieniu od samego przejecia fokusu, ktorego Windows takiemu procesowi
+' nie da (ta sama regula, ktora kazala klikac OK przed KOLEJNYMI oknami przegladarki).
+'
+' Proba AppActivate jest dodatkiem: gdy sie uda, okno dostaje tez klawiature, a gdy nie --
+' jest widoczne mimo wszystko. Dopasowanie idzie po POCZATKU tytulu okna, a blad jest
+' polykany, bo to wygoda, a nie czesc wysylki.
+Private Function MsgBoxFront(ByVal prompt As String, ByVal buttons As VbMsgBoxStyle, ByVal title As String) As VbMsgBoxResult
+    On Error Resume Next
+    AppActivate "Autodesk Inventor"
+    Err.Clear
+    On Error GoTo 0
+    MsgBoxFront = MsgBox(prompt, buttons + vbSystemModal, title)
+End Function
+
 Sub OpenUrlInBrowser(ByVal url As String)
     CreateObject("WScript.Shell").Run """" & url & """", 1, False
 End Sub
@@ -877,7 +901,7 @@ Function BuildBrowserDownloadUrl(ByVal ticket As String) As String
 
 TicketFailed:
     LogLine "POST /auth/browser-bridge-ticket -> ERROR (" & Err.Number & "): " & Err.Description
-    MsgBox T("ErrorPrefix") & Err.Description, vbCritical, T("AppTitle")
+    MsgBoxFront T("ErrorPrefix") & Err.Description, vbCritical, T("AppTitle")
     BuildBrowserDownloadUrl = ""
 End Function
 
@@ -1115,11 +1139,11 @@ Private Function PromptLogin() As Boolean
         On Error GoTo 0
 
         If loginErrNum = 0 Then
-            MsgBox T("LoggedInAsPrefix") & JsonGetString(user, "displayName", username) & ".", vbInformation, T("AppTitle")
+            MsgBoxFront T("LoggedInAsPrefix") & JsonGetString(user, "displayName", username) & ".", vbInformation, T("AppTitle")
             PromptLogin = True
             Exit Function
         Else
-            MsgBox T("LoginFailedPrefix") & loginErrDesc, vbExclamation, T("AppTitle")
+            MsgBoxFront T("LoginFailedPrefix") & loginErrDesc, vbExclamation, T("AppTitle")
         End If
     Next attempt
     PromptLogin = False
@@ -1438,7 +1462,7 @@ Function DownloadItem(ByVal item As Object, ByVal targetDir As String) As String
         End If
 
         Dim answer As VbMsgBoxResult
-        answer = MsgBox( _
+        answer = MsgBoxFront( _
             T("NewerRevisionPart1") & label & T("NewerRevisionPart2") & revLabels & _
             T("NewerRevisionPart3") & wanted & "." & vbCrLf & vbCrLf & _
             T("DownloadNewestQuestion"), vbYesNo, T("TitleNewerRevision"))
@@ -1566,7 +1590,7 @@ Sub main()
     On Error GoTo 0
 
     If InvApp Is Nothing Then
-        MsgBox T("MustRunInsideInventor"), vbCritical, T("AppTitle")
+        MsgBoxFront T("MustRunInsideInventor"), vbCritical, T("AppTitle")
         Exit Sub
     End If
 
@@ -1591,7 +1615,7 @@ Sub main()
     Dim ticketData As Object
     Set ticketData = WaitForTicket(ticket)
     If ticketData Is Nothing Then
-        MsgBox T("CancelledNothingDownloaded"), vbInformation, T("AppTitle")
+        MsgBoxFront T("CancelledNothingDownloaded"), vbInformation, T("AppTitle")
         LogLine "=== Finished: browser ticket cancelled/timed out ==="
         Exit Sub
     End If
@@ -1599,7 +1623,7 @@ Sub main()
     Dim topItem As Object
     Set topItem = ApiGet("/items/" & JsonGetString(ticketData, "itemId", ""))
     If topItem Is Nothing Then
-        MsgBox T("SelectedItemLoadFailed"), vbExclamation, T("AppTitle")
+        MsgBoxFront T("SelectedItemLoadFailed"), vbExclamation, T("AppTitle")
         Exit Sub
     End If
 
@@ -1675,23 +1699,23 @@ Sub main()
         AppendLog T("Dl_CouldNotDetermineMainFile")
     End If
 
-    MsgBox gLogText, vbInformation, T("AppTitle")
+    MsgBoxFront gLogText, vbInformation, T("AppTitle")
     LogLine "=== Finished ==="
     Exit Sub
 
 Failed:
     LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
     If Err.Number = ERR_AUTH Then
-        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & _
+        MsgBoxFront T("SessionExpiredPrompt") & vbCrLf & vbCrLf & _
                T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
         SetSessionToken ""
     Else
-        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
+        MsgBoxFront T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
     End If
 End Sub
 
 ' Separate Sub -- can be bound to your own toolbar button/shortcut to log out of EasyPDM.
 Sub Logout()
     ApiLogout
-    MsgBox T("LoggedOutMessage"), vbInformation, T("AppTitle")
+    MsgBoxFront T("LoggedOutMessage"), vbInformation, T("AppTitle")
 End Sub

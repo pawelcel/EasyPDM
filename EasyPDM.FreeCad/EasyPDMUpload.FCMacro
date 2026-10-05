@@ -991,6 +991,9 @@ def publish_cad_request(ticket, name, item_type=None, material=None, document_si
     # a podanie jej "komukolwiek" trafiałoby w przeglądarkę na innym komputerze zalogowaną tym
     # samym kontem. Pierwszy komponent biegu idzie więc starą ścieżką.
     if not _RUN["tab_opened"]:
+        App.Console.PrintMessage(
+            "EasyPDM: prosba o formularz pominieta -- zadna karta tego biegu jeszcze nie istnieje\n"
+        )
         return False
 
     payload = {"runId": run_id(), "ticket": ticket, "mode": "create"}
@@ -1010,18 +1013,29 @@ def publish_cad_request(ticket, name, item_type=None, material=None, document_si
         req = request.Request(get_base_url() + "/cad-requests", data=data, method="PUT", headers=headers)
         with request.urlopen(req, timeout=10):
             pass
-    except Exception:
+    except Exception as e:
+        # Bez tego wpisu nie da sie odroznic "serwer odrzucil prosbe" od "nikt nie patrzyl":
+        # oba konczyly sie po cichu otwarciem nowej karty, a zgloszenie brzmialo tak samo
+        # ("otwiera nowe okno przy kazdym pliku").
+        App.Console.PrintMessage(f"EasyPDM: prosba o formularz nie zostala przyjeta przez serwer: {e}\n")
         return False
 
     deadline = time.time() + 6.0
+    last_error = None
     while time.time() < deadline:
         time.sleep(0.4)
         try:
             probe = api_get(f"/cad-requests/taken?ticket={quote(ticket)}")
             if probe and probe.get("taken") == 1:
+                App.Console.PrintMessage(f"EasyPDM: formularz dla '{name}' podjela otwarta karta\n")
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            last_error = e
+
+    App.Console.PrintMessage(
+        f"EasyPDM: nikt nie podjal prosby o formularz dla '{name}' w ciagu 6 s"
+        f" -- otwieram nowa karte{'' if last_error is None else f' (ostatni blad odpytania: {last_error})'}\n"
+    )
 
     try:
         headers = _auth_headers()
@@ -1619,19 +1633,52 @@ def _upload_model_image_attachment(doc, item_id):
 
     Błędy nie przerywają niczego — tak samo jak w _upload_step_attachment: właściwy plik jest
     już w tym momencie wysłany, więc nieudany zrzut (np. FreeCAD uruchomiony bez GUI) nie
-    powinien wyglądać jak porażka całej operacji."""
-    try:
-        import FreeCADGui as Gui
+    powinien wyglądać jak porażka całej operacji. Każdy taki przypadek jest jednak WYPISYWANY
+    do Report View: cicha porażka bez śladu kosztowała już jedno zgłoszenie "nie ma screenów",
+    którego nie dało się zdiagnozować inaczej niż czytaniem kodu."""
+    import FreeCADGui as Gui
 
+    view = None
+    created_view = False
+    previous_document = None
+    label = getattr(doc, "Label", "?")
+    try:
         # Widok TEGO dokumentu, nie aktywnego. Gui.ActiveDocument to dokument, na którym
         # użytkownik akurat stoi — przy wysyłce złożenia jest nim złożenie, więc każdy
         # komponent dostawałby obraz złożenia zamiast własnego (tak właśnie zachowywał się
         # odpowiednik tej funkcji w SolidWorksie, zgłoszone z praktyki).
-        #
-        # getDocument(doc.Name) daje widok wskazanego dokumentu BEZ przełączania interfejsu —
-        # w odróżnieniu od makr SolidWorks/Inventor, gdzie trzeba aktywować dokument i potem
-        # przywrócić poprzedni.
-        view = Gui.getDocument(doc.Name).ActiveView
+        try:
+            view = _three_d_view_of(Gui.getDocument(doc.Name))
+        except Exception as e:
+            App.Console.PrintMessage(f"EasyPDM: zrzut '{label}' -- brak dokumentu GUI ({e})\n")
+
+        if view is None:
+            # Komponent złożenia zwykle NIE MA własnego okna 3D: FreeCAD wczytuje go jako
+            # zależność linku z dokumentu nadrzędnego, do modelu w drzewie, ale bez okna.
+            # Samo getDocument(...).ActiveView daje wtedy None, a zrzut po cichu nie powstaje
+            # -- i dokładnie to się stało po przejściu z Gui.ActiveDocument na widok własny
+            # dokumentu: złożenie (otwarte oknem) miało obrazek, żaden komponent nie miał.
+            #
+            # Okno 3D trzeba więc dla takiego dokumentu stworzyć, zrobić zrzut i je zamknąć.
+            # Przełączenie aktywnego dokumentu jest tu nieuniknione (inaczej niż zakładał
+            # komentarz, który tu wcześniej stał): to jedyna droga do widoku, z którego
+            # saveImage w ogóle potrafi renderować.
+            previous_document = getattr(getattr(Gui, "ActiveDocument", None), "Name", None)
+            try:
+                Gui.setActiveDocument(doc.Name)
+                # activateView(typ, create=True) tworzy okno 3D, jeśli dokument go nie ma.
+                Gui.activateView("Gui::View3DInventor", True)
+                view = _three_d_view_of(Gui.ActiveDocument)
+                created_view = view is not None
+            except Exception as e:
+                App.Console.PrintMessage(f"EasyPDM: zrzut '{label}' -- activateView nie zadzialalo ({e})\n")
+
+        if view is None:
+            App.Console.PrintMessage(
+                f"EasyPDM: zrzut '{label}' pominiety -- nie udalo sie uzyskac widoku 3D tego dokumentu\n"
+            )
+            return
+
         # Ustawiony kadr: aksonometria i dopasowanie do okna. Bez tego zrzut pokazałby to, na
         # czym akurat stał użytkownik — zbliżenie na fragment albo widok z boku.
         #
@@ -1658,16 +1705,58 @@ def _upload_model_image_attachment(doc, item_id):
             # zarówno na jasnym, jak i na ciemnym motywie.
             view.saveImage(image_path, 1200, 900, "Transparent")
             if not os.path.exists(image_path):
+                App.Console.PrintMessage(
+                    f"EasyPDM: zrzut '{label}' pominiety -- saveImage nie utworzylo pliku\n"
+                )
                 return
             api_upload_file(
                 f"/items/{item_id}/attachments", image_path,
                 override_filename=os.path.basename(image_path),
                 extra_fields={"role": "image"},
             )
+            App.Console.PrintMessage(f"EasyPDM: zrzut '{label}' wyslany\n")
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+    except Exception as e:
+        App.Console.PrintMessage(f"EasyPDM: zrzut '{label}' nie powiodl sie: {e}\n")
+    finally:
+        # Okno otwarte TYLKO po to, żeby zrobić zrzut, jest tu zamykane: przy złożeniu na
+        # kilkanaście części zostałoby po wysyłce kilkanaście okien 3D, których użytkownik
+        # nie otwierał. Zamknięcie jest najlepszym staraniem -- gdyby się nie udało, zostaje
+        # otwarte okno, co jest brzydkie, ale niczego nie psuje.
+        if created_view:
+            try:
+                view.close()
+            except Exception as e:
+                App.Console.PrintMessage(
+                    f"EasyPDM: zrzut '{label}' -- nie udalo sie zamknac tymczasowego okna 3D ({e})\n"
+                )
+        if previous_document:
+            try:
+                Gui.setActiveDocument(previous_document)
+            except Exception:
+                pass
+
+
+def _three_d_view_of(gui_doc):
+    """Widok 3D dokumentu GUI, albo None gdy ten dokument nie ma własnego okna.
+
+    Rozpoznawanie po obecności `saveImage`, a nie po typie: ActiveView dokumentu, na którym
+    stoi strona TechDraw, jest widokiem RYSUNKU, nie 3D, i renderować się z niego nie da.
+    `mdiViewsOfType` jest drugą szansą dla dokumentu, który okno 3D ma, ale aktywne jest w
+    nim akurat inne."""
+    if gui_doc is None:
+        return None
+    view = getattr(gui_doc, "ActiveView", None)
+    if hasattr(view, "saveImage"):
+        return view
+    try:
+        for candidate in gui_doc.mdiViewsOfType("Gui::View3DInventor"):
+            if hasattr(candidate, "saveImage"):
+                return candidate
     except Exception:
         pass
+    return None
 
 
 def _upload_pdf_attachment(doc, item_id):

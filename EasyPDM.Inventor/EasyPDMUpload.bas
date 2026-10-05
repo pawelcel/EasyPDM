@@ -1178,6 +1178,30 @@ Function NewGuid() As String
     NewGuid = LCase(raw)
 End Function
 
+' Okno komunikatu, ktore na pewno BEDZIE WIDOCZNE, nawet gdy fokus ma przegladarka.
+'
+' Zgloszone z praktyki: po zapisaniu ostatniego elementu koncowy raport pojawial sie w Inventor,
+' ale ekran zostawal na przegladarce -- czyli uzytkownik patrzyl na karte, a makro czekalo na
+' klikniecie w oknie, ktorego nie widzial ("nie wiadomo co sie dzieje").
+'
+' Powod: po oddaniu fokusu karcie (zob. AppActivate "EasyPDM" przy prosbie o formularz) Inventor
+' stoi w TLE, a okno utworzone przez proces w tle powstaje ZA oknem aktywnej aplikacji.
+'
+' vbSystemModal (4096) nadaje oknu atrybut "zawsze na wierzchu" -- i to dziala rowniez dla
+' procesu w tle, w odroznieniu od samego przejecia fokusu, ktorego Windows takiemu procesowi
+' nie da (ta sama regula, ktora kazala klikac OK przed KOLEJNYMI oknami przegladarki).
+'
+' Proba AppActivate jest dodatkiem: gdy sie uda, okno dostaje tez klawiature, a gdy nie --
+' jest widoczne mimo wszystko. Dopasowanie idzie po POCZATKU tytulu okna, a blad jest
+' polykany, bo to wygoda, a nie czesc wysylki.
+Private Function MsgBoxFront(ByVal prompt As String, ByVal buttons As VbMsgBoxStyle, ByVal title As String) As VbMsgBoxResult
+    On Error Resume Next
+    AppActivate "Autodesk Inventor"
+    Err.Clear
+    On Error GoTo 0
+    MsgBoxFront = MsgBox(prompt, buttons + vbSystemModal, title)
+End Function
+
 Sub OpenUrlInBrowser(ByVal url As String)
     CreateObject("WScript.Shell").Run """" & url & """", 1, False
 End Sub
@@ -1711,11 +1735,11 @@ Private Function PromptLogin() As Boolean
         On Error GoTo 0
 
         If loginErrNum = 0 Then
-            MsgBox T("LoggedInAsPrefix") & JsonGetString(user, "displayName", username) & ".", vbInformation, T("AppTitle")
+            MsgBoxFront T("LoggedInAsPrefix") & JsonGetString(user, "displayName", username) & ".", vbInformation, T("AppTitle")
             PromptLogin = True
             Exit Function
         Else
-            MsgBox T("LoginFailedPrefix") & loginErrDesc, vbExclamation, T("AppTitle")
+            MsgBoxFront T("LoginFailedPrefix") & loginErrDesc, vbExclamation, T("AppTitle")
         End If
     Next attempt
     PromptLogin = False
@@ -1910,7 +1934,7 @@ Function RenameAndUpload(ByVal oDoc As Object, ByVal filePath As String, ByVal i
     ' exists). Uploading from an empty path would fail deep inside the HTTP/file-read code
     ' with a confusing error, so stop here with a clear one instead.
     If filePath = "" Then
-        MsgBox T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
+        MsgBoxFront T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
         LogLine "RenameAndUpload: never-saved document still has no local path after a failed Save As -- aborting."
         RenameAndUpload = False
         Exit Function
@@ -2125,7 +2149,7 @@ Sub UploadDrawingForActiveDoc(ByVal oDoc As Object, ByVal filePath As String)
             unlinkedList = unlinkedList & "- " & unlinkedNameVariant & vbCrLf
         Next unlinkedNameVariant
 
-        MsgBox T("Dwg_UnlinkedReferencesBlockedPrefix") & unlinkedNames.Count & T("Dwg_UnlinkedReferencesBlockedSuffix") & vbCrLf & vbCrLf & unlinkedList, _
+        MsgBoxFront T("Dwg_UnlinkedReferencesBlockedPrefix") & unlinkedNames.Count & T("Dwg_UnlinkedReferencesBlockedSuffix") & vbCrLf & vbCrLf & unlinkedList, _
                vbExclamation, T("AppTitle")
         LogLine "Drawing upload: blocked -- " & unlinkedNames.Count & " referenced document(s) not linked to any PDM item (alongside " & candidateIds.Count & " that are)."
         Exit Sub
@@ -2155,7 +2179,7 @@ Sub UploadDrawingForActiveDoc(ByVal oDoc As Object, ByVal filePath As String)
         Dim onlyRefDoc As Object
         Set onlyRefDoc = refDocs(1)
         If DocKind(onlyRefDoc) = "part" Or DocKind(onlyRefDoc) = "assembly" Then
-            If MsgBox(T("Dwg_ReferencedPartNotLinkedPrompt"), vbYesNo + vbQuestion, T("AppTitle")) = vbYes Then
+            If MsgBoxFront(T("Dwg_ReferencedPartNotLinkedPrompt"), vbYesNo + vbQuestion, T("AppTitle")) = vbYes Then
                 Dim refFilePath As String, refItemTypeGuess As String, refDefaultName As String
                 If GetDocInfo(onlyRefDoc, refFilePath, refItemTypeGuess, refDefaultName) Then
                     Dim refResult As Object
@@ -2190,7 +2214,7 @@ Sub UploadDrawingForActiveDoc(ByVal oDoc As Object, ByVal filePath As String)
     ' wylaczona w Ustawieniach -> Numeracja, plik nazywa sie samym numerem).
     re.Pattern = "^[A-Za-z]*0*(\d+)\s*(?:\(|\.)"
     If Not re.Test(fname) Then
-        MsgBox T("Dwg_CannotIdentifyItem"), vbExclamation, T("AppTitle")
+        MsgBoxFront T("Dwg_CannotIdentifyItem"), vbExclamation, T("AppTitle")
         LogLine "Drawing upload: could not parse an item number out of """ & fname & """ -- done."
         Exit Sub
     End If
@@ -2209,10 +2233,10 @@ Sub UploadDrawingForActiveDoc(ByVal oDoc As Object, ByVal filePath As String)
     On Error GoTo 0
     If item Is Nothing Or lookupErrNum <> 0 Then
         If lookupErrNum = ERR_AUTH Then
-            MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+            MsgBoxFront T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
             SetSessionToken ""
         Else
-            MsgBox T("Dwg_ItemNotFoundPrefix") & itemNumber & T("Dwg_ItemNotFoundSuffix"), vbExclamation, T("AppTitle")
+            MsgBoxFront T("Dwg_ItemNotFoundPrefix") & itemNumber & T("Dwg_ItemNotFoundSuffix"), vbExclamation, T("AppTitle")
         End If
         LogLine "Drawing upload: item #" & itemNumber & " lookup failed (err=" & lookupErrNum & ")."
         Exit Sub
@@ -2359,7 +2383,7 @@ Sub AskBrowserWhichItemForDrawing(ByVal oDoc As Object, ByVal filePath As String
     Dim ticketData As Object
     Set ticketData = WaitForTicket(ticket, "/drawing-tickets/")
     If ticketData Is Nothing Then
-        MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
+        MsgBoxFront T("CancelledNothingSent"), vbInformation, T("AppTitle")
         LogLine "Drawing upload: browser disambiguation cancelled/timed out -- done."
         Exit Sub
     End If
@@ -2375,10 +2399,10 @@ Sub AskBrowserWhichItemForDrawing(ByVal oDoc As Object, ByVal filePath As String
 Failed:
     LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
     If Err.Number = ERR_AUTH Then
-        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+        MsgBoxFront T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
         SetSessionToken ""
     Else
-        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
+        MsgBoxFront T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
     End If
 End Sub
 
@@ -2387,7 +2411,7 @@ End Sub
 ' flow does (off by default via vbDefaultButton2), then delegates to UploadDrawingToItem.
 Sub UploadDrawingToItemNatively(ByVal oDoc As Object, ByVal filePath As String, ByVal item As Object)
     Dim nativeExportPdf As Boolean
-    nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
+    nativeExportPdf = (MsgBoxFront(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
     UploadDrawingToItem oDoc, filePath, item, nativeExportPdf
 End Sub
 
@@ -2403,7 +2427,7 @@ Sub UploadDrawingToItem(ByVal oDoc As Object, ByVal filePath As String, ByVal it
     Dim itemType As String
     itemType = JsonGetString(item, "itemType", "")
     If itemType <> "part" And itemType <> "assembly" Then
-        MsgBox T("Dwg_NotPartOrAssembly"), vbExclamation, T("AppTitle")
+        MsgBoxFront T("Dwg_NotPartOrAssembly"), vbExclamation, T("AppTitle")
         LogLine "Drawing upload: item #" & itemNumber & " is a '" & itemType & "', not part/assembly -- done."
         Exit Sub
     End If
@@ -2421,16 +2445,16 @@ Sub UploadDrawingToItem(ByVal oDoc As Object, ByVal filePath As String, ByVal it
     If uploadOk And exportPdf Then
         UploadPdfAttachment oDoc, itemId, itemNumber, name, revision
     End If
-    MsgBox T("Dwg_UploadedPrefix") & itemNumber & T("Dwg_UploadedSuffix"), vbInformation, T("AppTitle")
+    MsgBoxFront T("Dwg_UploadedPrefix") & itemNumber & T("Dwg_UploadedSuffix"), vbInformation, T("AppTitle")
     Exit Sub
 
 Failed:
     LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
     If Err.Number = ERR_AUTH Then
-        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
+        MsgBoxFront T("SessionExpiredPrompt") & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
         SetSessionToken ""
     Else
-        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
+        MsgBoxFront T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
     End If
 End Sub
 
@@ -2801,7 +2825,7 @@ Function PushToExistingItem(ByVal oDoc As Object, ByVal itemId As String, ByVal 
 
     If currentStatus = "wydany" Then
         Dim proceed As VbMsgBoxResult
-        proceed = MsgBox(T("ItemStatusReleasedPrefix") & itemNumber & T("ItemStatusReleasedSuffix"), vbYesNo + vbQuestion, T("TitleNewRevision"))
+        proceed = MsgBoxFront(T("ItemStatusReleasedPrefix") & itemNumber & T("ItemStatusReleasedSuffix"), vbYesNo + vbQuestion, T("TitleNewRevision"))
         If proceed <> vbYes Then
             Set PushToExistingItem = Nothing
             Exit Function
@@ -2837,7 +2861,7 @@ Function PushToExistingItem(ByVal oDoc As Object, ByVal itemId As String, ByVal 
         ' actively reviewing this item -- silently reverting to "w_pracy" and uploading a
         ' new file would silently blow away a review in progress, without asking anyone.
         ' Hard-block instead, with a message.
-        MsgBox T("UploadBlockedReviewPrefix") & itemNumber & T("UploadBlockedReviewSuffix"), vbExclamation, T("TitleUploadBlocked")
+        MsgBoxFront T("UploadBlockedReviewPrefix") & itemNumber & T("UploadBlockedReviewSuffix"), vbExclamation, T("TitleUploadBlocked")
         Set PushToExistingItem = Nothing
         Exit Function
     End If
@@ -3074,7 +3098,7 @@ Sub SyncStaleChildren(ByVal parentItemId As String, ByVal localChildIds As Objec
     Next c
 
     Dim choice As VbMsgBoxResult
-    choice = MsgBox(T("StaleChildrenConfirmPrefix") & staleList.Count & T("StaleChildrenConfirmSuffix") & vbCrLf & vbCrLf & lines, _
+    choice = MsgBoxFront(T("StaleChildrenConfirmPrefix") & staleList.Count & T("StaleChildrenConfirmSuffix") & vbCrLf & vbCrLf & lines, _
                      vbYesNo + vbQuestion, T("AppTitle"))
     If choice <> vbYes Then Exit Sub
 
@@ -3112,7 +3136,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
         For Each unsavedName In unsavedComponentNames
             unsavedList = unsavedList & "- " & unsavedName & vbCrLf
         Next unsavedName
-        MsgBox T("UnsavedComponentsWarningPrefix") & unsavedComponentNames.Count & T("UnsavedComponentsWarningSuffix") & vbCrLf & vbCrLf & unsavedList, _
+        MsgBoxFront T("UnsavedComponentsWarningPrefix") & unsavedComponentNames.Count & T("UnsavedComponentsWarningSuffix") & vbCrLf & vbCrLf & unsavedList, _
                vbExclamation, T("AppTitle")
         LogLine "ProcessAssemblyTree: " & unsavedComponentNames.Count & " component(s) skipped (no file on disk)."
     End If
@@ -3169,7 +3193,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
     Next p
 
     Dim choice As VbMsgBoxResult
-    choice = MsgBox(T("AssemblyLinksPart1") & order.Count & T("AssemblyLinksPart2") & vbCrLf & vbCrLf & _
+    choice = MsgBoxFront(T("AssemblyLinksPart1") & order.Count & T("AssemblyLinksPart2") & vbCrLf & vbCrLf & _
                      summary & vbCrLf & _
                      T("AssemblyLinksPart3") & vbCrLf & vbCrLf & _
                      T("AssemblyLinksPart4"), _
@@ -3277,7 +3301,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
                 ' przegladarki w biegu i tak przejmuje fokus (to wlasnie ta regula Windows
                 ' kazala klikac OK przed KOLEJNYMI), wiec dla pierwszego komponentu okno jest
                 ' zbedne -- a to on otwiera karte, ktora obsluzy cala reszte bez kart i okien.
-                If gRunTabOpened Then MsgBox T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
+                If gRunTabOpened Then MsgBoxFront T("NewComponentBrowserPromptPrefix") & compSuggestedName & T("NewComponentBrowserPromptSuffix"), vbInformation, T("AppTitle")
                 OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel), DocKind(childModel))
             End If
 
@@ -3390,7 +3414,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
                         If Err.Number <> 0 Then relErr = Err.Description
                         On Error GoTo 0
                         If relErr <> "" Then
-                            MsgBox T("CreatedButFailedAttachPart1") & Mid(CStr(edge2("child")), InStrRev(CStr(edge2("child")), "\") + 1) & _
+                            MsgBoxFront T("CreatedButFailedAttachPart1") & Mid(CStr(edge2("child")), InStrRev(CStr(edge2("child")), "\") + 1) & _
                                    T("CreatedButFailedAttachPart2") & Mid(filePath, InStrRev(filePath, "\") + 1) & T("CreatedButFailedAttachPart3") & relErr, vbExclamation, T("AppTitle")
                         ElseIf newlyCreatedPaths.Exists(edge2("child")) Then
                             ' Now properly nested under its real parent -- hide it from the
@@ -3462,7 +3486,7 @@ Function GetDocInfo(ByVal oDoc As Object, ByRef filePath As String, ByRef itemTy
     filePath = oDoc.FullFileName
 
     If filePath = "" Then
-        If MsgBox(T("UnsavedDocumentPrompt"), vbYesNo + vbQuestion, T("AppTitle")) <> vbYes Then
+        If MsgBoxFront(T("UnsavedDocumentPrompt"), vbYesNo + vbQuestion, T("AppTitle")) <> vbYes Then
             GetDocInfo = False
             Exit Function
         End If
@@ -3474,7 +3498,7 @@ Function GetDocInfo(ByVal oDoc As Object, ByRef filePath As String, ByRef itemTy
         saveErrNum = Err.Number
         On Error GoTo 0
         If saveErrNum <> 0 Then
-            MsgBox T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
+            MsgBoxFront T("FailedToSaveDocument"), vbExclamation, T("AppTitle")
             GetDocInfo = False
             Exit Function
         End If
@@ -3888,7 +3912,7 @@ Sub main()
     On Error GoTo 0
 
     If InvApp Is Nothing Then
-        MsgBox T("MustRunInsideInventor"), vbCritical, T("AppTitle")
+        MsgBoxFront T("MustRunInsideInventor"), vbCritical, T("AppTitle")
         Exit Sub
     End If
 
@@ -3908,7 +3932,7 @@ Sub main()
 
     Dim filePath As String, itemTypeGuess As String, defaultName As String
     If Not GetActiveDocInfo(filePath, itemTypeGuess, defaultName) Then
-        MsgBox T("NoActiveSavedDocument"), vbExclamation, T("AppTitle")
+        MsgBoxFront T("NoActiveSavedDocument"), vbExclamation, T("AppTitle")
         LogLine "No active/saved document -- done."
         Exit Sub
     End If
@@ -3990,7 +4014,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
             PendingLinkItemNumberText = ""
             PendingLinkItemName = ""
             SetLinkedItemOn oDoc
-            MsgBox T("StaleLinkCleared"), vbInformation, T("AppTitle")
+            MsgBoxFront T("StaleLinkCleared"), vbInformation, T("AppTitle")
             linkedItemId = ""
         End If
     End If
@@ -4028,7 +4052,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         End If
 
         Dim confirmUpdate As VbMsgBoxResult
-        confirmUpdate = MsgBox(confirmText, vbYesNo + vbQuestion, T("AppTitle"))
+        confirmUpdate = MsgBoxFront(confirmText, vbYesNo + vbQuestion, T("AppTitle"))
         If confirmUpdate <> vbYes Then Exit Function
 
         Set resultInfo = PushToExistingItem(oDoc, linkedItemId, filePath, targetFolder)
@@ -4044,9 +4068,9 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
             ' vbDefaultButton1/2 -- Enter alone picks the same answer the browser form
             ' would start with.
             Dim nativeExportStep As Boolean
-            nativeExportStep = (MsgBox(T("ExportStepPrompt"), vbYesNo + vbQuestion + vbDefaultButton1, T("AppTitle")) = vbYes)
+            nativeExportStep = (MsgBoxFront(T("ExportStepPrompt"), vbYesNo + vbQuestion + vbDefaultButton1, T("AppTitle")) = vbYes)
             Dim nativeExportPdf As Boolean
-            nativeExportPdf = (MsgBox(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
+            nativeExportPdf = (MsgBoxFront(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
 
             If nativeExportStep Then UploadStepAttachment oDoc, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
             If nativeExportPdf Then UploadPdfAttachment oDoc, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
@@ -4062,7 +4086,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)
         If ticketData Is Nothing Then
-            MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
+            MsgBoxFront T("CancelledNothingSent"), vbInformation, T("AppTitle")
             LogLine "=== Finished: browser ticket cancelled/timed out ==="
             Exit Function
         End If
@@ -4091,7 +4115,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         If isExisting Then
             Set resultInfo = PushToExistingItem(oDoc, ticketItemId, filePath, targetFolder)
             If resultInfo Is Nothing Then
-                MsgBox T("CancelledNothingSent"), vbInformation, T("AppTitle")
+                MsgBoxFront T("CancelledNothingSent"), vbInformation, T("AppTitle")
                 LogLine "=== Finished: existing item declined a new revision ==="
                 Exit Function
             End If
@@ -4144,7 +4168,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
             If Err.Number <> 0 Then topRelErr = Err.Description
             On Error GoTo 0
             If topRelErr <> "" Then
-                MsgBox T("FailedToAttachSubComponent") & topRelErr, vbExclamation, T("AppTitle")
+                MsgBoxFront T("FailedToAttachSubComponent") & topRelErr, vbExclamation, T("AppTitle")
             ElseIf edgeVariant(2) Then
                 ' Newly created purely as a leaves-first side effect of this upload (see
                 ' ProcessAssemblyTree's "newlyCreatedPaths") -- now properly nested under
@@ -4180,7 +4204,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
                          T("LockedComponentsTailSuffix") & vbCrLf & lockedTail
         End If
 
-        MsgBox T("UploadedSuccessPart1") & JsonGetLong(resultInfo, "itemNumber", 0) & _
+        MsgBoxFront T("UploadedSuccessPart1") & JsonGetLong(resultInfo, "itemNumber", 0) & _
                T("UploadedSuccessPart2") & JsonGetString(resultInfo, "revisionLabel", "A") & ")." & vbCrLf & vbCrLf & _
                T("RunLogPrefix") & LogFilePath() & lockedTail, vbInformation, T("AppTitle")
     Else
@@ -4192,11 +4216,11 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
 Failed:
     LogLine "=== ERROR (" & Err.Number & "): " & Err.Description & " ==="
     If Err.Number = ERR_AUTH Then
-        MsgBox T("SessionExpiredPrompt") & vbCrLf & vbCrLf & _
+        MsgBoxFront T("SessionExpiredPrompt") & vbCrLf & vbCrLf & _
                T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
         SetSessionToken ""
     Else
-        MsgBox T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
+        MsgBoxFront T("ErrorPrefix") & Err.Description & vbCrLf & vbCrLf & T("RunLogPrefix") & LogFilePath(), vbCritical, T("AppTitle")
     End If
 End Function
 
@@ -4204,5 +4228,5 @@ End Function
 ' without running the whole upload flow (the next run of "main" will ask to log in again).
 Sub Logout()
     ApiLogout
-    MsgBox T("LoggedOutMessage"), vbInformation, T("AppTitle")
+    MsgBoxFront T("LoggedOutMessage"), vbInformation, T("AppTitle")
 End Sub
