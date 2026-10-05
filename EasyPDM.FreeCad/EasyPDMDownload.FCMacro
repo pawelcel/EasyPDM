@@ -76,6 +76,7 @@ Ograniczenia (świadomie poza zakresem pierwszej wersji):
 import json
 import os
 import re
+import zipfile
 import uuid
 import webbrowser
 from urllib import error, request
@@ -165,6 +166,8 @@ TRANSLATIONS = {
             "pliku ({fileName})."
         ),
         "log_already_present": "  {label}: już jest w folderze (aktualna rewizja), pomijam.",
+        "log_relinked": "  {file}: przepiąłem odnośniki na pliki w tym folderze ({count}).",
+        "log_relink_failed": "  {file}: nie udało się przepiąć odnośników ({error}) — otwórz i popraw ręcznie.",
         "newer_revision_title": "Nowsza rewizja",
         "newer_revision_body": (
             "W folderze jest już {label} w rewizji {rev_list}, a na serwerze aktualna "
@@ -222,6 +225,8 @@ TRANSLATIONS = {
             "file ({fileName})."
         ),
         "log_already_present": "  {label}: already in the folder (current revision), skipping.",
+        "log_relinked": "  {file}: links repointed to the files in this folder ({count}).",
+        "log_relink_failed": "  {file}: could not repoint the links ({error}) — open and fix by hand.",
         "newer_revision_title": "Newer revision",
         "newer_revision_body": (
             "The folder already has {label} in revision {rev_list}, and the current "
@@ -280,6 +285,8 @@ TRANSLATIONS = {
             "öffnen ({fileName})."
         ),
         "log_already_present": "  {label}: bereits im Ordner vorhanden (aktuelle Revision), wird übersprungen.",
+        "log_relinked": "  {file}: Verknüpfungen auf die Dateien in diesem Ordner umgehängt ({count}).",
+        "log_relink_failed": "  {file}: Verknüpfungen konnten nicht umgehängt werden ({error}) — bitte von Hand korrigieren.",
         "newer_revision_title": "Neuere Revision",
         "newer_revision_body": (
             "Im Ordner befindet sich bereits {label} in Revision {rev_list}, und die "
@@ -635,7 +642,7 @@ def _local_revision_files(target_dir, item_number, name):
     return result
 
 
-def _download_item(item, target_dir, log):
+def _download_item(item, target_dir, log, downloaded=None):
     """Cienka nakładka na właściwe pobieranie, pilnująca wyłącznie listy postępu.
 
     Kluczem pozycji jest ID elementu — to samo, które zwrócił serwer w /descendants.
@@ -645,6 +652,8 @@ def _download_item(item, target_dir, log):
     progress_mark(item["id"], "active")
     try:
         result = _download_item_inner(item, target_dir, log)
+        if result and downloaded is not None:
+            downloaded.append(result)
     except Exception:
         progress_mark(item["id"], "failed")
         raise
@@ -724,7 +733,77 @@ def _download_item_inner(item, target_dir, log):
     return target_path
 
 
-def _download_children_recursive(item, target_dir, log, seen):
+def _flatten_xlinks(file_paths, log):
+    """Przepina odnośniki App::Link na pliki leżące OBOK, w tym samym folderze.
+
+    Pobieranie kładzie wszystko płasko w jednym folderze, ale złożenie pamięta ścieżkę
+    sprzed wysyłki — jeśli komponenty były wtedy w podfolderze, w pliku zostaje
+    `<XLink file="test/8(1ddd).A.FCStd" .../>`. FreeCAD rozwiązuje to WZGLĘDEM folderu
+    złożenia, czyli szuka w `.../test/test/...` i zgłasza "Link not restored" oraz
+    "Link broken!". Zgłoszone z praktyki: pobrane złożenie otwierało się bez komponentów.
+
+    .FCStd to archiwum ZIP, a ścieżki odnośników to atrybut `file` elementów `<XLink>`
+    w Document.xml. Obcinamy z nich katalog — i TYLKO wtedy, gdy plik o tej nazwie
+    faktycznie leży w tym samym folderze. Dzięki temu odnośnik, którego nie pobraliśmy
+    (coś spoza tego drzewa), zostaje nietknięty zamiast zostać wskazany w próżnię.
+
+    Zapis idzie przez plik tymczasowy i dopiero potem podmianę, żeby przerwanie w trakcie
+    nie zostawiło uszkodzonego dokumentu. Każdy błąd jest połykany: to naprawa wygody, a nie
+    część pobierania — nieudana nie może wywrócić tego, co już się udało ściągnąć."""
+    pattern = re.compile(rb'(<XLink\b[^>]*?\bfile=")([^"]+)(")')
+    repaired_total = 0
+
+    for path in file_paths:
+        if not path or not path.lower().endswith(".fcstd") or not os.path.exists(path):
+            continue
+        folder = os.path.dirname(path)
+        try:
+            with zipfile.ZipFile(path, "r") as zf:
+                entries = [(i, zf.read(i.filename)) for i in zf.infolist()]
+        except Exception as e:
+            log(t("log_relink_failed", file=os.path.basename(path), error=e))
+            continue
+
+        changed = 0
+
+        def fix(m):
+            nonlocal changed
+            stored = m.group(2).decode("utf-8", "replace")
+            base = os.path.basename(stored.replace("\\", "/"))
+            # Już płaski albo nie mamy takiego pliku obok -- nie ruszamy.
+            if stored == base or not os.path.exists(os.path.join(folder, base)):
+                return m.group(0)
+            changed += 1
+            return m.group(1) + base.encode("utf-8") + m.group(3)
+
+        new_entries = []
+        for info, data in entries:
+            if info.filename.lower().endswith(".xml"):
+                data = pattern.sub(fix, data)
+            new_entries.append((info, data))
+
+        if changed == 0:
+            continue
+
+        try:
+            tmp = path + ".easypdm-relink"
+            with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+                for info, data in new_entries:
+                    zf.writestr(info.filename, data)
+            os.replace(tmp, path)
+            repaired_total += changed
+            log(t("log_relinked", file=os.path.basename(path), count=changed))
+        except Exception as e:
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+            log(t("log_relink_failed", file=os.path.basename(path), error=e))
+
+    return repaired_total
+
+
+def _download_children_recursive(item, target_dir, log, seen, downloaded=None):
     """Rekurencyjnie pobiera CAŁE drzewo składników Złożenia (bezpośrednie dzieci, potem
     ich dzieci, itd.) do target_dir — patrz punkt 2 w docstringu modułu. `seen` (zbiór ID
     elementów) chroni przed podwójnym pobraniem tego samego, współdzielonego komponentu."""
@@ -742,9 +821,9 @@ def _download_children_recursive(item, target_dir, log, seen):
         if child["id"] in seen:
             continue
         seen.add(child["id"])
-        _download_item(child, target_dir, log)
+        _download_item(child, target_dir, log, downloaded)
         if child["itemType"] == "assembly":
-            _download_children_recursive(child, target_dir, log, seen)
+            _download_children_recursive(child, target_dir, log, seen, downloaded)
 
 
 class LoginDialog(QtWidgets.QDialog):
@@ -964,11 +1043,18 @@ def _run_download(top_item, target_dir, log):
     except Exception:
         pass
 
-    top_path = _download_item(top_item, target_dir, log)
+    downloaded = []
+    top_path = _download_item(top_item, target_dir, log, downloaded)
     if top_item["itemType"] == "assembly":
-        _download_children_recursive(top_item, target_dir, log, seen)
+        _download_children_recursive(top_item, target_dir, log, seen, downloaded)
 
     progress_finish()
+
+    # Odnośniki muszą wskazywać na pliki leżące OBOK — wszystko pobraliśmy do jednego
+    # folderu, więc ścieżka z podfolderem sprzed wysyłki rozwiązałaby się w próżnię.
+    # Robione PRZED otwarciem dokumentu: po otwarciu FreeCAD ma już zepsute odnośniki
+    # wczytane i samo przepisanie pliku na dysku niczego by nie naprawiło.
+    _flatten_xlinks(downloaded, log)
 
     if top_path and os.path.exists(top_path):
         try:

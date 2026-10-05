@@ -8,6 +8,9 @@ All notable changes to EasyPDM are documented in this file.
 - **A list of every file being sent or fetched, ticking itself off as the macro works.** It sits on the right of the app, shows each file with the one in progress spinning and the finished ones struck through, counts "3 of 7", and turns the bar red if something fails. Until now an upload of a whole assembly was a wait with nothing to look at: you could not tell whether it was on the second component or the last one, nor which file it was chewing on. The list appears within about a second and a half of the macro starting, and stays for a moment after the end with every tick in place — that complete list is the confirmation that everything went up.
 - It works the same from SolidWorks, Inventor and FreeCAD, and in both directions. The panel itself knows nothing about any CAD program: the macros report what they are doing and the app only displays it, so all three behave identically rather than each growing its own progress window.
 
+### Fixed
+- **A downloaded assembly now opens with its components attached.** Everything is downloaded into one folder, but an assembly remembers where its parts sat before the upload — if they were in a subfolder then, FreeCAD looked for them in a subfolder of the download folder, found nothing, and opened the assembly with every link broken ("Link not restored"). The macro now repoints those links at the files next to them before opening the document. A link to something that was not downloaded is deliberately left alone rather than pointed at nothing.
+
 ### Changed
 - **Downloading an assembly now asks the server for the whole subtree in one go** instead of walking it level by level. That is what makes the list possible at all — walking as it went, the macro could not know how many files there would be, so the counter would have kept growing. A part used in several places still appears once, so the count reaches its end.
 
