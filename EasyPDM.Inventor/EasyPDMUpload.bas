@@ -1196,7 +1196,7 @@ Function MaterialNameOf(ByVal oDoc As Object) As String
     On Error GoTo 0
 End Function
 
-Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "", Optional ByVal documentSizeBytes As Long = 0) As String
+Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "", Optional ByVal documentSizeBytes As Long = 0, Optional ByVal itemType As String = "") As String
     Dim redirectPath As String
     redirectPath = "/?ticket=" & UrlEncode(ticket)
     If name <> "" Then redirectPath = redirectPath & "&name=" & UrlEncode(name)
@@ -1206,6 +1206,11 @@ Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Opt
     ' Rozmiar dokumentu sluzy WYLACZNIE do ostrzezenia pod opcja eksportu STEP -- zob.
     ' komentarz w makrze SolidWorks, powod jest ten sam.
     If documentSizeBytes > 0 Then redirectPath = redirectPath & "&documentSize=" & CStr(documentSizeBytes)
+    ' Typ rozpoznany z samego dokumentu (DocKind) -- przegladarka zaznacza wtedy wlasciwy
+    ' przycisk zamiast startowac bez wyboru. Bez tego zlozenie latwo powstawalo jako Czesc,
+    ' a do Czesci nie da sie nic podpiac w strukturze, wiec podpinanie komponentow konczylo
+    ' sie bledem 400 i struktura BOM nie powstawala.
+    If itemType <> "" Then redirectPath = redirectPath & "&itemType=" & UrlEncode(itemType)
 
     Dim loginTicketResponse As Object
     Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
@@ -3117,7 +3122,7 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
 
             Dim compTicket As String
             compTicket = NewGuid()
-            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel))
+            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel), DocKind(childModel))
 
             Dim compTicketData As Object
             Set compTicketData = WaitForTicket(compTicket)
@@ -3895,7 +3900,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         ' this macro family. See BuildBrowserCreateUrl/WaitForTicket above.
         Dim ticket As String
         ticket = NewGuid()
-        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(oDoc), DocumentSizeOf(oDoc))
+        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(oDoc), DocumentSizeOf(oDoc), DocKind(oDoc))
 
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)

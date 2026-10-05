@@ -1215,7 +1215,19 @@ Function MaterialNameOf(ByVal model As Object) As String
     On Error GoTo 0
 End Function
 
-Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "", Optional ByVal documentSizeBytes As Long = 0) As String
+' "assembly" dla zlozenia, "part" dla reszty -- do wstepnego zaznaczenia przycisku w oknie
+' dodawania. Bez tego okno startowalo bez wyboru i zlozenie latwo powstawalo jako Czesc, a do
+' Czesci nie da sie nic podpiac w strukturze -- makro dostawalo wtedy 400 przy podpinaniu
+' komponentow i cala struktura BOM nie powstawala (zgloszone z praktyki).
+Function ItemTypeOf(ByVal model As Object) As String
+    On Error Resume Next
+    ItemTypeOf = "part"
+    If model.GetType() = SW_DOC_ASSEMBLY Then ItemTypeOf = "assembly"
+    On Error GoTo 0
+End Function
+
+
+Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Optional ByVal materialName As String = "", Optional ByVal documentSizeBytes As Long = 0, Optional ByVal itemType As String = "") As String
     Dim redirectPath As String
     redirectPath = "/?ticket=" & UrlEncode(ticket)
     If name <> "" Then redirectPath = redirectPath & "&name=" & UrlEncode(name)
@@ -1227,6 +1239,9 @@ Function BuildBrowserCreateUrl(ByVal ticket As String, ByVal name As String, Opt
     ' robi CAD, zanim cokolwiek poleci na serwer, i przy duzym modelu trwa minuty. Serwer tej
     ' liczby nie zna -- w tym momencie nic jeszcze nie zostalo zapisane ani wyslane.
     If documentSizeBytes > 0 Then redirectPath = redirectPath & "&documentSize=" & CStr(documentSizeBytes)
+    ' Typ rozpoznany z samego pliku -- przegladarka zaznacza wtedy wlasciwy przycisk zamiast
+    ' startowac bez wyboru. Zob. ItemTypeOf.
+    If itemType <> "" Then redirectPath = redirectPath & "&itemType=" & UrlEncode(itemType)
 
     Dim loginTicketResponse As Object
     Set loginTicketResponse = ApiPostJson("/auth/browser-bridge-ticket", "{}")
@@ -3045,7 +3060,7 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
 
             Dim compTicket As String
             compTicket = NewGuid()
-            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel))
+            OpenUrlInBrowser BuildBrowserCreateUrl(compTicket, compSuggestedName, MaterialNameOf(childModel), DocumentSizeOf(childModel), ItemTypeOf(childModel))
 
             Dim compTicketData As Object
             Set compTicketData = WaitForTicket(compTicket)
@@ -3702,7 +3717,7 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
         ' submit_via_browser. See BuildBrowserCreateUrl/WaitForTicket above.
         Dim ticket As String
         ticket = NewGuid()
-        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(swModel), DocumentSizeOf(swModel))
+        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(swModel), DocumentSizeOf(swModel), ItemTypeOf(swModel))
 
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)

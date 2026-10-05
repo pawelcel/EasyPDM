@@ -935,7 +935,24 @@ def _document_size(doc):
         return None
 
 
-def build_browser_create_url(name, ticket, suggested_item_number=None, document_size=None):
+def _cad_item_type(doc):
+    """"assembly", jeśli dokument linkuje (App::Link) do innych ZAPISANYCH plików, inaczej "part".
+
+    Służy wyłącznie do wstępnego zaznaczenia przycisku w oknie dodawania. Bez tego okno
+    startowało bez żadnego wyboru i złożenie łatwo powstawało jako Część — a do Części nie da
+    się nic podpiąć w strukturze, więc podpinanie komponentów kończyło się błędem 400 i cała
+    struktura BOM nie powstawała. Ta sama reguła co przy wykrywaniu drzewa, więc typ zgadza się
+    z tym, co makro faktycznie zaraz zrobi.
+
+    Błąd tutaj nie może niczego zatrzymać — w najgorszym razie okno startuje jak dotąd, bez
+    wyboru."""
+    try:
+        return "assembly" if _iter_external_link_targets(doc) else "part"
+    except Exception:
+        return ""
+
+
+def build_browser_create_url(name, ticket, suggested_item_number=None, document_size=None, item_type=None):
     """Adres, pod którym otwiera się przeglądarka systemowa zamiast natywnego formularza
     właściwości (zob. WaitForTicketDialog/submit_via_browser) — most logowania
     bilet->ciasteczko (GET /api/auth/browser-login) plus deep-link
@@ -970,6 +987,10 @@ def build_browser_create_url(name, ticket, suggested_item_number=None, document_
     # liczby nie zna — w tym momencie nic jeszcze nie zostało zapisane ani wysłane.
     if document_size:
         deep_link_params["documentSize"] = str(document_size)
+    # Typ rozpoznany z samego dokumentu — przeglądarka zaznacza wtedy właściwy przycisk
+    # zamiast startować bez wyboru (zob. _cad_item_type).
+    if item_type:
+        deep_link_params["itemType"] = item_type
     redirect_path = "/?" + urlencode(deep_link_params)
 
     login_ticket = api_post_json("/auth/browser-bridge-ticket", {})["ticket"]
@@ -2037,7 +2058,7 @@ def submit_via_browser(doc, target_folder):
 
     ticket = str(uuid.uuid4())
     try:
-        url = build_browser_create_url(doc.Label, ticket, suggested_item_number, _document_size(doc))
+        url = build_browser_create_url(doc.Label, ticket, suggested_item_number, _document_size(doc), _cad_item_type(doc))
         webbrowser.open(url)
     except Exception as e:
         QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
@@ -2255,7 +2276,7 @@ def process_assembly_tree(top_doc, target_folder=None):
 
             ticket = str(uuid.uuid4())
             try:
-                url = build_browser_create_url(suggested_name, ticket, None, _document_size(doc))
+                url = build_browser_create_url(suggested_name, ticket, None, _document_size(doc), _cad_item_type(doc))
                 webbrowser.open(url)
             except Exception as e:
                 QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))

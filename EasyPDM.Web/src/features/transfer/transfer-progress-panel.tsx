@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, ChevronRight, Loader2, X } from "lucide-react"
 
 import { api } from "@/api/client"
@@ -63,6 +63,7 @@ function TransferProgressPanel() {
   const { t } = useLanguage()
   const { progress, refetch } = useTransferProgress()
   const [dismissed, setDismissed] = useState(false)
+  const activeRef = useRef<HTMLLIElement | null>(null)
 
   // Nowy bieg kasuje wcześniejsze zamknięcie panelu ręką — inaczej raz zamknięty panel
   // nie pokazałby się już przy następnej wysyłce.
@@ -75,6 +76,15 @@ function TransferProgressPanel() {
     const id = window.setTimeout(() => setDismissed(true), KEEP_FINISHED_MS)
     return () => window.clearTimeout(id)
   }, [progress?.finished, startedAt])
+
+  // Aktywna pozycja jest przewijana do widoku sama. Przy 80 plikach po kilkunastu
+  // odhaczeniach wyjechalaby poza kadr i patrzyloby sie na odhaczony poczatek listy zamiast
+  // na to, co trwa. "nearest" zamiast "center": gdy lista i tak miesci sie w calosci,
+  // wysrodkowywanie szarpaloby panelem bez powodu.
+  const activeKey = progress?.entries.find((e) => e.status === "active")?.key
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+  }, [activeKey])
 
   if (!progress || dismissed) return null
 
@@ -126,6 +136,7 @@ function TransferProgressPanel() {
         {progress.entries.map((entry) => (
           <li
             key={entry.key}
+            ref={entry.status === "active" ? activeRef : undefined}
             className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] ${
               entry.status === "active" ? "bg-primary/10" : ""
             }`}

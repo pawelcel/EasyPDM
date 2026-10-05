@@ -9,6 +9,10 @@ All notable changes to EasyPDM are documented in this file.
 - It works the same from SolidWorks, Inventor and FreeCAD, and in both directions. The panel itself knows nothing about any CAD program: the macros report what they are doing and the app only displays it, so all three behave identically rather than each growing its own progress window.
 
 ### Fixed
+- **An assembly sent from CAD is no longer offered as a Part by default.** The "Add item" window opened with Part preselected regardless of what the macro was actually sending, so an assembly became a Part unless you noticed and switched it — and nothing can be attached to a Part in the structure, so the macro then failed with "Nothing can be added to this item in the structure" and the BOM was never built. The macros now say what the document is and the window preselects it.
+- **The progress list keeps the file in progress in view.** With a long list — an assembly can have dozens of components — the active entry scrolled out of sight after the first dozen and you were left looking at the finished beginning of the list instead of what was happening.
+
+### Fixed
 - **A downloaded assembly now opens with its components attached.** Everything is downloaded into one folder, but an assembly remembers where its parts sat before the upload — if they were in a subfolder then, FreeCAD looked for them in a subfolder of the download folder, found nothing, and opened the assembly with every link broken ("Link not restored"). The macro now repoints those links at the files next to them before opening the document. A link to something that was not downloaded is deliberately left alone rather than pointed at nothing.
 
 ### Changed

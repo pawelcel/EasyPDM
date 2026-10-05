@@ -236,7 +236,16 @@ function PendingTicketBanner() {
           trigger={<span className="hidden" />}
           initialOpen
           initialName={pendingTicket.name}
-          initialMode={duplicateSource?.itemType === "assembly" ? "assembly" : duplicateSource ? "part" : undefined}
+          // Duplikat dziedziczy typ po źródle; nowy element bierze typ rozpoznany przez makro
+          // z samego pliku CAD — inaczej okno startuje bez wyboru i złożenie łatwo powstaje
+          // jako Część, przez co struktura BOM nie ma się do czego podpiąć.
+          initialMode={
+            duplicateSource?.itemType === "assembly"
+              ? "assembly"
+              : duplicateSource
+                ? "part"
+                : pendingTicket.cadItemType
+          }
           // Duplikat ma własne właściwości skopiowane ze źródła i one mają pierwszeństwo —
           // użytkownik świadomie wybrał "skopiuj z istniejącego". Materiał z dokumentu CAD
           // wchodzi tylko tam, gdzie nie ma czego kopiować, czyli przy nowym elemencie.

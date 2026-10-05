@@ -27,6 +27,14 @@ type PendingTicket = {
   // Materiał odczytany z dokumentu CAD, podstawiany jako wartość POCZĄTKOWA pola Materiał
   // w oknie dodawania. Bez tego pole startuje puste, nie wiadomo co wpisać, a po wysyłce
   // materiał z CAD-a i tak się pojawia — jakby wziął się znikąd.
+  // Typ dokumentu rozpoznany przez makro z samego pliku (.SLDASM/.iam/złożenie FreeCAD ->
+  // "assembly", reszta -> "part"). Wstępnie zaznacza przycisk w oknie dodawania.
+  //
+  // Bez tego okno startowało bez żadnego wyboru i wystarczyło kliknąć "Część", żeby złożenie
+  // powstało jako Część — a do Części nie da się nic podpiąć w strukturze (IsChildTypeAllowed),
+  // więc makro zaraz potem dostawało 400 i cała struktura BOM nie powstawała. Zgłoszone z
+  // praktyki: "nie zbudował struktury, tylko wszystko zapisał osobno".
+  cadItemType?: "part" | "assembly"
   material?: string
   // Rozmiar dokumentu CAD w bajtach, odczytany przez makro z pliku na dysku. Służy TYLKO do
   // ostrzeżenia przy opcji eksportu STEP: dla dużych modeli ten eksport robi sam CAD i potrafi
@@ -43,6 +51,8 @@ function readFromUrl(): PendingTicket {
   const name = params.get("name") ?? undefined
   const suggestedItemNumberRaw = params.get("suggestedItemNumber")
   const suggestedItemNumber = suggestedItemNumberRaw ? Number(suggestedItemNumberRaw) : undefined
+  const cadItemTypeRaw = params.get("itemType")
+  const cadItemType = cadItemTypeRaw === "assembly" || cadItemTypeRaw === "part" ? cadItemTypeRaw : undefined
   const material = params.get("material") ?? undefined
   const documentSizeRaw = params.get("documentSize")
   const documentSize = documentSizeRaw ? Number(documentSizeRaw) : undefined
@@ -52,6 +62,7 @@ function readFromUrl(): PendingTicket {
     mode,
     name,
     suggestedItemNumber: Number.isFinite(suggestedItemNumber) ? suggestedItemNumber : undefined,
+    cadItemType,
     material: material || undefined,
     documentSize: Number.isFinite(documentSize) && documentSize! > 0 ? documentSize : undefined,
   }
