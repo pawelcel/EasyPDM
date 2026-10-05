@@ -341,13 +341,8 @@ them SolidWorks leaves the text alone and never evaluates it. When a value comes
 looking like the expression (an unresolved one, e.g. a Part with no material assigned), it is
 logged and dropped rather than sent — that is how `SW-Material@@Default@C0014.A.SLDPRT` once
 reached an item's material field. Inventor has no equivalent expression, so there both
-properties hold a
-snapshot read from `ComponentDefinition` at upload time and need a re-upload to refresh.
-Taking the picture needs the document to be **active**: saving an image captures the active
-viewport rather than the document the call names, so while an assembly is being sent every
-component would otherwise be given a picture of the assembly. SolidWorks and Inventor therefore
-activate the document, capture, and activate the previous one again; FreeCAD can take a named
-document's view without switching anything, so nothing moves on screen there.
+properties hold a snapshot read from `ComponentDefinition` at upload time and need a re-upload
+to refresh.
 
 Drawings are skipped entirely, material is written for Parts only (an Assembly has none of
 its own), and a mass that is empty or not a plain number is logged and skipped — it is
@@ -397,6 +392,13 @@ the geometry's complexity — a 40 kB file full of fillets and splines tessellat
 thousands of triangles. Dropping it removed **7.8 MB** from the published bundle, 7.6 MB of which
 was the OpenCascade `.wasm` binary that every browser downloaded and compiled.
 
+Taking the picture needs the document to be **active**: saving an image captures the active
+viewport rather than the document the call names, and while an assembly is being sent the active
+document is the assembly — so every component was handed a picture of the assembly it came from.
+SolidWorks and Inventor therefore activate the document, capture, and activate the previous one
+again; FreeCAD can take a named document's view without switching anything, so nothing moves on
+screen there.
+
 Two consequences follow from where the screenshot comes from:
 
 - **No STEP, no picture.** The macro takes the screenshot inside its STEP-upload step, so
@@ -433,11 +435,34 @@ and the open tab picks it up through `use-cad-requests.ts`, handing it to the ve
 `PendingTicketBanner` and `AddNodeDialog` that a URL-borne ticket feeds. Nothing about the form
 itself changed.
 
+A request is addressed to **one run of the macro**, not to the account. The CAD program
+generates a run id, passes it to the browser in the deep link, and the tab keeps it in
+`sessionStorage` — which survives a reload but reaches no other tab and no other machine. A tab
+claims a request only when the id matches. Keying by user alone assumed one run per person, and
+that stops being true the moment the same account is signed in to a browser on a second
+computer: a request from one computer was handed to the tab on the other, which showed the form
+to someone else entirely. That happened in practice, which is why the id exists.
+
+It is also why the **first** component of a run still opens a tab: that open is how a tab on
+this machine learns the run id, and until one has, the macro has nobody to hand a request to.
+That first open no longer shows a message box, because the first browser-open of a run takes
+focus by itself — the Windows rule above only bites from the second onwards. A normal run is
+therefore one tab and no clicks, against one tab and one click per component before.
+
+Once a tab has claimed a request, the macro calls `AppActivate "EasyPDM"` to hand focus back.
+The CAD program comes forward in between for a good reason — for the previous component it saved
+the file, exported the STEP and redrew the graphics window for the screenshot — but the next
+thing needed is the form. It works because Windows lets the application that *currently* holds
+focus give it away: the same rule that forced the clicks, used in the other direction. The match
+is on the start of the window title, so nothing happens when EasyPDM sits in a background tab,
+and a failure is swallowed, being a convenience rather than part of the upload.
+
 The one thing that cannot be assumed is that a browser is watching at all — it may be closed,
 or the server unreachable. So the macro publishes, then polls `GET /api/cad-requests/taken` for
 a few seconds; the tab marks the request taken the moment it claims it. No signal means nobody
 is there, and the macro falls back to the old path — message box, new tab — rather than waiting
-on a form nobody will see. That fallback is why the message box still exists in the code.
+on a form nobody will see. That fallback is where the message box still lives — ahead of the
+tab it opens, and only from the second component onwards, where the focus rule applies.
 
 `taken` is returned as a flat `1`/`0` rather than a boolean inside a nested object, because the
 JSON parsers inside the VBA macros only have `JsonGetString` and `JsonGetLong`; a flat number is

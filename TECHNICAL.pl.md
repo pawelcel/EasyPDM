@@ -381,6 +381,12 @@ pełen zaokrągleń i powierzchni swobodnych teseluje się na setki tysięcy tr�
 tego zabrało **7,8 MB** z publikowanej paczki, w tym 7,6 MB samego binarnego OpenCascade
 `.wasm`, który każda przeglądarka pobierała i kompilowała.
 
+Zrobienie zrzutu wymaga, żeby dokument był **aktywny**: zapis obrazu łapie aktywny widok, a nie
+dokument wskazany w wywołaniu, a w trakcie wysyłki złożenia aktywnym dokumentem jest złożenie —
+więc każdy komponent dostawał obrazek złożenia, z którego pochodzi. SolidWorks i Inventor
+aktywują więc dokument, robią zrzut i aktywują z powrotem poprzedni; FreeCAD potrafi wziąć widok
+wskazanego z nazwy dokumentu bez żadnego przełączania, więc tam nic nie rusza się na ekranie.
+
 Z tego, skąd bierze się zrzut, wynikają dwie rzeczy:
 
 - **Nie ma STEP-a, nie ma obrazka.** Makro robi zrzut wewnątrz swojego kroku wysyłki STEP-a,
@@ -408,7 +414,13 @@ Wysyłka złożenia potrzebuje formularza dla każdego nowego komponentu. Dotąd
 
 Przeglądarka jest już otwarta i już odpytuje serwer, więc żadna nowa karta nie jest potrzebna. Makro zostawia prośbę w `CadRequestStore` (w pamięci, kluczowane użytkownikiem, to samo uzasadnienie co przy `CreateTicketStore`), a otwarta karta podejmuje ją przez `use-cad-requests.ts` i podaje dokładnie temu samemu `PendingTicketBanner` i `AddNodeDialog`, które obsługują bilet z adresu URL. W samym formularzu nic się nie zmieniło.
 
-Jednego nie da się założyć: że ktokolwiek patrzy. Przeglądarka może być zamknięta, serwer nieosiągalny. Dlatego makro publikuje prośbę, a potem przez kilka sekund odpytuje `GET /api/cad-requests/taken`; karta oznacza prośbę jako podjętą w chwili, gdy ją przejmuje. Brak sygnału znaczy, że nikogo nie ma — i makro wraca do starej ścieżki, z oknem i nową kartą, zamiast czekać na formularz, którego nikt nie zobaczy. Ta ścieżka awaryjna jest jedynym powodem, dla którego okno nadal istnieje w kodzie.
+Prośba jest adresowana do **jednego biegu makra**, nie do konta. CAD generuje identyfikator biegu, przekazuje go przeglądarce w adresie, a karta trzyma go w `sessionStorage` — co przeżywa odświeżenie, ale nie dociera do żadnej innej karty ani do innego komputera. Karta podejmuje prośbę wyłącznie wtedy, gdy identyfikator się zgadza. Kluczowanie samym użytkownikiem zakładało jeden bieg na osobę, a to przestaje być prawdą w chwili, gdy to samo konto jest zalogowane w przeglądarce na drugim komputerze: prośba z jednego komputera trafiała do karty na drugim, która pokazywała formularz komuś zupełnie innemu. Zdarzyło się to w praktyce i to jest powód, dla którego identyfikator istnieje.
+
+Z tego samego wynika, że **pierwszy** komponent biegu nadal otwiera kartę: to otwarcie jest jedynym sposobem, żeby karta na tej maszynie poznała identyfikator biegu, a dopóki żadna go nie zna, makro nie ma komu podać prośby. To pierwsze otwarcie nie pokazuje już okna, bo pierwsze otwarcie przeglądarki w biegu i tak przejmuje fokus — reguła Windows opisana wyżej gryzie dopiero od drugiego. Normalny bieg to więc jedna karta i zero kliknięć, zamiast jednej karty i jednego kliknięcia na komponent.
+
+Gdy karta podejmie prośbę, makro oddaje fokus przez `AppActivate "EasyPDM"`. CAD wychodzi w międzyczasie na wierzch nie bez powodu — dla poprzedniego komponentu zapisywał plik, eksportował STEP i przerysowywał okno graficzne na potrzeby zrzutu — ale teraz potrzebny jest formularz. Działa to, bo Windows pozwala oddać fokus aplikacji, która *aktualnie* go ma: ta sama reguła, która wymuszała klikanie, użyta w drugą stronę. Dopasowanie idzie po początku tytułu okna, więc gdy EasyPDM siedzi w karcie w tle, nic się nie dzieje, a błąd jest połykany — to wygoda, a nie część wysyłki.
+
+Jednego nie da się założyć: że ktokolwiek patrzy. Przeglądarka może być zamknięta, serwer nieosiągalny. Dlatego makro publikuje prośbę, a potem przez kilka sekund odpytuje `GET /api/cad-requests/taken`; karta oznacza prośbę jako podjętą w chwili, gdy ją przejmuje. Brak sygnału znaczy, że nikogo nie ma — i makro wraca do starej ścieżki, z oknem i nową kartą, zamiast czekać na formularz, którego nikt nie zobaczy. W tej ścieżce awaryjnej okno nadal żyje — przed kartą, którą otwiera, i tylko od drugiego komponentu w górę, czyli tam, gdzie reguła fokusu obowiązuje.
 
 `taken` wraca jako płaskie `1`/`0`, a nie wartość logiczna w zagnieżdżonym obiekcie, bo parsery JSON w makrach VBA mają tylko `JsonGetString` i `JsonGetLong` — płaska liczba to jedyna postać, którą potrafią odczytać bez dokładania im parsera.
 

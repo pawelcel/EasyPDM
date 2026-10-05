@@ -426,6 +426,13 @@ Verrundungen und Freiformflächen tesselliert zu Hunderttausenden Dreiecken. Das
 **7,8 MB** aus dem veröffentlichten Bundle, davon 7,6 MB allein die OpenCascade-`.wasm`-Binärdatei,
 die jeder Browser herunterlud und kompilierte.
 
+Für den Schnappschuss muss das Dokument **aktiv** sein: Das Speichern eines Bildes erfasst den
+aktiven Viewport und nicht das im Aufruf benannte Dokument, und während eine Baugruppe
+hochgeladen wird, ist das aktive Dokument die Baugruppe — jede Komponente erhielt also ein Bild
+der Baugruppe, aus der sie stammt. SolidWorks und Inventor aktivieren daher das Dokument,
+erstellen den Schnappschuss und aktivieren das vorherige wieder; FreeCAD kann die Ansicht eines
+namentlich benannten Dokuments nehmen, ohne umzuschalten, dort bewegt sich also nichts am Bild.
+
 Daraus, woher der Schnappschuss stammt, folgen zwei Dinge:
 
 - **Kein STEP, kein Bild.** Das Makro erstellt den Schnappschuss innerhalb seines
@@ -455,7 +462,13 @@ Das Hochladen einer Baugruppe braucht für jede neue Komponente ein Formular. Bi
 
 Der Browser ist bereits offen und fragt den Server ohnehin ab, ein neuer Tab ist also überflüssig. Das Makro hinterlegt seine Anfrage in `CadRequestStore` (im Arbeitsspeicher, nach Benutzer geschlüsselt, dieselbe Begründung wie bei `CreateTicketStore`), und der offene Tab nimmt sie über `use-cad-requests.ts` an und reicht sie an genau dieselben `PendingTicketBanner` und `AddNodeDialog` weiter, die auch ein Ticket aus der URL bedienen. Am Formular selbst hat sich nichts geändert.
 
-Eines lässt sich nicht voraussetzen: dass überhaupt jemand zusieht. Der Browser kann geschlossen, der Server nicht erreichbar sein. Deshalb veröffentlicht das Makro die Anfrage und fragt dann einige Sekunden lang `GET /api/cad-requests/taken` ab; der Tab markiert die Anfrage in dem Moment als angenommen, in dem er sie übernimmt. Kein Signal heißt, dass niemand da ist — und das Makro kehrt zum alten Weg samt Fenster und neuem Tab zurück, statt auf ein Formular zu warten, das niemand sehen wird. Dieser Rückfallweg ist der einzige Grund, warum das Fenster im Code noch existiert.
+Eine Anfrage richtet sich an **einen Lauf des Makros**, nicht an das Konto. Das CAD-Programm erzeugt eine Lauf-Kennung, übergibt sie dem Browser im Link und der Tab hält sie in `sessionStorage` — das übersteht ein Neuladen, erreicht aber keinen anderen Tab und keinen anderen Rechner. Ein Tab nimmt eine Anfrage nur an, wenn die Kennung übereinstimmt. Allein nach Benutzer zu schlüsseln setzte einen Lauf pro Person voraus, und das gilt nicht mehr, sobald dasselbe Konto in einem Browser auf einem zweiten Rechner angemeldet ist: Eine Anfrage von einem Rechner landete im Tab des anderen, der das Formular jemand völlig anderem zeigte. Das ist in der Praxis passiert, und deshalb gibt es die Kennung.
+
+Daraus folgt auch, warum die **erste** Komponente eines Laufs weiterhin einen Tab öffnet: Dieses Öffnen ist der Weg, auf dem ein Tab auf diesem Rechner die Lauf-Kennung erfährt, und solange keiner sie kennt, hat das Makro niemanden, dem es eine Anfrage übergeben könnte. Dieses erste Öffnen zeigt kein Meldungsfenster mehr, denn der erste Browseraufruf eines Laufs holt den Fokus von selbst — die oben genannte Windows-Regel greift erst ab dem zweiten. Ein normaler Lauf ist damit ein Tab und kein Klick, statt ein Tab und ein Klick pro Komponente.
+
+Hat ein Tab die Anfrage angenommen, gibt das Makro den Fokus mit `AppActivate "EasyPDM"` zurück. Das CAD-Programm kommt zwischenzeitlich nicht ohne Grund nach vorn — für die vorherige Komponente hat es die Datei gespeichert, das STEP exportiert und das Grafikfenster für den Schnappschuss neu gezeichnet —, gebraucht wird jetzt aber das Formular. Es funktioniert, weil Windows der Anwendung, die den Fokus *gerade* hat, erlaubt, ihn abzugeben: dieselbe Regel, die die Klicks erzwang, in die andere Richtung genutzt. Verglichen wird der Anfang des Fenstertitels, sitzt EasyPDM also in einem Hintergrund-Tab, geschieht nichts; ein Fehler wird verschluckt, denn das ist Bequemlichkeit und nicht Teil des Uploads.
+
+Eines lässt sich nicht voraussetzen: dass überhaupt jemand zusieht. Der Browser kann geschlossen, der Server nicht erreichbar sein. Deshalb veröffentlicht das Makro die Anfrage und fragt dann einige Sekunden lang `GET /api/cad-requests/taken` ab; der Tab markiert die Anfrage in dem Moment als angenommen, in dem er sie übernimmt. Kein Signal heißt, dass niemand da ist — und das Makro kehrt zum alten Weg samt Fenster und neuem Tab zurück, statt auf ein Formular zu warten, das niemand sehen wird. In diesem Rückfallweg lebt das Fenster weiter — vor dem Tab, den es öffnet, und erst ab der zweiten Komponente, wo die Fokus-Regel gilt.
 
 `taken` kommt als flache `1`/`0` zurück und nicht als Wahrheitswert in einem verschachtelten Objekt, denn die JSON-Parser in den VBA-Makros kennen nur `JsonGetString` und `JsonGetLong` — eine flache Zahl ist die einzige Form, die sie ohne zusätzlichen Parser lesen können.
 
