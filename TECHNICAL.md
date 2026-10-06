@@ -455,10 +455,19 @@ the file, exported the STEP and redrew the graphics window for the screenshot �
 thing needed is the form. It works because Windows lets the application that *currently* holds
 focus give it away: the same rule that forced the clicks, used in the other direction. The match
 is on the start of the window title, so nothing happens when EasyPDM sits in a background tab,
-and a failure is swallowed, being a convenience rather than part of the upload. The FreeCAD
-macro does the same through `wmctrl`/`xdotool`, which only covers X11: under Wayland no
-application may raise another's window, so there it does nothing and the waiting dialog says
-in words that the form is filled in in the browser.
+and a failure is swallowed, being a convenience rather than part of the upload. In FreeCAD the
+problem was the other way round: nothing had to raise the browser, because the tab comes
+forward by itself when it takes the request — it was the macro's own waiting dialog, created
+straight afterwards, that took focus back, since Qt activates a new window on creation. It is
+now given `WA_ShowWithoutActivating`. The `wmctrl`/`xdotool` attempt is kept as a fallback for
+X11 only; under Wayland no application may raise another's window.
+
+That is also why the app itself can call the person back: when a request is taken and the tab
+does not have focus, it shows a desktop notification whose click switches to it. A click is
+the one mechanism no window system refuses, because the switch is the person's own doing.
+Permission is asked once, from a button in the macro's own dialog — browsers reject a request
+made without a fresh user gesture — and a focused tab shows nothing, there being nothing to
+call back from.
 
 The one thing that cannot be assumed is that a browser is watching at all — it may be closed,
 or the server unreachable. So the macro publishes, then polls `GET /api/cad-requests/taken` for

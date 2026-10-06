@@ -963,10 +963,10 @@ def _focus_browser_window():
     """Przenosi okno przeglądarki na wierzch — odpowiednik `AppActivate "EasyPDM"` z makr
     SolidWorks/Inventor.
 
-    Potrzebne, odkąd prośba o formularz trafia do JUŻ OTWARTEJ karty: nic się wtedy nie
-    otwiera, więc nic samo nie zabiera fokusu i FreeCAD zostaje na wierzchu z oknem
-    oczekiwania, a formularz czeka niewidoczny za nim. Zgłoszone z praktyki: „okno nie znika,
-    tylko muszę przeklikać w przeglądarkę".
+    ZAPAS, nie główny mechanizm. Fokus przeglądarce odbierało okno oczekiwania, które Qt
+    aktywowało samo przy tworzeniu — i to zostało naprawione u źródła (`WA_ShowWithoutActivating`
+    w WaitForTicketDialog). Ta funkcja zostaje na wypadek, gdyby platforma ten atrybut
+    zignorowała, albo gdy przeglądarka jest zminimalizowana.
 
     Na Windowsie to jedno wywołanie systemowe; na Linuksie zależy od środowiska okien. Pod
     X11 robi to `wmctrl`/`xdotool`, jeśli są zainstalowane. Pod Wayland kompozytor z zasady
@@ -2153,6 +2153,24 @@ class WaitForTicketDialog(QtWidgets.QDialog):
         self.result_data = None
         self._elapsed_ms = 0
         self._timeout_ms = timeout_seconds * 1000
+
+        # To okno NIE MA zabierać fokusu. Powstaje DOPIERO PO tym, jak prośbę podjęła otwarta
+        # karta -- czyli w chwili, gdy formularz stoi już w przeglądarce i to ona ma fokus.
+        # Bez tego atrybutu nowe okno Qt aktywuje się samo i odbiera fokus przeglądarce, przez
+        # co formularz ląduje ZA FreeCAD-em i trzeba w przeglądarkę kliknąć ręcznie (zgłoszone
+        # z praktyki). To właśnie to okno kradło fokus, nie brak odpowiednika AppActivate.
+        #
+        # Gdy platforma ten atrybut zignoruje, zachowanie jest dokładnie takie jak dotąd --
+        # nic się nie psuje, a od strony przeglądarki czeka jeszcze powiadomienie systemowe,
+        # którego kliknięcie przełącza na kartę.
+        #
+        # Pod osłoną try: nazwy enumów różnią się między PySide6/PySide2/PySide, a to jest
+        # wygoda — nie ma prawa wywrócić całego makra, gdyby w którejś wersji nazywało się
+        # inaczej.
+        try:
+            self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+        except Exception:
+            pass
 
         self.setWindowTitle(t("wait_ticket_title"))
         self.setMinimumWidth(380)

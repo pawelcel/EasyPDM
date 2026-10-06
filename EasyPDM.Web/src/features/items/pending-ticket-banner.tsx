@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { AddNodeDialog } from "@/features/items/add-node-dialog"
+import { askForCadFormNotices } from "@/features/items/cad-form-notice"
 import { clearPendingCreateTicket, usePendingCreateTicket } from "@/features/items/pending-create-ticket"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -138,13 +139,17 @@ function PendingTicketBanner() {
 
             {screen === "choice" && (
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => setCreating(true)}>
+                {/* Pytanie o zgodę na powiadomienia systemowe musi paść Z KLIKNIĘCIA —
+                    przeglądarki odrzucają je zadane w tle. To pierwsze kliknięcie w całym
+                    przepływie CAD-owym, a kolejne komponenty tego samego biegu już z tej
+                    zgody korzystają. Zob. cad-form-notice.ts. */}
+                <Button size="sm" onClick={() => { askForCadFormNotices(); setCreating(true) }}>
                   {t("app.pendingTicketCreateNewButton")}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setScreen("duplicate")}>
+                <Button size="sm" variant="outline" onClick={() => { askForCadFormNotices(); setScreen("duplicate") }}>
                   {t("app.pendingTicketDuplicateButton")}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setScreen("attach")}>
+                <Button size="sm" variant="outline" onClick={() => { askForCadFormNotices(); setScreen("attach") }}>
                   {t("app.pendingTicketAttachExistingButton")}
                 </Button>
               </div>

@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react"
 
 import { api } from "@/api/client"
+import { showCadFormNotice } from "@/features/items/cad-form-notice"
 import { acceptPendingCreateTicket, currentRunId } from "@/features/items/pending-create-ticket"
+import { useLanguage } from "@/i18n/use-language"
 
 // Podejmowanie próśb, które makro CAD zostawia na serwerze zamiast otwierać nową kartę.
 //
@@ -20,6 +22,8 @@ import { acceptPendingCreateTicket, currentRunId } from "@/features/items/pendin
 const POLL_INTERVAL_MS = 2_000
 
 export function useCadRequests() {
+  const { t } = useLanguage()
+
   // Bilety, które ta karta już podjęła — bez tego ta sama prośba byłaby podejmowana przy
   // każdym odpytaniu, dopóki użytkownik nie wypełni formularza.
   const handled = useRef<Set<string>>(new Set())
@@ -57,7 +61,18 @@ export function useCadRequests() {
         })
         // Nie weszło, bo inny bilet jest w toku — zapominamy, że ją widzieliśmy, żeby
         // podjąć ją ponownie, gdy formularz się zwolni.
-        if (!accepted) handled.current.delete(request.ticket)
+        if (!accepted) {
+          handled.current.delete(request.ticket)
+          return
+        }
+
+        // Formularz stoi, ale człowiek może patrzeć na CAD-a. Powiadomienie systemowe jest
+        // jedyną drogą, która przełącza na kartę wszędzie — kliknięcie w nie robi to, czego
+        // sama strona zrobić nie może.
+        showCadFormNotice(
+          t("cadNotice.title"),
+          request.name ? t("cadNotice.bodyNamed", { name: request.name }) : t("cadNotice.body")
+        )
       } catch {
         // Cicho: to jest wygoda, nie część wysyłki. Gdy serwer nie odpowiada, makro po
         // swoim czasie oczekiwania i tak wróci do otwierania karty.
