@@ -455,7 +455,10 @@ the file, exported the STEP and redrew the graphics window for the screenshot â€
 thing needed is the form. It works because Windows lets the application that *currently* holds
 focus give it away: the same rule that forced the clicks, used in the other direction. The match
 is on the start of the window title, so nothing happens when EasyPDM sits in a background tab,
-and a failure is swallowed, being a convenience rather than part of the upload.
+and a failure is swallowed, being a convenience rather than part of the upload. The FreeCAD
+macro does the same through `wmctrl`/`xdotool`, which only covers X11: under Wayland no
+application may raise another's window, so there it does nothing and the waiting dialog says
+in words that the form is filled in in the browser.
 
 The one thing that cannot be assumed is that a browser is watching at all â€” it may be closed,
 or the server unreachable. So the macro publishes, then polls `GET /api/cad-requests/taken` for

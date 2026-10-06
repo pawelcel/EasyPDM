@@ -18,9 +18,14 @@ import { useLanguage } from "@/i18n/use-language"
 // odpytania to odczyt ze słownika w pamięci i kilkadziesiąt bajtów odpowiedzi, bez dotykania
 // bazy, więc nawet kilkanaście otwartych kart nic nie kosztuje.
 const POLL_INTERVAL_MS = 1_500
-// Po zakończeniu lista zostaje chwilę z kompletem ptaszków — to ona jest potwierdzeniem,
-// że wszystko poszło. Potem znika sama, bez klikania.
-const KEEP_FINISHED_MS = 20_000
+// Po zakończeniu lista zostaje tylko na moment z kompletem ptaszków — tyle, żeby dało się
+// zobaczyć, że domknęła się w całości. Potem znika sama, bez klikania.
+//
+// Było 20 s i to było za długo (zgłoszone z praktyki: „znika na końcu, ale długo"). Tyle
+// trzeba było czekać, zanim panel przestał zasłaniać róg aplikacji, mimo że nic się już nie
+// działo. Krótko można, odkąd trwałym śladem po biegu jest raport w powiadomieniach: lista
+// nie musi już być jedynym miejscem, w którym widać, co poszło.
+const KEEP_FINISHED_MS = 3_000
 
 function useTransferProgress() {
   const [progress, setProgress] = useState<TransferProgress | null>(null)

@@ -179,6 +179,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import uuid
 import webbrowser
@@ -293,7 +294,7 @@ TRANSLATIONS = {
         "open_browser_failed": "Nie udało się otworzyć przeglądarki: {error}",
         "wait_ticket_title": "Czekam na przeglądarkę",
         "wait_ticket_body": (
-            "Otworzono przeglądarkę — uzupełnij dane elementu i zapisz.\n\n"
+            "Uzupełnij dane elementu w przeglądarce i zapisz.\n\n"
             "To okno samo się zamknie, gdy element zostanie utworzony."
         ),
         "wait_timeout": "Upłynął czas oczekiwania.",
@@ -399,7 +400,7 @@ TRANSLATIONS = {
         "open_browser_failed": "Failed to open the browser: {error}",
         "wait_ticket_title": "Waiting for the browser",
         "wait_ticket_body": (
-            "The browser has been opened — fill in the item details and save.\n\n"
+            "Fill in the item details in the browser and save.\n\n"
             "This window will close automatically once the item is created."
         ),
         "wait_timeout": "The waiting time has expired.",
@@ -508,7 +509,7 @@ TRANSLATIONS = {
         "open_browser_failed": "Der Browser konnte nicht geöffnet werden: {error}",
         "wait_ticket_title": "Warte auf den Browser",
         "wait_ticket_body": (
-            "Der Browser wurde geöffnet — füllen Sie die Elementdaten aus und speichern Sie.\n\n"
+            "Füllen Sie die Elementdaten im Browser aus und speichern Sie.\n\n"
             "Dieses Fenster schließt sich automatisch, sobald das Element erstellt wurde."
         ),
         "wait_timeout": "Die Wartezeit ist abgelaufen.",
@@ -958,6 +959,37 @@ def _cad_item_type(doc):
         return ""
 
 
+def _focus_browser_window():
+    """Przenosi okno przeglądarki na wierzch — odpowiednik `AppActivate "EasyPDM"` z makr
+    SolidWorks/Inventor.
+
+    Potrzebne, odkąd prośba o formularz trafia do JUŻ OTWARTEJ karty: nic się wtedy nie
+    otwiera, więc nic samo nie zabiera fokusu i FreeCAD zostaje na wierzchu z oknem
+    oczekiwania, a formularz czeka niewidoczny za nim. Zgłoszone z praktyki: „okno nie znika,
+    tylko muszę przeklikać w przeglądarkę".
+
+    Na Windowsie to jedno wywołanie systemowe; na Linuksie zależy od środowiska okien. Pod
+    X11 robi to `wmctrl`/`xdotool`, jeśli są zainstalowane. Pod Wayland kompozytor z zasady
+    nie pozwala jednej aplikacji wyciągnąć okna drugiej — tam nie zadziała NIC i nie ma co
+    tego obchodzić; dlatego treść okna oczekiwania mówi wprost, że dane uzupełnia się w
+    przeglądarce, zamiast obiecywać, że sama się pokaże.
+
+    Dopasowanie po tytule okna: strona ma <title> zaczynający się od "EasyPDM", a przeglądarki
+    doklejają swoją nazwę na końcu."""
+    for command in (["wmctrl", "-a", "EasyPDM"],
+                    ["xdotool", "search", "--name", "EasyPDM", "windowactivate"]):
+        if shutil.which(command[0]) is None:
+            continue
+        try:
+            done = subprocess.run(command, timeout=3,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if done.returncode == 0:
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def publish_cad_request(ticket, name, item_type=None, material=None, document_size=None):
     """Zostawia na serwerze prośbę o formularz dla JUŻ OTWARTEJ karty przeglądarki i czeka
     chwilę na sygnał, że ktoś ją podjął. Zwraca True, gdy podjęta — wtedy NIE otwieramy
@@ -1019,6 +1051,13 @@ def publish_cad_request(ticket, name, item_type=None, material=None, document_si
             probe = api_get(f"/cad-requests/taken?ticket={quote(ticket)}")
             if probe and probe.get("taken") == 1:
                 App.Console.PrintMessage(f"EasyPDM: formularz dla '{name}' podjela otwarta karta\n")
+                # Karta formularz pokazala, ale fokus zostal w FreeCAD -- oddajemy go tam,
+                # gdzie teraz trzeba cos wpisac.
+                if not _focus_browser_window():
+                    App.Console.PrintMessage(
+                        "EasyPDM: nie udalo sie przelaczyc na przegladarke"
+                        " (brak wmctrl/xdotool albo sesja Wayland) -- przejdz do niej recznie\n"
+                    )
                 return True
         except Exception as e:
             last_error = e
@@ -2079,6 +2118,25 @@ class NewRevisionDialog(QtWidgets.QDialog):
         return self.comment_edit.toPlainText().strip()
 
 
+def _close_wait_dialog(dialog):
+    """Zdejmuje okno oczekiwania z ekranu OD RAZU, zanim makro ruszy dalej.
+
+    `exec()` wraca w chwili zatwierdzenia, ale samo okno znika dopiero wtedy, gdy pętla
+    zdarzeń Qt dostanie szansę je przerysować — a makro leci zaraz potem w Save As, eksport
+    STEP, zrzut modelu i wysyłkę pliku, wszystko synchronicznie, bez oddania sterowania.
+    Okno stało więc na ekranie przez CAŁY upload komponentu i znikało dopiero na jego końcu
+    (zgłoszone z praktyki: „okno znika, ale robi to długo"). `processEvents` oddaje Qt tę
+    jedną chwilę, której brakowało.
+
+    Nie `deleteLater()`: `result_data` czytamy z tego obiektu PO zamknięciu, a kasowanie go
+    spod spodu byłoby proszeniem się o sięgnięcie do nieistniejącego obiektu C++."""
+    try:
+        dialog.hide()
+        QtWidgets.QApplication.processEvents()
+    except Exception:
+        pass
+
+
 class WaitForTicketDialog(QtWidgets.QDialog):
     """Pokazywane PO otwarciu przeglądarki na formularzu dodawania (zob.
     build_browser_create_url/_submit_new) — odpytuje GET /api/create-tickets/{ticket} co
@@ -2241,10 +2299,12 @@ def submit_via_browser(doc, target_folder):
         return None
 
     wait_dlg = WaitForTicketDialog(ticket)
-    if wait_dlg.exec() != QtWidgets.QDialog.Accepted:
+    accepted = wait_dlg.exec() == QtWidgets.QDialog.Accepted
+    ticket_data = wait_dlg.result_data
+    _close_wait_dialog(wait_dlg)
+    if not accepted:
         return None
 
-    ticket_data = wait_dlg.result_data
     export_step = ticket_data.get("exportStep")
     if export_step is None:
         export_step = True
@@ -2469,10 +2529,12 @@ def process_assembly_tree(top_doc, target_folder=None):
                     return [], True, locked_matches
 
             wait_dlg = WaitForTicketDialog(ticket)
-            if wait_dlg.exec() != QtWidgets.QDialog.Accepted:
+            accepted = wait_dlg.exec() == QtWidgets.QDialog.Accepted
+            ticket_data = wait_dlg.result_data
+            _close_wait_dialog(wait_dlg)
+            if not accepted:
                 return [], True, locked_matches
 
-            ticket_data = wait_dlg.result_data
             comp_export_step = ticket_data.get("exportStep")
             if comp_export_step is None:
                 comp_export_step = True
