@@ -273,7 +273,11 @@ CREATE TABLE notifications (
         'status_review', 'status_released', 'status_regressed', 'new_revision',
         'project_assigned', 'project_unassigned', 'project_deleted',
         'password_changed', 'low_disk_space', 'sample_project',
-        'client_verification_needs_work', 'client_verification_verified'
+        'client_verification_needs_work', 'client_verification_verified',
+        -- Raport z biegu makra CAD (wysyłka albo pobieranie -- rozróżnia data->>'kind').
+        -- Zastąpił blokujące okno w CAD-zie, które po oddaniu fokusu przeglądarce wisiało
+        -- za nią niewidoczne. Zob. db/migrations/058.
+        'cad_transfer_finished'
     )),
     -- Dane do wyrenderowania treści PO STRONIE FRONTU (i18n, 3 języki) -- ten sam
     -- wzorzec co HistoryEntry/ItemHistoryPanel: zapisujemy surowe dane (nazwy/numery

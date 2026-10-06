@@ -314,6 +314,9 @@ export type NotificationType =
   | "sample_project"
   | "client_verification_needs_work"
   | "client_verification_verified"
+  // Raport z zakończonego biegu makra CAD — zob. BuildReport w TransferProgressEndpoints.cs
+  // po kształt "data" (kind/total/done/skipped/failed/pending/entries/omitted).
+  | "cad_transfer_finished"
 
 // "data" niesie surowe dane zapisane w momencie zdarzenia (np. itemLabel, projectName) —
 // treść jest renderowana po stronie frontu (i18n), zob. describe() w notification-bell.tsx.

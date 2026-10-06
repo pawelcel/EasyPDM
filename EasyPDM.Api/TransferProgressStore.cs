@@ -59,10 +59,18 @@ class TransferProgressStore
     // użytkownik ma zobaczyć na koniec. Znika sama po FinishedLinger od ostatniej zmiany --
     // tym zajmuje się Sweep przy kolejnym dostępie, a frontend po prostu przestaje ją
     // pokazywać, gdy serwer odda "finished" i minie jego własny czas wyświetlania.
-    public void Finish(Guid userId)
+    // Zwraca bieg, KTÓRY WŁAŚNIE SIĘ SKOŃCZYŁ -- i tylko przy pierwszym wywołaniu, bo z tego
+    // powstaje raport w powiadomieniach (zob. TransferProgressEndpoints). Powtórne "finish"
+    // tego samego biegu oddaje null, żeby makro, które zawoła je dwa razy (ścieżka błędu plus
+    // normalne zakończenie), nie zostawiło dwóch takich samych raportów.
+    public TransferProgress? Finish(Guid userId)
     {
-        if (_byUser.TryGetValue(userId, out var progress))
-            _byUser[userId] = progress with { UpdatedAt = DateTime.UtcNow, Finished = true };
+        if (!_byUser.TryGetValue(userId, out var progress) || progress.Finished)
+            return null;
+
+        var finished = progress with { UpdatedAt = DateTime.UtcNow, Finished = true };
+        _byUser[userId] = finished;
+        return finished;
     }
 
     public void Clear(Guid userId) => _byUser.TryRemove(userId, out _);

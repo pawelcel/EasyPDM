@@ -1,4 +1,4 @@
-import { Bell, X } from "lucide-react"
+import { Bell, Check, X } from "lucide-react"
 import { useState } from "react"
 
 import type { NotificationEntry } from "@/api/types"
@@ -66,8 +66,12 @@ function NotificationBell({
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full right-0 z-50 mt-2 w-96 rounded-xl bg-card p-2 shadow-lg ring-1 ring-foreground/10">
+          {/* Wyżej niż panel postępu wysyłki (z-60), a ten celowo stoi nad modalami (z-50):
+              raport z biegu ląduje tu W CHWILI, gdy lista plików jeszcze wisi na ekranie, więc
+              przy niższej warstwie panel postępu przykrywałby dokładnie to powiadomienie,
+              które właśnie zapowiedział (wyłapane zrzutem ekranu przy weryfikacji). */}
+          <div className="fixed inset-0 z-[65]" onClick={() => setOpen(false)} />
+          <div className="absolute top-full right-0 z-[70] mt-2 w-96 rounded-xl bg-card p-2 shadow-lg ring-1 ring-foreground/10">
             <div className="flex items-center justify-between px-1.5 pt-1 pb-2">
               <span className="text-[12.5px] font-medium">{t("notifications.title")}</span>
               <Button type="button" variant="link" size="xs" onClick={markAllRead} disabled={unreadCount === 0}>
@@ -94,6 +98,7 @@ function NotificationBell({
                       {!entry.readAt && <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />}
                       <span className={cn("flex-1", entry.readAt && "pl-3.5")}>
                         <span className="block">{describe(entry, t)}</span>
+                        {entry.type === "cad_transfer_finished" && <TransferReport entry={entry} t={t} />}
                         <span className="text-muted-foreground">
                           {new Date(entry.createdAt).toLocaleString("pl-PL")}
                         </span>
@@ -147,7 +152,59 @@ function describe(entry: NotificationEntry, t: LanguageContextValue["t"]): strin
       return t("notifications.clientVerificationNeedsWork", { itemLabel: data.itemLabel })
     case "client_verification_verified":
       return t("notifications.clientVerificationVerified", { itemLabel: data.itemLabel })
+    case "cad_transfer_finished": {
+      // "done" celowo NIE obejmuje pominiętych: pominięty komponent to taki, który już był w
+      // PDM i nie trzeba go było wysyłać — policzenie go jako wysłanego zawyżałoby raport.
+      const line =
+        data.kind === "download"
+          ? t("notifications.cadTransferDownload", { done: data.done, total: data.total })
+          : t("notifications.cadTransferUpload", { done: data.done, total: data.total })
+      const failed = Number(data.failed) > 0 ? t("notifications.cadTransferFailed", { failed: data.failed }) : ""
+      const skipped = Number(data.skipped) > 0 ? t("notifications.cadTransferSkipped", { skipped: data.skipped }) : ""
+      return line + failed + skipped
+    }
   }
+}
+
+// Ile pozycji raportu pokazuje dzwonek. Serwer przysyła ich do czterdziestu, ale dzwonek ma
+// zostać podsumowaniem — pełną listę plik po pliku widać NA ŻYWO w panelu postępu.
+const REPORT_ROWS = 8
+
+// Najpierw to, co wymaga uwagi. Przy dwudziestu plikach i jednym nieudanym pokazanie ośmiu
+// pierwszych z listy znaczyłoby, że jedyna ważna pozycja nie mieści się w kadrze.
+const REPORT_ORDER: Record<string, number> = { failed: 0, pending: 1, active: 1, skipped: 2, done: 3 }
+
+function TransferReport({ entry, t }: { entry: NotificationEntry; t: LanguageContextValue["t"] }) {
+  const all = Array.isArray(entry.data.entries)
+    ? (entry.data.entries as { label: string; status: string }[])
+    : []
+  if (all.length === 0) return null
+
+  const sorted = [...all].sort((a, b) => (REPORT_ORDER[a.status] ?? 9) - (REPORT_ORDER[b.status] ?? 9))
+  const shown = sorted.slice(0, REPORT_ROWS)
+  const omitted = all.length - shown.length + Number(entry.data.omitted ?? 0)
+
+  return (
+    <span className="mt-1 block">
+      {shown.map((row, index) => (
+        <span key={`${row.label}-${index}`} className="flex items-center gap-1.5 text-muted-foreground">
+          {row.status === "failed" ? (
+            <X className="size-3 shrink-0 text-destructive" strokeWidth={3} />
+          ) : row.status === "done" ? (
+            <Check className="size-3 shrink-0 text-[#49c17d]" strokeWidth={3} />
+          ) : (
+            <Check className="size-3 shrink-0 opacity-40" strokeWidth={3} />
+          )}
+          <span className="truncate">{row.label}</span>
+        </span>
+      ))}
+      {omitted > 0 && (
+        <span className="block pl-4.5 text-muted-foreground">
+          {t("notifications.cadTransferMore", { count: omitted })}
+        </span>
+      )}
+    </span>
+  )
 }
 
 export { NotificationBell }

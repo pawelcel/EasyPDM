@@ -367,7 +367,9 @@ element czeka na sprawdzenie, został wydany albo cofnięty do "W pracy", ma now
 przyszedł wynik weryfikacji klienta (uwagi albo akceptacja) do elementu, który utworzyłeś,
 zostałeś dodany do projektu lub z niego usunięty, przypisany do Ciebie projekt został
 usunięty, Twoje hasło zostało zmienione przez administratora, albo (tylko administratorzy)
-mało miejsca na dysku na przechowywanie plików. Każde powiadomienie można osobno oznaczyć
+mało miejsca na dysku na przechowywanie plików. Zostaje tu też raport z zakończonego biegu
+makra CAD: ile plików poszło albo przyszło, które się nie powiodły i które pominięto, bo
+były już w PDM. Każde powiadomienie można osobno oznaczyć
 jako przeczytane albo usunąć, a każdy typ można wyłączyć w Ustawienia → Powiadomienia.
 
 ## Konta i dostęp

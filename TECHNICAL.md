@@ -511,6 +511,43 @@ resumed — and the saving was not worth it, since a poll is a dictionary lookup
 bytes, never touching the database. A finished run stops being served after two minutes, so a
 list from an hour ago does not greet whoever opens the app next.
 
+### The run reports itself in notifications
+
+When a run ends, the server composes a report and leaves it in the bell
+(`cad_transfer_finished`). The macros used to end with a blocking message box — "uploaded as
+item #X" — which was right while the person was still sitting in the CAD program. Since focus
+is handed back to the browser after every component, that window is now made by a program in
+the background, so it opens *behind* the browser and hangs there waiting for a click nobody
+can see. The report therefore goes where the person is already looking, and unlike a window
+it stays to be found later.
+
+It is composed in `POST /api/progress/finish`, from the run the progress store already holds
+— not in the macros. That is the same choice as counting progress on the server: one place for
+three CAD programs, so the report reads the same whichever one sent it, and a macro needs no
+code for it beyond the `finish` call it already made.
+
+`Finish` returns the run **only on the first call** that ends it. A macro can legitimately call
+`finish` twice — once on an error path, once on the normal one — and two identical reports in
+the bell would be noise.
+
+The data holds counts and the list: `kind`, `total`, `done`, `skipped`, `failed`, `pending`,
+and up to forty entries with their labels. `done` deliberately excludes `skipped`: a skipped
+component is one that was already in the PDM and did not need sending, so counting it as sent
+would overstate the report. `pending` is separate from `failed` because an interrupted run did
+not break anything, it simply never got there. The bell shows eight of those entries, failures
+first — with twenty files and one failure, showing the first eight in list order would leave
+the only entry that matters out of the frame.
+
+The bell polls every 30 s, which is far too slow for something the person is watching happen,
+so the progress panel fires a window event the moment the server reports the run finished and
+`use-notifications` refetches on it. The panel also sits above dialogs at `z-60`, so the bell's
+own dropdown had to go above that — otherwise the panel covered exactly the notification it
+had just announced.
+
+One window is kept on purpose: components already linked to a PDM item whose status is "in
+review" or "released". The macro never updates those, so a local change to one of them did not
+go up — and the file list cannot say so, because from its point of view nothing happened.
+
 ### Login, roles, and project access
 
 Every request to `/api/*` (except `/api/auth/login`) requires being logged in — a

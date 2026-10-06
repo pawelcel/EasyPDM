@@ -400,6 +400,9 @@ zurückgesetzt, hat eine neue Revision, es kam ein Ergebnis der Kundenprüfung (
 oder Abnahme) zu einem von Ihnen erstellten Element, Sie wurden einem Projekt hinzugefügt
 oder daraus entfernt, ein zugewiesenes Projekt wurde gelöscht, Ihr Passwort wurde von einem
 Administrator geändert, oder (nur Administratoren) wenig Speicherplatz im Dateispeicher.
+Auch ein beendeter CAD-Makrolauf hinterlässt hier einen Bericht: wie viele Dateien hoch-
+oder heruntergingen, welche fehlschlugen und welche übersprungen wurden, weil sie bereits
+im PDM waren.
 Jede Benachrichtigung kann einzeln als gelesen markiert oder gelöscht werden, und jeder
 Typ lässt sich unter Einstellungen → Benachrichtigungen abschalten.
 

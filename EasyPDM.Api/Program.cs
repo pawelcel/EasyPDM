@@ -127,7 +127,7 @@ app.MapConfigEndpoints(storage);
 app.MapSettingsEndpoints(connectionString, storage, appSettingsPath);
 app.MapLogEndpoints(logRoot);
 app.MapNotificationEndpoints(connectionString);
-app.MapTransferProgressEndpoints(transferProgressStore);
+app.MapTransferProgressEndpoints(transferProgressStore, connectionString);
 app.MapCadRequestEndpoints(cadRequestStore);
 
 // Bez rejestracji w DI (patrz komentarz w ScheduledBackupService.cs) — uruchamiane ręcznie,

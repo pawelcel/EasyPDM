@@ -342,8 +342,6 @@ Private Function T_PL(ByVal key As String) As String
         Case "StaleLinkCleared": T_PL = "Element PDM, z ktorym ten dokument byl powiazany, juz nie istnieje (zostal usuniety) -- stary link zostal wyczyszczony, dokument zostanie potraktowany jako jeszcze niewyslany."
         Case "CancelledNothingSent": T_PL = "Anulowano -- nic nie zostalo wyslane."
         Case "FailedToAttachSubComponent": T_PL = "Nie udalo sie podpiac jednego z podkomponentow pod element glowny: "
-        Case "UploadedSuccessPart1": T_PL = "Przeslano do EasyPDM: element nr "
-        Case "UploadedSuccessPart2": T_PL = " (rewizja "
         Case "RunLogPrefix": T_PL = "Log przebiegu: "
         Case "SessionExpiredPrompt": T_PL = "Sesja wygasla -- uruchom makro ponownie, aby sie zalogowac."
         Case "ErrorPrefix": T_PL = "Blad: "
@@ -419,8 +417,6 @@ Private Function T_EN(ByVal key As String) As String
         Case "StaleLinkCleared": T_EN = "The PDM item this document was linked to no longer exists (it was deleted) -- the stale link has been cleared, this document will be treated as not yet sent."
         Case "CancelledNothingSent": T_EN = "Cancelled -- nothing was sent."
         Case "FailedToAttachSubComponent": T_EN = "Failed to attach one of the sub-components under the main element: "
-        Case "UploadedSuccessPart1": T_EN = "Uploaded to EasyPDM: item #"
-        Case "UploadedSuccessPart2": T_EN = " (revision "
         Case "RunLogPrefix": T_EN = "Run log: "
         Case "SessionExpiredPrompt": T_EN = "Session expired -- run the macro again to log in."
         Case "ErrorPrefix": T_EN = "Error: "
@@ -496,8 +492,6 @@ Private Function T_DE(ByVal key As String) As String
         Case "StaleLinkCleared": T_DE = "Das PDM-Element, mit dem dieses Dokument verknuepft war, existiert nicht mehr (wurde geloescht) -- die veraltete Verknuepfung wurde entfernt, dieses Dokument wird als noch nicht gesendet behandelt."
         Case "CancelledNothingSent": T_DE = "Abgebrochen -- es wurde nichts gesendet."
         Case "FailedToAttachSubComponent": T_DE = "Eine der Unterkomponenten konnte nicht unter dem Hauptelement angehaengt werden: "
-        Case "UploadedSuccessPart1": T_DE = "Zu EasyPDM hochgeladen: Element Nr. "
-        Case "UploadedSuccessPart2": T_DE = " (Revision "
         Case "RunLogPrefix": T_DE = "Ausfuehrungsprotokoll: "
         Case "SessionExpiredPrompt": T_DE = "Sitzung abgelaufen -- fuehren Sie das Makro erneut aus, um sich anzumelden."
         Case "ErrorPrefix": T_DE = "Fehler: "
@@ -4193,20 +4187,28 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         LogLine "=== Finished successfully: item #" & JsonGetLong(resultInfo, "itemNumber", 0) & _
                 ", revision " & JsonGetString(resultInfo, "revisionLabel", "A") & " ==="
 
-        Dim lockedTail As String
-        lockedTail = ""
+        ' Bez okna "wyslano element nr X". Raport z calego biegu sklada teraz serwer przy
+        ' POST /api/progress/finish i zostawia go jako powiadomienie w przegladarce -- tam,
+        ' gdzie czlowiek i tak patrzy, bo fokus po wysylce wraca do karty. Okno powstawalo
+        ' ZA przegladarka i wisialo, czekajac na klikniecie, ktorego nikt nie widzial
+        ' (zgloszone z praktyki). Numer elementu i rewizja zostaja w logu ponizej.
+        '
+        ' JEDEN wyjatek: komponenty juz podpiete do PDM, ktore maja status "sprawdzany" albo
+        ' "wydany". Takich makro NIGDY nie aktualizuje, wiec jesli ktos zmienil taki plik
+        ' lokalnie, jego zmiana NIE poszla na serwer -- a tego raport z listy plikow nie
+        ' powie, bo z jego punktu widzenia nic sie nie wydarzylo. To warto zatrzymac przed
+        ' oczami i dlatego dla tego jednego przypadku okno zostaje.
         If lockedComponents.Count > 0 Then
+            Dim lockedTail As String
+            lockedTail = ""
             Dim lockedLine As Variant
             For Each lockedLine In lockedComponents
                 lockedTail = lockedTail & "- " & lockedLine & vbCrLf
             Next lockedLine
-            lockedTail = vbCrLf & vbCrLf & T("LockedComponentsTailPrefix") & lockedComponents.Count & _
-                         T("LockedComponentsTailSuffix") & vbCrLf & lockedTail
+            MsgBoxFront T("LockedComponentsTailPrefix") & lockedComponents.Count & _
+                   T("LockedComponentsTailSuffix") & vbCrLf & lockedTail & vbCrLf & _
+                   T("RunLogPrefix") & LogFilePath(), vbExclamation, T("AppTitle")
         End If
-
-        MsgBoxFront T("UploadedSuccessPart1") & JsonGetLong(resultInfo, "itemNumber", 0) & _
-               T("UploadedSuccessPart2") & JsonGetString(resultInfo, "revisionLabel", "A") & ")." & vbCrLf & vbCrLf & _
-               T("RunLogPrefix") & LogFilePath() & lockedTail, vbInformation, T("AppTitle")
     Else
         LogLine "=== Finished without uploading (cancelled or no new revision) ==="
     End If

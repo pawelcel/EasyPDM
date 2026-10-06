@@ -157,4 +157,102 @@ public class TransferProgressTests
         (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
         Assert.Equal(JsonValueKind.Null, (await ReadAsync(client)).ValueKind);
     }
+
+    // Raport z biegu. Makro kończyło dotąd blokującym oknem w CAD-zie -- a odkąd fokus po
+    // wysyłce wraca do przeglądarki, takie okno powstaje ZA nią i wisi, czekając na
+    // kliknięcie, którego nikt nie widzi (zgłoszone z praktyki). Raport powstaje więc tam,
+    // gdzie człowiek i tak patrzy, i składa go SERWER -- jedno miejsce na trzy CAD-y.
+    [Fact]
+    public async Task Koniec_biegu_zostawia_raport_w_powiadomieniach()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        (await StartAsync(client, "upload", "a", "b", "c", "d")).EnsureSuccessStatusCode();
+        (await MarkAsync(client, "a", "done")).EnsureSuccessStatusCode();
+        (await MarkAsync(client, "b", "done")).EnsureSuccessStatusCode();
+        (await MarkAsync(client, "c", "skipped")).EnsureSuccessStatusCode();
+        (await MarkAsync(client, "d", "failed")).EnsureSuccessStatusCode();
+        (await client.PostAsync("/api/progress/finish", null)).EnsureSuccessStatusCode();
+
+        var report = await LatestReportAsync(client);
+        var data = report.GetProperty("data");
+        Assert.Equal("upload", data.GetProperty("kind").GetString());
+        Assert.Equal(4, data.GetProperty("total").GetInt32());
+        // "done" NIE obejmuje pominiętych: pominięty komponent to taki, który już był w PDM
+        // i nie trzeba go było wysyłać -- policzenie go jako wysłanego zawyżałoby raport.
+        Assert.Equal(2, data.GetProperty("done").GetInt32());
+        Assert.Equal(1, data.GetProperty("skipped").GetInt32());
+        Assert.Equal(1, data.GetProperty("failed").GetInt32());
+        Assert.Equal(0, data.GetProperty("pending").GetInt32());
+
+        // Nazwy plików, nie same liczby -- po to jest raport, żeby dało się zobaczyć, CO poszło.
+        var labels = data.GetProperty("entries").EnumerateArray()
+            .Select(e => e.GetProperty("label").GetString()).ToList();
+        Assert.Contains("a.SLDPRT", labels);
+        Assert.Contains("d.SLDPRT", labels);
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
+    // Bieg przerwany w połowie też daje raport -- i nie nazywa niedokończonych pozycji
+    // błędami, bo nic się nie zepsuło, po prostu do nich nie doszło.
+    [Fact]
+    public async Task Przerwany_bieg_liczy_niedokonczone_osobno_od_bledow()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        (await StartAsync(client, "download", "a", "b", "c")).EnsureSuccessStatusCode();
+        (await MarkAsync(client, "a", "done")).EnsureSuccessStatusCode();
+        (await client.PostAsync("/api/progress/finish", null)).EnsureSuccessStatusCode();
+
+        var data = (await LatestReportAsync(client)).GetProperty("data");
+        Assert.Equal("download", data.GetProperty("kind").GetString());
+        Assert.Equal(1, data.GetProperty("done").GetInt32());
+        Assert.Equal(0, data.GetProperty("failed").GetInt32());
+        Assert.Equal(2, data.GetProperty("pending").GetInt32());
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
+    // Makro potrafi zawołać "finish" dwa razy (ścieżka błędu plus normalne zakończenie).
+    // Drugie wywołanie nie ma prawa zostawić drugiego, identycznego raportu.
+    [Fact]
+    public async Task Powtorzone_zakonczenie_nie_dubluje_raportu()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        var before = (await ReportsAsync(client)).Count;
+
+        (await StartAsync(client, "upload", "a")).EnsureSuccessStatusCode();
+        (await MarkAsync(client, "a", "done")).EnsureSuccessStatusCode();
+        (await client.PostAsync("/api/progress/finish", null)).EnsureSuccessStatusCode();
+        (await client.PostAsync("/api/progress/finish", null)).EnsureSuccessStatusCode();
+
+        Assert.Equal(before + 1, (await ReportsAsync(client)).Count);
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
+    private static async Task<List<JsonElement>> ReportsAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/notifications");
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return body.GetProperty("items").EnumerateArray()
+            .Where(n => n.GetProperty("type").GetString() == "cad_transfer_finished")
+            .ToList();
+    }
+
+    private static async Task<JsonElement> LatestReportAsync(HttpClient client)
+    {
+        var reports = await ReportsAsync(client);
+        Assert.NotEmpty(reports);
+        return reports[0];
+    }
 }

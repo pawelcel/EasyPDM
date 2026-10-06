@@ -366,7 +366,9 @@ waiting for review, released, or reverted to "In progress", a new revision on yo
 item, a client verification result (remarks or acceptance) on an item you created,
 being assigned to or removed from a project, an assigned project being deleted,
 your password being changed by an administrator, or (administrators only) low disk
-space on the file storage. Each notification can be marked as read or deleted
+space on the file storage. A CAD macro run that has finished also leaves a report here:
+how many files went up or came down, which ones failed, and which were skipped because
+they were already in the PDM. Each notification can be marked as read or deleted
 individually, and each type can be turned off in Settings → Notifications.
 
 ## Accounts and access

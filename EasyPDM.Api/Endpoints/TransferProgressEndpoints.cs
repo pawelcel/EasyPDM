@@ -1,3 +1,5 @@
+using Npgsql;
+
 // Postęp wysyłki/pobierania: makro CAD zgłasza listę plików i odhacza kolejne, a aplikacja
 // webowa pokazuje to jako listę z ptaszkami. Zob. TransferProgressStore po powód, dla
 // którego stan siedzi w pamięci i jest kluczowany UŻYTKOWNIKIEM, a nie identyfikatorem sesji.
@@ -8,7 +10,13 @@
 // przekazywania czegokolwiek w URL-u.
 static class TransferProgressEndpoints
 {
-    public static void MapTransferProgressEndpoints(this WebApplication app, TransferProgressStore store)
+    // Ile pozycji trafia do raportu w powiadomieniu. Złożenie potrafi mieć ich kilkadziesiąt,
+    // a powiadomienie ma zostać czytelnym podsumowaniem, nie kopią całej listy -- reszta jest
+    // policzona ("i jeszcze N"). Sama lista plik po pliku jest i tak widoczna NA ŻYWO w panelu
+    // postępu, po to on jest.
+    private const int MaxReportedEntries = 40;
+
+    public static void MapTransferProgressEndpoints(this WebApplication app, TransferProgressStore store, string connectionString)
     {
         // PUT /api/progress   body: { "kind": "upload"|"download", "entries": [{ "key": "...", "label": "..." }] }
         // Wołane RAZ, zanim makro zacznie przesyłać cokolwiek. Zastępuje poprzedni bieg tego
@@ -58,10 +66,27 @@ static class TransferProgressEndpoints
 
         // POST /api/progress/finish — makro skończyło. Lista NIE znika od razu: zostaje
         // oznaczona jako zakończona, żeby użytkownik zobaczył komplet ptaszków.
-        app.MapPost("/api/progress/finish", (HttpContext ctx) =>
+        app.MapPost("/api/progress/finish", async (HttpContext ctx) =>
         {
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
-            store.Finish(user.Id);
+            var finished = store.Finish(user.Id);
+
+            // Raport z biegu zostaje w powiadomieniach. Makro kończyło dotąd blokującym oknem
+            // w CAD-zie -- a odkąd fokus po wysyłce wraca do przeglądarki, takie okno powstaje
+            // ZA nią i wisi, czekając na kliknięcie, którego nikt nie widzi. Powiadomienie
+            // trafia tam, gdzie człowiek i tak patrzy, i zostaje do odszukania później.
+            //
+            // Powstaje TUTAJ, a nie w makrze, z tego samego powodu co liczenie postępu po
+            // stronie serwera: jedno miejsce na trzy CAD-y, więc raport wygląda tak samo
+            // niezależnie od tego, z czego wysyłano.
+            if (finished is not null)
+            {
+                await using var conn = new NpgsqlConnection(connectionString);
+                await conn.OpenAsync();
+                await Notifications.NotifyAsync(
+                    conn, app.Logger, user.Id, "cad_transfer_finished", BuildReport(finished));
+            }
+
             return Results.Ok();
         });
 
@@ -103,4 +128,28 @@ static class TransferProgressEndpoints
     record ProgressEntryRequest(string Key, string Label);
     record StartProgressRequest(string Kind, List<ProgressEntryRequest>? Entries);
     record MarkProgressRequest(string Key, string Status);
+
+    // Raport z zakończonego biegu: liczby plus lista pozycji, żeby w powiadomieniu dało się
+    // zobaczyć NIE TYLKO ile, ale i co poszło. "pending" to pozycje, których makro nie zdążyło
+    // oznaczyć (bieg przerwany) -- liczone osobno od "failed", bo nic się nie zepsuło, po
+    // prostu do nich nie doszło.
+    private static object BuildReport(TransferProgress progress)
+    {
+        var entries = progress.Entries;
+        var done = entries.Count(e => e.Status == "done");
+        var skipped = entries.Count(e => e.Status == "skipped");
+        var failed = entries.Count(e => e.Status == "failed");
+
+        return new
+        {
+            kind = progress.Kind,
+            total = entries.Count,
+            done,
+            skipped,
+            failed,
+            pending = entries.Count - done - skipped - failed,
+            entries = entries.Take(MaxReportedEntries).Select(e => new { label = e.Label, status = e.Status }).ToList(),
+            omitted = Math.Max(0, entries.Count - MaxReportedEntries),
+        };
+    }
 }

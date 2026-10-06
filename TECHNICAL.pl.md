@@ -439,6 +439,20 @@ Makro zgłasza **całą listę z góry** i dopiero potem odhacza pozycje. Bez pe
 
 Przeglądarka odpytuje co 1,5 s zwykłym `setInterval` — wzorcem sprawdzonym już w `use-notifications.ts`. Pierwsze podejście dobierało interwał dynamicznie przez `setTimeout` planujący sam siebie; okazało się mierzalnie kruche (jedno przemontowanie urywało łańcuch i nic go nie wznawiało), a oszczędność nie była tego warta, bo jedno odpytanie to odczyt ze słownika i kilkadziesiąt bajtów, bez dotykania bazy. Zakończony bieg przestaje być wydawany po dwóch minutach, żeby lista sprzed godziny nie witała kolejnej osoby otwierającej aplikację.
 
+### Bieg sam się raportuje w powiadomieniach
+
+Na koniec biegu serwer składa raport i zostawia go w dzwonku (`cad_transfer_finished`). Makra kończyły dotąd blokującym oknem — „wysłano jako element nr X" — co było w porządku, dopóki człowiek siedział w CAD-zie. Odkąd po każdym komponencie fokus wraca do przeglądarki, to okno tworzy program stojący W TLE, więc powstaje ZA przeglądarką i wisi, czekając na kliknięcie, którego nikt nie widzi. Raport idzie więc tam, gdzie człowiek i tak patrzy — i w odróżnieniu od okna zostaje, żeby dało się go później odszukać.
+
+Składa go `POST /api/progress/finish` z biegu, który magazyn postępu i tak trzyma — a nie makro. To ten sam wybór co liczenie postępu po stronie serwera: jedno miejsce na trzy CAD-y, więc raport czyta się tak samo niezależnie od tego, z czego wysyłano, a makro nie potrzebuje na to ani linijki ponad `finish`, które i tak wołało.
+
+`Finish` oddaje bieg **tylko przy pierwszym wywołaniu**, które go kończy. Makro ma prawo zawołać `finish` dwa razy — raz ze ścieżki błędu, raz z normalnej — a dwa identyczne raporty w dzwonku byłyby zwykłym szumem.
+
+W danych siedzą liczby i lista: `kind`, `total`, `done`, `skipped`, `failed`, `pending` oraz do czterdziestu pozycji z etykietami. `done` celowo NIE obejmuje `skipped`: pominięty komponent to taki, który już był w PDM i nie trzeba go było wysyłać, więc policzenie go jako wysłanego zawyżałoby raport. `pending` jest osobno od `failed`, bo przerwany bieg niczego nie zepsuł — po prostu do tych pozycji nie doszedł. Dzwonek pokazuje osiem pozycji, najpierw nieudane: przy dwudziestu plikach i jednym błędzie pokazanie ośmiu pierwszych z listy zostawiłoby jedyną ważną pozycję poza kadrem.
+
+Dzwonek odpytuje co 30 s, czyli stanowczo za rzadko jak na coś, co dzieje się na oczach użytkownika — panel postępu wysyła więc zdarzenie w chwili, gdy serwer pierwszy raz odda „zakończony", a `use-notifications` odświeża się na nim. Panel stoi przy tym nad modalami (`z-60`), więc rozwijany panel dzwonka musiał pójść jeszcze wyżej: inaczej przykrywał dokładnie to powiadomienie, które sam zapowiedział.
+
+Jedno okno zostaje świadomie: komponenty już podpięte do PDM ze statusem „sprawdzany" albo „wydany". Takich makro nigdy nie aktualizuje, więc lokalna zmiana w którymś z nich NIE poszła na serwer — a lista plików tego nie powie, bo z jej punktu widzenia nic się nie wydarzyło.
+
 ### Logowanie, role i dostęp do projektów
 
 Każde żądanie do `/api/*` (poza `/api/auth/login`) wymaga zalogowania — sesja to losowy

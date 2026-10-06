@@ -487,6 +487,20 @@ Das Makro meldet die **gesamte Liste im Voraus** und hakt erst danach ab. Ohne v
 
 Der Browser fragt alle 1,5 s mit einem schlichten `setInterval` ab — das Muster, das sich in `use-notifications.ts` bereits bewährt hat. Ein erster Versuch wählte das Intervall dynamisch über ein `setTimeout`, das sich selbst neu plante; das erwies sich als messbar fragil (ein einziges Neueinhängen zerriss die Kette, und nichts setzte sie fort), und die Ersparnis war es nicht wert, denn eine Abfrage ist ein Wörterbuchzugriff und ein paar Dutzend Bytes, ohne die Datenbank zu berühren. Ein beendeter Lauf wird nach zwei Minuten nicht mehr ausgeliefert, damit eine Liste von vor einer Stunde nicht die nächste Person begrüßt, die die Anwendung öffnet.
 
+### Der Lauf meldet sich selbst in den Benachrichtigungen
+
+Am Ende eines Laufs stellt der Server einen Bericht zusammen und hinterlegt ihn in der Glocke (`cad_transfer_finished`). Die Makros endeten bisher mit einem blockierenden Fenster — „als Element Nr. X hochgeladen" —, was richtig war, solange der Mensch noch im CAD-Programm saß. Seit der Fokus nach jeder Komponente an den Browser zurückgeht, stammt dieses Fenster von einem Programm im HINTERGRUND, erscheint also HINTER dem Browser und hängt dort und wartet auf einen Klick, den niemand sieht. Der Bericht geht deshalb dorthin, wo der Mensch ohnehin hinsieht — und bleibt, anders als ein Fenster, auffindbar.
+
+Zusammengestellt wird er in `POST /api/progress/finish` aus dem Lauf, den der Fortschrittsspeicher ohnehin hält — nicht im Makro. Das ist dieselbe Entscheidung wie beim Zählen des Fortschritts auf dem Server: eine Stelle für drei CAD-Programme, der Bericht liest sich also gleich, aus welchem er auch kam, und das Makro braucht dafür keine Zeile über das `finish` hinaus, das es ohnehin schon rief.
+
+`Finish` gibt den Lauf **nur beim ersten Aufruf** zurück, der ihn beendet. Ein Makro darf `finish` zweimal rufen — einmal aus dem Fehlerpfad, einmal aus dem normalen —, und zwei identische Berichte in der Glocke wären schlicht Rauschen.
+
+Die Daten enthalten Zahlen und die Liste: `kind`, `total`, `done`, `skipped`, `failed`, `pending` sowie bis zu vierzig Einträge mit ihren Bezeichnungen. `done` schließt `skipped` bewusst NICHT ein: Eine übersprungene Komponente war bereits im PDM und musste nicht gesendet werden, sie als gesendet zu zählen würde den Bericht beschönigen. `pending` steht getrennt von `failed`, denn ein abgebrochener Lauf hat nichts kaputtgemacht — er kam nur nicht mehr dorthin. Die Glocke zeigt acht dieser Einträge, Fehlschläge zuerst: Bei zwanzig Dateien und einem Fehlschlag ließen die ersten acht in Listenreihenfolge genau den einen wichtigen Eintrag außerhalb des Bildes.
+
+Die Glocke fragt alle 30 s ab, was für etwas, das vor den Augen des Benutzers geschieht, viel zu selten ist — die Fortschrittsliste sendet daher ein Fensterereignis in dem Moment, in dem der Server den Lauf erstmals als beendet ausliefert, und `use-notifications` lädt daraufhin neu. Die Liste steht dabei über den Dialogen (`z-60`), also musste das Aufklappfeld der Glocke noch höher: Sonst verdeckte die Liste genau die Benachrichtigung, die sie gerade angekündigt hatte.
+
+Ein Fenster bleibt mit Absicht: Komponenten, die bereits mit einem PDM-Element verknüpft sind und den Status „in Prüfung" oder „freigegeben" haben. Diese aktualisiert das Makro nie, eine lokale Änderung daran ging also NICHT hoch — und die Dateiliste kann das nicht sagen, denn aus ihrer Sicht ist nichts geschehen.
+
 ### Anmeldung, Rollen und Projektzugriff
 
 Jede Anfrage an `/api/*` (außer `/api/auth/login`) erfordert eine Anmeldung — eine

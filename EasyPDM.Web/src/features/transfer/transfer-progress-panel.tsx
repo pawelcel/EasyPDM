@@ -3,6 +3,7 @@ import { Check, ChevronRight, Loader2, X } from "lucide-react"
 
 import { api } from "@/api/client"
 import type { TransferProgress } from "@/api/types"
+import { announceTransferFinished } from "@/features/transfer/transfer-finished-event"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -70,9 +71,12 @@ function TransferProgressPanel() {
   const startedAt = progress?.startedAt
   useEffect(() => setDismissed(false), [startedAt])
 
-  // Zakończona lista znika sama po chwili.
+  // Zakończona lista znika sama po chwili. Przy okazji budzimy dzwonek: na koniec biegu
+  // serwer zapisuje raport jako powiadomienie, a czekanie na kolejne odpytanie dzwonka
+  // (30 s) znaczyłoby, że raport pojawia się długo po tym, jak lista zniknęła z ekranu.
   useEffect(() => {
     if (!progress?.finished) return
+    announceTransferFinished()
     const id = window.setTimeout(() => setDismissed(true), KEEP_FINISHED_MS)
     return () => window.clearTimeout(id)
   }, [progress?.finished, startedAt])

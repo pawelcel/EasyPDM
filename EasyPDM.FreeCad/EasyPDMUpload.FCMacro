@@ -310,9 +310,6 @@ TRANSLATIONS = {
         "local_already_named_line": (
             "Lokalny plik już był pod właściwą nazwą PDM — nic nie trzeba było przenosić:\n{path}"
         ),
-        "upload_success_sent": "Wysłano do PDM jako {number}",
-        "upload_success_with_subitems": " razem z {count} podelementami",
-        "upload_success_tail": ".\nKopia w magazynie PDM:\n{path}\n\n{local}",
         "status_revision_mismatch": (
             "Status/rewizja elementu #{number} zostały już zmienione na "
             "serwerze (rewizja {revision}, status 'w_pracy'), ale dogranie pliku się nie "
@@ -419,9 +416,6 @@ TRANSLATIONS = {
         "local_already_named_line": (
             "The local file was already under the correct PDM name — nothing needed to be moved:\n{path}"
         ),
-        "upload_success_sent": "Sent to PDM as {number}",
-        "upload_success_with_subitems": " together with {count} sub-items",
-        "upload_success_tail": ".\nCopy in PDM storage:\n{path}\n\n{local}",
         "status_revision_mismatch": (
             "The status/revision of item #{number} has already been changed on the "
             "server (revision {revision}, status 'w_pracy'), but uploading the file failed: "
@@ -531,9 +525,6 @@ TRANSLATIONS = {
         "local_already_named_line": (
             "Die lokale Datei trug bereits den richtigen PDM-Namen — es musste nichts verschoben werden:\n{path}"
         ),
-        "upload_success_sent": "An PDM gesendet als {number}",
-        "upload_success_with_subitems": " zusammen mit {count} Unterelementen",
-        "upload_success_tail": ".\nKopie im PDM-Speicher:\n{path}\n\n{local}",
         "status_revision_mismatch": (
             "Status/Revision von Element #{number} wurden bereits auf dem Server geändert "
             "(Revision {revision}, Status 'w_pracy'), aber das Hochladen der Datei ist "
@@ -2699,24 +2690,30 @@ def run():
     else:
         local_line = t("local_already_named_line", path=doc.FileName)
 
+    # Bez okna "wysłano do PDM jako X". Raport z całego biegu składa teraz serwer przy
+    # POST /api/progress/finish i zostawia go jako powiadomienie w przeglądarce — tam, gdzie
+    # człowiek i tak patrzy, bo to w karcie wypełniał formularze. Okno powstawało za
+    # przeglądarką i wisiało, czekając na kliknięcie, którego nikt nie widział (zgłoszone
+    # z praktyki). Numer, ścieżka w magazynie i los lokalnego pliku zostają w Report View.
+    App.Console.PrintMessage(
+        f"EasyPDM: wyslano jako {info['itemNumber']}"
+        + (f" razem z {len(edges_for_top)} podelementami" if edges_for_top else "")
+        + f"; kopia w magazynie PDM: {info['newPath']}; {local_line}\n"
+    )
+
+    # JEDEN wyjątek, dla którego okno zostaje: komponenty już podpięte do PDM ze statusem
+    # "sprawdzany"/"wydany". Takich makro NIGDY nie aktualizuje, więc jeśli ktoś zmienił taki
+    # plik lokalnie, jego zmiana NIE poszła na serwer — a raport z listy plików tego nie
+    # powie, bo z jego punktu widzenia nic się nie wydarzyło.
     if locked_matches:
         status_labels = {"sprawdzany": t("status_label_sprawdzany"), "wydany": t("status_label_wydany")}
         lines = "\n".join(
             f"- {number}({name}) -- {status_labels.get(status, status)}"
             for number, name, status in locked_matches
         )
-        locked_tail = t("locked_components_tail", count=len(locked_matches), lines=lines)
-    else:
-        locked_tail = ""
-
-    QtWidgets.QMessageBox.information(
-        None,
-        t("pdm_title"),
-        t("upload_success_sent", number=info["itemNumber"])
-        + (t("upload_success_with_subitems", count=len(edges_for_top)) if edges_for_top else "")
-        + t("upload_success_tail", path=info["newPath"], local=local_line)
-        + locked_tail,
-    )
+        QtWidgets.QMessageBox.warning(
+            None, t("pdm_title"), t("locked_components_tail", count=len(locked_matches), lines=lines).strip()
+        )
 
     # Dokument nadrzędny leci jako ostatni, już po całym drzewie. Gdy listy nie ma
     # (pojedynczy dokument, bez drzewa złożenia), serwer odpowiada "matched": false i nic

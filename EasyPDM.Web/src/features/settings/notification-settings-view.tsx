@@ -24,6 +24,7 @@ const PROJECT_TYPES: { type: NotificationType; labelKey: TranslationKey }[] = [
 const ACCOUNT_TYPES: { type: NotificationType; labelKey: TranslationKey }[] = [
   { type: "password_changed", labelKey: "notifications.pref.passwordChanged" },
   { type: "sample_project", labelKey: "notifications.pref.sampleProject" },
+  { type: "cad_transfer_finished", labelKey: "notifications.pref.cadTransferFinished" },
 ]
 const ADMIN_TYPES: { type: NotificationType; labelKey: TranslationKey }[] = [
   { type: "low_disk_space", labelKey: "notifications.pref.lowDiskSpace" },
