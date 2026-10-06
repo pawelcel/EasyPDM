@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Check, ChevronRight, Loader2, X } from "lucide-react"
+import { Check, Loader2, X } from "lucide-react"
 
 import { api } from "@/api/client"
 import type { TransferProgress } from "@/api/types"
@@ -59,7 +59,14 @@ function StatusIcon({ status }: { status: TransferProgress["entries"][number]["s
     return <X className="size-4 shrink-0 text-destructive" strokeWidth={3} />
   if (status === "active")
     return <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
-  return <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />
+  // Czeka w kolejce: sama kropka. Był tu szewron, ale odkąd lista jest drzewem, wyglądał jak
+  // strzałka rozwijania gałęzi — jakby wiersz dało się kliknąć i zwinąć. Kropka siedzi w polu
+  // tej samej szerokości co pozostałe ikony, żeby nazwy plików trzymały jedną linię.
+  return (
+    <span className="flex size-4 shrink-0 items-center justify-center">
+      <span className="size-1.5 rounded-full bg-muted-foreground/40" />
+    </span>
+  )
 }
 
 // Lista plików, które makro CAD ma przesłać, odhaczana w trakcie pracy. Przyklejona do
