@@ -1095,7 +1095,16 @@ def publish_cad_request(ticket, name, item_type=None, material=None, document_si
                 App.Console.PrintMessage(f"EasyPDM: formularz dla '{name}' podjela otwarta karta\n")
                 # Karta formularz pokazala, ale fokus zostal w FreeCAD -- oddajemy go tam,
                 # gdzie teraz trzeba cos wpisac.
-                if not _focus_browser_window():
+                #
+                # Tylko na Linuksie: to jedyny system, na którym wmctrl/xdotool w ogóle mają
+                # sens. Na Windowsie nie ma czego naprawiać — przeglądarka, która właśnie
+                # dostała formularz, zostaje na wierzchu, bo żaden proces w tle (a FreeCAD
+                # wtedy w tle jest) nie może jej odebrać fokusu. Wcześniej ta próba szła
+                # wszędzie i na Windowsie przy każdym komponencie zostawiała w logu
+                # linuksowe wyjaśnienie, które tam nie miało sensu.
+                import sys
+
+                if sys.platform.startswith("linux") and not _focus_browser_window():
                     App.Console.PrintMessage(
                         "EasyPDM: nie udalo sie przelaczyc na przegladarke"
                         " (brak wmctrl/xdotool albo sesja Wayland) -- przejdz do niej recznie\n"
