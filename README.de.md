@@ -287,6 +287,8 @@ Ist kein Browser offen, bemerkt das Makro das binnen weniger Sekunden und kehrt 
 
 Während ein Makro Dateien ins PDM sendet oder zurückholt, zeigt die Anwendung rechts eine Liste dieser Dateien. Jede wird nach Abschluss abgehakt, die laufende dreht sich, und ein Zähler sagt „3 von 7". Schlägt etwas fehl, wird der Eintrag rot markiert und der Rest läuft weiter.
 
+Die Schaltfläche **Abbrechen** an der Liste stoppt den Rest der Übertragung — nach einer Rückfrage. Was schon übertragen ist, bleibt; das Makro hält vor der nächsten Datei an, die gerade laufende wird also noch fertig. Ein Formular des Makros, das gerade auf dem Bildschirm steht, verschwindet, und in den Benachrichtigungen bleibt ein Bericht, wie weit es gekommen ist.
+
 Am meisten bringt das bei einer Baugruppe. Deren Versand war bisher ein Warten ohne jede Rückmeldung — man konnte nicht erkennen, ob das Makro beim zweiten Bauteil oder beim letzten war, noch an welcher Datei es gerade arbeitete. Die Liste erscheint etwa eine Sekunde nach dem Start des Makros und bleibt am Ende einen Moment mit allen Haken stehen, was die Bestätigung ist, dass alles hochgegangen ist.
 
 Aus SolidWorks, Inventor und FreeCAD verhält es sich identisch, und in beide Richtungen. Bricht unterwegs die Verbindung ab oder startet der Server neu, hört die Liste einfach auf sich zu aktualisieren — das Hoch- oder Herunterladen selbst läuft unberührt weiter.

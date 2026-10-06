@@ -3,6 +3,7 @@ import { Check, ChevronRight, Loader2, X } from "lucide-react"
 
 import { api } from "@/api/client"
 import type { TransferProgress } from "@/api/types"
+import { clearPendingCreateTicket, usePendingCreateTicket } from "@/features/items/pending-create-ticket"
 import { announceTransferFinished } from "@/features/transfer/transfer-finished-event"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/i18n/use-language"
@@ -69,12 +70,21 @@ function TransferProgressPanel() {
   const { t } = useLanguage()
   const { progress, refetch } = useTransferProgress()
   const [dismissed, setDismissed] = useState(false)
+  // Dwuetapowe anulowanie: pierwsze kliknięcie tylko pyta. Pytanie siedzi W panelu, a nie w
+  // osobnym oknie, bo panel stoi nad oknami dialogowymi (z-60) — okno potwierdzenia na z-50
+  // wylądowałoby POD nim, a do tego w chwili, gdy na ekranie może już wisieć formularz z makra.
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [cancelPending, setCancelPending] = useState(false)
+  const pendingTicket = usePendingCreateTicket()
   const activeRef = useRef<HTMLLIElement | null>(null)
 
   // Nowy bieg kasuje wcześniejsze zamknięcie panelu ręką — inaczej raz zamknięty panel
-  // nie pokazałby się już przy następnej wysyłce.
+  // nie pokazałby się już przy następnej wysyłce. To samo dotyczy rozpoczętego anulowania.
   const startedAt = progress?.startedAt
-  useEffect(() => setDismissed(false), [startedAt])
+  useEffect(() => {
+    setDismissed(false)
+    setConfirmingCancel(false)
+  }, [startedAt])
 
   // Zakończona lista znika sama po chwili. Przy okazji budzimy dzwonek: na koniec biegu
   // serwer zapisuje raport jako powiadomienie, a czekanie na kolejne odpytanie dzwonka
@@ -99,6 +109,29 @@ function TransferProgressPanel() {
 
   const failed = progress.entries.filter((e) => e.status === "failed").length
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
+
+  // Anulowanie pozostałej części biegu. Serwer tylko zapisuje prośbę; makro sprawdza ją przy
+  // każdym odpytaniu o formularz i przed każdym kolejnym plikiem, więc plik, który akurat
+  // leci, zostaje dokończony — przerwanie w połowie zostawiłoby go uszkodzonego.
+  //
+  // Formularz z makra, jeśli właśnie wisi na ekranie, znika od razu: makro i tak już na niego
+  // nie poczeka, a niezamykalne okno zostałoby inaczej bez nikogo po drugiej stronie.
+  async function confirmCancel() {
+    setCancelPending(true)
+    try {
+      await api.cancelTransfer()
+      if (pendingTicket) {
+        void api.clearCadRequest(pendingTicket.ticket)
+        clearPendingCreateTicket()
+      }
+      await refetch()
+    } catch {
+      // Gdy się nie udało, przycisk zostaje — można spróbować jeszcze raz.
+    } finally {
+      setCancelPending(false)
+      setConfirmingCancel(false)
+    }
+  }
 
   async function close() {
     setDismissed(true)
@@ -125,12 +158,37 @@ function TransferProgressPanel() {
           <div className="text-xs text-muted-foreground">
             {t("transfer.counter", { done: progress.done, total: progress.total })}
             {failed > 0 && <span className="text-destructive"> · {t("transfer.failed", { count: failed })}</span>}
+            {progress.cancelled && <span> · {t("transfer.cancelled")}</span>}
           </div>
         </div>
         <Button size="sm" variant="ghost" onClick={close} aria-label={t("common.close")}>
           <X className="size-4" />
         </Button>
       </div>
+
+      {!progress.finished && (
+        <div className="border-b border-border px-4 py-2 text-xs">
+          {progress.cancelled ? (
+            <span className="text-muted-foreground">{t("transfer.cancelling")}</span>
+          ) : confirmingCancel ? (
+            <div className="flex flex-col gap-2">
+              <span>{t("transfer.cancelConfirm")}</span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="destructive" onClick={confirmCancel} disabled={cancelPending}>
+                  {t("transfer.cancelConfirmYes")}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmingCancel(false)} disabled={cancelPending}>
+                  {t("transfer.cancelConfirmNo")}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => setConfirmingCancel(true)}>
+              {t("transfer.cancel")}
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="h-1 w-full bg-muted">
         <div

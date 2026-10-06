@@ -239,6 +239,87 @@ public class TransferProgressTests
         (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
     }
 
+    private static async Task<int> CancelledAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/progress/cancelled");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("cancelled").GetInt32();
+    }
+
+    // Przycisk „Anuluj" w panelu postępu. Serwer niczego sam nie przerywa -- zapisuje prośbę,
+    // a makro sprawdza ją przed kolejnym plikiem. Ten test pilnuje kontraktu, na którym to
+    // stoi: makro widzi 0, dopóki nikt nie anulował, i 1 od chwili anulowania.
+    [Fact]
+    public async Task Anulowanie_jest_widoczne_dla_makra()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        (await StartAsync(client, "upload", "a", "b", "c")).EnsureSuccessStatusCode();
+        Assert.Equal(0, await CancelledAsync(client));
+
+        var cancel = await client.PostAsync("/api/progress/cancel", null);
+        cancel.EnsureSuccessStatusCode();
+        Assert.True((await cancel.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("matched").GetBoolean());
+
+        // Liczba, nie wartość logiczna: parsery JSON w makrach VBA mają tylko JsonGetLong.
+        Assert.Equal(1, await CancelledAsync(client));
+        Assert.True((await ReadAsync(client)).GetProperty("cancelled").GetBoolean());
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
+    // Raport z przerwanego biegu mówi, że go przerwano -- inaczej "1 z 3" wyglądałoby jak
+    // awaria, a nie jak decyzja użytkownika. Nieodhaczone pozycje to "pending", nie "failed".
+    [Fact]
+    public async Task Raport_z_anulowanego_biegu_mowi_ze_go_przerwano()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        (await StartAsync(client, "upload", "a", "b", "c")).EnsureSuccessStatusCode();
+        (await MarkAsync(client, "a", "done")).EnsureSuccessStatusCode();
+        (await client.PostAsync("/api/progress/cancel", null)).EnsureSuccessStatusCode();
+        (await client.PostAsync("/api/progress/finish", null)).EnsureSuccessStatusCode();
+
+        var data = (await LatestReportAsync(client)).GetProperty("data");
+        Assert.True(data.GetProperty("cancelled").GetBoolean());
+        Assert.Equal(1, data.GetProperty("done").GetInt32());
+        Assert.Equal(2, data.GetProperty("pending").GetInt32());
+        Assert.Equal(0, data.GetProperty("failed").GetInt32());
+
+        // Po zakończeniu makro nie ma już czego pytać -- następny bieg startuje od zera.
+        Assert.Equal(0, await CancelledAsync(client));
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
+    // Anulowanie zakończonego albo nieistniejącego biegu nic nie robi -- spóźnione kliknięcie
+    // nie może oznaczyć jako przerwanego następnego biegu, który dopiero ruszy.
+    [Fact]
+    public async Task Anulowanie_bez_trwajacego_biegu_nic_nie_robi()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+
+        var none = await client.PostAsync("/api/progress/cancel", null);
+        Assert.False((await none.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("matched").GetBoolean());
+
+        (await StartAsync(client, "upload", "a")).EnsureSuccessStatusCode();
+        (await client.PostAsync("/api/progress/finish", null)).EnsureSuccessStatusCode();
+        var late = await client.PostAsync("/api/progress/cancel", null);
+        Assert.False((await late.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("matched").GetBoolean());
+
+        (await StartAsync(client, "upload", "x")).EnsureSuccessStatusCode();
+        Assert.Equal(0, await CancelledAsync(client));
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
     private static async Task<List<JsonElement>> ReportsAsync(HttpClient client)
     {
         var response = await client.GetAsync("/api/notifications");

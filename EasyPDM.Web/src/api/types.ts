@@ -595,6 +595,9 @@ export interface TransferProgressEntry {
 export interface TransferProgress {
   kind: "upload" | "download"
   finished: boolean
+  // Użytkownik poprosił o przerwanie (przycisk „Anuluj" w panelu). Makro zatrzymuje się
+  // dopiero przed kolejnym plikiem, więc przez chwilę bieg jest anulowany, ale nie zakończony.
+  cancelled: boolean
   startedAt: string
   // Liczone po stronie serwera, nie tutaj — ta sama zasada co przy itemNumberLabel.
   total: number

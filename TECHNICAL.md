@@ -548,6 +548,29 @@ resumed — and the saving was not worth it, since a poll is a dictionary lookup
 bytes, never touching the database. A finished run stops being served after two minutes, so a
 list from an hour ago does not greet whoever opens the app next.
 
+**Cancelling.** The panel's Cancel button cannot stop anything itself — the macro runs inside a
+CAD program on another machine. `POST /api/progress/cancel` only records the request, and each
+macro asks `GET /api/progress/cancelled` (a flat `1`/`0`, for the VBA parsers) at the two points
+where stopping is safe: every poll while waiting for a form, and before each next file. The
+file in flight is always finished, since stopping mid-write would leave it corrupt. The first
+"yes" is remembered for the rest of the run so the server is not asked again; any error counts
+as "not cancelled". The flag is reset at the start of `main` in the VBA macros, because module
+variables can outlive a run there, and a leftover `True` would stop every later run at once.
+
+A cancelled run still ends with `finish`, so the panel closes and the report says "cancelled"
+rather than looking like a failure — entries never reached count as `pending`, not `failed`.
+Two things had to change for that to be true: the top document used to be marked done
+unconditionally after its upload function returned, even when that upload had been abandoned,
+and FreeCAD's cancel paths never called `finish` at all, so a cancelled FreeCAD run left the
+panel up until it expired. A downloaded assembly is not opened after a cancel, since its links
+would point at files that never arrived.
+
+The confirmation lives inside the panel rather than in a dialog: the panel sits above dialogs
+at `z-60`, so a dialog on `z-50` would open underneath it, possibly while a macro form is
+already on screen. While such a modal form is open the panel is marked `aria-hidden` by the
+dialog, though it stays on top and clickable with the mouse — keyboard users cannot reach
+Cancel until the form is gone.
+
 ### The run reports itself in notifications
 
 When a run ends, the server composes a report and leaves it in the bell

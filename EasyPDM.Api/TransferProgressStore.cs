@@ -36,7 +36,7 @@ class TransferProgressStore
     public void Start(Guid userId, string kind, IReadOnlyList<TransferProgressEntry> entries)
     {
         Sweep();
-        _byUser[userId] = new TransferProgress(DateTime.UtcNow, DateTime.UtcNow, kind, entries.ToList(), false);
+        _byUser[userId] = new TransferProgress(DateTime.UtcNow, DateTime.UtcNow, kind, entries.ToList(), false, false);
     }
 
     // Zwraca false, gdy nie ma czego aktualizować (np. serwer zrestartował się w trakcie) --
@@ -72,6 +72,25 @@ class TransferProgressStore
         _byUser[userId] = finished;
         return finished;
     }
+
+    // Użytkownik w przeglądarce prosi o przerwanie biegu. Serwer NIE przerywa niczego sam --
+    // nie ma jak, makro działa w CAD-zie na innej maszynie. Tylko zapisuje prośbę, a makro
+    // sprawdza ją przy każdym odpytaniu o formularz i przed każdym kolejnym plikiem
+    // (GET /api/progress/cancelled) i zatrzymuje się w pierwszym takim miejscu. Plik, który
+    // akurat leci, zostaje dokończony: przerwanie w połowie zapisu zostawiłoby go uszkodzonego.
+    //
+    // Zwraca false, gdy nie ma czego anulować -- biegu nie ma albo już się skończył.
+    public bool Cancel(Guid userId)
+    {
+        if (!_byUser.TryGetValue(userId, out var progress) || progress.Finished)
+            return false;
+
+        _byUser[userId] = progress with { UpdatedAt = DateTime.UtcNow, Cancelled = true };
+        return true;
+    }
+
+    public bool IsCancelled(Guid userId) =>
+        _byUser.TryGetValue(userId, out var progress) && progress.Cancelled && !progress.Finished;
 
     public void Clear(Guid userId) => _byUser.TryRemove(userId, out _);
 
@@ -119,4 +138,8 @@ record TransferProgress(
     DateTime UpdatedAt,
     string Kind,
     List<TransferProgressEntry> Entries,
-    bool Finished);
+    bool Finished,
+    // Użytkownik poprosił w przeglądarce o przerwanie -- zob. Cancel. Zostaje true także po
+    // zakończeniu, bo z tego raport w powiadomieniach wie, że bieg przerwano, a nie że po
+    // prostu nie doszedł do końca.
+    bool Cancelled);

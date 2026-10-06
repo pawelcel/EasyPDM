@@ -119,6 +119,9 @@ Private gLogText As String
 
 ' Klucz pozycji odhaczanej na liscie postepu jako NASTEPNA -- zob. ProgressAdvance.
 Private gProgressPrevKey As String
+' Uzytkownik kliknal "Anuluj" w panelu postepu -- zob. TransferCancelled. Zerowana na
+' starcie main, bo zmienne modulu potrafia przezyc miedzy uruchomieniami makra.
+Private gCancelledFromBrowser As Boolean
 
 Private Function DetectLanguage() As String
     Dim langId As Integer
@@ -663,6 +666,24 @@ Sub ProgressFinish()
     ProgressSend "POST", "/progress/finish", "{}"
     On Error GoTo 0
 End Sub
+
+' Czy uzytkownik kliknal "Anuluj" w panelu postepu w przegladarce -- odpowiednik funkcji o tej
+' samej nazwie w EasyPDMUpload.bas, gdzie stoi pelne wyjasnienie. Sprawdzane przed kazdym
+' kolejnym plikiem; plik, ktory akurat sie pobiera, zostaje dokonczony. Kazdy blad znaczy
+' "nie anulowano" -- to wygoda, ktora nie ma prawa zatrzymac pobierania.
+Function TransferCancelled() As Boolean
+    If Not gCancelledFromBrowser Then
+        On Error Resume Next
+        Dim data As Object
+        Set data = ApiGet("/progress/cancelled")
+        If Not data Is Nothing Then
+            If JsonGetLong(data, "cancelled", 0) = 1 Then gCancelledFromBrowser = True
+        End If
+        Err.Clear
+        On Error GoTo 0
+    End If
+    TransferCancelled = gCancelledFromBrowser
+End Function
 
 ' Odhacza poprzednia pozycje i zaznacza biezaca jako aktywna -- DownloadItem jest wolane z
 ' dwoch miejsc i ma kilka sciezek wyjscia, wiec jedno miejsce zamiast pilnowania kazdej.
@@ -1560,6 +1581,10 @@ Sub DownloadChildrenRecursive(ByVal item As Object, ByVal targetDir As String, B
         If Not child Is Nothing Then
             Dim childId As String
             childId = JsonGetString(child, "id", "")
+            ' Anulowanie z przegladarki: stop PRZED kolejnym plikiem. Wewnetrzne Exit Sub
+            ' wraca do petli rodzica, ktora przy nastepnym obiegu trafia tu znowu i dostaje
+            ' zapamietana odpowiedz bez pytania serwera -- tak schodzi cala rekurencja.
+            If TransferCancelled() Then Exit Sub
             If childId <> "" And Not seen.Exists(childId) Then
                 seen.Add childId, True
                 DownloadItem child, targetDir
@@ -1584,6 +1609,7 @@ End Sub
 
 Sub main()
     LogLine "=== EasyPDM download macro started ==="
+    gCancelledFromBrowser = False
 
     On Error Resume Next
     Set InvApp = GetObject(, "Inventor.Application")
@@ -1675,6 +1701,15 @@ Sub main()
     ' Ostatnia pobrana pozycja nie ma juz nastepnej, ktora by ja odhaczyla.
     If gProgressPrevKey <> "" Then ProgressMark gProgressPrevKey, "done"
     ProgressFinish
+
+    ' Anulowane z przegladarki: pobrane pliki zostaja na dysku, ale dokumentu NIE
+    ' otwieramy -- bez reszty komponentow zlozenie otworzyloby sie z brakujacymi
+    ' odwolaniami. Bez okna na koniec: raport z biegu jest juz w powiadomieniach w
+    ' przegladarce, czyli tam, gdzie kliknieto "Anuluj".
+    If gCancelledFromBrowser Then
+        LogLine "=== Finished: cancelled from the browser, top document not opened ==="
+        Exit Sub
+    End If
 
     If topPath <> "" And Dir(topPath) <> "" Then
         ' InvApp.Documents.Open infers the document type from the file itself (unlike

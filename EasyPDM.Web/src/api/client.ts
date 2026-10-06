@@ -836,6 +836,9 @@ export const api = {
   getTransferProgress: () =>
     fetch(`${BASE}/progress`).then((r) => handleResponse<{ progress: TransferProgress | null }>(r)),
 
+  cancelTransfer: () =>
+    fetch(`${BASE}/progress/cancel`, { method: "POST" }).then((r) => handleResponse<{ matched: boolean }>(r)),
+
   dismissTransferProgress: () =>
     fetch(`${BASE}/progress`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 

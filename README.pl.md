@@ -265,6 +265,8 @@ Jeśli żadna przeglądarka nie jest otwarta, makro zauważa to w kilka sekund i
 
 Gdy makro wysyła pliki do PDM albo je pobiera, aplikacja pokazuje po prawej stronie listę tych plików. Każdy jest odhaczany po zakończeniu, bieżący się kręci, a licznik mówi „3 z 7". Jeśli coś się nie uda, pozycja jest zaznaczona na czerwono, a reszta leci dalej.
 
+Przycisk **Anuluj** na liście zatrzymuje resztę przesyłania — po potwierdzeniu. To, co już poszło, zostaje; makro staje przed kolejnym plikiem, więc ten, który akurat leci, zostanie dokończony. Formularz z makra, jeśli właśnie wisi na ekranie, znika, a w powiadomieniach zostaje raport, ile zdążyło przejść.
+
 Najbardziej przydaje się to przy złożeniu. Wysyłka takiego do tej pory była czekaniem bez żadnej informacji — nie dało się stwierdzić, czy makro jest przy drugim komponencie, czy przy ostatnim, ani nad którym plikiem akurat pracuje. Lista pojawia się około sekundy po starcie makra i zostaje chwilę na koniec z kompletem ptaszków, co jest potwierdzeniem, że całość poszła.
 
 Działa tak samo z SolidWorksa, Inventora i FreeCAD-a, w obie strony. Jeśli w trakcie padnie połączenie albo serwer się zrestartuje, lista po prostu przestaje się odświeżać — sama wysyłka czy pobieranie lecą dalej, nietknięte.

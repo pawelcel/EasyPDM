@@ -569,7 +569,8 @@ TOP_DOCUMENT_PROGRESS_KEY = "__top__"
 #
 # Dlatego PIERWSZY komponent biegu zawsze otwiera kartę — i dopiero ta karta, znając runId,
 # obsługuje resztę bez kolejnych kart i bez okien.
-_RUN = {"id": None, "tab_opened": False}
+# "cancelled" -- użytkownik kliknął „Anuluj" w panelu postępu, zob. transfer_cancelled.
+_RUN = {"id": None, "tab_opened": False, "cancelled": False}
 
 
 def run_id():
@@ -801,6 +802,29 @@ def progress_mark(key, status):
     """status: "active" | "done" | "failed" | "skipped" """
     if key:
         _progress_send("PATCH", "/progress", {"key": key, "status": status})
+
+
+def transfer_cancelled():
+    """Czy użytkownik kliknął „Anuluj" w panelu postępu w przeglądarce.
+
+    Serwer niczego sam nie przerywa — tylko zapisuje prośbę (POST /api/progress/cancel) — więc
+    to makro pyta o nią przy każdym odpytaniu o formularz i przed każdym kolejnym plikiem. Plik,
+    który akurat leci, zostaje dokończony: przerwanie w połowie zostawiłoby go uszkodzonego.
+
+    Pierwsze „tak" jest zapamiętywane, żeby nie pytać serwera za każdym razem. Każdy błąd
+    (brak połączenia, starszy serwer bez tego endpointu) znaczy „nie anulowano" — to wygoda,
+    która nie ma prawa zatrzymać przesyłania."""
+    if not _RUN["cancelled"]:
+        try:
+            probe = api_get("/progress/cancelled")
+            if probe and probe.get("cancelled") == 1:
+                _RUN["cancelled"] = True
+                App.Console.PrintMessage(
+                    "EasyPDM: anulowano w przegladarce -- zatrzymuje sie przed kolejnym plikiem\n"
+                )
+        except Exception:
+            pass
+    return _RUN["cancelled"]
 
 
 def progress_finish():
@@ -2139,6 +2163,9 @@ def wait_for_ticket(ticket, timeout_seconds=600):
     try:
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
+            # Anulowane z przegladarki -- formularz i tak zniknal tam z ekranu, nie ma na co czekac.
+            if transfer_cancelled():
+                return None
             try:
                 data = api_get(f"/create-tickets/{ticket}")
                 if data and data.get("itemId"):
@@ -2444,6 +2471,10 @@ def process_assembly_tree(top_doc, target_folder=None):
     for file_path in order:
         if progress_prev[0]:
             progress_mark(progress_prev[0], "done")
+        # Anulowanie z przeglądarki: stop PRZED kolejnym komponentem. Poprzedni jest już
+        # wysłany i odhaczony linijkę wyżej; ten i następne zostają nieruszone.
+        if transfer_cancelled():
+            return [], True, locked_matches
         progress_mark(file_path, "active")
         progress_prev[0] = file_path
         doc = docs[file_path]
@@ -2651,7 +2682,13 @@ def run():
     # znalezione przez App::Link, w kolejności liście-najpierw.
     edges_for_top, cancelled, locked_matches = process_assembly_tree(doc, target_folder)
     if cancelled:
-        QtWidgets.QMessageBox.information(None, t("pdm_title"), t("cancelled_upload"))
+        # Bieg trzeba zamknąć także tu, nie tylko po udanej wysyłce: bez tego panel postępu
+        # w przeglądarce wisiał do wygaśnięcia, a raport z biegu nigdy nie powstawał.
+        progress_finish()
+        # Po „Anuluj" w przeglądarce okno jest zbędne — raport idzie do powiadomień, tam,
+        # gdzie kliknięto.
+        if not _RUN["cancelled"]:
+            QtWidgets.QMessageBox.information(None, t("pdm_title"), t("cancelled_upload"))
         return
 
     # Krok 2: nowy element czy dogranie do istniejącego? Makro już o to w ogóle nie pyta —
@@ -2663,7 +2700,11 @@ def run():
         # użytkownik odmówił stworzenia nowej rewizji, albo element ma status "Sprawdzany"
         # i push_to_existing_item już pokazał własny komunikat blokujący — w każdym z tych
         # przypadków nic nie wysłano.
-        QtWidgets.QMessageBox.information(None, t("pdm_title"), t("nothing_sent"))
+        progress_finish()
+        # „Nic nie wysłano" byłoby po anulowaniu z przeglądarki nieprawdą — komponenty mogły
+        # już pójść — a raport z biegu i tak trafia do powiadomień.
+        if not _RUN["cancelled"]:
+            QtWidgets.QMessageBox.information(None, t("pdm_title"), t("nothing_sent"))
         return
 
     # Zanim dogramy AKTUALNE relacje niżej, sprawdź czy w PDM nie zostały jakieś relacje

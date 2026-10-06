@@ -90,6 +90,23 @@ static class TransferProgressEndpoints
             return Results.Ok();
         });
 
+        // POST /api/progress/cancel — użytkownik prosi o przerwanie biegu (przycisk „Anuluj"
+        // w panelu postępu). Zob. TransferProgressStore.Cancel po to, czego serwer tu NIE robi.
+        app.MapPost("/api/progress/cancel", (HttpContext ctx) =>
+        {
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            return Results.Ok(new { matched = store.Cancel(user.Id) });
+        });
+
+        // GET /api/progress/cancelled — makro pyta, czy ma się zatrzymać. Płaska liczba 1/0,
+        // a nie wartość logiczna: parsery JSON w makrach VBA mają tylko JsonGetString i
+        // JsonGetLong (ten sam powód co przy /api/cad-requests/taken).
+        app.MapGet("/api/progress/cancelled", (HttpContext ctx) =>
+        {
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            return Results.Ok(new { cancelled = store.IsCancelled(user.Id) ? 1 : 0 });
+        });
+
         // DELETE /api/progress — zamknięcie listy przez użytkownika w przeglądarce.
         app.MapDelete("/api/progress", (HttpContext ctx) =>
         {
@@ -114,6 +131,7 @@ static class TransferProgressEndpoints
                 {
                     kind = progress.Kind,
                     finished = progress.Finished,
+                    cancelled = progress.Cancelled,
                     startedAt = progress.StartedAt,
                     // Liczby wyliczamy TUTAJ, a nie na froncie -- ta sama zasada co przy
                     // itemNumberLabel/recordName: jedno miejsce liczy, klienci tylko pokazują.
@@ -143,6 +161,7 @@ static class TransferProgressEndpoints
         return new
         {
             kind = progress.Kind,
+            cancelled = progress.Cancelled,
             total = entries.Count,
             done,
             skipped,

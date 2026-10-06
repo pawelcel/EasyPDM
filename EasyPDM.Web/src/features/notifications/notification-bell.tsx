@@ -155,10 +155,14 @@ function describe(entry: NotificationEntry, t: LanguageContextValue["t"]): strin
     case "cad_transfer_finished": {
       // "done" celowo NIE obejmuje pominiętych: pominięty komponent to taki, który już był w
       // PDM i nie trzeba go było wysyłać — policzenie go jako wysłanego zawyżałoby raport.
+      // Przerwany bieg mówi, że go przerwano — inaczej "1 z 3" wyglądałoby jak awaria, a nie
+      // jak decyzja użytkownika.
+      const counts = { done: data.done, total: data.total }
+      const cancelled = (entry.data as Record<string, unknown>).cancelled === true
       const line =
         data.kind === "download"
-          ? t("notifications.cadTransferDownload", { done: data.done, total: data.total })
-          : t("notifications.cadTransferUpload", { done: data.done, total: data.total })
+          ? t(cancelled ? "notifications.cadTransferDownloadCancelled" : "notifications.cadTransferDownload", counts)
+          : t(cancelled ? "notifications.cadTransferUploadCancelled" : "notifications.cadTransferUpload", counts)
       const failed = Number(data.failed) > 0 ? t("notifications.cadTransferFailed", { failed: data.failed }) : ""
       const skipped = Number(data.skipped) > 0 ? t("notifications.cadTransferSkipped", { skipped: data.skipped }) : ""
       return line + failed + skipped

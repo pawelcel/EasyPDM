@@ -108,6 +108,10 @@ Private Const TOP_DOCUMENT_PROGRESS_KEY As String = "__top__"
 ' kolejnych kart.
 Private gRunId As String
 Private gRunTabOpened As Boolean
+' Uzytkownik kliknal "Anuluj" w panelu postepu -- zob. TransferCancelled. Zerowana na
+' starcie main: zmienne modulu VBA potrafia przezyc miedzy uruchomieniami makra, a
+' pozostawiona tu prawda zatrzymywalaby kazdy kolejny bieg, zanim by ruszyl.
+Private gCancelledFromBrowser As Boolean
 
 Private Const APP_SETTINGS_NAME As String = "EasyPDM"
 Private Const SETTINGS_SECTION As String = "Connection"
@@ -1478,6 +1482,28 @@ Sub ProgressFinish()
     On Error GoTo 0
 End Sub
 
+' Czy uzytkownik kliknal "Anuluj" w panelu postepu w przegladarce. Serwer niczego sam nie
+' przerywa -- tylko zapisuje prosbe -- wiec to makro pyta o nia w dwoch miejscach: przy
+' kazdym odpytaniu o formularz (WaitForTicket) i przed kazdym kolejnym komponentem. Plik,
+' ktory akurat leci, zostaje wiec dokonczony; przerwanie w polowie zostawiloby go uszkodzonego.
+'
+' Pierwsze "tak" jest zapamietywane w gCancelledFromBrowser, zeby nie pytac serwera za
+' kazdym razem. Kazdy blad (brak polaczenia, starszy serwer bez tego endpointu) znaczy "nie
+' anulowano" -- to wygoda, ktora nie ma prawa zatrzymac wysylki.
+Function TransferCancelled() As Boolean
+    If Not gCancelledFromBrowser Then
+        On Error Resume Next
+        Dim data As Object
+        Set data = ApiGet("/progress/cancelled")
+        If Not data Is Nothing Then
+            If JsonGetLong(data, "cancelled", 0) = 1 Then gCancelledFromBrowser = True
+        End If
+        Err.Clear
+        On Error GoTo 0
+    End If
+    TransferCancelled = gCancelledFromBrowser
+End Function
+
 ' Sama nazwa pliku z rozszerzeniem -- pelna sciezka nie zmiesci sie w panelu i nic nie wnosi.
 Function ProgressLabelFor(ByVal path As String) As String
     If path = "" Then
@@ -1517,6 +1543,10 @@ Function WaitForTicket(ByVal ticket As String, Optional ByVal endpointPath As St
 
         If sincePollMs >= POLL_EVERY_MS Then
             sincePollMs = 0
+            If TransferCancelled() Then
+                LogLine "WaitForTicket: cancelled from the browser."
+                GoTo TimedOutOrCancelled
+            End If
             Dim data As Object
             Set data = Nothing
             On Error Resume Next
@@ -2377,7 +2407,7 @@ Sub AskBrowserWhichItemForDrawing(ByVal oDoc As Object, ByVal filePath As String
     Dim ticketData As Object
     Set ticketData = WaitForTicket(ticket, "/drawing-tickets/")
     If ticketData Is Nothing Then
-        MsgBoxFront T("CancelledNothingSent"), vbInformation, T("AppTitle")
+        If Not gCancelledFromBrowser Then MsgBoxFront T("CancelledNothingSent"), vbInformation, T("AppTitle")
         LogLine "Drawing upload: browser disambiguation cancelled/timed out -- done."
         Exit Sub
     End If
@@ -3245,6 +3275,13 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
     Dim filePath As Variant
     For Each filePath In order
         If progPrevKey <> "" Then ProgressMark progPrevKey, "done"
+        ' Anulowanie z przegladarki: zatrzymujemy sie PRZED kolejnym komponentem. Poprzedni
+        ' jest juz wyslany i odhaczony linijke wyzej; ten i nastepne zostaja nieruszone.
+        If TransferCancelled() Then
+            LogLine "Assembly tree: cancelled from the browser before " & CStr(filePath)
+            ProcessAssemblyTree = True
+            Exit Function
+        End If
         ProgressMark CStr(filePath), "active"
         progPrevKey = CStr(filePath)
         Dim childModel As Object
@@ -3900,6 +3937,7 @@ End Function
 
 Sub main()
     LogLine "=== EasyPDM Inventor macro started ==="
+    gCancelledFromBrowser = False
 
     On Error Resume Next
     Set InvApp = GetObject(, "Inventor.Application")
@@ -3944,11 +3982,16 @@ Sub main()
         Exit Sub
     End If
 
-    UploadPartOrAssemblyDoc InvApp.ActiveDocument, filePath, itemTypeGuess, defaultName
+    Dim uploadResult As Object
+    Set uploadResult = UploadPartOrAssemblyDoc(InvApp.ActiveDocument, filePath, itemTypeGuess, defaultName)
 
     ' Dokument nadrzedny leci jako ostatni, juz po calym drzewie. Gdy listy nie ma
     ' (pojedynczy dokument), serwer odpowiada matched=false i nic sie nie dzieje.
-    ProgressMark TOP_DOCUMENT_PROGRESS_KEY, "done"
+    ' TYLKO gdy dokument faktycznie poszedl. Dotad odhaczany bezwarunkowo, wiec bieg
+    ' anulowany (z przegladarki, Esc albo odmowa nowej rewizji) konczyl sie raportem, wedlug
+    ' ktorego dokument nadrzedny zostal wyslany. Nieodhaczony liczy sie w raporcie jako
+    ' "nie doszlo do niego", co jest prawda.
+    If Not uploadResult Is Nothing Then ProgressMark TOP_DOCUMENT_PROGRESS_KEY, "done"
     ProgressFinish
 End Sub
 
@@ -4080,7 +4123,7 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)
         If ticketData Is Nothing Then
-            MsgBoxFront T("CancelledNothingSent"), vbInformation, T("AppTitle")
+            If Not gCancelledFromBrowser Then MsgBoxFront T("CancelledNothingSent"), vbInformation, T("AppTitle")
             LogLine "=== Finished: browser ticket cancelled/timed out ==="
             Exit Function
         End If

@@ -153,6 +153,7 @@ TRANSLATIONS = {
         "cannot_use_folder": "Nie można użyć tego folderu: {error}",
         "logged_out_message": "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie.",
         "wait_timeout": "Upłynął czas oczekiwania.",
+        "log_cancelled_not_opened": "Anulowano w przeglądarce — pobrane pliki zostały w folderze, dokument nie został otwarty.",
         "wait_ticket_status": "EasyPDM: czekam na wskazanie elementu w przeglądarce...",
         "log_no_attachments_list": "  {label}: nie udało się pobrać listy załączników ({error}).",
         "log_no_cad_files": "  {label}: brak plików CAD do pobrania (element nie ma żadnych załączników).",
@@ -208,6 +209,7 @@ TRANSLATIONS = {
         "cannot_use_folder": "Cannot use this folder: {error}",
         "logged_out_message": "Logged out. The next time you run the macro, it will ask you to log in again.",
         "wait_timeout": "The waiting time has expired.",
+        "log_cancelled_not_opened": "Cancelled in the browser — the files downloaded so far are in the folder; the document was not opened.",
         "wait_ticket_status": "EasyPDM: waiting for an item to be picked in the browser...",
         "log_no_attachments_list": "  {label}: failed to fetch the attachment list ({error}).",
         "log_no_cad_files": "  {label}: no CAD files to download (the item has no attachments).",
@@ -263,6 +265,7 @@ TRANSLATIONS = {
         "cannot_use_folder": "Dieser Ordner kann nicht verwendet werden: {error}",
         "logged_out_message": "Abgemeldet. Beim nächsten Ausführen des Makros werden Sie erneut zur Anmeldung aufgefordert.",
         "wait_timeout": "Die Wartezeit ist abgelaufen.",
+        "log_cancelled_not_opened": "Im Browser abgebrochen — die bisher heruntergeladenen Dateien liegen im Ordner, das Dokument wurde nicht geöffnet.",
         "wait_ticket_status": "EasyPDM: warte auf die Auswahl eines Elements im Browser...",
         "log_no_attachments_list": "  {label}: Anhangsliste konnte nicht abgerufen werden ({error}).",
         "log_no_cad_files": "  {label}: keine CAD-Dateien zum Herunterladen (das Element hat keine Anhänge).",
@@ -424,6 +427,35 @@ def progress_start(kind, entries):
 def progress_mark(key, status):
     if key:
         _progress_send("PATCH", "/progress", {"key": key, "status": status})
+
+
+# Użytkownik kliknął „Anuluj" w panelu postępu — zob. transfer_cancelled. Słownik, nie
+# zwykła zmienna, żeby funkcje mogły go zmieniać bez `global`; przypisanie na poziomie modułu
+# wykonuje się przy każdym uruchomieniu makra, więc stan nie przechodzi na kolejny bieg.
+_CANCEL = {"requested": False}
+
+
+def transfer_cancelled():
+    """Czy użytkownik kliknął „Anuluj" w panelu postępu w przeglądarce.
+
+    Serwer niczego sam nie przerywa — tylko zapisuje prośbę (POST /api/progress/cancel) — więc
+    to makro pyta o nią przy każdym odpytaniu o formularz i przed każdym kolejnym plikiem. Plik,
+    który akurat leci, zostaje dokończony: przerwanie w połowie zostawiłoby go uszkodzonego.
+
+    Pierwsze „tak" jest zapamiętywane, żeby nie pytać serwera za każdym razem. Każdy błąd
+    (brak połączenia, starszy serwer bez tego endpointu) znaczy „nie anulowano" — to wygoda,
+    która nie ma prawa zatrzymać przesyłania."""
+    if not _CANCEL["requested"]:
+        try:
+            probe = api_get("/progress/cancelled")
+            if probe and probe.get("cancelled") == 1:
+                _CANCEL["requested"] = True
+                App.Console.PrintMessage(
+                    "EasyPDM: anulowano w przegladarce -- zatrzymuje sie przed kolejnym plikiem\n"
+                )
+        except Exception:
+            pass
+    return _CANCEL["requested"]
 
 
 def progress_finish():
@@ -804,6 +836,10 @@ def _download_children_recursive(item, target_dir, log, seen, downloaded=None):
     # element jest ZAGNIEŻDŻONY pod kluczem "item" (ta sama konwencja co childEntries
     # w item-detail-panel.tsx), NIE płaski obiekt jak w GET /api/items.
     for row in rows:
+        # Anulowanie z przeglądarki: stop PRZED kolejnym plikiem. Powrót z rekurencji trafia
+        # w pętli rodzica znowu tutaj i dostaje zapamiętaną odpowiedź — tak schodzi całość.
+        if transfer_cancelled():
+            return
         child = row["item"]
         if child["id"] in seen:
             continue
@@ -1030,6 +1066,12 @@ def _run_download(top_item, target_dir, log):
     # wczytane i samo przepisanie pliku na dysku niczego by nie naprawiło.
     _flatten_xlinks(downloaded, log)
 
+    # Anulowane z przeglądarki: pobrane pliki zostają na dysku, ale dokumentu NIE otwieramy —
+    # bez reszty komponentów złożenie otworzyłoby się z brakującymi odnośnikami.
+    if _CANCEL["requested"]:
+        log(t("log_cancelled_not_opened"))
+        return
+
     if top_path and os.path.exists(top_path):
         try:
             App.openDocument(top_path)
@@ -1098,6 +1140,10 @@ def main():
         )
         return
 
+    # Po „Anuluj" w przeglądarce bez okna na koniec — raport z biegu jest już w powiadomieniach,
+    # tam, gdzie kliknięto. Zapis przebiegu został w Report View.
+    if _CANCEL["requested"]:
+        return
     QtWidgets.QMessageBox.information(None, t("easypdm_title"), "\n".join(log_lines[-25:]))
 
 

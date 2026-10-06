@@ -264,6 +264,8 @@ If no browser is open, the macro notices within a few seconds and falls back to 
 
 While a macro is sending files to the PDM or fetching them back, the app shows a list of those files on the right. Each one is ticked off as it completes, the one in progress spins, and a counter says "3 of 7". If something fails it is marked in red and the rest carries on.
 
+The list's **Cancel** button stops the rest of the transfer, after asking you to confirm. Whatever has gone through stays; the macro stops before the next file, so the one already on its way is finished first. A form from the macro that is waiting on screen goes away, and the notifications get a report of how far it got.
+
 This matters most for an assembly. Sending one used to be a wait with nothing to look at — no way to tell whether the macro was on the second component or the last, or which file it was working on. The list appears about a second after the macro starts and stays for a moment at the end with everything ticked, which is your confirmation that the whole thing went up.
 
 It behaves identically from SolidWorks, Inventor and FreeCAD, and in both directions. If the connection drops or the server restarts mid-way, the list simply stops updating — the upload or download itself carries on untouched.
