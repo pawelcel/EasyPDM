@@ -971,6 +971,36 @@ def _cad_item_type(doc):
         return ""
 
 
+def open_in_browser(url):
+    """Otwiera adres w przeglądarce tak, żeby wyszła NA WIERZCH.
+
+    Dotąd było to `webbrowser.open`, który uruchamia po prostu `xdg-open`. Pod Wayland nowy
+    proces dostaje fokus tylko wtedy, gdy uruchamiający przekaże mu token aktywacji
+    (xdg-activation) — a `webbrowser` żadnego nie przekazuje. KDE otwierało więc kartę w tle
+    i jedynie podświetlało przeglądarkę na pasku zadań; trzeba było ją wyciągać ręcznie
+    (zgłoszone z praktyki, KDE/Wayland).
+
+    `QDesktopServices.openUrl` robi to samo, ale przez Qt, który od wersji 6.6 prosi
+    kompozytor o token w imieniu FreeCAD-a i przekazuje go dalej. Token jest ważny, bo
+    w tej chwili fokus ma FreeCAD — użytkownik właśnie uruchomił w nim makro.
+
+    `webbrowser.open` zostaje jako zapas: gdy Qt nie ma tej funkcji albo odmówi (stare
+    FreeCAD, brak środowiska graficznego), zachowanie jest dokładnie takie jak dotąd."""
+    try:
+        try:
+            from PySide6 import QtGui
+        except ImportError:
+            try:
+                from PySide2 import QtGui
+            except ImportError:
+                from PySide import QtGui
+        if QtGui.QDesktopServices.openUrl(QtCore.QUrl(url)):
+            return
+    except Exception:
+        pass
+    webbrowser.open(url)
+
+
 def _focus_browser_window():
     """Przenosi okno przeglądarki na wierzch — odpowiednik `AppActivate "EasyPDM"` z makr
     SolidWorks/Inventor.
@@ -2285,7 +2315,7 @@ def submit_via_browser(doc, target_folder):
     ticket = str(uuid.uuid4())
     try:
         url = build_browser_create_url(doc.Label, ticket, suggested_item_number, _document_size(doc), _cad_item_type(doc))
-        webbrowser.open(url)
+        open_in_browser(url)
     except Exception as e:
         QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
         return None
@@ -2516,7 +2546,7 @@ def process_assembly_tree(top_doc, target_folder=None):
                     )
                 try:
                     url = build_browser_create_url(suggested_name, ticket, None, _document_size(doc), _cad_item_type(doc))
-                    webbrowser.open(url)
+                    open_in_browser(url)
                 except Exception as e:
                     QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
                     return [], True, locked_matches

@@ -487,6 +487,13 @@ focus. The dialog is therefore gone; FreeCAD waits like the SolidWorks and Inven
 always have, polling with a message in the status bar and `processEvents` keeping the UI
 alive. The `wmctrl`/`xdotool` attempt stays as a fallback for X11 only.
 
+The same rule explains why the *first* open did not raise the browser either. Under Wayland a
+launched program gets focus only if the launcher passes an xdg-activation token, and Python's
+`webbrowser.open` just runs `xdg-open` without one. FreeCAD now opens addresses through
+`QDesktopServices.openUrl` (`open_in_browser`), which since Qt 6.6 obtains the token on
+FreeCAD's behalf and passes it on — valid at that moment, because the user has just started
+the macro and FreeCAD has focus. `webbrowser.open` remains the fallback.
+
 That is also why the app itself can call the person back: when a request is taken and the tab
 does not have focus, it shows a desktop notification whose click switches to it. A click is
 the one mechanism no window system refuses, because the switch is the person's own doing.
