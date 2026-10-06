@@ -76,6 +76,10 @@ Ograniczenia (świadomie poza zakresem pierwszej wersji):
 import json
 import os
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
 import zipfile
 import uuid
 import webbrowser
@@ -383,6 +387,103 @@ def open_in_browser(url):
     except Exception:
         pass
     webbrowser.open(url)
+
+
+# Pełny <title> aplikacji (EasyPDM.Web/index.html). Okno przeglądarki dopasowujemy po POCZĄTKU
+# tytułu, bo przeglądarki doklejają swoją nazwę na końcu. NIE po samym "EasyPDM": u autora
+# okno Shotcuta miało w tytule "EasyPDM2.mlt", więc takie dopasowanie wyciągnęłoby na
+# wierzch montaż wideo zamiast przeglądarki (wyłapane sondą na żywej sesji KDE).
+APP_WINDOW_TITLE = "EasyPDM — przeglądarka elementów CAD"
+
+# Skrypt dla KWin. Szuka zwykłego okna, którego tytuł zaczyna się od tytułu aplikacji, i
+# aktywuje je. Plasma 6 ma windowList/activeWindow, Plasma 5 clientList/activeClient.
+_KWIN_RAISE_SCRIPT = """
+const wins = workspace.windowList ? workspace.windowList() : workspace.clientList();
+for (const w of wins) {
+    if (w.normalWindow && (w.caption || "").indexOf(%(title)s) === 0) {
+        if (workspace.activeWindow !== undefined) workspace.activeWindow = w;
+        else workspace.activeClient = w;
+        break;
+    }
+}
+"""
+
+
+def _raise_via_kwin():
+    """Wyciąga okno przeglądarki na wierzch przez KWin — działa na KDE, także pod Wayland.
+
+    Pod Wayland żadna aplikacja nie może sama aktywować okna innej. Może to jednak zrobić
+    kompozytor, a KWin przyjmuje skrypty przez DBus (org.kde.KWin /Scripting) — tak samo
+    działa `kdotool`. Skrypt jest zapisywany do pliku tymczasowego, wczytywany, uruchamiany i
+    od razu zdejmowany.
+
+    Potrzebne, bo token aktywacji (zob. open_in_browser) pomaga tylko przeglądarce
+    URUCHAMIANEJ od zera. Gdy już działa, `xdg-open` startuje jedynie jej krótki proces
+    pośredniczący, który przekazuje adres do działającego okna — a czy to okno skorzysta z
+    tokenu, zależy od przeglądarki (zgłoszone z praktyki: zamknięta przeglądarka wychodziła na
+    wierzch, otwarta — nie).
+
+    Zwraca True, gdy skrypt udało się uruchomić — nie mówi, czy okno znalazł. Poza KDE (brak
+    gdbus albo usługi org.kde.KWin) po prostu zwraca False."""
+    if shutil.which("gdbus") is None:
+        return False
+    plugin = "easypdm-raise-browser"
+    path = None
+
+    def call(object_path, method, *args):
+        return subprocess.run(
+            ["gdbus", "call", "--session", "--dest", "org.kde.KWin",
+             "--object-path", object_path, "--method", method, *args],
+            capture_output=True, text=True, timeout=3,
+        )
+
+    try:
+        fd, path = tempfile.mkstemp(prefix="easypdm-kwin-", suffix=".js")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            # json.dumps daje poprawny literał JS, z polskimi znakami jako \uXXXX.
+            f.write(_KWIN_RAISE_SCRIPT % {"title": json.dumps(APP_WINDOW_TITLE)})
+        # Gdyby poprzednie uruchomienie zostawiło skrypt wczytany, loadScript by odmówił.
+        call("/Scripting", "org.kde.kwin.Scripting.unloadScript", plugin)
+        loaded = call("/Scripting", "org.kde.kwin.Scripting.loadScript", path, plugin)
+        found = re.search(r"-?\d+", loaded.stdout or "")
+        if loaded.returncode != 0 or not found or int(found.group()) < 0:
+            return False
+        ran = call(f"/Scripting/Script{found.group()}", "org.kde.kwin.Script.run")
+        call("/Scripting", "org.kde.kwin.Scripting.unloadScript", plugin)
+        return ran.returncode == 0
+    except Exception:
+        return False
+    finally:
+        if path:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+
+def _focus_browser_window():
+    """Przenosi okno przeglądarki z EasyPDM na wierzch — odpowiednik `AppActivate "EasyPDM"`
+    z makr SolidWorks/Inventor. Kopia (celowo zduplikowana,
+    zob. LoginDialog) funkcji z EasyPDMUpload.FCMacro. Tylko dla Linuksa; na Windowsie nie ma tu czego naprawiać.
+
+    Najpierw KWin (KDE, X11 i Wayland — zob. _raise_via_kwin), potem `wmctrl`/`xdotool`
+    (inne środowiska pod X11). Poza tym — GNOME pod Wayland — nie zadziała nic, bo kompozytor
+    na to nie pozwala; od strony przeglądarki czeka wtedy powiadomienie systemowe, którego
+    kliknięcie przełącza na kartę."""
+    if _raise_via_kwin():
+        return True
+    for command in (["wmctrl", "-a", APP_WINDOW_TITLE],
+                    ["xdotool", "search", "--name", "^" + re.escape(APP_WINDOW_TITLE), "windowactivate"]):
+        if shutil.which(command[0]) is None:
+            continue
+        try:
+            done = subprocess.run(command, timeout=3,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if done.returncode == 0:
+                return True
+        except Exception:
+            pass
+    return False
 
 
 def build_browser_download_url(ticket):
@@ -1010,7 +1111,7 @@ class DownloadFolderDialog(QtWidgets.QDialog):
         self.accept()
 
 
-def wait_for_ticket(ticket, timeout_seconds=600):
+def wait_for_ticket(ticket, timeout_seconds=600, raise_browser=False):
     """Czeka, aż element zostanie wskazany w przeglądarce — BEZ własnego okna. Odpowiednik
     (celowo zduplikowany, zob. LoginDialog wyżej) funkcji o tej samej nazwie w
     EasyPDMUpload.FCMacro, gdzie stoi też pełne wyjaśnienie.
@@ -1034,6 +1135,7 @@ def wait_for_ticket(ticket, timeout_seconds=600):
 
     try:
         deadline = time.time() + timeout_seconds
+        polls = 0
         while time.time() < deadline:
             try:
                 data = api_get(f"/create-tickets/{ticket}")
@@ -1042,6 +1144,15 @@ def wait_for_ticket(ticket, timeout_seconds=600):
             except Exception:
                 # Chwilowy błąd sieci nie przerywa czekania — kolejny obieg spróbuje ponownie.
                 pass
+
+            # Przeglądarka otwarta przed chwilą przez open_in_browser: gdy już działała, nowa
+            # karta mogła wylądować w tle (zob. _raise_via_kwin). Wyciągamy ją przy pierwszych
+            # trzech odpytaniach — strona potrzebuje chwili, żeby załadować się i ustawić tytuł,
+            # po którym okno jest rozpoznawane. Tylko trzy, żeby nie wyrywać fokusu komuś, kto
+            # świadomie wrócił do FreeCAD-a.
+            if raise_browser and polls < 3 and sys.platform.startswith("linux"):
+                _focus_browser_window()
+            polls += 1
 
             # Interfejs odświeżany dziesięć razy częściej niż odpytywanie serwera, żeby
             # FreeCAD nie stał zamrożony przez cały czas czekania.
@@ -1131,7 +1242,7 @@ def main():
         QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
         return
 
-    ticket_data = wait_for_ticket(ticket)
+    ticket_data = wait_for_ticket(ticket, raise_browser=True)
     if ticket_data is None:
         # Upłynął czas oczekiwania — nic do pobrania.
         return

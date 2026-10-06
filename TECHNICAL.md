@@ -494,6 +494,19 @@ launched program gets focus only if the launcher passes an xdg-activation token,
 FreeCAD's behalf and passes it on — valid at that moment, because the user has just started
 the macro and FreeCAD has focus. `webbrowser.open` remains the fallback.
 
+The token only helps a browser that is being *started*. A running one receives the address
+from a short-lived helper process, and whether it then honours the token is up to the
+browser — in practice a closed browser came forward and an open one did not. So on Linux,
+after opening a tab, the macro also asks the compositor directly: `_raise_via_kwin` writes a
+small KWin script, loads it over DBus (`org.kde.KWin /Scripting`), runs and unloads it — the
+same route `kdotool` takes, and one Wayland does allow, because it is the compositor itself
+that activates the window. It tries during the first three polls, since the page needs a
+moment to load and set its title, and no more, so as not to pull focus from someone who went
+back to FreeCAD on purpose. The window is matched by the app's full `<title>` at the start of
+its caption: matching on "EasyPDM" alone was ruled out by a probe of a live session, where a
+Shotcut project called `EasyPDM2.mlt` would have been raised instead. Outside KDE it falls
+back to `wmctrl`/`xdotool` (X11), and on Windows none of this runs.
+
 That is also why the app itself can call the person back: when a request is taken and the tab
 does not have focus, it shows a desktop notification whose click switches to it. A click is
 the one mechanism no window system refuses, because the switch is the person's own doing.
