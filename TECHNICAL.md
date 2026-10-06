@@ -568,6 +568,19 @@ resumed — and the saving was not worth it, since a poll is a dictionary lookup
 bytes, never touching the database. A finished run stops being served after two minutes, so a
 list from an hour ago does not greet whoever opens the app next.
 
+**Laid out as a tree.** For an assembly the list is shown in the order of its structure, each
+level indented under its parent, although the files are processed leaves-first — marks go by
+key, not by position, so the two orders never have to agree. `ProgressTree.Arrange` does this
+once, on the server, for all three CAD programs. Upload macros send the parent–child pairs they
+already hold for attaching the BOM (`edges` in `PUT /api/progress`); there is no other source,
+since new components do not exist in the PDM yet and the keys are local file paths. Downloads
+need no macro change at all: their keys are item ids, so the server reads the relations between
+them from `item_relations` itself. A part used in several assemblies is placed once, under the
+first parent the walk reaches — the decision was the user's, and it keeps the counter counting
+files rather than rows. Without any relations the list stays exactly as sent, flat; anything
+unreachable because of a cycle is appended flat rather than dropped. No icons mark assemblies
+or parts: an icon would suggest a kind of item (made, purchased…), which the list does not know.
+
 **Cancelling.** The panel's Cancel button cannot stop anything itself — the macro runs inside a
 CAD program on another machine. `POST /api/progress/cancel` only records the request, and each
 macro asks `GET /api/progress/cancelled` (a flat `1`/`0`, for the VBA parsers) at the two points

@@ -285,7 +285,7 @@ Ist kein Browser offen, bemerkt das Makro das binnen weniger Sekunden und kehrt 
 
 ### Hoch- und Herunterladen mitverfolgen
 
-Während ein Makro Dateien ins PDM sendet oder zurückholt, zeigt die Anwendung rechts eine Liste dieser Dateien. Jede wird nach Abschluss abgehakt, die laufende dreht sich, und ein Zähler sagt „3 von 7". Schlägt etwas fehl, wird der Eintrag rot markiert und der Rest läuft weiter.
+Während ein Makro Dateien ins PDM sendet oder zurückholt, zeigt die Anwendung rechts eine Liste dieser Dateien. Jede wird nach Abschluss abgehakt, die laufende dreht sich, und ein Zähler sagt „3 von 7". Schlägt etwas fehl, wird der Eintrag rot markiert und der Rest läuft weiter. Die Liste einer Baugruppe ist wie ihr Baum aufgebaut — Unterbaugruppen und Teile eingerückt unter der Baugruppe, zu der sie gehören —, und ein mehrfach verwendetes Teil steht einmal, unter der ersten davon.
 
 Die Schaltfläche **Abbrechen** an der Liste stoppt den Rest der Übertragung — nach einer Rückfrage. Was schon übertragen ist, bleibt; das Makro hält vor der nächsten Datei an, die gerade laufende wird also noch fertig. Ein Formular des Makros, das gerade auf dem Bildschirm steht, verschwindet, und in den Benachrichtigungen bleibt ein Bericht, wie weit es gekommen ist.
 

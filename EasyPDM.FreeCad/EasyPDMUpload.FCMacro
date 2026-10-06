@@ -787,16 +787,22 @@ def _progress_send(method, path, payload):
         pass
 
 
-def progress_start(kind, entries):
+def progress_start(kind, entries, edges=None):
     """entries: lista par (klucz, etykieta). Zgłaszana w CAŁOŚCI, zanim cokolwiek poleci —
     bez pełnej listy od początku pasek postępu kłamałby ("3 z 3" zamieniałoby się w "3 z 9",
-    gdy znajdzie się kolejny poziom drzewa)."""
+    gdy znajdzie się kolejny poziom drzewa).
+
+    edges (opcjonalnie): pary (klucz rodzica, klucz dziecka), po których serwer układa listę
+    w drzewo z wcięciami (zob. ProgressTree.cs). Bez nich lista zostaje płaska, jak dotąd."""
     if not entries:
         return
-    _progress_send("PUT", "/progress", {
+    payload = {
         "kind": kind,
         "entries": [{"key": k, "label": l} for k, l in entries],
-    })
+    }
+    if edges:
+        payload["edges"] = [{"parent": p, "child": c} for p, c in edges]
+    _progress_send("PUT", "/progress", payload)
 
 
 def progress_mark(key, status):
@@ -2574,9 +2580,14 @@ def process_assembly_tree(top_doc, target_folder=None):
     # Lista do panelu postępu w przeglądarce — zgłaszana TERAZ, bo dopiero teraz wiadomo, że
     # użytkownik potwierdził. Komponenty w kolejności wysyłki (liście najpierw), a na końcu
     # sam dokument nadrzędny, który leci po nich.
+    # Pary rodzic-dziecko do ułożenia listy w drzewo. Rodzicem komponentów najwyższego poziomu
+    # jest plik dokumentu nadrzędnego, który na liście stoi pod TOP_DOCUMENT_PROGRESS_KEY.
+    top_file = getattr(top_doc, "FileName", "")
     progress_start("upload",
                    [(fp, progress_label_for(fp)) for fp in order]
-                   + [(TOP_DOCUMENT_PROGRESS_KEY, progress_label_for(getattr(top_doc, "FileName", "")))])
+                   + [(TOP_DOCUMENT_PROGRESS_KEY, progress_label_for(top_file))],
+                   [(TOP_DOCUMENT_PROGRESS_KEY if parent == top_file else parent, child)
+                    for parent, child, _qty in edges])
     # Poprzednia pozycja jest odhaczana na POCZĄTKU następnej, a ostatnia tuż za pętlą — ciało
     # pętli ma kilka ścieżek wyjścia (continue) i każda musiałaby inaczej o tym pamiętać.
     progress_prev = [None]

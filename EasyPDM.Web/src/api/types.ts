@@ -590,6 +590,9 @@ export interface TransferProgressEntry {
   key: string
   label: string
   status: TransferProgressStatus
+  // Poziom zagłębienia w drzewie złożenia (0 = najwyższy), liczony na serwerze — zob.
+  // ProgressTree.cs. Tylko do wcięcia; starszy serwer go nie przysyła.
+  depth?: number
 }
 
 export interface TransferProgress {

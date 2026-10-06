@@ -21,7 +21,7 @@ static class TransferProgressEndpoints
         // PUT /api/progress   body: { "kind": "upload"|"download", "entries": [{ "key": "...", "label": "..." }] }
         // Wołane RAZ, zanim makro zacznie przesyłać cokolwiek. Zastępuje poprzedni bieg tego
         // samego użytkownika -- nowe kliknięcie "Upload" unieważnia starą listę.
-        app.MapPut("/api/progress", (StartProgressRequest body, HttpContext ctx) =>
+        app.MapPut("/api/progress", async (StartProgressRequest body, HttpContext ctx) =>
         {
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
 
@@ -44,6 +44,18 @@ static class TransferProgressEndpoints
                 entries.Add(new TransferProgressEntry { Key = e.Key, Label = e.Label });
             }
 
+            // Drzewo do wyświetlenia. Relacje przysyła makro (wysyłka: klucze to ścieżki plików,
+            // a nowych komponentów jeszcze nie ma w PDM, więc struktura istnieje tylko w CAD-zie).
+            // Przy pobieraniu kluczami są identyfikatory elementów, a relacje między nimi są już
+            // w bazie — serwer bierze je sam, więc istniejące makra pobierania nie muszą się zmieniać.
+            var edges = body.Edges?
+                .Where(e => !string.IsNullOrWhiteSpace(e.Parent) && !string.IsNullOrWhiteSpace(e.Child))
+                .Select(e => (e.Parent, e.Child))
+                .ToList() ?? [];
+            if (edges.Count == 0 && body.Kind == "download")
+                edges = await LoadDownloadEdgesAsync(connectionString, entries);
+
+            entries = ProgressTree.Arrange(entries, edges);
             store.Start(user.Id, body.Kind, entries);
             return Results.Ok(new { count = entries.Count });
         });
@@ -137,14 +149,53 @@ static class TransferProgressEndpoints
                     // itemNumberLabel/recordName: jedno miejsce liczy, klienci tylko pokazują.
                     total = progress.Entries.Count,
                     done = progress.Entries.Count(e => e.Status is "done" or "skipped"),
-                    entries = progress.Entries.Select(e => new { key = e.Key, label = e.Label, status = e.Status }),
+                    entries = progress.Entries.Select(e => new { key = e.Key, label = e.Label, status = e.Status, depth = e.Depth }),
                 }
             });
         });
     }
 
     record ProgressEntryRequest(string Key, string Label);
-    record StartProgressRequest(string Kind, List<ProgressEntryRequest>? Entries);
+    record ProgressEdgeRequest(string Parent, string Child);
+    record StartProgressRequest(string Kind, List<ProgressEntryRequest>? Entries, List<ProgressEdgeRequest>? Edges);
+
+    // Relacje BOM między pozycjami listy pobierania (kluczami są tu identyfikatory elementów).
+    // Klucz, który nie jest identyfikatorem, po prostu nie bierze udziału — lista zostaje płaska.
+    // Błąd bazy też niczego nie przerywa: drzewo to wygoda wyświetlania, nie część pobierania.
+    private static async Task<List<(string Parent, string Child)>> LoadDownloadEdgesAsync(
+        string connectionString, List<TransferProgressEntry> entries)
+    {
+        // Relacje wracają z bazy jako Guid; odwzorowujemy je na DOKŁADNIE te napisy kluczy, które
+        // przysłało makro — inaczej różnica w wielkości liter rozjechałaby dopasowanie.
+        var keyById = new Dictionary<Guid, string>();
+        foreach (var e in entries)
+            if (Guid.TryParse(e.Key, out var id))
+                keyById.TryAdd(id, e.Key);
+        var ids = keyById.Keys.ToArray();
+        var result = new List<(string Parent, string Child)>();
+        if (ids.Length < 2)
+            return result;
+        try
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            const string sql = """
+                SELECT parent_id, child_id FROM item_relations
+                WHERE parent_id = ANY(@ids) AND child_id = ANY(@ids)
+                ORDER BY parent_id, position;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("ids", ids);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                result.Add((keyById[reader.GetGuid(0)], keyById[reader.GetGuid(1)]));
+        }
+        catch
+        {
+            result.Clear();
+        }
+        return result;
+    }
     record MarkProgressRequest(string Key, string Status);
 
     // Raport z zakończonego biegu: liczby plus lista pozycji, żeby w powiadomieniu dało się

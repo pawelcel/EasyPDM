@@ -262,7 +262,7 @@ If no browser is open, the macro notices within a few seconds and falls back to 
 
 ### Watching an upload or a download
 
-While a macro is sending files to the PDM or fetching them back, the app shows a list of those files on the right. Each one is ticked off as it completes, the one in progress spins, and a counter says "3 of 7". If something fails it is marked in red and the rest carries on.
+While a macro is sending files to the PDM or fetching them back, the app shows a list of those files on the right. Each one is ticked off as it completes, the one in progress spins, and a counter says "3 of 7". If something fails it is marked in red and the rest carries on. An assembly's list is laid out like its tree — sub-assemblies and parts indented under the assembly they belong to — and a part used in several places is listed once, under the first of them.
 
 The list's **Cancel** button stops the rest of the transfer, after asking you to confirm. Whatever has gone through stays; the macro stops before the next file, so the one already on its way is finished first. A form from the macro that is waiting on screen goes away, and the notifications get a report of how far it got.
 

@@ -1451,7 +1451,12 @@ Private Sub ProgressSend(ByVal method As String, ByVal path As String, ByVal bod
     On Error GoTo 0
 End Sub
 
-Sub ProgressStart(ByVal kind As String, ByRef keys As Collection, ByRef labels As Collection)
+' edges (opcjonalnie): pary rodzic-dziecko z DiscoverComponentTree, po ktorych serwer uklada
+' liste w drzewo z wcieciami (zob. ProgressTree.cs). Rodzic rowny topPath dostaje klucz
+' TOP_DOCUMENT_PROGRESS_KEY, bo pod nim dokument nadrzedny stoi na liscie. Bez edges lista
+' zostaje plaska, jak dotad.
+Sub ProgressStart(ByVal kind As String, ByRef keys As Collection, ByRef labels As Collection, _
+                  Optional ByVal edges As Collection, Optional ByVal topPath As String = "")
     On Error Resume Next
     If keys Is Nothing Then Exit Sub
     If keys.Count = 0 Then Exit Sub
@@ -1462,7 +1467,24 @@ Sub ProgressStart(ByVal kind As String, ByRef keys As Collection, ByRef labels A
         body = body & "{""key"":""" & JsonStringEscape(CStr(keys(i))) & _
                """,""label"":""" & JsonStringEscape(CStr(labels(i))) & """}"
     Next i
-    body = body & "]}"
+    body = body & "]"
+    If Not edges Is Nothing Then
+        If edges.Count > 0 Then
+            Dim edge As Variant, parentKey As String, firstEdge As Boolean
+            firstEdge = True
+            body = body & ",""edges"":["
+            For Each edge In edges
+                parentKey = CStr(edge("parent"))
+                If parentKey = topPath Then parentKey = TOP_DOCUMENT_PROGRESS_KEY
+                If Not firstEdge Then body = body & ","
+                body = body & "{""parent"":""" & JsonStringEscape(parentKey) & _
+                       """,""child"":""" & JsonStringEscape(CStr(edge("child"))) & """}"
+                firstEdge = False
+            Next edge
+            body = body & "]"
+        End If
+    End If
+    body = body & "}"
     ProgressSend "PUT", "/progress", body
     LogLine "Progress: started " & kind & " with " & keys.Count & " entry(ies)."
     On Error GoTo 0
@@ -3246,8 +3268,8 @@ Function ProcessAssemblyTree(ByVal topDoc As Object, ByRef edgesForTop As Collec
         progLabels.Add ProgressLabelFor(CStr(progPath))
     Next progPath
     progKeys.Add TOP_DOCUMENT_PROGRESS_KEY
-    progLabels.Add ProgressLabelFor(topModel.FullFileName)
-    ProgressStart "upload", progKeys, progLabels
+    progLabels.Add ProgressLabelFor(topDoc.FullFileName)
+    ProgressStart "upload", progKeys, progLabels, tree("edges"), topDoc.FullFileName
 
     Dim edges As Collection
     Set edges = tree("edges")

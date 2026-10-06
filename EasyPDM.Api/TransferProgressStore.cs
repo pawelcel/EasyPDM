@@ -131,6 +131,9 @@ class TransferProgressEntry
     public required string Key { get; init; }
     public required string Label { get; init; }
     public string Status { get; set; } = "pending";
+    // Poziom zagłębienia w drzewie złożenia (0 = najwyższy) — tylko do wcięcia w panelu.
+    // Ustawiany przez ProgressTree; bez relacji wszystko zostaje na 0, czyli płasko.
+    public int Depth { get; set; }
 }
 
 record TransferProgress(

@@ -263,7 +263,7 @@ Jeśli żadna przeglądarka nie jest otwarta, makro zauważa to w kilka sekund i
 
 ### Podgląd wysyłki i pobierania
 
-Gdy makro wysyła pliki do PDM albo je pobiera, aplikacja pokazuje po prawej stronie listę tych plików. Każdy jest odhaczany po zakończeniu, bieżący się kręci, a licznik mówi „3 z 7". Jeśli coś się nie uda, pozycja jest zaznaczona na czerwono, a reszta leci dalej.
+Gdy makro wysyła pliki do PDM albo je pobiera, aplikacja pokazuje po prawej stronie listę tych plików. Każdy jest odhaczany po zakończeniu, bieżący się kręci, a licznik mówi „3 z 7". Jeśli coś się nie uda, pozycja jest zaznaczona na czerwono, a reszta leci dalej. Lista złożenia jest ułożona tak jak jego drzewo — podzłożenia i części z wcięciem pod złożeniem, w którym są — a część użyta w kilku miejscach stoi raz, pod pierwszym z nich.
 
 Przycisk **Anuluj** na liście zatrzymuje resztę przesyłania — po potwierdzeniu. To, co już poszło, zostaje; makro staje przed kolejnym plikiem, więc ten, który akurat leci, zostanie dokończony. Formularz z makra, jeśli właśnie wisi na ekranie, znika, a w powiadomieniach zostaje raport, ile zdążyło przejść.
 

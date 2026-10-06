@@ -207,6 +207,9 @@ function TransferProgressPanel() {
             className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] ${
               entry.status === "active" ? "bg-primary/10" : ""
             }`}
+            // Samo wcięcie, bez ikon złożenia/części: ikona sugerowałaby rodzaj elementu
+            // (wykonywana, zakupowa…), a tego lista nie wie — zna tylko miejsce w drzewie.
+            style={{ paddingLeft: 8 + (entry.depth ?? 0) * 16 }}
           >
             <StatusIcon status={entry.status} />
             <span

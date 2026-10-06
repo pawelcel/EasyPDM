@@ -320,6 +320,144 @@ public class TransferProgressTests
         (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
     }
 
+    // ---------------------------------------------------------------------------------------
+    // Lista ułożona w drzewo: złożenie, pod nim z wcięciem jego zawartość.
+
+    private static async Task<List<(string Key, int Depth)>> TreeAsync(HttpClient client)
+    {
+        var progress = await ReadAsync(client);
+        return progress.GetProperty("entries").EnumerateArray()
+            .Select(e => (e.GetProperty("key").GetString()!, e.GetProperty("depth").GetInt32()))
+            .ToList();
+    }
+
+    private static object Entries(params string[] keys) =>
+        keys.Select(k => new { key = k, label = k }).ToArray();
+
+    // Makro wysyła od liści (złożenia nie da się podpiąć, zanim nie istnieją jego części), a
+    // lista ma stać w kolejności drzewa. Odhaczanie idzie po kluczu, więc jedno drugiemu nie
+    // przeszkadza.
+    [Fact]
+    public async Task Wysylka_ze_struktura_jest_ulozona_w_drzewo()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        (await client.PutAsJsonAsync("/api/progress", new
+        {
+            kind = "upload",
+            entries = Entries("a", "b", "sub", "c", "__top__"),
+            edges = new[]
+            {
+                new { parent = "__top__", child = "sub" }, new { parent = "__top__", child = "c" },
+                new { parent = "sub", child = "a" }, new { parent = "sub", child = "b" },
+            },
+        })).EnsureSuccessStatusCode();
+
+        Assert.Equal(
+            [("__top__", 0), ("sub", 1), ("a", 2), ("b", 2), ("c", 1)],
+            await TreeAsync(client));
+
+        // Odhaczanie dalej trafia we właściwą pozycję, choć kolejność listy jest inna.
+        (await MarkAsync(client, "a", "done")).EnsureSuccessStatusCode();
+        var a = (await ReadAsync(client)).GetProperty("entries").EnumerateArray()
+            .Single(e => e.GetProperty("key").GetString() == "a");
+        Assert.Equal("done", a.GetProperty("status").GetString());
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
+    // Część użyta w kilku złożeniach jest wysyłana raz, więc i na liście stoi raz — pod
+    // PIERWSZYM złożeniem, w którym występuje. Licznik "x z y" liczy pliki, nie wiersze.
+    [Fact]
+    public async Task Czesc_wspolna_stoi_pod_pierwszym_zlozeniem()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        (await client.PutAsJsonAsync("/api/progress", new
+        {
+            kind = "upload",
+            entries = Entries("sruba", "s1", "s2", "__top__"),
+            edges = new[]
+            {
+                new { parent = "__top__", child = "s1" }, new { parent = "__top__", child = "s2" },
+                new { parent = "s1", child = "sruba" }, new { parent = "s2", child = "sruba" },
+            },
+        })).EnsureSuccessStatusCode();
+
+        Assert.Equal(
+            [("__top__", 0), ("s1", 1), ("sruba", 2), ("s2", 1)],
+            await TreeAsync(client));
+        Assert.Equal(4, (await ReadAsync(client)).GetProperty("total").GetInt32());
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
+    // Bez relacji (starsze makro, pojedynczy plik) lista zostaje dokładnie taka, jak przyszła.
+    // Cykl w danych nie gubi żadnej pozycji — lista bez którejś kłamałaby przy liczniku.
+    [Fact]
+    public async Task Bez_relacji_plasko_a_cykl_niczego_nie_gubi()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        (await StartAsync(client, "upload", "x", "y", "z")).EnsureSuccessStatusCode();
+        Assert.Equal([("x", 0), ("y", 0), ("z", 0)], await TreeAsync(client));
+
+        (await client.PutAsJsonAsync("/api/progress", new
+        {
+            kind = "upload",
+            entries = Entries("p", "q", "r"),
+            edges = new[] { new { parent = "p", child = "q" }, new { parent = "q", child = "p" } },
+        })).EnsureSuccessStatusCode();
+        var cyclic = await TreeAsync(client);
+        Assert.Equal(3, cyclic.Count);
+        Assert.Equal(["p", "q", "r"], cyclic.Select(e => e.Key).OrderBy(k => k).ToList());
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
+    // Przy pobieraniu kluczami są identyfikatory elementów, a relacje są już w bazie — serwer
+    // bierze je sam, więc makra pobierania działają z drzewem bez żadnej zmiany.
+    [Fact]
+    public async Task Pobieranie_bierze_strukture_z_bazy()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        async Task<string> Create(string name, string type, string? parentId)
+        {
+            var response = await client.PostAsJsonAsync("/api/nodes", new { name, itemType = type, parentId });
+            response.EnsureSuccessStatusCode();
+            return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString()!;
+        }
+        var top = await Create("gora-" + Guid.NewGuid().ToString("N")[..6], "assembly", null);
+        var sub = await Create("pod", "assembly", top);
+        var part = await Create("czesc", "part", sub);
+        var loose = await Create("luzna", "part", top);
+
+        // Kolejność, w jakiej makro dostaje listę z /descendants, nie ma znaczenia.
+        (await client.PutAsJsonAsync("/api/progress", new
+        {
+            kind = "download",
+            entries = Entries(part, top, loose, sub),
+        })).EnsureSuccessStatusCode();
+
+        var tree = await TreeAsync(client);
+        Assert.Equal((top, 0), tree[0]);
+        Assert.Contains((sub, 1), tree);
+        Assert.Contains((loose, 1), tree);
+        Assert.Contains((part, 2), tree);
+        Assert.True(tree.IndexOf((part, 2)) == tree.IndexOf((sub, 1)) + 1, "część ma stać tuż pod swoim podzłożeniem");
+
+        (await client.DeleteAsync("/api/progress")).EnsureSuccessStatusCode();
+    }
+
     private static async Task<List<JsonElement>> ReportsAsync(HttpClient client)
     {
         var response = await client.GetAsync("/api/notifications");
