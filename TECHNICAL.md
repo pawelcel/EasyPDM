@@ -481,9 +481,11 @@ is on the start of the window title, so nothing happens when EasyPDM sits in a b
 and a failure is swallowed, being a convenience rather than part of the upload. In FreeCAD the
 problem was the other way round: nothing had to raise the browser, because the tab comes
 forward by itself when it takes the request — it was the macro's own waiting dialog, created
-straight afterwards, that took focus back, since Qt activates a new window on creation. It is
-now given `WA_ShowWithoutActivating`. The `wmctrl`/`xdotool` attempt is kept as a fallback for
-X11 only; under Wayland no application may raise another's window.
+straight afterwards, that took focus back. `WA_ShowWithoutActivating` did not stop it: under
+Wayland it is the compositor, not the application, that decides whether a new window gets
+focus. The dialog is therefore gone; FreeCAD waits like the SolidWorks and Inventor macros
+always have, polling with a message in the status bar and `processEvents` keeping the UI
+alive. The `wmctrl`/`xdotool` attempt stays as a fallback for X11 only.
 
 That is also why the app itself can call the person back: when a request is taken and the tab
 does not have focus, it shows a desktop notification whose click switches to it. A click is

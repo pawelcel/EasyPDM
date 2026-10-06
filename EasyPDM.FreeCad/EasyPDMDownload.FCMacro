@@ -152,12 +152,8 @@ TRANSLATIONS = {
         "indicate_target_folder": "Wskaż folder docelowy.",
         "cannot_use_folder": "Nie można użyć tego folderu: {error}",
         "logged_out_message": "Wylogowano. Kolejne uruchomienie makra poprosi o ponowne zalogowanie.",
-        "wait_ticket_title": "Czekam na przeglądarkę",
-        "wait_ticket_download_body": (
-            "Otworzono przeglądarkę — wybierz Część/Złożenie do pobrania i zatwierdź.\n\n"
-            "To okno samo się zamknie, gdy wybór zostanie zatwierdzony."
-        ),
         "wait_timeout": "Upłynął czas oczekiwania.",
+        "wait_ticket_status": "EasyPDM: czekam na wskazanie elementu w przeglądarce...",
         "log_no_attachments_list": "  {label}: nie udało się pobrać listy załączników ({error}).",
         "log_no_cad_files": "  {label}: brak plików CAD do pobrania (element nie ma żadnych załączników).",
         "log_wrong_format": (
@@ -211,12 +207,8 @@ TRANSLATIONS = {
         "indicate_target_folder": "Choose a target folder.",
         "cannot_use_folder": "Cannot use this folder: {error}",
         "logged_out_message": "Logged out. The next time you run the macro, it will ask you to log in again.",
-        "wait_ticket_title": "Waiting for the browser",
-        "wait_ticket_download_body": (
-            "The browser has been opened — choose the Part/Assembly to download and confirm.\n\n"
-            "This window will close automatically once the selection is confirmed."
-        ),
         "wait_timeout": "The waiting time has expired.",
+        "wait_ticket_status": "EasyPDM: waiting for an item to be picked in the browser...",
         "log_no_attachments_list": "  {label}: failed to fetch the attachment list ({error}).",
         "log_no_cad_files": "  {label}: no CAD files to download (the item has no attachments).",
         "log_wrong_format": (
@@ -270,13 +262,8 @@ TRANSLATIONS = {
         "indicate_target_folder": "Wählen Sie einen Zielordner.",
         "cannot_use_folder": "Dieser Ordner kann nicht verwendet werden: {error}",
         "logged_out_message": "Abgemeldet. Beim nächsten Ausführen des Makros werden Sie erneut zur Anmeldung aufgefordert.",
-        "wait_ticket_title": "Warte auf den Browser",
-        "wait_ticket_download_body": (
-            "Der Browser wurde geöffnet — wählen Sie das herunterzuladende Teil/die "
-            "Baugruppe aus und bestätigen Sie.\n\nDieses Fenster schließt sich automatisch, "
-            "sobald die Auswahl bestätigt wurde."
-        ),
         "wait_timeout": "Die Wartezeit ist abgelaufen.",
+        "wait_ticket_status": "EasyPDM: warte auf die Auswahl eines Elements im Browser...",
         "log_no_attachments_list": "  {label}: Anhangsliste konnte nicht abgerufen werden ({error}).",
         "log_no_cad_files": "  {label}: keine CAD-Dateien zum Herunterladen (das Element hat keine Anhänge).",
         "log_wrong_format": (
@@ -367,7 +354,7 @@ def set_download_folder(folder):
 
 def build_browser_download_url(ticket):
     """Adres, pod którym otwiera się przeglądarka systemowa zamiast natywnej wyszukiwarki
-    Części/Złożenia (zob. WaitForTicketDialog/main) — most logowania bilet->ciasteczko
+    Części/Złożenia (zob. wait_for_ticket/main) — most logowania bilet->ciasteczko
     (GET /api/auth/browser-login) plus deep-link "?ticket=&mode=download"
     (pending-create-ticket.ts w aplikacji webowej) — "mode=download" mówi PendingTicketBanner,
     żeby od razu pokazać samą wyszukiwarkę (bez opcji "nowy element", nieistotnej przy
@@ -957,69 +944,56 @@ class DownloadFolderDialog(QtWidgets.QDialog):
         self.accept()
 
 
-class WaitForTicketDialog(QtWidgets.QDialog):
-    """Identyczne (celowo zduplikowane, zob. LoginDialog wyżej) okno co w
-    EasyPDMUpload.FCMacro — pokazywane PO otwarciu przeglądarki, odpytuje
-    GET /api/create-tickets/{ticket} co POLL_INTERVAL_MS, aż użytkownik wskaże element w
-    przeglądarce (albo aż upłynie timeout / kliknie Anuluj). accept()/reject() nadpisane,
-    żeby timer ZAWSZE zatrzymywał się razem z zamknięciem okna."""
+def wait_for_ticket(ticket, timeout_seconds=600):
+    """Czeka, aż element zostanie wskazany w przeglądarce — BEZ własnego okna. Odpowiednik
+    (celowo zduplikowany, zob. LoginDialog wyżej) funkcji o tej samej nazwie w
+    EasyPDMUpload.FCMacro, gdzie stoi też pełne wyjaśnienie.
 
-    POLL_INTERVAL_MS = 2000
+    W skrócie: okno „Czekam na przeglądarkę" powstawało zaraz po tym, jak przeglądarka
+    dostała fokus, i Qt odbierało jej go z powrotem, przez co lista elementów lądowała ZA
+    FreeCAD-em. Makra SolidWorks i Inventor nie mają tu żadnego okna — czekają, pisząc na
+    pasku stanu, i tak jest teraz również tutaj.
 
-    def __init__(self, ticket, parent=None, timeout_seconds=600):
-        super().__init__(parent)
-        self.ticket = ticket
-        self.result_data = None
-        self._elapsed_ms = 0
-        self._timeout_ms = timeout_seconds * 1000
+    Zwraca dane biletu albo None, gdy upłynął czas oczekiwania."""
+    import time
 
-        self.setWindowTitle(t("wait_ticket_title"))
-        self.setMinimumWidth(380)
+    status_bar = None
+    try:
+        import FreeCADGui as Gui
 
-        layout = QtWidgets.QVBoxLayout(self)
-        label = QtWidgets.QLabel(t("wait_ticket_download_body"))
-        label.setWordWrap(True)
-        layout.addWidget(label)
+        status_bar = Gui.getMainWindow().statusBar()
+        status_bar.showMessage(t("wait_ticket_status"))
+    except Exception:
+        status_bar = None
 
-        self.error_label = QtWidgets.QLabel("")
-        self.error_label.setStyleSheet("color: #c0392b;")
-        self.error_label.setWordWrap(True)
-        layout.addWidget(self.error_label)
+    try:
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            try:
+                data = api_get(f"/create-tickets/{ticket}")
+                if data and data.get("itemId"):
+                    return data
+            except Exception:
+                # Chwilowy błąd sieci nie przerywa czekania — kolejny obieg spróbuje ponownie.
+                pass
 
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel)
-        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText(t("cancel_button"))
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+            # Interfejs odświeżany dziesięć razy częściej niż odpytywanie serwera, żeby
+            # FreeCAD nie stał zamrożony przez cały czas czekania.
+            for _ in range(20):
+                try:
+                    QtWidgets.QApplication.processEvents()
+                except Exception:
+                    pass
+                time.sleep(0.1)
 
-        self._timer = QtCore.QTimer(self)
-        self._timer.setInterval(self.POLL_INTERVAL_MS)
-        self._timer.timeout.connect(self._poll)
-        self._timer.start()
-
-    def accept(self):
-        self._timer.stop()
-        super().accept()
-
-    def reject(self):
-        self._timer.stop()
-        super().reject()
-
-    def _poll(self):
-        self._elapsed_ms += self.POLL_INTERVAL_MS
-        if self._elapsed_ms >= self._timeout_ms:
-            self.error_label.setText(t("wait_timeout"))
-            self.reject()
-            return
-        try:
-            data = api_get(f"/create-tickets/{self.ticket}")
-        except Exception as e:
-            # Chwilowy błąd sieci nie przerywa czekania — kolejny cykl spróbuje ponownie.
-            self.error_label.setText(str(e))
-            return
-        if data and data.get("itemId"):
-            self.result_data = data
-            self.accept()
-
+        App.Console.PrintMessage(f"EasyPDM: {t('wait_timeout')}\n")
+        return None
+    finally:
+        if status_bar is not None:
+            try:
+                status_bar.clearMessage()
+            except Exception:
+                pass
 
 def _run_download(top_item, target_dir, log):
     """Faktyczne pobieranie + otwarcie, wydzielone z main() wyłącznie po to, żeby dało się
@@ -1085,12 +1059,11 @@ def main():
         QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
         return
 
-    wait_dlg = WaitForTicketDialog(ticket)
-    if wait_dlg.exec() != QtWidgets.QDialog.Accepted:
-        # Anulowano w przeglądarce/oknie oczekiwania, albo upłynął czas — nic do pobrania.
+    ticket_data = wait_for_ticket(ticket)
+    if ticket_data is None:
+        # Upłynął czas oczekiwania — nic do pobrania.
         return
 
-    ticket_data = wait_dlg.result_data
     try:
         top_item = api_get(f"/items/{ticket_data['itemId']}")
     except Exception as e:

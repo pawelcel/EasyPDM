@@ -292,12 +292,8 @@ TRANSLATIONS = {
         "upload_component_failed": "Nie udało się wysłać {file}: {error}",
         "link_child_failed": "Utworzono {child}, ale nie udało się podpiąć go pod {parent}: {error}",
         "open_browser_failed": "Nie udało się otworzyć przeglądarki: {error}",
-        "wait_ticket_title": "Czekam na przeglądarkę",
-        "wait_ticket_body": (
-            "Uzupełnij dane elementu w przeglądarce i zapisz.\n\n"
-            "To okno samo się zamknie, gdy element zostanie utworzony."
-        ),
         "wait_timeout": "Upłynął czas oczekiwania.",
+        "wait_ticket_status": "EasyPDM: czekam na dane elementu uzupełniane w przeglądarce...",
         "no_active_document": "Brak otwartego dokumentu.",
         "document_not_saved": "Dokument nie jest jeszcze zapisany — wskaż, gdzie go zapisać.",
         "save_failed": "Nie udało się zapisać dokumentu: {error}",
@@ -398,12 +394,8 @@ TRANSLATIONS = {
         "upload_component_failed": "Failed to send {file}: {error}",
         "link_child_failed": "Created {child}, but failed to link it under {parent}: {error}",
         "open_browser_failed": "Failed to open the browser: {error}",
-        "wait_ticket_title": "Waiting for the browser",
-        "wait_ticket_body": (
-            "Fill in the item details in the browser and save.\n\n"
-            "This window will close automatically once the item is created."
-        ),
         "wait_timeout": "The waiting time has expired.",
+        "wait_ticket_status": "EasyPDM: waiting for the item details to be filled in in the browser...",
         "no_active_document": "No document is open.",
         "document_not_saved": "The document has not been saved yet — choose where to save it.",
         "save_failed": "Failed to save the document: {error}",
@@ -507,12 +499,8 @@ TRANSLATIONS = {
         "upload_component_failed": "{file} konnte nicht gesendet werden: {error}",
         "link_child_failed": "{child} wurde erstellt, konnte aber nicht unter {parent} verknüpft werden: {error}",
         "open_browser_failed": "Der Browser konnte nicht geöffnet werden: {error}",
-        "wait_ticket_title": "Warte auf den Browser",
-        "wait_ticket_body": (
-            "Füllen Sie die Elementdaten im Browser aus und speichern Sie.\n\n"
-            "Dieses Fenster schließt sich automatisch, sobald das Element erstellt wurde."
-        ),
         "wait_timeout": "Die Wartezeit ist abgelaufen.",
+        "wait_ticket_status": "EasyPDM: warte auf die im Browser einzutragenden Elementdaten...",
         "no_active_document": "Kein Dokument geöffnet.",
         "document_not_saved": "Das Dokument wurde noch nicht gespeichert — wählen Sie einen Speicherort.",
         "save_failed": "Das Dokument konnte nicht gespeichert werden: {error}",
@@ -963,16 +951,16 @@ def _focus_browser_window():
     """Przenosi okno przeglądarki na wierzch — odpowiednik `AppActivate "EasyPDM"` z makr
     SolidWorks/Inventor.
 
-    ZAPAS, nie główny mechanizm. Fokus przeglądarce odbierało okno oczekiwania, które Qt
-    aktywowało samo przy tworzeniu — i to zostało naprawione u źródła (`WA_ShowWithoutActivating`
-    w WaitForTicketDialog). Ta funkcja zostaje na wypadek, gdyby platforma ten atrybut
-    zignorowała, albo gdy przeglądarka jest zminimalizowana.
+    ZAPAS, nie główny mechanizm. Fokus przeglądarce odbierało okno oczekiwania makra, które
+    Qt aktywowało samo przy tworzeniu — i tego okna już nie ma (zob. wait_for_ticket). Ta
+    funkcja zostaje na wypadek, gdy przeglądarka jest zminimalizowana albo na innym pulpicie,
+    czyli tam, gdzie i tak nie wyszłaby sama na wierzch.
 
     Na Windowsie to jedno wywołanie systemowe; na Linuksie zależy od środowiska okien. Pod
     X11 robi to `wmctrl`/`xdotool`, jeśli są zainstalowane. Pod Wayland kompozytor z zasady
     nie pozwala jednej aplikacji wyciągnąć okna drugiej — tam nie zadziała NIC i nie ma co
-    tego obchodzić; dlatego treść okna oczekiwania mówi wprost, że dane uzupełnia się w
-    przeglądarce, zamiast obiecywać, że sama się pokaże.
+    tego obchodzić; od strony przeglądarki czeka wtedy powiadomienie systemowe, którego
+    kliknięcie przełącza na kartę.
 
     Dopasowanie po tytule okna: strona ma <title> zaczynający się od "EasyPDM", a przeglądarki
     doklejają swoją nazwę na końcu."""
@@ -1003,7 +991,7 @@ def publish_cad_request(ticket, name, item_type=None, material=None, document_si
     jej prośbę podać.
 
     Czekanie jest krótkie: sprawdzamy tylko, CZY KTOŚ PATRZY, a nie czy wypełnił formularz —
-    tym zajmuje się WaitForTicketDialog. Gdy nikt nie podejmie (przeglądarka zamknięta),
+    tym zajmuje się wait_for_ticket. Gdy nikt nie podejmie (przeglądarka zamknięta),
     kasujemy prośbę i wracamy do starej ścieżki.
 
     Błąd tutaj nie może niczego zatrzymać: w najgorszym razie zwracamy False i wszystko idzie
@@ -1079,7 +1067,7 @@ def publish_cad_request(ticket, name, item_type=None, material=None, document_si
 
 def build_browser_create_url(name, ticket, suggested_item_number=None, document_size=None, item_type=None):
     """Adres, pod którym otwiera się przeglądarka systemowa zamiast natywnego formularza
-    właściwości (zob. WaitForTicketDialog/submit_via_browser) — most logowania
+    właściwości (zob. wait_for_ticket/submit_via_browser) — most logowania
     bilet->ciasteczko (GET /api/auth/browser-login) plus deep-link
     "?ticket=&name=&suggestedItemNumber=" (App.tsx / pending-create-ticket.ts w aplikacji
     webowej; UWAGA: to DWA różne bilety pod tą samą nazwą parametru na dwóch różnych
@@ -2118,106 +2106,65 @@ class NewRevisionDialog(QtWidgets.QDialog):
         return self.comment_edit.toPlainText().strip()
 
 
-def _close_wait_dialog(dialog):
-    """Zdejmuje okno oczekiwania z ekranu OD RAZU, zanim makro ruszy dalej.
+def wait_for_ticket(ticket, timeout_seconds=600):
+    """Czeka, aż formularz zostanie wypełniony w przeglądarce — BEZ własnego okna.
 
-    `exec()` wraca w chwili zatwierdzenia, ale samo okno znika dopiero wtedy, gdy pętla
-    zdarzeń Qt dostanie szansę je przerysować — a makro leci zaraz potem w Save As, eksport
-    STEP, zrzut modelu i wysyłkę pliku, wszystko synchronicznie, bez oddania sterowania.
-    Okno stało więc na ekranie przez CAŁY upload komponentu i znikało dopiero na jego końcu
-    (zgłoszone z praktyki: „okno znika, ale robi to długo"). `processEvents` oddaje Qt tę
-    jedną chwilę, której brakowało.
+    Dotąd czekał na to modalny dialog „Czekam na przeglądarkę". Powstawał dokładnie w chwili,
+    gdy przeglądarka dostała formularz i fokus — a nowe okno Qt zabierało fokus z powrotem,
+    więc formularz lądował ZA FreeCAD-em i trzeba było w przeglądarkę kliknąć ręcznie.
+    `WA_ShowWithoutActivating` tego nie powstrzymało (sprawdzone w praktyce, KDE/Wayland): o
+    tym, czy nowe okno dostanie fokus, decyduje kompozytor, nie aplikacja.
 
-    Nie `deleteLater()`: `result_data` czytamy z tego obiektu PO zamknięciu, a kasowanie go
-    spod spodu byłoby proszeniem się o sięgnięcie do nieistniejącego obiektu C++."""
+    Makra SolidWorks i Inventor nie mają w tym miejscu żadnego okna — czekają, pisząc na
+    pasku stanu. Tutaj jest teraz tak samo. Co się dzieje, widać w dwóch miejscach: na pasku
+    stanu FreeCAD-a i w panelu postępu w przeglądarce, czyli tam, gdzie i tak się patrzy.
+
+    Kosztem jest brak przycisku „Anuluj" — takiego samego, jakiego nigdy nie miały tamte dwa
+    makra. Czekanie kończy się samo po `timeout_seconds`.
+
+    Zwraca dane biletu albo None, gdy upłynął czas oczekiwania."""
+    import time
+
+    # Pasek stanu jest wygodą, nie częścią operacji: gdy nie da się go dosięgnąć (FreeCAD bez
+    # GUI, inna wersja interfejsu), czekanie idzie dalej bez niego.
+    status_bar = None
     try:
-        dialog.hide()
-        QtWidgets.QApplication.processEvents()
+        import FreeCADGui as Gui
+
+        status_bar = Gui.getMainWindow().statusBar()
+        status_bar.showMessage(t("wait_ticket_status"))
     except Exception:
-        pass
+        status_bar = None
 
+    try:
+        deadline = time.time() + timeout_seconds
+        while time.time() < deadline:
+            try:
+                data = api_get(f"/create-tickets/{ticket}")
+                if data and data.get("itemId"):
+                    return data
+            except Exception:
+                # Chwilowy błąd sieci nie przerywa czekania — kolejny obieg spróbuje ponownie.
+                pass
 
-class WaitForTicketDialog(QtWidgets.QDialog):
-    """Pokazywane PO otwarciu przeglądarki na formularzu dodawania (zob.
-    build_browser_create_url/_submit_new) — odpytuje GET /api/create-tickets/{ticket} co
-    POLL_INTERVAL_MS, aż użytkownik zapisze element w przeglądarce, aż upłynie timeout, albo
-    aż sam kliknie Anuluj. accept()/reject() są nadpisane, żeby timer ZAWSZE zatrzymywał się
-    razem z zamknięciem okna — niezależnie od tego, którą drogą się ono zamyka (przycisk,
-    Escape, systemowy krzyżyk) — inaczej odpaliłby się jeszcze raz w już zniszczony dialog."""
+            # Odpytujemy co 2 s, ale interfejs odświeżamy dziesięć razy częściej: bez tego
+            # FreeCAD stałby zamrożony na cały czas czekania (dialog robił to za nas, mając
+            # własną pętlę zdarzeń).
+            for _ in range(20):
+                try:
+                    QtWidgets.QApplication.processEvents()
+                except Exception:
+                    pass
+                time.sleep(0.1)
 
-    POLL_INTERVAL_MS = 2000
-
-    def __init__(self, ticket, parent=None, timeout_seconds=600):
-        super().__init__(parent)
-        self.ticket = ticket
-        self.result_data = None
-        self._elapsed_ms = 0
-        self._timeout_ms = timeout_seconds * 1000
-
-        # To okno NIE MA zabierać fokusu. Powstaje DOPIERO PO tym, jak prośbę podjęła otwarta
-        # karta -- czyli w chwili, gdy formularz stoi już w przeglądarce i to ona ma fokus.
-        # Bez tego atrybutu nowe okno Qt aktywuje się samo i odbiera fokus przeglądarce, przez
-        # co formularz ląduje ZA FreeCAD-em i trzeba w przeglądarkę kliknąć ręcznie (zgłoszone
-        # z praktyki). To właśnie to okno kradło fokus, nie brak odpowiednika AppActivate.
-        #
-        # Gdy platforma ten atrybut zignoruje, zachowanie jest dokładnie takie jak dotąd --
-        # nic się nie psuje, a od strony przeglądarki czeka jeszcze powiadomienie systemowe,
-        # którego kliknięcie przełącza na kartę.
-        #
-        # Pod osłoną try: nazwy enumów różnią się między PySide6/PySide2/PySide, a to jest
-        # wygoda — nie ma prawa wywrócić całego makra, gdyby w którejś wersji nazywało się
-        # inaczej.
-        try:
-            self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
-        except Exception:
-            pass
-
-        self.setWindowTitle(t("wait_ticket_title"))
-        self.setMinimumWidth(380)
-
-        layout = QtWidgets.QVBoxLayout(self)
-        label = QtWidgets.QLabel(t("wait_ticket_body"))
-        label.setWordWrap(True)
-        layout.addWidget(label)
-
-        self.error_label = QtWidgets.QLabel("")
-        self.error_label.setStyleSheet("color: #c0392b;")
-        self.error_label.setWordWrap(True)
-        layout.addWidget(self.error_label)
-
-        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Cancel)
-        buttons.button(QtWidgets.QDialogButtonBox.Cancel).setText(t("cancel_button"))
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-        self._timer = QtCore.QTimer(self)
-        self._timer.setInterval(self.POLL_INTERVAL_MS)
-        self._timer.timeout.connect(self._poll)
-        self._timer.start()
-
-    def accept(self):
-        self._timer.stop()
-        super().accept()
-
-    def reject(self):
-        self._timer.stop()
-        super().reject()
-
-    def _poll(self):
-        self._elapsed_ms += self.POLL_INTERVAL_MS
-        if self._elapsed_ms >= self._timeout_ms:
-            self.error_label.setText(t("wait_timeout"))
-            self.reject()
-            return
-        try:
-            data = api_get(f"/create-tickets/{self.ticket}")
-        except Exception as e:
-            # Chwilowy błąd sieci nie przerywa czekania — kolejny cykl spróbuje ponownie.
-            self.error_label.setText(str(e))
-            return
-        if data and data.get("itemId"):
-            self.result_data = data
-            self.accept()
+        App.Console.PrintMessage(f"EasyPDM: {t('wait_timeout')}\n")
+        return None
+    finally:
+        if status_bar is not None:
+            try:
+                status_bar.clearMessage()
+            except Exception:
+                pass
 
 
 def submit_via_browser(doc, target_folder):
@@ -2225,7 +2172,7 @@ def submit_via_browser(doc, target_folder):
     wystarczająco pewnego lokalnego dopasowania (zob. blok "already_linked" poniżej dla
     przypadku, gdy jest) — obie decyzje ("co", i "który") zapadają w przeglądarce, nie
     lokalnie (zob. build_browser_create_url). Makro: generuje bilet, otwiera przeglądarkę,
-    czeka (WaitForTicketDialog). Po stronie przeglądarki dwie możliwe drogi dopełniają ten
+    czeka (wait_for_ticket). Po stronie przeglądarki dwie możliwe drogi dopełniają ten
     sam bilet: zwykłe "Dodaj" (nowy element, POST /nodes z ticketem) albo baner "oczekujące
     żądanie z makra" -> dogranie do istniejącego (POST /create-tickets/{ticket}/attach-
     existing) — GET /create-tickets/{ticket} zwraca pole "existing", które mówi, którą z
@@ -2316,11 +2263,8 @@ def submit_via_browser(doc, target_folder):
         QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
         return None
 
-    wait_dlg = WaitForTicketDialog(ticket)
-    accepted = wait_dlg.exec() == QtWidgets.QDialog.Accepted
-    ticket_data = wait_dlg.result_data
-    _close_wait_dialog(wait_dlg)
-    if not accepted:
+    ticket_data = wait_for_ticket(ticket)
+    if ticket_data is None:
         return None
 
     export_step = ticket_data.get("exportStep")
@@ -2546,11 +2490,8 @@ def process_assembly_tree(top_doc, target_folder=None):
                     QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
                     return [], True, locked_matches
 
-            wait_dlg = WaitForTicketDialog(ticket)
-            accepted = wait_dlg.exec() == QtWidgets.QDialog.Accepted
-            ticket_data = wait_dlg.result_data
-            _close_wait_dialog(wait_dlg)
-            if not accepted:
+            ticket_data = wait_for_ticket(ticket)
+            if ticket_data is None:
                 return [], True, locked_matches
 
             comp_export_step = ticket_data.get("exportStep")
