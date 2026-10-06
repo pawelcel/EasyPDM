@@ -104,6 +104,18 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
+  // Wejście w "Całą bazę" odświeża listę elementów. useItems wisi na poziomie App, a nie w
+  // samym widoku — przełączenie widoku go nie przemontowuje, więc bez tego lista pokazuje
+  // stan sprzed zmian zrobionych gdzie indziej (np. usunięcia elementów w drzewie projektu)
+  // dopóki ktoś nie kliknie "Odśwież". Zgłoszone z praktyki.
+  //
+  // Po wejściu w widok, nie po każdej zmianie czegokolwiek: to jedno zapytanie w momencie,
+  // w którym ktoś i tak czeka na pokazanie listy.
+  useEffect(() => {
+    if (view === "database" && user) refetchItems()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, user])
+
   // "Użytkownicy"/"Magazyn plików" są dostępne tylko dla admina, ale każdy może wejść w
   // Ustawienia (Wygląd/Język) — gdyby zwykły użytkownik trafił tu z domyślnym
   // settingsSection="users", zamiast tego lądował na ekranie "Brak uprawnień".
