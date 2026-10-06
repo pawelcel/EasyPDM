@@ -159,6 +159,13 @@ Deleting a Folder therefore does take its contents with it, minus anything that 
 sits somewhere outside it. A Part/Assembly can also be **duplicated** — the copy gets its
 own number and lands right next to the original, with its properties copied over.
 
+Both kinds of removal also work on **several items at once**. Select them with
+**Ctrl+click** on a tree row (or with the "Select multiple" button and checkboxes, if the
+mouse suits you better); the bar at the top then shows how many are selected and lets you
+remove them from the structure, delete them completely, tag them or change their status.
+Removing several works exactly like removing one: the items stay in the database and
+remain findable under "Whole database".
+
 A finished project can be **closed** with one button in the toolbar — it drops out of the
 project selector and the "add item" picker, but nothing else about it changes: its items
 stay fully searchable through "Whole database", and the same button opens it again.

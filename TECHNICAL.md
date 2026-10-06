@@ -376,6 +376,29 @@ document rather than from a list, so without this the item would carry a materia
 neither be picked again nor used as a filter. Only the name is created; group and subgroup
 stay empty.
 
+### Selecting several items in the tree
+
+Rows are selected with Ctrl (Cmd) + click, alongside the older "Select multiple" button and
+its checkboxes — the button stays because a tablet has no Ctrl key. A Ctrl+click turns
+selection mode on by itself, since the checkboxes and the action bar only exist in that mode
+and the first such click would otherwise select something invisible.
+
+The selection records the **parent of the clicked row**, not just the item's id. The same item
+can hang in the tree in several places at once — as a root of the project and under an
+assembly — and "remove from the structure" detaches one named place: `removeChild(parent, id)`
+plus `moveItemToProject(id, null)` for a child, or clearing `showInTree` for a root. Without
+the row's parent there would be no way to tell which of those a selection meant. It is exactly
+what the single-item action does, done for each selected row.
+
+While anything is selected, the action bars for the current item and for the project step
+aside. Both are positioned absolutely over the selection bar, and both carry a button named
+like one of the bulk ones: two "remove from the structure" buttons stood side by side, one
+acting on the previewed item and one on the whole selection, with nothing in their appearance
+to tell them apart. The bulk one is also named "Remove selected from the structure", matching
+"Delete selected" next to it. If the previewed item was among those detached, the panel falls
+back to the project, as it does after a single detach — the "it vanished from the tree" cleanup
+does not catch this, because the record still exists, only without a project.
+
 ### The model preview is a picture, not a rendered STEP
 
 The preview box above an item's properties shows a **PNG screenshot** that the CAD macro takes

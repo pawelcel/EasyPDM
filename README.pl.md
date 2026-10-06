@@ -159,6 +159,13 @@ Folderu zabiera więc jego zawartość ze sobą, poza tym, co leży również gd
 Część/Złożenie da się też **zduplikować** — kopia dostaje własny numer i od razu ląduje
 obok oryginału, z jego skopiowanymi właściwościami.
 
+Jedno i drugie usuwanie działa też **na wielu elementach naraz**. Zaznacza się je
+**Ctrl+klikiem** w wiersz drzewa (albo przyciskiem „Zaznacz wiele" i checkboxami, jeśli
+wygodniej myszką), a belka u góry pokazuje wtedy, ile jest zaznaczonych, i pozwala je
+odpiąć ze struktury, usunąć całkowicie, nadać im tag albo zmienić status. Odpięcie
+wielu działa tak samo jak pojedyncze: elementy zostają w bazie i nadal są znajdywalne
+w „Całej bazie".
+
 Skończony projekt można **zamknąć** jednym przyciskiem na belce — wypada wtedy z listy
 wyboru projektu i z okna dodawania elementów, ale nic poza tym się w nim nie zmienia: jego
 elementy są nadal w pełni wyszukiwalne przez "Całą bazę", a ten sam przycisk otwiera go

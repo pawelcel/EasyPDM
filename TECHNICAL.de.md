@@ -409,6 +409,14 @@ Hochladens nicht kannte. Die Makros lesen das Material aus dem Dokument statt au
 Liste; ohne dies trüge das Element ein Material, das sich weder erneut auswählen noch als
 Filter nutzen ließe. Angelegt wird nur der Name; Gruppe und Untergruppe bleiben leer.
 
+### Mehrere Elemente im Baum auswählen
+
+Zeilen werden mit Strg (Cmd) + Klick ausgewählt, neben der älteren Schaltfläche „Mehrere auswählen" und ihren Kontrollkästchen — die Schaltfläche bleibt, denn ein Tablet hat keine Strg-Taste. Ein Strg+Klick schaltet den Auswahlmodus selbst ein: Kontrollkästchen und Aktionsleiste gibt es nur dort, der erste solche Klick würde sonst etwas Unsichtbares auswählen.
+
+Die Auswahl merkt sich den **Elternknoten der angeklickten Zeile**, nicht nur die Kennung des Elements. Dasselbe Element kann an mehreren Stellen zugleich im Baum hängen — als Wurzel des Projekts und unter einer Baugruppe — und „aus der Struktur entfernen" löst eine benannte Stelle: `removeChild(parent, id)` plus `moveItemToProject(id, null)` für ein Kind oder das Löschen von `showInTree` für eine Wurzel. Ohne den Elternknoten der Zeile ließe sich nicht sagen, welche davon gemeint war. Es ist genau das, was die Aktion für ein einzelnes Element tut, für jede ausgewählte Zeile ausgeführt.
+
+Solange etwas ausgewählt ist, treten die Aktionsleisten des aktuellen Elements und des Projekts zurück. Beide liegen absolut positioniert über der Auswahlleiste, und beide tragen eine Schaltfläche wie eine der Sammelaktionen: Nebeneinander standen zwei „Aus der Struktur entfernen" — eine für das Element in der Vorschau, eine für die ganze Auswahl — ohne im Aussehen unterscheidbar zu sein. Die Sammelaktion heißt zudem „Ausgewählte aus der Struktur entfernen", passend zum benachbarten „Ausgewählte löschen". War das Element der Vorschau unter den gelösten, fällt die Anzeige auf das Projekt zurück, wie nach einem einzelnen Lösen — die Bereinigung „aus dem Baum verschwunden" greift hier nicht, denn der Datensatz existiert weiter, nur ohne Projekt.
+
 ### Die Modellvorschau ist ein Bild, kein gerendertes STEP
 
 Das Vorschaufeld über den Eigenschaften eines Elements zeigt einen **PNG-Schnappschuss**, den das

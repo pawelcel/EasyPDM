@@ -75,6 +75,12 @@ function ProjectTreeView({
   // da się nic zaznaczyć (unika przypadkowego zaznaczania przy zwykłym przeglądaniu drzewa).
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // Rodzic wiersza, którym dany element został zaznaczony. Sam identyfikator elementu tu nie
+  // wystarcza: ten sam element potrafi wisieć w drzewie w kilku miejscach (jako korzeń projektu
+  // i pod złożeniem), a "usuń ze struktury" odpina JEDNO, wskazane miejsce. null = wiersz
+  // korzenia projektu, czyli nie ma czego odpinać i gasimy showInTree — dokładnie jak przy
+  // pojedynczym elemencie (zob. handleRemoveFromStructure).
+  const [selectedParents, setSelectedParents] = useState<Map<string, string | null>>(new Map())
   const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false)
   const [bulkDeletingPending, setBulkDeletingPending] = useState(false)
   const [bulkError, setBulkError] = useState<string | null>(null)
@@ -87,6 +93,7 @@ function ProjectTreeView({
       const next = !prev
       if (!next) {
         setSelectedIds(new Set())
+        setSelectedParents(new Map())
         setBulkError(null)
       }
       return next
@@ -106,6 +113,10 @@ function ProjectTreeView({
       const next = new Set([...prev].filter((id) => tree.itemsById.has(id)))
       return next.size === prev.size ? prev : next
     })
+    setSelectedParents((prev) => {
+      const next = new Map([...prev].filter(([id]) => tree.itemsById.has(id)))
+      return next.size === prev.size ? prev : next
+    })
   }, [tree.itemsById])
 
   const selectedItem = selection.kind === "item" ? tree.itemsById.get(selection.id) : undefined
@@ -119,7 +130,23 @@ function ProjectTreeView({
     (i) => (i.itemType === "part" || i.itemType === "assembly") && i.status !== "wydany"
   )
 
-  function toggleSelect(id: string) {
+  // Ctrl+klik w wiersz drzewa. Włącza tryb zaznaczania sam, bo inaczej pierwszy taki klik
+  // zaznaczałby coś, czego nie widać: checkboxy i belka akcji pojawiają się dopiero w tym
+  // trybie. Wyłączyć go nadal można przyciskiem, co od razu czyści zaznaczenie.
+  function toggleSelectFromRow(id: string, parentId: string | null) {
+    setSelectionMode(true)
+    toggleSelect(id, parentId)
+  }
+
+  function toggleSelect(id: string, parentId: string | null) {
+    setSelectedParents((prev) => {
+      // Stan czytany z samej mapy, nie z selectedIds — obie zmiany idą wtedy z tego samego
+      // źródła prawdy i nie da się ich rozjechać dwoma kliknięciami w jednym cyklu.
+      const next = new Map(prev)
+      if (next.has(id)) next.delete(id)
+      else next.set(id, parentId)
+      return next
+    })
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -248,6 +275,42 @@ function ProjectTreeView({
     await tree.refetch()
   }
 
+  // Masowe "usuń ze struktury" — dla każdego zaznaczenia dokładnie to samo, co robi
+  // handleRemoveFromStructure dla pojedynczego elementu, z rodzicem tego wiersza, którym
+  // element został zaznaczony. Bez okna potwierdzenia, tak samo jak przy pojedynczym: nic nie
+  // ginie, rekordy zostają i nadal są znajdywalne w "Całej bazie".
+  //
+  // Pętla leci do końca nawet, gdy któryś element zawiedzie: zatrzymanie się na pierwszym
+  // błędzie zostawiłoby zaznaczenie odpięte w połowie, bez powiedzenia których dotyczy.
+  async function handleBulkRemoveFromStructure() {
+    setBulkError(null)
+    let failures = 0
+    for (const id of selectedIds) {
+      const parentId = selectedParents.get(id) ?? null
+      try {
+        if (parentId) {
+          await api.removeChild(parentId, id)
+          await api.moveItemToProject(id, null)
+        } else {
+          await api.setShowInTree(id, false)
+        }
+      } catch {
+        failures += 1
+      }
+    }
+    // Podgląd po prawej wraca na projekt, jeśli pokazywał któryś z odpiętych elementów —
+    // tak samo jak przy pojedynczym odpięciu. Inaczej zostaje otwarty na elemencie, którego
+    // w tym drzewie już nie ma, razem z jego akcjami (wyłapane zrzutem ekranu w teście).
+    // Sprzątanie "zniknął z drzewa" tego nie łapie: rekord dalej istnieje, tylko bez projektu.
+    if (selection.kind === "item" && selectedIds.has(selection.id)) {
+      setSelection({ kind: "project" })
+    }
+    setSelectedIds(new Set())
+    setSelectedParents(new Map())
+    if (failures > 0) setBulkError(t("bulk.removeFromStructureFailed", { count: failures }))
+    await tree.refetch()
+  }
+
   async function confirmBulkDelete() {
     setBulkDeletingPending(true)
     setBulkError(null)
@@ -257,6 +320,7 @@ function ProjectTreeView({
       }
       setConfirmingBulkDelete(false)
       setSelectedIds(new Set())
+      setSelectedParents(new Map())
     } catch (err) {
       // Elementy usunięte PRZED tym, który zawiódł, zostają usunięte — tree.refetch()
       // poniżej (w finally) zsynchronizuje listę, a okno zostaje otwarte z komunikatem
@@ -299,6 +363,11 @@ function ProjectTreeView({
                 <SelectItem value="wydany">{t(STATUS_LABEL_KEYS.wydany)}</SelectItem>
               </SelectContent>
             </Select>
+            {/* Odpięcie od struktury jest dostępne dla każdego, tak samo jak przy pojedynczym
+                elemencie — usunięcie całkowite zostaje przy administratorze. */}
+            <Button size="sm" variant="outline" onClick={handleBulkRemoveFromStructure}>
+              {t("bulk.removeFromStructureButton")}
+            </Button>
             {isAdmin && (
               <Button
                 size="sm"
@@ -311,7 +380,14 @@ function ProjectTreeView({
                 {t("bulk.deleteButton")}
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setSelectedIds(new Set())
+                setSelectedParents(new Map())
+              }}
+            >
               {t("bulk.clearSelection")}
             </Button>
           </>
@@ -332,7 +408,10 @@ function ProjectTreeView({
             useResizableWidth) na wąskim oknie przeglądarki, bez tego przyciski
             renderowałyby się poza <main> (overflow-hidden) i byłyby niewidoczne/nieklikalne;
             teraz zamiast tego zawijają się w tym samym, ograniczonym pasie. */}
-        {selection.kind === "project" && (
+        {/* Akcje projektu ustępują zaznaczeniu z tego samego powodu co akcje elementu niżej:
+            ten blok jest pozycjonowany absolutnie NAD belką, a belka z zaznaczeniem bywa
+            szeroka — oba rysowały się jedno na drugim (widać to na zrzucie z testu). */}
+        {selection.kind === "project" && selectedIds.size === 0 && (
           <div
             className="absolute top-2 flex flex-wrap items-center gap-1.5"
             style={{ left: treeWidth + 16, maxWidth: `calc(100% - ${treeWidth + 16}px)` }}
@@ -366,7 +445,11 @@ function ProjectTreeView({
           </div>
         )}
 
-        {selection.kind === "item" && selectedItem && (
+        {/* Akcje pojedynczego elementu ustępują, gdy cokolwiek jest zaznaczone masowo. Bez
+            tego obok siebie stały DWA przyciski o tym samym znaczeniu — jeden działający na
+            element, na którym stoi podgląd, drugi na całe zaznaczenie — i nie dało się po
+            wyglądzie poznać, który jest który (wyłapane testem w przeglądarce). */}
+        {selection.kind === "item" && selectedItem && selectedIds.size === 0 && (
           <div
             className="absolute top-2 flex flex-wrap items-center gap-1.5"
             style={{ left: treeWidth + 16, maxWidth: `calc(100% - ${treeWidth + 16}px)` }}
@@ -446,7 +529,7 @@ function ProjectTreeView({
             onSelectProject={() => setSelection({ kind: "project" })}
             selectionMode={selectionMode}
             selectedIds={selectedIds}
-            onToggleSelect={toggleSelect}
+            onToggleSelect={toggleSelectFromRow}
             onError={setItemActionError}
             clientVerifications={clientVerifications}
           />

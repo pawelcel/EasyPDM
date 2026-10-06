@@ -364,6 +364,14 @@ nazwę, której katalog nie miał aż do zakończenia wysyłki. Makra czytają m
 a nie z listy wyboru, więc bez tego element miałby materiał, którego nie da się ani wybrać
 ponownie, ani użyć jako filtr. Zakładana jest sama nazwa; grupa i podgrupa zostają puste.
 
+### Zaznaczanie wielu elementów w drzewie
+
+Wiersze zaznacza się Ctrl (Cmd) + klikiem, obok starszego przycisku „Zaznacz wiele" i jego checkboxów — przycisk zostaje, bo na tablecie nie ma klawisza Ctrl. Ctrl+klik sam włącza tryb zaznaczania: checkboxy i belka akcji istnieją tylko w nim, więc pierwszy taki klik zaznaczałby inaczej coś, czego nie widać.
+
+Zaznaczenie zapamiętuje **rodzica klikniętego wiersza**, nie sam identyfikator elementu. Ten sam element potrafi wisieć w drzewie w kilku miejscach naraz — jako korzeń projektu i pod złożeniem — a „usuń ze struktury" odpina jedno, wskazane miejsce: `removeChild(parent, id)` plus `moveItemToProject(id, null)` dla dziecka albo zgaszenie `showInTree` dla korzenia. Bez rodzica wiersza nie dałoby się powiedzieć, które z tych miejsc miało na myśli zaznaczenie. To dokładnie to, co robi akcja pojedynczego elementu, wykonane dla każdego zaznaczonego wiersza.
+
+Dopóki cokolwiek jest zaznaczone, belki akcji bieżącego elementu i projektu ustępują. Obie są pozycjonowane absolutnie nad belką zaznaczenia i obie niosą przycisk nazwany jak jeden z masowych: obok siebie stały dwa „Usuń ze struktury" — jeden działający na element z podglądu, drugi na całe zaznaczenie — i nic w wyglądzie ich nie odróżniało. Masowy nazywa się przy tym „Usuń zaznaczone ze struktury", spójnie z sąsiednim „Usuń zaznaczone". Gdy element z podglądu był wśród odpinanych, panel wraca na projekt, tak samo jak po pojedynczym odpięciu — sprzątanie „zniknął z drzewa" tego nie łapie, bo rekord dalej istnieje, tylko bez projektu.
+
 ### Podgląd modelu to obrazek, a nie renderowany STEP
 
 Box podglądu nad właściwościami elementu pokazuje **zrzut PNG**, który makro CAD robi w chwili

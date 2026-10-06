@@ -71,7 +71,10 @@ function ItemTree({
   onSelectProject: () => void
   selectionMode: boolean
   selectedIds: Set<string>
-  onToggleSelect: (id: string) => void
+  // parentId tego KONKRETNEGO wiersza, nie elementu: ten sam element potrafi wisieć w
+  // drzewie w kilku miejscach naraz (jako korzeń projektu i pod złożeniem), a odpięcie
+  // od struktury dotyczy jednego, wskazanego miejsca. Zob. handleBulkRemoveFromStructure.
+  onToggleSelect: (id: string, parentId: string | null) => void
   onError?: (message: string | null) => void
   // Ostatni wynik weryfikacji klienta per element (zob. useClientVerifications) -- tylko do
   // znacznika przy wierszu; pusta mapa = nic nie pokazujemy.
@@ -203,7 +206,7 @@ function TreeNode({
   onRefetch: () => void | Promise<void>
   selectionMode: boolean
   selectedIds: Set<string>
-  onToggleSelect: (id: string) => void
+  onToggleSelect: (id: string, parentId: string | null) => void
   onError?: (message: string | null) => void
   clientVerifications: Map<string, ClientVerificationSummary>
 }) {
@@ -271,7 +274,7 @@ function TreeNode({
           <input
             type="checkbox"
             checked={checked}
-            onChange={() => onToggleSelect(item.id)}
+            onChange={() => onToggleSelect(item.id, parentId)}
             onClick={(e) => e.stopPropagation()}
             aria-label={t("bulk.selectItemAria", { name: itemDisplayLabel(item) })}
             className="size-3.5 shrink-0 accent-primary"
@@ -331,7 +334,13 @@ function TreeNode({
 
         <button
           type="button"
-          onClick={() => onSelect(item.id, parentId)}
+          onClick={(e) => {
+            // Ctrl (Cmd na Macu) + klik dokłada wiersz do zaznaczenia, zamiast przestawiać na
+            // niego podgląd — ten sam gest co w każdym menedżerze plików. Checkboxy i przycisk
+            // "Zaznacz wiele" zostają obok, dla myszki i dla dotyku.
+            if (e.ctrlKey || e.metaKey) onToggleSelect(item.id, parentId)
+            else onSelect(item.id, parentId)
+          }}
           className="flex-1 truncate text-left"
         >
           {itemDisplayLabel(item)}

@@ -174,6 +174,14 @@ seinen Inhalt daher mit, abzüglich dessen, was auch außerhalb davon liegt. Ein
 Baugruppe kann auch **dupliziert** werden — die Kopie erhält eine eigene Nummer und landet
 sofort neben dem Original, mit dessen kopierten Eigenschaften.
 
+Beide Arten des Entfernens funktionieren auch für **mehrere Elemente auf einmal**.
+Ausgewählt werden sie mit **Strg+Klick** auf eine Zeile des Baums (oder über die
+Schaltfläche „Mehrere auswählen" und Kontrollkästchen, wenn die Maus lieber ist); die
+Leiste oben zeigt dann, wie viele ausgewählt sind, und erlaubt, sie aus der Struktur zu
+entfernen, vollständig zu löschen, ihnen ein Schlagwort zu geben oder den Status zu
+ändern. Das Entfernen mehrerer wirkt genau wie bei einem einzelnen: Die Elemente bleiben
+in der Datenbank und sind weiterhin unter „Gesamte Datenbank" auffindbar.
+
 Ein fertiges Projekt lässt sich mit einer Schaltfläche in der Leiste **schließen** — es
 fällt aus der Projektauswahl und aus dem Dialog zum Hinzufügen von Elementen heraus, sonst
 ändert sich nichts daran: Seine Elemente bleiben über "Gesamte Datenbank" vollständig
