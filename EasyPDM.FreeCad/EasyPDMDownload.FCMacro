@@ -389,11 +389,12 @@ def open_in_browser(url):
     webbrowser.open(url)
 
 
-# Pełny <title> aplikacji (EasyPDM.Web/index.html). Okno przeglądarki dopasowujemy po POCZĄTKU
+# Pełny <title> aplikacji (EasyPDM.Web/index.html — musi się z nim zgadzać co do znaku).
+# Okno przeglądarki dopasowujemy po POCZĄTKU
 # tytułu, bo przeglądarki doklejają swoją nazwę na końcu. NIE po samym "EasyPDM": u autora
 # okno Shotcuta miało w tytule "EasyPDM2.mlt", więc takie dopasowanie wyciągnęłoby na
 # wierzch montaż wideo zamiast przeglądarki (wyłapane sondą na żywej sesji KDE).
-APP_WINDOW_TITLE = "EasyPDM — przeglądarka elementów CAD"
+APP_WINDOW_TITLE = "EasyPDM — CAD item browser"
 
 # Skrypt dla KWin. Szuka zwykłego okna, którego tytuł zaczyna się od tytułu aplikacji, i
 # aktywuje je. Plasma 6 ma windowList/activeWindow, Plasma 5 clientList/activeClient.
