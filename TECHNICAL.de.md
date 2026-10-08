@@ -787,7 +787,7 @@ einer zusätzlichen Warnung, wenn die Datenbank nicht `easypdm` heißt, da sie d
 dienen kann. Ohne Terminal bleiben die Daten erhalten; `sudo PDM_REMOVE_DATA=yes|no` entscheidet
 ohne Rückfrage. PostgreSQL selbst wird nie entfernt.
 
-Schema und Migrationen vergeben Rechte `TO CURRENT_USER` statt an eine benannte Rolle — erst dadurch kann die native Installation eine eigene Rolle haben: Jede Bereitstellung führt sie mit der Rolle der Anwendung aus. Eine Sicherung behält ihre Rechte unter dem Rollennamen der Installation, aus der sie stammt; sie in eine Installation mit anders benannter Rolle zurückzuspielen (`pdm_user` aus Docker oder Windows in eine native `easypdm` oder umgekehrt), wird noch nicht unterstützt.
+Schema und Migrationen vergeben Rechte `TO CURRENT_USER` statt an eine benannte Rolle — erst dadurch kann die native Installation eine eigene Rolle haben: Jede Bereitstellung führt sie mit der Rolle der Anwendung aus. Eine Sicherung behält ihre Rechte unter dem Rollennamen der Installation, aus der sie stammt; sie in eine Installation mit anders benannter Rolle zurückzuspielen (`pdm_user` aus Docker in eine Installation mit `easypdm` oder umgekehrt), wird noch nicht unterstützt.
 
 **Port, Sprache, PostgreSQL-Authentifizierung.** Eine frische Installation lauscht auf dem ersten freien Port ab 5000 (normalerweise 5000 selbst); ein Update behält den Port, den der Dienst bereits nutzt, damit Lesezeichen, CAD-Makros und andere Rechner weiter funktionieren; `sudo PDM_PORT=8080 ./install-easypdm-linux.sh` setzt ihn ausdrücklich, auch bei einem Update. Erfolg wird erst gemeldet, wenn auf diesem Port EasyPDM selbst antwortet — geprüft wird der Seitentitel, ein anderes Programm auf dem Port zählt also nicht. Bis 0.7 war der Port fest 5000, und das Skript meldete den Dienst als laufend, auch wenn er auf einem von jemand anderem belegten Port abgestürzt war. Die Meldungen folgen der Systemsprache (Polnisch, Deutsch, sonst Englisch, nach denselben Regeln wie das Docker-Installationsprogramm), und `sudo EASYPDM_LANG=en ./install-easypdm-linux.sh` erzwingt eine — die Variable steht nach `sudo`, das `LANG`, `LANGUAGE` und `LC_*` durchlässt, andere aber verwirft. Unter Arch/CachyOS verwendet der vom Installationsprogramm angelegte Cluster `peer` für lokale Verbindungen und `scram-sha-256` über TCP; ein nacktes `initdb` setzt `trust`, wobei sich jeder Benutzer der Maschine als beliebige Rolle verbinden konnte, `postgres` eingeschlossen. Vor 0.7 angelegte Cluster bleiben unverändert — prüfen Sie `/var/lib/postgres/data/pg_hba.conf`.
 
@@ -829,8 +829,10 @@ Es entsteht `packaging\windows\Output\EasyPDM_Windows_v<Version>.exe`. Der Insta
 PostgreSQL bereits installiert ist (falls nicht — verweist auf die Download-Seite und
 bricht ab, versucht bewusst NICHT, im Hintergrund still einen mehrere hundert Megabyte
 großen PostgreSQL-Installer nachzuinstallieren), fragt nach dem Passwort des
-`postgres`-Superusers (einmalig, um die eigene Rolle `pdm_user` und die Datenbank `pdm`
-anzulegen — das Passwort selbst wird nirgends gespeichert), legt das Schema an,
+`postgres`-Superusers (einmalig, um die eigene Rolle und Datenbank `easypdm`
+anzulegen — das Passwort selbst wird nirgends gespeichert; bis 0.6 hießen sie
+`pdm`/`pdm_user` wie in einer Entwicklungsumgebung, sodass der Installer auf einem
+Entwicklerrechner deren Datenbank übernahm und das Passwort ihrer Rolle änderte), legt das Schema an,
 schreibt `appsettings.Production.json` mit den übrigen Einstellungen (Speicher/Sicherungen/
 Protokolle in `%ProgramData%\EasyPDM`), registriert `EasyPDM.Api.exe` als
 **Windows-Dienst** (Autostart, läuft im Hintergrund ohne Konsolenfenster) und erstellt
@@ -842,7 +844,7 @@ bewusst die Datenbank selbst nicht angetastet.
 ausführen. Die vorhandene Installation wird über die feste `AppId` erkannt (ihr
 Uninstall-Schlüssel in der Registry), sodass Inno sie AN ORT UND STELLE ersetzt, statt
 daneben zu installieren. Ein Update **fragt nicht nach dem Passwort des Superusers
-`postgres`** — der Installer liest das Passwort der Rolle `pdm_user` aus der
+`postgres`** — der Installer liest Datenbank, Rolle und deren Passwort aus der
 `appsettings.Production.json` der vorherigen Installation und fasst Rolle und Datenbank gar
 nicht an, das Rollenpasswort BLEIBT also unverändert (nichts anderes, was sich mit dieser
 Datenbank verbindet — Sicherungsskripte, pgAdmin — hört auf zu funktionieren).

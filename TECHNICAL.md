@@ -895,8 +895,8 @@ itself is never removed.
 The schema and the migrations grant privileges `TO CURRENT_USER` rather than to a named role,
 which is what lets the native install have a role of its own: every deployment runs them as
 the application's role. A backup keeps its privileges under the role name of the installation
-it came from, so restoring it into an installation whose role has a different name (Docker or
-Windows `pdm_user` into a native `easypdm`, or the other way) is not supported yet.
+it came from, so restoring it into an installation whose role has a different name (Docker's
+`pdm_user` into an `easypdm` installation, or the other way) is not supported yet.
 
 **Port, language, PostgreSQL authentication.** A fresh install listens on the first free port
 from 5000 (normally 5000 itself); an update keeps the port the service already uses, so
@@ -990,8 +990,10 @@ Produces `packaging\windows\Output\EasyPDM_Windows_v<version>.exe`. The installe
 PostgreSQL is already installed (if not — points to the download page and stops,
 deliberately does NOT try to silently install a several-hundred-megabyte PostgreSQL
 installer in the background), asks for the `postgres` superuser password (once, to
-create its own `pdm_user` role and `pdm` database — the password itself is never
-stored anywhere), sets up the schema, writes `appsettings.Production.json` with the
+create its own `easypdm` role and database — the password itself is never
+stored anywhere; up to 0.6 the names were `pdm`/`pdm_user`, the same as a development
+setup's, so on a developer's machine the installer adopted that database and reset its
+role's password), sets up the schema, writes `appsettings.Production.json` with the
 rest of the settings (storage/backups/logs in `%ProgramData%\EasyPDM`), registers
 `EasyPDM.Api.exe` as a **Windows service** (autostart, runs in the background with no
 console window), and creates a shortcut that opens `http://localhost:5000`.
@@ -1001,7 +1003,7 @@ as on Linux, it deliberately doesn't touch the database itself.
 **Update**: build a new `EasyPDM_Windows_v<version>.exe` (as above) and run it again. The
 existing installation is detected via the fixed `AppId` (its Uninstall key in the registry),
 so Inno replaces it IN PLACE rather than installing alongside it. An update **does not ask
-for the `postgres` superuser password** — the installer reads the `pdm_user` role's password
+for the `postgres` superuser password** — the installer reads the database, the role and its password
 out of the previous installation's `appsettings.Production.json` and leaves the role and the
 database alone entirely, so the role's password STAYS as it was (nothing else connecting to
 that database — backup scripts, pgAdmin — breaks). `PrepareToInstall` stops the service

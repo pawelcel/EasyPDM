@@ -713,7 +713,7 @@ rolę i całą zawartość `/var/lib/easypdm` — domyślnie nie, z dodatkowym o
 nazywa się `easypdm`, bo wtedy może służyć czemuś innemu. Bez terminala dane zostawia;
 `sudo PDM_REMOVE_DATA=yes|no` rozstrzyga bez pytania. Samego PostgreSQL nie usuwa nigdy.
 
-Schemat i migracje nadają uprawnienia `TO CURRENT_USER`, a nie roli o konkretnej nazwie — dzięki temu instalacja natywna może mieć własną rolę: każde wdrożenie wykonuje je rolą aplikacji. Kopia zapasowa zachowuje uprawnienia pod nazwą roli instalacji, z której pochodzi, więc przywrócenie jej w instalacji z rolą o innej nazwie (`pdm_user` z Dockera lub Windows do natywnej `easypdm` albo odwrotnie) nie jest jeszcze obsługiwane.
+Schemat i migracje nadają uprawnienia `TO CURRENT_USER`, a nie roli o konkretnej nazwie — dzięki temu instalacja natywna może mieć własną rolę: każde wdrożenie wykonuje je rolą aplikacji. Kopia zapasowa zachowuje uprawnienia pod nazwą roli instalacji, z której pochodzi, więc przywrócenie jej w instalacji z rolą o innej nazwie (`pdm_user` z Dockera do instalacji z `easypdm` albo odwrotnie) nie jest jeszcze obsługiwane.
 
 **Port, język, uwierzytelnianie PostgreSQL.** Świeża instalacja słucha na pierwszym wolnym porcie od 5000 (zwykle na samym 5000); aktualizacja zostawia port, na którym usługa już działa, żeby zakładki, makra CAD i inne komputery dalej trafiały; `sudo PDM_PORT=8080 ./install-easypdm-linux.sh` ustawia go jawnie, także przy aktualizacji. Sukces jest ogłaszany dopiero wtedy, gdy na tym porcie odpowiada samo EasyPDM — sprawdzany jest tytuł strony, więc inny program trzymający port się nie liczy. Do wersji 0.7 port był na sztywno 5000, a skrypt pisał, że usługa działa, nawet gdy padła na porcie zajętym przez kogoś innego. Komunikaty idą w języku systemu (polski, niemiecki, w pozostałych przypadkach angielski, według tych samych reguł co instalator dockerowy), a `sudo EASYPDM_LANG=en ./install-easypdm-linux.sh` wymusza język — zmienna stoi po `sudo`, które przepuszcza `LANG`, `LANGUAGE` i `LC_*`, ale inne odrzuca. Na Archu/CachyOS klaster zakładany przez instalator używa `peer` dla połączeń lokalnych i `scram-sha-256` przez TCP; gołe `initdb` ustawia `trust`, przy którym każdy użytkownik maszyny mógł się połączyć jako dowolna rola, łącznie z `postgres`. Klastry założone przed 0.7 zostają bez zmian — sprawdź `/var/lib/postgres/data/pg_hba.conf`.
 
@@ -753,7 +753,9 @@ Powstaje `packaging\windows\Output\EasyPDM_Windows_v<wersja>.exe`. Instalator: s
 PostgreSQL jest już zainstalowany (jeśli nie — kieruje na stronę pobierania i przerywa,
 świadomie NIE próbuje cicho doinstalować kilkusetmegabajtowego instalatora PostgreSQL w
 tle), pyta o hasło superużytkownika `postgres` (jednorazowo, do założenia własnej roli
-`pdm_user` i bazy `pdm` — samo hasło nigdzie nie jest zapisywane), zakłada schemat, zapisuje
+i bazy `easypdm` — samo hasło nigdzie nie jest zapisywane; do 0.6 nazwy brzmiały
+`pdm`/`pdm_user`, tak jak w środowisku deweloperskim, więc na maszynie programisty instalator
+przejmował jego bazę i zmieniał hasło jego roli), zakłada schemat, zapisuje
 `appsettings.Production.json` z resztą ustawień (magazyn/kopie/logi w
 `%ProgramData%\EasyPDM`), rejestruje `EasyPDM.Api.exe` jako **usługę Windows**
 (autostart, działa w tle bez okna konsoli) i tworzy skrót otwierający
@@ -763,7 +765,7 @@ Inno Setup) — tak samo jak na Linuksie, celowo nie rusza samej bazy danych.
 **Aktualizacja**: zbuduj nowy `EasyPDM_Windows_v<wersja>.exe` (jak wyżej) i uruchom go
 ponownie. Istniejąca instalacja jest wykrywana po stałym `AppId` (klucz Uninstall w
 rejestrze), więc Inno podmienia ją W MIEJSCU zamiast instalować obok. Aktualizacja **nie
-pyta o hasło superużytkownika `postgres`** — instalator odczytuje hasło roli `pdm_user` z
+pyta o hasło superużytkownika `postgres`** — instalator odczytuje bazę, rolę i jej hasło z
 `appsettings.Production.json` poprzedniej instalacji i w ogóle nie dotyka roli ani bazy,
 więc hasło roli ZOSTAJE bez zmian (nic, co łączy się do tej bazy poza EasyPDM — skrypty
 kopii, pgAdmin — nie przestaje działać). `PrepareToInstall` zatrzymuje usługę PRZED podmianą

@@ -10,8 +10,11 @@
 ;      (świadomie NIE próbujemy cicho pobierać/instalować 300+ MB instalatora PostgreSQL —
 ;      za duże ryzyko niewidocznej awarii bez możliwości zdiagnozowania).
 ;   2. Pyta o hasło superużytkownika "postgres" (potrzebne, żeby założyć rolę/bazę EasyPDM).
-;   3. Zakłada rolę "pdm_user" (z wygenerowanym losowo hasłem) i bazę "pdm", ładuje schemat
-;      (db\schema.sql, dołączony do instalatora).
+;   3. Zakłada WŁASNĄ rolę i bazę "easypdm" (z wygenerowanym losowo hasłem), ładuje schemat
+;      (db\schema.sql, dołączony do instalatora). Do 0.6 były to "pdm_user" i "pdm" — te same
+;      nazwy, których używa środowisko deweloperskie; na komputerze programisty instalator
+;      przejmował więc jego bazę i zmieniał hasło jego roli. Instalacje z 0.6 i starszych
+;      aktualizują się dalej na swoich "pdm"/"pdm_user" (nazwy odczytywane z ich konfiguracji).
 ;   4. Zapisuje appsettings.Production.json z prawdziwym connection stringiem i ścieżkami
 ;      magazynu/kopii/logów w %ProgramData%\EasyPDM.
 ;   5. Rejestruje EasyPDM.Api.exe jako usługę Windows (autostart, działa w tle bez okna
@@ -22,8 +25,8 @@
 ; Istniejąca instalacja jest wykrywana po stałym AppId (rejestr, klucz Uninstall — zob.
 ; UninstallRegKey w [Code]), więc Inno podmienia ją W MIEJSCU zamiast instalować obok.
 ; Przebieg aktualizacji:
-;   - NIE pyta o hasło superużytkownika "postgres" — odczytuje hasło roli pdm_user z
-;     appsettings.Production.json poprzedniej instalacji (ReadExistingPdmPassword) i w ogóle
+;   - NIE pyta o hasło superużytkownika "postgres" — odczytuje bazę, rolę i jej hasło z
+;     appsettings.Production.json poprzedniej instalacji (ReadExistingConnPart) i w ogóle
 ;     nie dotyka roli ani bazy. Hasło roli ZOSTAJE bez zmian, więc nic, co łączy się do tej
 ;     bazy poza EasyPDM (skrypty kopii, pgAdmin), nie przestaje działać.
 ;   - Zatrzymuje usługę PRZED podmianą plików (PrepareToInstall — inaczej Windows
@@ -101,39 +104,39 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{win}\explorer.exe"; Parameters: 
 ; CustomMessage('Klucz') w Pascal Script zamiast wpisywać literały na stałe.
 en.PgPageCaption=PostgreSQL Connection
 en.PgPageSubCaption=Superuser password for "postgres"
-en.PgPageDescription=EasyPDM needs it ONCE, to create its own role (pdm_user) and database (pdm) — it is not stored anywhere.
+en.PgPageDescription=EasyPDM needs it ONCE, to create its own role and database (easypdm) — it is not stored anywhere.
 en.PgFieldLabel=Password for "postgres":
 en.PgNotFoundConfirm=No installed PostgreSQL found (required, version 18 recommended). Open the download page? Run this installer again after installing it.
 en.PgPasswordRequired=Enter the "postgres" superuser password.
 en.PgConnectionFailed=Could not connect to PostgreSQL with this password. Please try again.
-en.PgRoleConfigFailed=Could not configure the PostgreSQL database role (pdm_user). Check the "postgres" superuser password and whether another PostgreSQL instance is running on this port (5432). Details in the log:
-en.PgDatabaseCreateFailed=Could not create the PostgreSQL database "pdm". Details in the log:
+en.PgRoleConfigFailed=Could not configure the PostgreSQL database role. Check the "postgres" superuser password and whether another PostgreSQL instance is running on this port (5432). Details in the log:
+en.PgDatabaseCreateFailed=Could not create the PostgreSQL database. Details in the log:
 en.PgSchemaLoadFailed=Could not load the database schema. Details in the log:
 en.ServiceDescription=Local PDM server
 en.DowngradeBlocked=A newer version of EasyPDM (%1) is already installed — this installer carries version %2. Installing an older version over a newer one is not supported: the database has already been migrated to the newer schema and older versions cannot read it. Uninstall the current version first if you really want to go back.
 
 pl.PgPageCaption=Połączenie z PostgreSQL
 pl.PgPageSubCaption=Hasło superużytkownika "postgres"
-pl.PgPageDescription=EasyPDM potrzebuje go JEDNORAZOWO, żeby założyć własną rolę (pdm_user) i bazę danych (pdm) — nie jest nigdzie zapisywane.
+pl.PgPageDescription=EasyPDM potrzebuje go JEDNORAZOWO, żeby założyć własną rolę i bazę danych (easypdm) — nie jest nigdzie zapisywane.
 pl.PgFieldLabel=Hasło "postgres":
 pl.PgNotFoundConfirm=Nie znaleziono zainstalowanego PostgreSQL (wymagany, wersja 18 zalecana). Otworzyć stronę pobierania? Po instalacji uruchom ten instalator ponownie.
 pl.PgPasswordRequired=Podaj hasło superużytkownika "postgres".
 pl.PgConnectionFailed=Nie udało się połączyć z PostgreSQL tym hasłem. Spróbuj ponownie.
-pl.PgRoleConfigFailed=Nie udało się skonfigurować roli bazy danych PostgreSQL (pdm_user). Sprawdź hasło superużytkownika "postgres" oraz czy na tym porcie (5432) nie działa inna instancja PostgreSQL. Szczegóły w logu:
-pl.PgDatabaseCreateFailed=Nie udało się utworzyć bazy danych PostgreSQL "pdm". Szczegóły w logu:
+pl.PgRoleConfigFailed=Nie udało się skonfigurować roli bazy danych PostgreSQL. Sprawdź hasło superużytkownika "postgres" oraz czy na tym porcie (5432) nie działa inna instancja PostgreSQL. Szczegóły w logu:
+pl.PgDatabaseCreateFailed=Nie udało się utworzyć bazy danych PostgreSQL. Szczegóły w logu:
 pl.PgSchemaLoadFailed=Nie udało się załadować schematu bazy danych. Szczegóły w logu:
 pl.ServiceDescription=Lokalny serwer PDM
 pl.DowngradeBlocked=Zainstalowana jest już nowsza wersja EasyPDM (%1) — ten instalator zawiera wersję %2. Instalacja starszej wersji na nowszej nie jest wspierana: baza danych została już zmigrowana do nowszego schematu, którego starsze wersje nie potrafią odczytać. Jeśli naprawdę chcesz się cofnąć, najpierw odinstaluj obecną wersję.
 
 de.PgPageCaption=PostgreSQL-Verbindung
 de.PgPageSubCaption=Passwort des Superusers "postgres"
-de.PgPageDescription=EasyPDM benötigt es EINMALIG, um seine eigene Rolle (pdm_user) und Datenbank (pdm) anzulegen — es wird nirgendwo gespeichert.
+de.PgPageDescription=EasyPDM benötigt es EINMALIG, um seine eigene Rolle und Datenbank (easypdm) anzulegen — es wird nirgendwo gespeichert.
 de.PgFieldLabel=Passwort für "postgres":
 de.PgNotFoundConfirm=Keine PostgreSQL-Installation gefunden (erforderlich, Version 18 empfohlen). Download-Seite öffnen? Starten Sie dieses Installationsprogramm nach der Installation erneut.
 de.PgPasswordRequired=Geben Sie das Passwort des Superusers "postgres" ein.
 de.PgConnectionFailed=Verbindung zu PostgreSQL mit diesem Passwort fehlgeschlagen. Bitte versuchen Sie es erneut.
-de.PgRoleConfigFailed=Die PostgreSQL-Datenbankrolle (pdm_user) konnte nicht konfiguriert werden. Überprüfen Sie das Passwort des Superusers "postgres" und ob auf diesem Port (5432) eine andere PostgreSQL-Instanz läuft. Details im Protokoll:
-de.PgDatabaseCreateFailed=Die PostgreSQL-Datenbank "pdm" konnte nicht erstellt werden. Details im Protokoll:
+de.PgRoleConfigFailed=Die PostgreSQL-Datenbankrolle konnte nicht konfiguriert werden. Überprüfen Sie das Passwort des Superusers "postgres" und ob auf diesem Port (5432) eine andere PostgreSQL-Instanz läuft. Details im Protokoll:
+de.PgDatabaseCreateFailed=Die PostgreSQL-Datenbank konnte nicht erstellt werden. Details im Protokoll:
 de.PgSchemaLoadFailed=Das Datenbankschema konnte nicht geladen werden. Details im Protokoll:
 de.ServiceDescription=Lokaler PDM-Server
 de.DowngradeBlocked=Es ist bereits eine neuere Version von EasyPDM (%1) installiert — dieses Installationsprogramm enthält Version %2. Eine ältere Version über eine neuere zu installieren wird nicht unterstützt: Die Datenbank wurde bereits auf das neuere Schema migriert, das ältere Versionen nicht lesen können. Deinstallieren Sie zuerst die aktuelle Version, wenn Sie wirklich zurückgehen möchten.
@@ -153,10 +156,14 @@ var
   PostgresPasswordPage: TInputQueryWizardPage;
   PsqlPath: String;
   DebugLogPath: String;
-  // Hasło roli pdm_user odczytane z appsettings.Production.json POPRZEDNIEJ instalacji.
+  // Hasło roli odczytane z appsettings.Production.json POPRZEDNIEJ instalacji.
   // Niepuste = to aktualizacja, przy której rola i baza już istnieją i nie trzeba ich w
   // ogóle dotykać (a więc i pytać o hasło superużytkownika "postgres").
   ExistingPdmPassword: String;
+  // Baza i rola tej poprzedniej instalacji — "pdm"/"pdm_user" w instalacjach z 0.6 i starszych,
+  // "easypdm" w nowszych. Aktualizacja zostaje przy nich; świeża instalacja zakłada "easypdm".
+  ExistingDbName: String;
+  ExistingDbUser: String;
 
 { Log instalacji zapisywany do %ProgramData%\EasyPDM (przetrwa poza katalogiem tymczasowym
   instalatora, więc da się go obejrzeć już PO zakończeniu) — RunPsql/RoleExists/DatabaseExists
@@ -292,14 +299,14 @@ begin
     Result := '';
 end;
 
-{ Wyciąga hasło roli pdm_user z ConnectionString w appsettings.Production.json poprzedniej
-  instalacji. Dzięki temu aktualizacja NIE MUSI ani pytać o hasło superużytkownika
+{ Wyciąga jedną część (Database / Username / Password) z ConnectionString w
+  appsettings.Production.json poprzedniej instalacji. Dzięki temu aktualizacja NIE MUSI ani pytać o hasło superużytkownika
   "postgres", ani przestawiać hasła roli — a to drugie było realnie uciążliwe: zmiana hasła
   przy każdej aktualizacji wywracała wszystko, co łączy się do bazy poza samym EasyPDM
   (skrypty kopii zapasowych, pgAdmin z zapamiętanym hasłem). Pusty string = nie udało się
   odczytać (brak pliku, inny format) i wtedy przebieg wraca do pełnej konfiguracji z
   pytaniem o hasło, dokładnie jak przy świeżej instalacji. }
-function ReadExistingPdmPassword(const AppDir: String): String;
+function ReadExistingConnPart(const AppDir, Key: String): String;
 var
   Content: AnsiString;
   S: String;
@@ -312,16 +319,32 @@ begin
   if not LoadStringFromFile(AddBackslash(AppDir) + 'appsettings.Production.json', Content) then
     exit;
   S := String(Content);
-  P := Pos('Password=', S);
+  P := Pos(Key + '=', S);
   if P = 0 then
     exit;
-  S := Copy(S, P + Length('Password='), Length(S));
+  S := Copy(S, P + Length(Key) + 1, Length(S));
   { Wartość kończy się cudzysłowem zamykającym string JSON albo średnikiem kolejnego
     parametru connection stringa — bierzemy wszystko do pierwszego z nich. }
   E := 1;
   while (E <= Length(S)) and (S[E] <> '"') and (S[E] <> ';') do
     E := E + 1;
   Result := Copy(S, 1, E - 1);
+end;
+
+{ Nazwy bazy i roli trafiają wprost do poleceń SQL, więc tylko bezpieczne identyfikatory:
+  małe litery, cyfry i podkreślenie, bez cyfry na początku. }
+function IsSafeIdentifier(const Name: String): Boolean;
+var
+  I: Integer;
+  C: Char;
+begin
+  Result := Length(Name) > 0;
+  for I := 1 to Length(Name) do
+  begin
+    C := Name[I];
+    if not (((C >= 'a') and (C <= 'z')) or (C = '_') or ((I > 1) and (C >= '0') and (C <= '9'))) then
+      Result := False;
+  end;
 end;
 
 function GenerateRandomPassword(Len: Integer): String;
@@ -348,7 +371,7 @@ end;
   na Windows to tymczasowy plik .bat, który najpierw ustawia PGPASSWORD, a potem woła psql.
   Zwraca True, jeśli psql zakończył się kodem 0. UWAGA: Args MUSI zawierać własne "-U <rola>"
   — ta funkcja nie narzuca żadnej roli domyślnej (wywołania łączą się raz jako "postgres",
-  raz jako "pdm_user"). }
+  raz jako rola aplikacji). }
 function RunPsql(PgPassword, Args, StepLabel: String): Boolean;
 var
   BatchFile: String;
@@ -377,7 +400,7 @@ begin
   end;
 end;
 
-function RoleExists(PgPassword: String): Boolean;
+function RoleExists(PgPassword, RoleName: String): Boolean;
 var
   OutFile: String;
   Output: AnsiString;
@@ -392,7 +415,7 @@ begin
     '@echo off' + #13#10 +
     'set "PGPASSWORD=' + EscapeForBatch(PgPassword) + '"' + #13#10 +
     '"' + PsqlPath + '" -h localhost -U postgres -tAc ' +
-    '"SELECT 1 FROM pg_roles WHERE rolname=''pdm_user''" > "' + OutFile + '"' + #13#10,
+    '"SELECT 1 FROM pg_roles WHERE rolname=''' + RoleName + '''" > "' + OutFile + '"' + #13#10,
     False);
   try
     Exec(BatchFile, '', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
@@ -407,7 +430,7 @@ begin
   end;
 end;
 
-function DatabaseExists(PgPassword: String): Boolean;
+function DatabaseExists(PgPassword, DbName: String): Boolean;
 var
   OutFile: String;
   Output: AnsiString;
@@ -420,7 +443,7 @@ begin
     '@echo off' + #13#10 +
     'set "PGPASSWORD=' + EscapeForBatch(PgPassword) + '"' + #13#10 +
     '"' + PsqlPath + '" -h localhost -U postgres -tAc ' +
-    '"SELECT 1 FROM pg_database WHERE datname=''pdm''" > "' + OutFile + '"' + #13#10,
+    '"SELECT 1 FROM pg_database WHERE datname=''' + DbName + '''" > "' + OutFile + '"' + #13#10,
     False);
   try
     Exec(BatchFile, '', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
@@ -518,9 +541,13 @@ begin
   end;
 
   { Aktualizacja: sięgamy po hasło roli z poprzedniej instalacji, żeby w ogóle nie ruszać
-    bazy (ani nie pytać o hasło superużytkownika) -- zob. ReadExistingPdmPassword. }
+    bazy (ani nie pytać o hasło superużytkownika) -- zob. ReadExistingConnPart. }
   if Installed <> '' then
-    ExistingPdmPassword := ReadExistingPdmPassword(InstalledLocation());
+  begin
+    ExistingPdmPassword := ReadExistingConnPart(InstalledLocation(), 'Password');
+    ExistingDbName := ReadExistingConnPart(InstalledLocation(), 'Database');
+    ExistingDbUser := ReadExistingConnPart(InstalledLocation(), 'Username');
+  end;
 
   PsqlPath := FindPsqlPath();
   if PsqlPath = '' then
@@ -560,7 +587,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  PgSuperPassword, PdmPassword, AppSettings: String;
+  PgSuperPassword, PdmPassword, AppSettings, DbName, DbUser: String;
   ResultCode: Integer;
   RoleOk, DbOk, SchemaOk: Boolean;
 begin
@@ -571,6 +598,38 @@ begin
   DebugLogPath := ExpandConstant('{#MyDataDir}\install-debug.log');
   LogInstall('=== Instalacja/aktualizacja EasyPDM rozpoczeta ===');
 
+  { Baza i rola: aktualizacja zostaje przy swoich (z konfiguracji poprzedniej instalacji;
+    gdyby jej brakowało nazw, to instalacja sprzed 0.7, czyli "pdm"/"pdm_user"), świeża
+    instalacja zakłada własne "easypdm" — nigdy nie przejmuje cudzej bazy "pdm". }
+  if ExistingPdmPassword <> '' then
+  begin
+    DbName := ExistingDbName;
+    DbUser := ExistingDbUser;
+    if DbName = '' then
+      DbName := 'pdm';
+    if DbUser = '' then
+      DbUser := 'pdm_user';
+  end
+  else
+  begin
+    { Ponowna instalacja z nieczytelnym hasłem (np. ręcznie zmieniony plik): jeśli same nazwy
+      dało się odczytać, zostajemy przy nich, zamiast zakładać obok pustą bazę. }
+    DbName := ExistingDbName;
+    DbUser := ExistingDbUser;
+    if DbName = '' then
+      DbName := 'easypdm';
+    if DbUser = '' then
+      DbUser := 'easypdm';
+  end;
+  if not (IsSafeIdentifier(DbName) and IsSafeIdentifier(DbUser)) then
+  begin
+    LogInstall('BLAD KRYTYCZNY: niedozwolona nazwa bazy lub roli: "' + DbName + '" / "' + DbUser + '".');
+    if not WizardSilent then
+      MsgBox(CustomMessage('PgRoleConfigFailed') + ' ' + DebugLogPath, mbError, MB_OK);
+    exit;
+  end;
+  LogInstall('Baza: ' + DbName + ', rola: ' + DbUser);
+
   if ExistingPdmPassword <> '' then
   begin
     { AKTUALIZACJA ze znanym hasłem roli: rola i baza już istnieją i są sprawne (program
@@ -579,7 +638,7 @@ begin
       wszystko inne, co łączy się do tej bazy (skrypty kopii, pgAdmin). Nowe migracje
       schematu i tak stosuje sam program przy starcie, nie instalator. }
     PdmPassword := ExistingPdmPassword;
-    LogInstall('Aktualizacja: rola i baza juz istnieja, uzywam zapisanego hasla pdm_user - pomijam konfiguracje bazy.');
+    LogInstall('Aktualizacja: rola i baza juz istnieja, uzywam zapisanego hasla roli - pomijam konfiguracje bazy.');
   end
   else
   begin
@@ -592,10 +651,10 @@ begin
       odczytać hasła z poprzedniej instalacji (np. skasowany/uszkodzony
       appsettings.Production.json): wtedy trzeba je ustawić na nowo, żeby appsettings
       zgadzało się z tym, co faktycznie jest w bazie. }
-    if RoleExists(PgSuperPassword) then
-      RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "ALTER ROLE pdm_user PASSWORD ''' + PdmPassword + ''';" postgres', 'ALTER ROLE pdm_user')
+    if RoleExists(PgSuperPassword, DbUser) then
+      RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "ALTER ROLE ' + DbUser + ' PASSWORD ''' + PdmPassword + ''';" postgres', 'ALTER ROLE ' + DbUser)
     else
-      RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE ROLE pdm_user LOGIN PASSWORD ''' + PdmPassword + ''';" postgres', 'CREATE ROLE pdm_user');
+      RoleOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE ROLE ' + DbUser + ' LOGIN PASSWORD ''' + PdmPassword + ''';" postgres', 'CREATE ROLE ' + DbUser);
 
     { Wcześniej wynik powyższego wcale nie był sprawdzany — przy błędzie (np. złe hasło
       superużytkownika albo połączenie z niewłaściwym serwerem PostgreSQL, gdy na maszynie
@@ -608,7 +667,7 @@ begin
       w CI, zanim doszła straż WizardSilent poniżej). }
     if not RoleOk then
     begin
-      LogInstall('BLAD KRYTYCZNY: nie udalo sie zalozyc/zaktualizowac roli pdm_user - przerywam konfiguracje bazy.');
+      LogInstall('BLAD KRYTYCZNY: nie udalo sie zalozyc/zaktualizowac roli ' + DbUser + ' - przerywam konfiguracje bazy.');
       if not WizardSilent then
         MsgBox(CustomMessage('PgRoleConfigFailed') + ' ' + DebugLogPath, mbError, MB_OK);
       exit;
@@ -618,21 +677,21 @@ begin
       przerwana wcześniej dokładnie między CREATE ROLE a CREATE DATABASE zostawiłaby rolę
       bez bazy; gdyby to sprawdzenie było zagnieżdżone pod "if not RoleExists", taki stan
       zostałby już NA ZAWSZE bez bazy/schematu przy każdym kolejnym uruchomieniu instalatora. }
-    if not DatabaseExists(PgSuperPassword) then
+    if not DatabaseExists(PgSuperPassword, DbName) then
     begin
-      DbOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE DATABASE pdm OWNER pdm_user;" postgres', 'CREATE DATABASE pdm');
+      DbOk := RunPsql(PgSuperPassword, '-U postgres -c "CREATE DATABASE ' + DbName + ' OWNER ' + DbUser + ';" postgres', 'CREATE DATABASE ' + DbName);
       if not DbOk then
       begin
-        LogInstall('BLAD KRYTYCZNY: nie udalo sie utworzyc bazy danych pdm.');
+        LogInstall('BLAD KRYTYCZNY: nie udalo sie utworzyc bazy danych ' + DbName + '.');
         if not WizardSilent then
           MsgBox(CustomMessage('PgDatabaseCreateFailed') + ' ' + DebugLogPath, mbError, MB_OK);
         exit;
       end;
 
-      SchemaOk := RunPsql(PdmPassword, '-U pdm_user -f "' + ExpandConstant('{app}\db\schema.sql') + '" pdm', 'zaladuj schema.sql');
+      SchemaOk := RunPsql(PdmPassword, '-U ' + DbUser + ' -f "' + ExpandConstant('{app}\db\schema.sql') + '" ' + DbName, 'zaladuj schema.sql');
       if not SchemaOk then
       begin
-        LogInstall('BLAD KRYTYCZNY: nie udalo sie zaladowac schema.sql do bazy pdm.');
+        LogInstall('BLAD KRYTYCZNY: nie udalo sie zaladowac schema.sql do bazy ' + DbName + '.');
         if not WizardSilent then
           MsgBox(CustomMessage('PgSchemaLoadFailed') + ' ' + DebugLogPath, mbError, MB_OK);
         exit;
@@ -671,7 +730,7 @@ begin
     niezawodne (Menedżer Usług nie zawsze odświeża środowisko bez restartu). }
   AppSettings :=
     '{' + #13#10 +
-    '  "ConnectionString": "Host=localhost;Port=5432;Database=pdm;Username=pdm_user;Password=' + PdmPassword + '",' + #13#10 +
+    '  "ConnectionString": "Host=localhost;Port=5432;Database=' + DbName + ';Username=' + DbUser + ';Password=' + PdmPassword + '",' + #13#10 +
     '  "StorageRoot": "' + ExpandConstant('{#MyDataDir}\storage') + '",' + #13#10 +
     '  "BackupRoot": "' + ExpandConstant('{#MyDataDir}\backups') + '",' + #13#10 +
     '  "LogRoot": "' + ExpandConstant('{#MyDataDir}\logs') + '"' + #13#10 +

@@ -138,6 +138,22 @@ jobs:
           }
           Write-Host "Połączenie jako postgres/postgres działa poprawnie."
 
+      # Komputer programisty: rola "pdm_user" i baza "pdm" już istnieją (te same nazwy co w
+      # środowisku deweloperskim i w Dockerze). Do 0.6 instalator przejmował je i zmieniał
+      # hasło roli — teraz ma założyć obok własne "easypdm" i tych nie ruszać.
+      - name: Załóż deweloperską bazę "pdm" (instalator nie może jej przejąć)
+        shell: pwsh
+        run: |
+          $psql = (Get-ChildItem "C:\Program Files\PostgreSQL" -Recurse -Filter psql.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notlike "*pgAdmin*" } |
+            Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          $env:PGPASSWORD = "postgres"
+          & $psql -h localhost -U postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE pdm_user LOGIN PASSWORD 'dev';" postgres
+          & $psql -h localhost -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE pdm OWNER pdm_user;" postgres
+          $env:PGPASSWORD = "dev"
+          & $psql -h localhost -U pdm_user -v ON_ERROR_STOP=1 -c "CREATE TABLE dev_marker (v int); INSERT INTO dev_marker VALUES (42);" pdm
+          if ($LASTEXITCODE -ne 0) { Write-Error "Nie udało się przygotować bazy deweloperskiej."; exit 1 }
+
       - name: Uruchom instalator w trybie cichym (/VERYSILENT)
         shell: pwsh
         run: |
@@ -214,6 +230,28 @@ jobs:
           }
           Write-Host "EasyPDM odpowiada poprawnie po świeżej instalacji."
 
+      - name: Sprawdź, że świeża instalacja ma własną bazę, a deweloperska jest nietknięta
+        shell: pwsh
+        run: |
+          $cfg = Get-Content "C:\Program Files\EasyPDM\appsettings.Production.json" -Raw
+          if ($cfg -notmatch 'Database=easypdm;Username=easypdm;') {
+            Write-Host ($cfg -replace 'Password=[^"]*', 'Password=***')
+            Write-Error "Świeża instalacja nie używa własnej bazy/roli easypdm."
+            exit 1
+          }
+          $psql = (Get-ChildItem "C:\Program Files\PostgreSQL" -Recurse -Filter psql.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notlike "*pgAdmin*" } |
+            Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          $env:PGPASSWORD = "dev"
+          $v = & $psql -h localhost -U pdm_user -tA -c "SELECT v FROM dev_marker;" pdm
+          if ($LASTEXITCODE -ne 0 -or "$v".Trim() -ne "42") {
+            Write-Error "Baza deweloperska pdm lub hasło roli pdm_user zostały zmienione przez instalator."
+            exit 1
+          }
+          $conn = ([regex]::Match($cfg, '"ConnectionString":\s*"([^"]*)"')).Groups[1].Value
+          Set-Content -Path (Join-Path $PWD "conn-before-update.txt") -Value $conn -NoNewline
+          Write-Host "Baza easypdm założona obok, pdm/pdm_user nietknięte."
+
       # Uruchomienie instalatora DRUGI RAZ symuluje aktualizację — sprawdza, że wykrywa
       # istniejącą rolę/bazę/usługę (nie próbuje zakładać ich od nowa) i poprawnie
       # restartuje usługę zamiast się wywalić na "usługa już istnieje".
@@ -255,6 +293,18 @@ jobs:
             exit 1
           }
           Write-Host "EasyPDM odpowiada poprawnie po symulowanej aktualizacji."
+
+      - name: Sprawdź, że aktualizacja zachowała connection string
+        shell: pwsh
+        run: |
+          $cfg = Get-Content "C:\Program Files\EasyPDM\appsettings.Production.json" -Raw
+          $conn = ([regex]::Match($cfg, '"ConnectionString":\s*"([^"]*)"')).Groups[1].Value
+          $before = Get-Content (Join-Path $PWD "conn-before-update.txt") -Raw
+          if ($conn -ne $before) {
+            Write-Error "Aktualizacja zmieniła ConnectionString (bazę, rolę albo hasło)."
+            exit 1
+          }
+          Write-Host "ConnectionString bez zmian po aktualizacji."
 
       # Analogicznie do test-linux-installer.yml — CurUninstallStepChanged (w EasyPDM.iss)
       # zatrzymuje i usuwa usługę, ale celowo NIE rusza bazy/roli PostgreSQL (deinstalacja
