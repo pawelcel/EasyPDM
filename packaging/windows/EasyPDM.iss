@@ -785,6 +785,6 @@ begin
     Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#MyServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end
   else if (CurUninstallStep = usPostUninstall) and not UninstallSilent then
-    MsgBox(FmtMessage(CustomMessage('DataKeptAfterUninstall'),
-      [UninstallDbName, UninstallDbUser, ExpandConstant('{#MyDataDir}')]), mbInformation, MB_OK);
+    { Lista argumentów w jednej linii: linia zaczynająca się od "[" to dla Inno nagłówek sekcji. }
+    MsgBox(FmtMessage(CustomMessage('DataKeptAfterUninstall'), [UninstallDbName, UninstallDbUser, ExpandConstant('{#MyDataDir}')]), mbInformation, MB_OK);
 end;
