@@ -114,6 +114,7 @@ en.PgDatabaseCreateFailed=Could not create the PostgreSQL database. Details in t
 en.PgSchemaLoadFailed=Could not load the database schema. Details in the log:
 en.ServiceDescription=Local PDM server
 en.DowngradeBlocked=A newer version of EasyPDM (%1) is already installed — this installer carries version %2. Installing an older version over a newer one is not supported: the database has already been migrated to the newer schema and older versions cannot read it. Uninstall the current version first if you really want to go back.
+en.DataKeptAfterUninstall=EasyPDM has been removed, but its database and files were deliberately kept.%n%nTo remove them as well:%n- in pgAdmin or psql as postgres: DROP DATABASE %1; then DROP ROLE %2;%n- delete the folder %3 (stored files, backups, logs).
 
 pl.PgPageCaption=Połączenie z PostgreSQL
 pl.PgPageSubCaption=Hasło superużytkownika "postgres"
@@ -127,6 +128,7 @@ pl.PgDatabaseCreateFailed=Nie udało się utworzyć bazy danych PostgreSQL. Szcz
 pl.PgSchemaLoadFailed=Nie udało się załadować schematu bazy danych. Szczegóły w logu:
 pl.ServiceDescription=Lokalny serwer PDM
 pl.DowngradeBlocked=Zainstalowana jest już nowsza wersja EasyPDM (%1) — ten instalator zawiera wersję %2. Instalacja starszej wersji na nowszej nie jest wspierana: baza danych została już zmigrowana do nowszego schematu, którego starsze wersje nie potrafią odczytać. Jeśli naprawdę chcesz się cofnąć, najpierw odinstaluj obecną wersję.
+pl.DataKeptAfterUninstall=EasyPDM zostało odinstalowane, ale jego baza danych i pliki celowo zostały.%n%nAby usunąć także je:%n- w pgAdmin lub psql jako postgres: DROP DATABASE %1; a potem DROP ROLE %2;%n- usuń folder %3 (zapisane pliki, kopie zapasowe, logi).
 
 de.PgPageCaption=PostgreSQL-Verbindung
 de.PgPageSubCaption=Passwort des Superusers "postgres"
@@ -140,6 +142,7 @@ de.PgDatabaseCreateFailed=Die PostgreSQL-Datenbank konnte nicht erstellt werden.
 de.PgSchemaLoadFailed=Das Datenbankschema konnte nicht geladen werden. Details im Protokoll:
 de.ServiceDescription=Lokaler PDM-Server
 de.DowngradeBlocked=Es ist bereits eine neuere Version von EasyPDM (%1) installiert — dieses Installationsprogramm enthält Version %2. Eine ältere Version über eine neuere zu installieren wird nicht unterstützt: Die Datenbank wurde bereits auf das neuere Schema migriert, das ältere Versionen nicht lesen können. Deinstallieren Sie zuerst die aktuelle Version, wenn Sie wirklich zurückgehen möchten.
+de.DataKeptAfterUninstall=EasyPDM wurde entfernt, seine Datenbank und Dateien wurden jedoch bewusst behalten.%n%nUm auch diese zu entfernen:%n- in pgAdmin oder psql als postgres: DROP DATABASE %1; danach DROP ROLE %2;%n- den Ordner %3 löschen (gespeicherte Dateien, Sicherungen, Protokolle).
 
 [Code]
 const
@@ -164,6 +167,9 @@ var
   // "easypdm" w nowszych. Aktualizacja zostaje przy nich; świeża instalacja zakłada "easypdm".
   ExistingDbName: String;
   ExistingDbUser: String;
+  // Baza i rola odinstalowywanej instalacji — do komunikatu na końcu deinstalacji.
+  UninstallDbName: String;
+  UninstallDbUser: String;
 
 { Log instalacji zapisywany do %ProgramData%\EasyPDM (przetrwa poza katalogiem tymczasowym
   instalatora, więc da się go obejrzeć już PO zakończeniu) — RunPsql/RoleExists/DatabaseExists
@@ -759,13 +765,26 @@ begin
   LogInstall('sc start {#MyServiceName} -> kod wyjscia ' + IntToStr(ResultCode));
 end;
 
+{ Baza danych i %ProgramData%\EasyPDM zostają po deinstalacji celowo — usunięcie bazy
+  wymagałoby hasła superużytkownika "postgres", a pliki to dane użytkownika. Na koniec
+  mówimy więc wprost, co zostało i jak to usunąć ręcznie. Nazwy odczytujemy przed
+  usunięciem plików programu (0.6 i starsze: pdm/pdm_user, nowsze: easypdm). }
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ResultCode: Integer;
 begin
   if CurUninstallStep = usUninstall then
   begin
+    UninstallDbName := ReadExistingConnPart(ExpandConstant('{app}'), 'Database');
+    UninstallDbUser := ReadExistingConnPart(ExpandConstant('{app}'), 'Username');
+    if UninstallDbName = '' then
+      UninstallDbName := 'easypdm';
+    if UninstallDbUser = '' then
+      UninstallDbUser := 'easypdm';
     Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#MyServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#MyServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  end;
+  end
+  else if (CurUninstallStep = usPostUninstall) and not UninstallSilent then
+    MsgBox(FmtMessage(CustomMessage('DataKeptAfterUninstall'),
+      [UninstallDbName, UninstallDbUser, ExpandConstant('{#MyDataDir}')]), mbInformation, MB_OK);
 end;

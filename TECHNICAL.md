@@ -997,8 +997,10 @@ role's password), sets up the schema, writes `appsettings.Production.json` with 
 rest of the settings (storage/backups/logs in `%ProgramData%\EasyPDM`), registers
 `EasyPDM.Api.exe` as a **Windows service** (autostart, runs in the background with no
 console window), and creates a shortcut that opens `http://localhost:5000`.
-Uninstalling stops and removes the service (the standard Inno Setup uninstaller) — same
-as on Linux, it deliberately doesn't touch the database itself.
+Uninstalling stops and removes the service (the standard Inno Setup uninstaller) but
+deliberately keeps the database and `%ProgramData%\EasyPDM`: unlike on Linux, removing the
+database would need the `postgres` superuser password. At the end it says what was kept and
+how to remove it by hand (`DROP DATABASE` and `DROP ROLE` with the installation's own names).
 
 **Update**: build a new `EasyPDM_Windows_v<version>.exe` (as above) and run it again. The
 existing installation is detected via the fixed `AppId` (its Uninstall key in the registry),

@@ -9,6 +9,7 @@ All notable changes to EasyPDM are documented in this file.
 
 ### Changed
 - **The native Linux installer picks a free port, keeps it on update and only says it is running once it is.** The port used to be fixed at 5000: with something else already there — say EasyPDM in Docker on the same machine — the service died on start while the installer still announced it at `:5000`. A fresh install now takes the first free port from 5000, an update keeps the port the service already uses, and `sudo PDM_PORT=8080 ./install-easypdm-linux.sh` sets one explicitly. The address is printed only after EasyPDM itself has answered on it.
+- **The Windows uninstaller says at the end that the database and files were kept**, naming the database and role to drop and the folder to delete if you want them gone too. It always kept them, but said nothing about it.
 - **The native Linux installer and uninstaller speak your language**, picking Polish, German or English from the system settings like the Docker installer and the CAD macros; `sudo EASYPDM_LANG=en ./install-easypdm-linux.sh` forces one.
 
 ### Fixed

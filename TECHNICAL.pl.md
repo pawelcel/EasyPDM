@@ -760,7 +760,9 @@ przejmował jego bazę i zmieniał hasło jego roli), zakłada schemat, zapisuje
 `%ProgramData%\EasyPDM`), rejestruje `EasyPDM.Api.exe` jako **usługę Windows**
 (autostart, działa w tle bez okna konsoli) i tworzy skrót otwierający
 `http://localhost:5000`. Odinstalowanie zatrzymuje i usuwa usługę (standardowy deinstalator
-Inno Setup) — tak samo jak na Linuksie, celowo nie rusza samej bazy danych.
+Inno Setup), ale celowo zostawia bazę danych i `%ProgramData%\EasyPDM`: w odróżnieniu od
+Linuksa usunięcie bazy wymagałoby hasła superużytkownika `postgres`. Na koniec mówi, co
+zostało i jak to usunąć ręcznie (`DROP DATABASE` i `DROP ROLE` z nazwami tej instalacji).
 
 **Aktualizacja**: zbuduj nowy `EasyPDM_Windows_v<wersja>.exe` (jak wyżej) i uruchom go
 ponownie. Istniejąca instalacja jest wykrywana po stałym `AppId` (klucz Uninstall w

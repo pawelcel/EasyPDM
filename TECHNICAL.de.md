@@ -837,8 +837,10 @@ schreibt `appsettings.Production.json` mit den übrigen Einstellungen (Speicher/
 Protokolle in `%ProgramData%\EasyPDM`), registriert `EasyPDM.Api.exe` als
 **Windows-Dienst** (Autostart, läuft im Hintergrund ohne Konsolenfenster) und erstellt
 eine Verknüpfung, die `http://localhost:5000` öffnet. Die Deinstallation stoppt und
-entfernt den Dienst (der Standard-Deinstaller von Inno Setup) — genau wie unter Linux wird
-bewusst die Datenbank selbst nicht angetastet.
+entfernt den Dienst (der Standard-Deinstaller von Inno Setup) , behält aber bewusst die
+Datenbank und `%ProgramData%\EasyPDM`: anders als unter Linux bräuchte das Entfernen der
+Datenbank das Passwort des Superusers `postgres`. Am Ende sagt er, was geblieben ist und wie
+man es von Hand entfernt (`DROP DATABASE` und `DROP ROLE` mit den Namen der Installation).
 
 **Update**: ein neues `EasyPDM_Windows_v<Version>.exe` bauen (wie oben) und erneut
 ausführen. Die vorhandene Installation wird über die feste `AppId` erkannt (ihr
