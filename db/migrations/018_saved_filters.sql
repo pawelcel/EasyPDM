@@ -15,6 +15,6 @@ CREATE TABLE IF NOT EXISTS saved_filters (
     UNIQUE (user_id, name)
 );
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON saved_filters TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON saved_filters TO CURRENT_USER;
 
 COMMIT;

@@ -1,3 +1,9 @@
+-- Uprawnienia nadawane są roli, która WYKONUJE ten plik (GRANT ... TO CURRENT_USER), a nie roli
+-- o wpisanej na sztywno nazwie. Każde wdrożenie ładuje schemat rolą aplikacji — Docker jako
+-- POSTGRES_USER=pdm_user, Windows przez "psql -U pdm_user", instalacja natywna Linux jako swoja
+-- rola "easypdm" — a migracje wykonuje MigrationRunner na połączeniu aplikacji. Do 0.6 było tu
+-- "TO pdm_user", przez co własna rola instalacji natywnej nie mogła działać: migracje przy starcie
+-- padały na nieistniejącej roli, a usługa nie wstawała.
 -- Schemat bazy danych systemu PDM
 -- Uruchom jako: psql -U <user> -d <database> -f schema.sql
 
@@ -24,7 +30,7 @@ CREATE TABLE sessions (
 );
 
 CREATE INDEX idx_sessions_user ON sessions (user_id);
-GRANT SELECT, INSERT, UPDATE, DELETE ON sessions TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON sessions TO CURRENT_USER;
 
 -- ============================================================
 -- Projekty (kontener grupujący elementy)
@@ -49,7 +55,7 @@ CREATE TABLE project_users (
     PRIMARY KEY (project_id, user_id)
 );
 
-GRANT SELECT, INSERT, DELETE ON project_users TO pdm_user;
+GRANT SELECT, INSERT, DELETE ON project_users TO CURRENT_USER;
 
 -- ============================================================
 -- Elementy (pliki CAD i powiązane dokumenty)
@@ -82,7 +88,7 @@ CREATE TABLE items (
 );
 
 CREATE SEQUENCE item_number_seq START 1;
-GRANT USAGE, SELECT ON SEQUENCE item_number_seq TO pdm_user;
+GRANT USAGE, SELECT ON SEQUENCE item_number_seq TO CURRENT_USER;
 
 CREATE INDEX idx_items_properties ON items USING GIN (properties);
 CREATE INDEX idx_items_file_type ON items (file_type);
@@ -123,7 +129,7 @@ CREATE TABLE item_number_prefixes (
     rodzaj TEXT PRIMARY KEY,
     prefix TEXT NOT NULL CHECK (char_length(prefix) BETWEEN 1 AND 4)
 );
-GRANT SELECT, INSERT, UPDATE, DELETE ON item_number_prefixes TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON item_number_prefixes TO CURRENT_USER;
 
 CREATE TABLE manufacturer_contacts (
     id              SERIAL PRIMARY KEY,
@@ -153,8 +159,8 @@ CREATE TABLE manufacturer_product_types (
 CREATE INDEX idx_manufacturer_product_types_manufacturer
     ON manufacturer_product_types (manufacturer_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON manufacturer_product_types TO pdm_user;
-GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_types_id_seq TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON manufacturer_product_types TO CURRENT_USER;
+GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_types_id_seq TO CURRENT_USER;
 
 -- Podtyp zawsze należy do konkretnej serii/typu (FK do typu, nie do producenta) -- element
 -- może wskazać sam typ albo typ + podtyp, nigdy sam podtyp.
@@ -168,8 +174,8 @@ CREATE TABLE manufacturer_product_subtypes (
 CREATE INDEX idx_manufacturer_product_subtypes_type
     ON manufacturer_product_subtypes (product_type_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON manufacturer_product_subtypes TO pdm_user;
-GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_subtypes_id_seq TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON manufacturer_product_subtypes TO CURRENT_USER;
+GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_subtypes_id_seq TO CURRENT_USER;
 
 -- ============================================================
 -- Klienci (katalog z osobami kontaktowymi i własną strukturą plików, zarządzany z panelu
@@ -195,8 +201,8 @@ CREATE TABLE client_name2 (
 
 CREATE INDEX idx_client_name2_client ON client_name2 (client_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON client_name2 TO pdm_user;
-GRANT USAGE, SELECT ON SEQUENCE client_name2_id_seq TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON client_name2 TO CURRENT_USER;
+GRANT USAGE, SELECT ON SEQUENCE client_name2_id_seq TO CURRENT_USER;
 
 -- name2_id NULL -- kontakt należy do samego klienta (rodzica), odziedziczony (tylko do
 -- odczytu z tego poziomu) przez KAŻDĄ jego Nazwę 2. name2_id ustawiony -- kontakt należy
@@ -235,7 +241,7 @@ CREATE INDEX idx_client_nodes_client ON client_nodes (client_id);
 CREATE INDEX idx_client_nodes_parent ON client_nodes (parent_id);
 CREATE INDEX idx_client_nodes_name2 ON client_nodes (name2_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON clients, client_contacts, client_nodes TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON clients, client_contacts, client_nodes TO CURRENT_USER;
 
 -- projects.client_id dokłada się tutaj (ALTER, nie inline w CREATE TABLE projects wyżej),
 -- bo clients musi już istnieć, żeby FK zadziałało -- projects jest zdefiniowane wcześniej
@@ -293,7 +299,7 @@ CREATE TABLE notifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_notifications_user ON notifications (user_id, created_at DESC);
-GRANT SELECT, INSERT, UPDATE, DELETE ON notifications TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON notifications TO CURRENT_USER;
 
 -- Per-użytkownik wyłączenia (opt-out): brak wiersza = włączone (domyślnie wszystko
 -- włączone bez potrzeby zasiewania wiersza dla każdego usera x każdy typ).
@@ -303,7 +309,7 @@ CREATE TABLE notification_preferences (
     enabled BOOLEAN NOT NULL DEFAULT true,
     PRIMARY KEY (user_id, type)
 );
-GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO CURRENT_USER;
 
 CREATE TABLE item_tags (
     item_id UUID REFERENCES items(id) ON DELETE CASCADE,
@@ -389,7 +395,7 @@ CREATE TABLE item_status_history (
 );
 
 CREATE INDEX idx_item_status_history_item ON item_status_history (item_id);
-GRANT SELECT, INSERT ON item_status_history TO pdm_user;
+GRANT SELECT, INSERT ON item_status_history TO CURRENT_USER;
 
 -- Historia dodawania/usuwania załączników — osobna tabela, bo usunięty załącznik znika
 -- z item_attachments, więc samo to nie wystarczy do zachowania śladu kto/kiedy go usunął.
@@ -403,7 +409,7 @@ CREATE TABLE item_attachment_history (
 );
 
 CREATE INDEX idx_item_attachment_history_item ON item_attachment_history (item_id);
-GRANT SELECT, INSERT ON item_attachment_history TO pdm_user;
+GRANT SELECT, INSERT ON item_attachment_history TO CURRENT_USER;
 
 -- Historia blokady/zwolnienia właściciela — kto i kiedy zablokował (przejął na własność)
 -- albo zwolnił element.
@@ -416,7 +422,7 @@ CREATE TABLE item_owner_history (
 );
 
 CREATE INDEX idx_item_owner_history_item ON item_owner_history (item_id);
-GRANT SELECT, INSERT ON item_owner_history TO pdm_user;
+GRANT SELECT, INSERT ON item_owner_history TO CURRENT_USER;
 
 -- ============================================================
 -- Załączniki PROJEKTU -- dokumenty dotyczące całego zlecenia, nie pojedynczej Części:
@@ -439,7 +445,7 @@ CREATE TABLE project_attachments (
 
 CREATE INDEX idx_project_attachments_project ON project_attachments (project_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON project_attachments TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON project_attachments TO CURRENT_USER;
 
 -- ============================================================
 -- Weryfikacja klienta -- ślad akceptacji (albo uwag) klienta dla WYDANEJ Części/Złożenia,
@@ -484,8 +490,8 @@ CREATE TABLE item_client_verification_attachments (
 CREATE INDEX idx_item_client_verification_attachments_verification
     ON item_client_verification_attachments (verification_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verifications TO pdm_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verification_attachments TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verifications TO CURRENT_USER;
+GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verification_attachments TO CURRENT_USER;
 
 -- Harmonogram automatycznej kopii zapasowej (Ustawienia -> Magazyn plików). Jeden
 -- wiersz-singleton wymuszony przez "id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id)".
@@ -507,7 +513,7 @@ CREATE TABLE backup_schedule (
 
 INSERT INTO backup_schedule (id, day_of_week, day_of_month) VALUES (true, 0, 1);
 
-GRANT SELECT, INSERT, UPDATE ON backup_schedule TO pdm_user;
+GRANT SELECT, INSERT, UPDATE ON backup_schedule TO CURRENT_USER;
 
 -- Trwały znacznik stanu serwera, którego celowo NIE dotyka "Wyczyść bazę" (czyści tylko
 -- projects/materials/manufacturers/clients) -- bez tego, po ręcznym wyczyszczeniu Projektów
@@ -524,7 +530,7 @@ CREATE TABLE system_state (
     -- Czy nazwa elementu wchodzi w nazwę rekordu: true = "C0005(płyta)", false = "C0005".
     item_number_with_name  BOOLEAN NOT NULL DEFAULT true
 );
-GRANT SELECT, INSERT, UPDATE ON system_state TO pdm_user;
+GRANT SELECT, INSERT, UPDATE ON system_state TO CURRENT_USER;
 
 -- ============================================================
 -- Zapisane filtry widoku "Cała baza" — każdy użytkownik zapisuje własne zestawy filtrów
@@ -540,7 +546,7 @@ CREATE TABLE saved_filters (
     UNIQUE (user_id, name)
 );
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON saved_filters TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON saved_filters TO CURRENT_USER;
 
 -- ============================================================
 -- Śledzenie zastosowanych migracji — od tej wersji EasyPDM.Api sam sprawdza tę tabelę
@@ -554,7 +560,7 @@ CREATE TABLE schema_migrations (
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-GRANT SELECT, INSERT ON schema_migrations TO pdm_user;
+GRANT SELECT, INSERT ON schema_migrations TO CURRENT_USER;
 
 INSERT INTO schema_migrations (filename) VALUES
     ('002_add_projects.sql'), ('003_item_types.sql'), ('004_show_in_tree.sql'),

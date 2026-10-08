@@ -13,6 +13,6 @@ CREATE TABLE system_state (
     id                     BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
     sample_project_seeded  BOOLEAN NOT NULL DEFAULT false
 );
-GRANT SELECT, INSERT, UPDATE ON system_state TO pdm_user;
+GRANT SELECT, INSERT, UPDATE ON system_state TO CURRENT_USER;
 
 COMMIT;

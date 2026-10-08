@@ -23,6 +23,6 @@ CREATE TABLE backup_schedule (
 
 INSERT INTO backup_schedule (id, day_of_week, day_of_month) VALUES (true, 0, 1);
 
-GRANT SELECT, INSERT, UPDATE ON backup_schedule TO pdm_user;
+GRANT SELECT, INSERT, UPDATE ON backup_schedule TO CURRENT_USER;
 
 COMMIT;

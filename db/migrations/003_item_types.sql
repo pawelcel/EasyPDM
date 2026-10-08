@@ -19,7 +19,7 @@ ALTER TABLE items ALTER COLUMN file_path DROP NOT NULL;
 ALTER TABLE items ALTER COLUMN file_type DROP NOT NULL;
 
 CREATE SEQUENCE IF NOT EXISTS item_number_seq START 1;
-GRANT USAGE, SELECT ON SEQUENCE item_number_seq TO pdm_user;
+GRANT USAGE, SELECT ON SEQUENCE item_number_seq TO CURRENT_USER;
 ALTER TABLE items ADD COLUMN IF NOT EXISTS item_number INTEGER;
 
 INSERT INTO property_definitions (key, display_name, data_type, enum_values) VALUES

@@ -11,7 +11,7 @@ CREATE TABLE item_number_prefixes (
     rodzaj TEXT PRIMARY KEY,
     prefix TEXT NOT NULL CHECK (char_length(prefix) BETWEEN 1 AND 4)
 );
-GRANT SELECT, INSERT, UPDATE, DELETE ON item_number_prefixes TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON item_number_prefixes TO CURRENT_USER;
 
 -- Zamrożony w momencie utworzenia elementu (na podstawie ówczesnego rodzaju i
 -- ówczesnej konfiguracji item_number_prefixes) — NIGDY nie przeliczany retroaktywnie,

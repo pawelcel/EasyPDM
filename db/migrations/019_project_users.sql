@@ -11,6 +11,6 @@ CREATE TABLE IF NOT EXISTS project_users (
     PRIMARY KEY (project_id, user_id)
 );
 
-GRANT SELECT, INSERT, DELETE ON project_users TO pdm_user;
+GRANT SELECT, INSERT, DELETE ON project_users TO CURRENT_USER;
 
 COMMIT;

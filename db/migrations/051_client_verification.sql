@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS item_client_verification_attachments (
 CREATE INDEX IF NOT EXISTS idx_item_client_verification_attachments_verification
     ON item_client_verification_attachments (verification_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verifications TO pdm_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verification_attachments TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verifications TO CURRENT_USER;
+GRANT SELECT, INSERT, UPDATE, DELETE ON item_client_verification_attachments TO CURRENT_USER;
 
 COMMIT;

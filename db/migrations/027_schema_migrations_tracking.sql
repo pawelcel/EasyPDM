@@ -12,6 +12,6 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-GRANT SELECT, INSERT ON schema_migrations TO pdm_user;
+GRANT SELECT, INSERT ON schema_migrations TO CURRENT_USER;
 
 COMMIT;

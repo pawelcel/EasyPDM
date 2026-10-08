@@ -18,8 +18,8 @@ CREATE TABLE IF NOT EXISTS client_name2 (
 
 CREATE INDEX IF NOT EXISTS idx_client_name2_client ON client_name2 (client_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON client_name2 TO pdm_user;
-GRANT USAGE, SELECT ON SEQUENCE client_name2_id_seq TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON client_name2 TO CURRENT_USER;
+GRANT USAGE, SELECT ON SEQUENCE client_name2_id_seq TO CURRENT_USER;
 
 -- Przenieś istniejące wartości clients.name2 (dotychczas co najwyżej jedna per klient) do
 -- nowej tabeli, zanim kolumna zniknie -- nic z tego, co ktoś już wpisał, nie ginie.

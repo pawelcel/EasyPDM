@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS client_nodes (
 CREATE INDEX IF NOT EXISTS idx_client_nodes_client ON client_nodes (client_id);
 CREATE INDEX IF NOT EXISTS idx_client_nodes_parent ON client_nodes (parent_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON clients, client_contacts, client_nodes TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON clients, client_contacts, client_nodes TO CURRENT_USER;
 
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_projects_client ON projects (client_id);

@@ -14,6 +14,6 @@ CREATE TABLE item_owner_history (
 
 CREATE INDEX idx_item_owner_history_item ON item_owner_history (item_id);
 
-GRANT SELECT, INSERT ON item_owner_history TO pdm_user;
+GRANT SELECT, INSERT ON item_owner_history TO CURRENT_USER;
 
 COMMIT;

@@ -20,6 +20,6 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON sessions TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON sessions TO CURRENT_USER;
 
 COMMIT;

@@ -24,6 +24,6 @@ CREATE TABLE IF NOT EXISTS project_attachments (
 
 CREATE INDEX IF NOT EXISTS idx_project_attachments_project ON project_attachments (project_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON project_attachments TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON project_attachments TO CURRENT_USER;
 
 COMMIT;

@@ -26,7 +26,7 @@ CREATE TABLE notifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_notifications_user ON notifications (user_id, created_at DESC);
-GRANT SELECT, INSERT, UPDATE, DELETE ON notifications TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON notifications TO CURRENT_USER;
 
 -- Per-użytkownik wyłączenia (opt-out): brak wiersza = włączone (domyślnie wszystko
 -- włączone bez potrzeby zasiewania wiersza dla każdego usera x każdy typ).
@@ -36,6 +36,6 @@ CREATE TABLE notification_preferences (
     enabled BOOLEAN NOT NULL DEFAULT true,
     PRIMARY KEY (user_id, type)
 );
-GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON notification_preferences TO CURRENT_USER;
 
 COMMIT;

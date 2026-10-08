@@ -16,6 +16,6 @@ CREATE TABLE item_attachment_history (
 
 CREATE INDEX idx_item_attachment_history_item ON item_attachment_history (item_id);
 
-GRANT SELECT, INSERT ON item_attachment_history TO pdm_user;
+GRANT SELECT, INSERT ON item_attachment_history TO CURRENT_USER;
 
 COMMIT;

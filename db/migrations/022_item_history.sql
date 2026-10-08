@@ -20,6 +20,6 @@ CREATE TABLE item_status_history (
 
 CREATE INDEX idx_item_status_history_item ON item_status_history (item_id);
 
-GRANT SELECT, INSERT ON item_status_history TO pdm_user;
+GRANT SELECT, INSERT ON item_status_history TO CURRENT_USER;
 
 COMMIT;

@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS manufacturer_product_subtypes (
 CREATE INDEX IF NOT EXISTS idx_manufacturer_product_subtypes_type
     ON manufacturer_product_subtypes (product_type_id);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON manufacturer_product_subtypes TO pdm_user;
-GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_subtypes_id_seq TO pdm_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON manufacturer_product_subtypes TO CURRENT_USER;
+GRANT USAGE, SELECT ON SEQUENCE manufacturer_product_subtypes_id_seq TO CURRENT_USER;
 
 COMMIT;

@@ -892,6 +892,12 @@ when the database is not called `easypdm`, since then it may serve something els
 a terminal it keeps them; `sudo PDM_REMOVE_DATA=yes|no` decides without asking. PostgreSQL
 itself is never removed.
 
+The schema and the migrations grant privileges `TO CURRENT_USER` rather than to a named role,
+which is what lets the native install have a role of its own: every deployment runs them as
+the application's role. A backup keeps its privileges under the role name of the installation
+it came from, so restoring it into an installation whose role has a different name (Docker or
+Windows `pdm_user` into a native `easypdm`, or the other way) is not supported yet.
+
 **Port, language, PostgreSQL authentication.** A fresh install listens on the first free port
 from 5000 (normally 5000 itself); an update keeps the port the service already uses, so
 bookmarks, CAD macros and other computers keep working; `sudo PDM_PORT=8080
