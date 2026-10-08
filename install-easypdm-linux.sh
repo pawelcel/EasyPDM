@@ -17,6 +17,8 @@
 # Port: pierwszy wolny od 5000 przy świeżej instalacji; przy aktualizacji zostaje ten, na którym
 # usługa już działa; PDM_PORT=<port> wymusza konkretny (sudo PDM_PORT=8080 ./install-easypdm-linux.sh).
 # Język komunikatów: z ustawień systemu albo sudo EASYPDM_LANG=en ./install-easypdm-linux.sh
+# Baza: świeża instalacja zakłada własną "easypdm"; aktualizacja zostaje przy swojej;
+# PDM_DB_NAME / PDM_DB_USER / PDM_DB_PASSWORD wskazują inną.
 #
 # Obsługiwane menedżery pakietów (do instalacji samego PostgreSQL): pacman (Arch/CachyOS),
 # apt (Debian/Ubuntu), dnf (Fedora/RHEL). Inna dystrybucja: zainstaluj PostgreSQL ręcznie
@@ -101,6 +103,9 @@ msg() {
         pl:step_service)    text="== 5/6: Konfiguracja i usługa systemd ==" ;;
         de:step_service)    text="== 5/6: Konfiguration und systemd-Dienst ==" ;;
         *:step_service)     text="== 5/6: Configuration and systemd service ==" ;;
+        pl:bad_db_name)     text="'%s' nie nadaje się na nazwę bazy ani roli — dozwolone małe litery, cyfry i podkreślenie." ;;
+        de:bad_db_name)     text="'%s' taugt nicht als Datenbank- oder Rollenname — erlaubt sind Kleinbuchstaben, Ziffern und Unterstrich." ;;
+        *:bad_db_name)      text="'%s' cannot be used as a database or role name — use lowercase letters, digits and underscores." ;;
         pl:bad_port)        text="PDM_PORT=%s nie jest poprawnym numerem portu (1-65535)." ;;
         de:bad_port)        text="PDM_PORT=%s ist keine gültige Portnummer (1-65535)." ;;
         *:bad_port)         text="PDM_PORT=%s is not a valid port number (1-65535)." ;;
@@ -159,8 +164,6 @@ fi
 DATA_DIR=/var/lib/easypdm
 CONFIG_DIR=/etc/easypdm
 SERVICE_USER=easypdm
-DB_NAME=pdm
-DB_USER=pdm_user
 
 echo "== 1/6: PostgreSQL =="
 if command -v pacman >/dev/null 2>&1; then
@@ -197,7 +200,7 @@ if command -v pacman >/dev/null 2>&1 && [ ! -s /var/lib/postgres/data/PG_VERSION
     # Uwierzytelnianie podane JAWNIE. Gołe initdb ustawia "trust" — każdy użytkownik tej maszyny
     # łączyłby się wtedy z bazą jako dowolna rola, łącznie z superużytkownikiem postgres, bez
     # hasła. peer dla gniazda lokalnego wystarcza poleceniom "sudo -u postgres ..." w tym
-    # skrypcie, a scram-sha-256 przez TCP — aplikacji, która loguje się hasłem pdm_user. Tak
+    # skrypcie, a scram-sha-256 przez TCP — aplikacji, która loguje się hasłem swojej roli. Tak
     # samo, jak klaster domyślnie konfigurują Debian i Ubuntu.
     sudo -u postgres initdb -D /var/lib/postgres/data --auth-local=peer --auth-host=scram-sha-256
 fi
@@ -214,9 +217,40 @@ for _ in $(seq 1 10); do
 done
 
 msg step_db
-DB_PASSWORD="${PDM_DB_PASSWORD:-}"
+# Baza, rola i hasło. Kolejność:
+#   1. PDM_DB_NAME / PDM_DB_USER / PDM_DB_PASSWORD podane jawnie.
+#   2. To, czego używa istniejąca instalacja (ConnectionString w easypdm.env) — aktualizacja
+#      zostaje przy swojej bazie i swoim haśle. Dotąd hasło roli było generowane od nowa przy
+#      każdym uruchomieniu.
+#   3. Świeża instalacja: baza i rola "easypdm", jak konto systemowe usługi.
+# Dotąd było na sztywno "pdm" / "pdm_user" — te same nazwy, których używa środowisko
+# deweloperskie i przykłady w dokumentacji. Na maszynie programisty instalator przejmował więc
+# jego bazę i po cichu zmieniał hasło jego roli (wyłapane w praktyce na CachyOS). Instalacje
+# z 0.6 i starszych mają "pdm" zapisane w easypdm.env, więc punkt 2 zostawia je przy niej.
+CONFIG_FILE="${CONFIG_DIR}/easypdm.env"
+CURRENT_DB_NAME=""; CURRENT_DB_USER=""; CURRENT_DB_PASSWORD=""
+if [ -f "${CONFIG_FILE}" ]; then
+    CURRENT_CS="$(sed -n 's/^ConnectionString=//p' "${CONFIG_FILE}" | head -n 1)"
+    cs_part() { printf '%s' "${CURRENT_CS}" | tr ';' '\n' | sed -n "s/^$1=//p" | head -n 1; }
+    CURRENT_DB_NAME="$(cs_part Database)"
+    CURRENT_DB_USER="$(cs_part Username)"
+    CURRENT_DB_PASSWORD="$(cs_part Password)"
+fi
+DB_NAME="${PDM_DB_NAME:-${CURRENT_DB_NAME:-easypdm}}"
+DB_USER="${PDM_DB_USER:-${CURRENT_DB_USER:-easypdm}}"
+# Nazwy trafiają wprost do poleceń SQL, więc tylko bezpieczne identyfikatory.
+for name in "${DB_NAME}" "${DB_USER}"; do
+    if ! [[ "${name}" =~ ^[a-z_][a-z0-9_]*$ ]]; then
+        msg bad_db_name "${name}" >&2
+        exit 1
+    fi
+done
 GENERATED_PASSWORD=0
-if [ -z "$DB_PASSWORD" ]; then
+if [ -n "${PDM_DB_PASSWORD:-}" ]; then
+    DB_PASSWORD="${PDM_DB_PASSWORD}"
+elif [ -n "${CURRENT_DB_PASSWORD}" ] && [ "${DB_USER}" = "${CURRENT_DB_USER}" ]; then
+    DB_PASSWORD="${CURRENT_DB_PASSWORD}"
+else
     DB_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32)"
     GENERATED_PASSWORD=1
 fi
@@ -310,15 +344,15 @@ else
 fi
 # Sekrety (hasło do bazy) w osobnym pliku z ograniczonymi uprawnieniami — nie w samej
 # jednostce systemd w /etc/systemd/system/, która bywa czytelna dla wszystkich.
-cat > "${CONFIG_DIR}/easypdm.env" <<EOF
+cat > "${CONFIG_FILE}" <<EOF
 ConnectionString=Host=localhost;Port=5432;Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD}
 StorageRoot=${DATA_DIR}/storage
 BackupRoot=${DATA_DIR}/backups
 LogRoot=${DATA_DIR}/logs
 ASPNETCORE_URLS=http://0.0.0.0:${PORT}
 EOF
-chmod 600 "${CONFIG_DIR}/easypdm.env"
-chown root:root "${CONFIG_DIR}/easypdm.env"
+chmod 600 "${CONFIG_FILE}"
+chown root:root "${CONFIG_FILE}"
 
 cat > /etc/systemd/system/easypdm.service <<EOF
 [Unit]
@@ -379,7 +413,7 @@ msg migrations
 msg first_login
 msg status
 if [ "$GENERATED_PASSWORD" -eq 1 ]; then
-    msg gen_password "${CONFIG_DIR}/easypdm.env"
+    msg gen_password "${CONFIG_FILE}"
 fi
 # Tylko gdy port RÓŻNI się od domyślnego — jak w install-easypdm-docker.sh.
 if [ "$GENERATED_PORT" -eq 1 ] && [ "$PORT" != "5000" ]; then

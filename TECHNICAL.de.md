@@ -766,8 +766,12 @@ sudo ./install-easypdm-linux.sh
 Ein einziges Skript: installiert PostgreSQL, falls noch nicht vorhanden (erkennt
 `pacman`/`apt`/`dnf` — unter Arch/CachyOS initialisiert es zusätzlich selbst den
 Cluster, da das dortige Paket dies im Gegensatz zu Debian/Fedora nicht automatisch tut),
-legt die Rolle und die Datenbank `pdm` an (generiert ein zufälliges Passwort, falls Sie
-kein eigenes über `PDM_DB_PASSWORD=... sudo -E ./install-easypdm-linux.sh` angeben),
+legt eine eigene Rolle und Datenbank `easypdm` an (zufälliges Passwort, sofern nicht
+`sudo PDM_DB_PASSWORD=...` eines vorgibt; ein Update bleibt bei Datenbank, Rolle und Passwort,
+die die Installation bereits nutzt — gelesen aus `/etc/easypdm/easypdm.env`;
+`PDM_DB_NAME`/`PDM_DB_USER` verweisen anderswohin. Bis 0.6 hießen sie `pdm`/`pdm_user`, wie in
+einer Entwicklungsumgebung, sodass das Installationsprogramm auf einem Entwicklerrechner jene
+Datenbank übernahm und das Passwort ihrer Rolle zurücksetzte),
 baut das Frontend und veröffentlicht das Backend als **eigenständige einzelne
 ausführbare Datei** (`dotnet publish -r linux-x64 --self-contained
 -p:PublishSingleFile=true` — der fertige Dienst benötigt kein installiertes .NET mehr,
@@ -777,9 +781,11 @@ installiert einen systemd-Dienst (`easypdm.service`, Autostart, `ProtectSystem=s
 System schreiben). Nach der Installation: die vom Installationsprogramm genannte Adresse (meist `http://localhost:5000`), Status über
 `systemctl status easypdm`, Live-Protokolle über `journalctl -u easypdm -f`
 (unabhängig vom eigenen Anwendungsprotokoll unter Einstellungen -> Protokolle).
-Deinstallation: `sudo ./uninstall-easypdm-linux.sh` (rührt bewusst NICHT die Datenbank
-selbst oder PostgreSQL an — das wird manuell entschieden, damit Daten nicht versehentlich
-gelöscht werden).
+Deinstallation: `sudo ./uninstall-easypdm-linux.sh` fragt vorab, ob auch Datenbank, Rolle
+und der gesamte Inhalt von `/var/lib/easypdm` entfernt werden sollen — standardmäßig nein, mit
+einer zusätzlichen Warnung, wenn die Datenbank nicht `easypdm` heißt, da sie dann etwas anderem
+dienen kann. Ohne Terminal bleiben die Daten erhalten; `sudo PDM_REMOVE_DATA=yes|no` entscheidet
+ohne Rückfrage. PostgreSQL selbst wird nie entfernt.
 
 **Port, Sprache, PostgreSQL-Authentifizierung.** Eine frische Installation lauscht auf dem ersten freien Port ab 5000 (normalerweise 5000 selbst); ein Update behält den Port, den der Dienst bereits nutzt, damit Lesezeichen, CAD-Makros und andere Rechner weiter funktionieren; `sudo PDM_PORT=8080 ./install-easypdm-linux.sh` setzt ihn ausdrücklich, auch bei einem Update. Erfolg wird erst gemeldet, wenn auf diesem Port EasyPDM selbst antwortet — geprüft wird der Seitentitel, ein anderes Programm auf dem Port zählt also nicht. Bis 0.7 war der Port fest 5000, und das Skript meldete den Dienst als laufend, auch wenn er auf einem von jemand anderem belegten Port abgestürzt war. Die Meldungen folgen der Systemsprache (Polnisch, Deutsch, sonst Englisch, nach denselben Regeln wie das Docker-Installationsprogramm), und `sudo EASYPDM_LANG=en ./install-easypdm-linux.sh` erzwingt eine — die Variable steht nach `sudo`, das `LANG`, `LANGUAGE` und `LC_*` durchlässt, andere aber verwirft. Unter Arch/CachyOS verwendet der vom Installationsprogramm angelegte Cluster `peer` für lokale Verbindungen und `scram-sha-256` über TCP; ein nacktes `initdb` setzt `trust`, wobei sich jeder Benutzer der Maschine als beliebige Rolle verbinden konnte, `postgres` eingeschlossen. Vor 0.7 angelegte Cluster bleiben unverändert — prüfen Sie `/var/lib/postgres/data/pg_hba.conf`.
 

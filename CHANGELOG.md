@@ -4,11 +4,15 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [0.7]
 
+### Added
+- **The Linux uninstaller asks whether to remove the database and data as well.** It used to leave them and print the commands to do it by hand. Now it asks up front — before anything is removed, default no — and removes the database, its role and everything in `/var/lib/easypdm` (files, backups, logs) only on a yes. A database not created under EasyPDM's own name gets an extra warning first, since something else may be using it. Without a terminal nothing is asked and the data stays; `sudo PDM_REMOVE_DATA=yes` removes it without asking.
+
 ### Changed
 - **The native Linux installer picks a free port, keeps it on update and only says it is running once it is.** The port used to be fixed at 5000: with something else already there — say EasyPDM in Docker on the same machine — the service died on start while the installer still announced it at `:5000`. A fresh install now takes the first free port from 5000, an update keeps the port the service already uses, and `sudo PDM_PORT=8080 ./install-easypdm-linux.sh` sets one explicitly. The address is printed only after EasyPDM itself has answered on it.
 - **The native Linux installer and uninstaller speak your language**, picking Polish, German or English from the system settings like the Docker installer and the CAD macros; `sudo EASYPDM_LANG=en ./install-easypdm-linux.sh` forces one.
 
 ### Fixed
+- **The native Linux installer no longer takes over an existing `pdm` database.** It used the names `pdm` and `pdm_user` — the same as a development setup — so on a developer's machine it adopted that database and silently changed its role's password. A fresh install now creates its own database and role named `easypdm`; an update keeps whatever the installation already uses, so installations from 0.6 stay on their data. Updates also stopped generating a new database password on every run.
 - **On Arch and CachyOS, the PostgreSQL the installer sets up no longer lets every local user in without a password.** It created the database cluster with a bare `initdb`, which allows any local user to connect as any role, the database superuser included. New clusters now require the system account locally and a password over the network, as Debian and Ubuntu do by default. A cluster created by an earlier version is left untouched; to tighten it, change `trust` in `/var/lib/postgres/data/pg_hba.conf` to `peer` for local and `scram-sha-256` for host lines and restart PostgreSQL.
 
 ## [0.6]

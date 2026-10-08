@@ -34,6 +34,18 @@ jobs:
       # Każde uruchomienie instalatora zapisuje swój wynik do pliku, a kolejny krok sprawdza, co
       # ogłosił — i czy pod ogłoszonym adresem odpowiada naprawdę EasyPDM (tytuł strony), a nie
       # cokolwiek. Runner ma locale C.UTF-8, więc domyślnie komunikaty są angielskie.
+      # Maszyna programisty: na tym samym PostgreSQL jest już baza "pdm" z rolą "pdm_user" — te
+      # same nazwy, których instalator używał do 0.6. Przejmował ją wtedy i zmieniał hasło roli
+      # (wyłapane w praktyce). Ma ją zostawić w spokoju przez cały test: instalację, aktualizację
+      # i oba warianty deinstalacji.
+      - name: "Symulacja bazy deweloperskiej (pdm / pdm_user)"
+        run: |
+          sudo apt-get install -y postgresql > /dev/null
+          sudo systemctl start postgresql
+          sudo -u postgres psql -c "CREATE ROLE pdm_user LOGIN PASSWORD 'dev';"
+          sudo -u postgres createdb -O pdm_user pdm
+          PGPASSWORD=dev psql -h localhost -U pdm_user -d pdm -c "CREATE TABLE dev_marker(x int); INSERT INTO dev_marker VALUES (42);"
+
       - name: Zainstaluj od zera
         run: |
           set -o pipefail
@@ -47,6 +59,10 @@ jobs:
           fi
           curl -sf http://localhost:5000/ | grep -q '<title>EasyPDM'
           systemctl status easypdm --no-pager
+          # Własna baza i rola, a baza deweloperska nietknięta — z tym samym hasłem i danymi.
+          sudo grep -q 'Database=easypdm;Username=easypdm;' /etc/easypdm/easypdm.env
+          PGPASSWORD=dev psql -h localhost -U pdm_user -d pdm -tAc "SELECT x FROM dev_marker" | grep -qx 42
+          sudo grep '^ConnectionString=' /etc/easypdm/easypdm.env > cs-before.txt
 
       # Język z ustawień systemu, nie z wymuszenia: LC_ALL i LANGUAGE puste, żeby decydował LANG.
       - name: "Aktualizacja po polsku: port zostaje ten sam"
@@ -58,6 +74,8 @@ jobs:
         run: |
           grep -F "EasyPDM działa pod http://localhost:5000" install-2.log
           grep -F "już istnieje" install-2.log
+          # Aktualizacja zostaje przy swojej bazie i swoim haśle (dotąd generowała nowe za każdym razem).
+          sudo grep '^ConnectionString=' /etc/easypdm/easypdm.env | diff - cs-before.txt
           curl -sf http://localhost:5000/ | grep -q '<title>EasyPDM'
 
       - name: "PDM_PORT przenosi usługę na wskazany port"
@@ -80,7 +98,9 @@ jobs:
 
       - name: Sprawdź, że usługa faktycznie zniknęła
         run: |
-          grep -F "Done. NOT removed" uninstall-1.log
+          # Bez terminala deinstalator nie pyta i dane zostawia.
+          grep -F "The data was kept" uninstall-1.log
+          test -n "$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='easypdm'")"
           if systemctl status easypdm --no-pager 2>&1 | grep -q "could not be found"; then
             echo "Usługa poprawnie usunięta."
           else
@@ -107,6 +127,19 @@ jobs:
           if curl -s http://localhost:5000/ | grep -q '<title>EasyPDM'; then
             echo "::error::Na porcie 5000 miał zostać inny program."; exit 1
           fi
+
+      - name: "Odinstaluj z usunięciem danych (PDM_REMOVE_DATA=yes)"
+        run: |
+          set -o pipefail
+          sudo PDM_REMOVE_DATA=yes ./uninstall-easypdm-linux.sh | tee uninstall-2.log
+
+      - name: "Sprawdź: dane EasyPDM usunięte, baza deweloperska nietknięta"
+        run: |
+          grep -F "Removed the database 'easypdm'" uninstall-2.log
+          test -z "$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='easypdm'")"
+          test -z "$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='easypdm'")"
+          test ! -e /var/lib/easypdm
+          PGPASSWORD=dev psql -h localhost -U pdm_user -d pdm -tAc "SELECT x FROM dev_marker" | grep -qx 42
 
       - name: Posprzątaj
         if: always()

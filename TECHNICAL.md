@@ -872,9 +872,12 @@ sudo ./install-easypdm-linux.sh
 
 One script: installs PostgreSQL if it isn't there yet (recognizes `pacman`/`apt`/`dnf`
 — on Arch/CachyOS it additionally initializes the cluster itself, since that package,
-unlike Debian's/Fedora's, doesn't do it automatically), creates the `pdm` role and
-database (generates a random password if you don't supply your own via
-`PDM_DB_PASSWORD=... sudo -E ./install-easypdm-linux.sh`), builds the frontend and
+unlike Debian's/Fedora's, doesn't do it automatically), creates its own `easypdm`
+role and database (random password unless `sudo PDM_DB_PASSWORD=...` gives one; an update
+keeps the database, role and password the installation already uses, read from
+`/etc/easypdm/easypdm.env`; `PDM_DB_NAME`/`PDM_DB_USER` point it elsewhere — up to 0.6 the
+names were `pdm`/`pdm_user`, the same as a development setup's, so on a developer's machine
+the installer took that database over and reset its role's password), builds the frontend and
 publishes the backend as a **self-contained single executable file**
 (`dotnet publish -r linux-x64 --self-contained -p:PublishSingleFile=true` — the finished
 service no longer requires .NET to be installed, only at build time), creates a
@@ -883,9 +886,11 @@ dedicated, unprivileged system account `easypdm`, and installs a systemd service
 `/var/lib/easypdm` — the service cannot write anywhere else in the system). After
 installation: the address the installer prints (usually `http://localhost:5000`), status via `systemctl status easypdm`, live logs
 via `journalctl -u easypdm -f` (independent of the application's own log under Settings
-→ Logs). Uninstalling: `sudo ./uninstall-easypdm-linux.sh` (deliberately does NOT touch
-the database itself or PostgreSQL — that's a decision made manually, so data isn't
-deleted by accident).
+→ Logs). Uninstalling: `sudo ./uninstall-easypdm-linux.sh` asks up front whether to remove the
+database, role and everything in `/var/lib/easypdm` too — default no, with an extra warning
+when the database is not called `easypdm`, since then it may serve something else. Without
+a terminal it keeps them; `sudo PDM_REMOVE_DATA=yes|no` decides without asking. PostgreSQL
+itself is never removed.
 
 **Port, language, PostgreSQL authentication.** A fresh install listens on the first free port
 from 5000 (normally 5000 itself); an update keeps the port the service already uses, so
