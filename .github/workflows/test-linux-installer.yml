@@ -3,7 +3,8 @@ name: Test Linux Installer
 # Uruchamia NAPRAWDĘ install-easypdm-linux.sh na czystym Ubuntu (runner ma sudo bez hasła,
 # czego zabrakło w lokalnym środowisku deweloperskim, gdzie ten skrypt dało się tylko
 # przejrzeć/zweryfikować składniowo) — sprawdza pełną instalację od zera, "aktualizację"
-# (drugie uruchomienie) i odinstalowanie.
+# (drugie uruchomienie), wybór portu (zachowanie przy aktualizacji, PDM_PORT, zajęty 5000),
+# język komunikatów i odinstalowanie.
 on:
   workflow_dispatch:
   push:
@@ -30,45 +31,56 @@ jobs:
         with:
           node-version: 24
 
+      # Każde uruchomienie instalatora zapisuje swój wynik do pliku, a kolejny krok sprawdza, co
+      # ogłosił — i czy pod ogłoszonym adresem odpowiada naprawdę EasyPDM (tytuł strony), a nie
+      # cokolwiek. Runner ma locale C.UTF-8, więc domyślnie komunikaty są angielskie.
       - name: Zainstaluj od zera
-        run: sudo ./install-easypdm-linux.sh
-
-      - name: Sprawdź status usługi i odpowiedź serwera
         run: |
-          systemctl status easypdm --no-pager
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:5000/ > /dev/null; then
-              echo "EasyPDM odpowiada poprawnie po świeżej instalacji."
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::EasyPDM nie odpowiedziało pod http://localhost:5000 po instalacji."
-          journalctl -u easypdm --no-pager | tail -100
-          exit 1
+          set -o pipefail
+          sudo ./install-easypdm-linux.sh | tee install-1.log
 
-      - name: Uruchom ponownie (symulacja aktualizacji)
-        run: sudo ./install-easypdm-linux.sh
-
-      - name: Sprawdź, czy serwer odpowiada też po "aktualizacji"
+      - name: "Świeża instalacja: port 5000, komunikaty po angielsku"
         run: |
+          grep -F "EasyPDM is running at http://localhost:5000" install-1.log
+          if grep -qF "was taken" install-1.log; then
+            echo "::error::Wolny port 5000, a instalator twierdzi, że był zajęty."; exit 1
+          fi
+          curl -sf http://localhost:5000/ | grep -q '<title>EasyPDM'
           systemctl status easypdm --no-pager
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:5000/ > /dev/null; then
-              echo "EasyPDM odpowiada poprawnie po symulowanej aktualizacji."
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::EasyPDM nie odpowiedziało pod http://localhost:5000 po drugiej instalacji."
-          journalctl -u easypdm --no-pager | tail -100
-          exit 1
+
+      # Język z ustawień systemu, nie z wymuszenia: LC_ALL i LANGUAGE puste, żeby decydował LANG.
+      - name: "Aktualizacja po polsku: port zostaje ten sam"
+        run: |
+          set -o pipefail
+          sudo LC_ALL= LANGUAGE= LANG=pl_PL.UTF-8 ./install-easypdm-linux.sh | tee install-2.log
+
+      - name: Sprawdź aktualizację
+        run: |
+          grep -F "EasyPDM działa pod http://localhost:5000" install-2.log
+          grep -F "już istnieje" install-2.log
+          curl -sf http://localhost:5000/ | grep -q '<title>EasyPDM'
+
+      - name: "PDM_PORT przenosi usługę na wskazany port"
+        run: |
+          set -o pipefail
+          sudo PDM_PORT=5055 ./install-easypdm-linux.sh | tee install-3.log
+
+      - name: Sprawdź przeniesienie
+        run: |
+          grep -F "EasyPDM is running at http://localhost:5055" install-3.log
+          curl -sf http://localhost:5055/ | grep -q '<title>EasyPDM'
+          if curl -sf http://localhost:5000/ > /dev/null; then
+            echo "::error::Usługa nadal odpowiada na starym porcie 5000."; exit 1
+          fi
 
       - name: Odinstaluj
-        run: sudo ./uninstall-easypdm-linux.sh
+        run: |
+          set -o pipefail
+          sudo ./uninstall-easypdm-linux.sh | tee uninstall-1.log
 
       - name: Sprawdź, że usługa faktycznie zniknęła
         run: |
+          grep -F "Done. NOT removed" uninstall-1.log
           if systemctl status easypdm --no-pager 2>&1 | grep -q "could not be found"; then
             echo "Usługa poprawnie usunięta."
           else
@@ -76,3 +88,28 @@ jobs:
             systemctl status easypdm --no-pager || true
             exit 1
           fi
+
+      # Port 5000 trzyma inny program (tak jak EasyPDM w Dockerze na tej samej maszynie). Dotąd
+      # usługa padała na zajętym porcie, a instalator i tak pisał, że działa pod :5000.
+      - name: "Zajęty port 5000: instalator bierze następny wolny"
+        run: |
+          set -o pipefail
+          python3 -m http.server 5000 --bind 127.0.0.1 > /dev/null 2>&1 &
+          echo $! > blocker.pid
+          sleep 1
+          sudo ./install-easypdm-linux.sh | tee install-4.log
+
+      - name: Sprawdź wybór portu
+        run: |
+          grep -F "EasyPDM is running at http://localhost:5001" install-4.log
+          grep -F "Port 5000 was taken, so 5001 was chosen" install-4.log
+          curl -sf http://localhost:5001/ | grep -q '<title>EasyPDM'
+          if curl -s http://localhost:5000/ | grep -q '<title>EasyPDM'; then
+            echo "::error::Na porcie 5000 miał zostać inny program."; exit 1
+          fi
+
+      - name: Posprzątaj
+        if: always()
+        run: |
+          kill "$(cat blocker.pid)" 2>/dev/null || true
+          sudo ./uninstall-easypdm-linux.sh || true

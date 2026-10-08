@@ -79,7 +79,8 @@ nie, wskaże stronę, skąd go pobrać, zanim będzie mógł kontynuować).
   startującą automatycznie razem z maszyną.
 
 W obu przypadkach EasyPDM ląduje pod `http://localhost:5000` (albo adresem maszyny w
-sieci, z innego komputera). Pełne szczegóły, aktualizacja i deinstalacja: patrz
+sieci, z innego komputera) — a gdy port 5000 jest już zajęty, pod kolejnym wolnym;
+instalator podaje adres na końcu. Pełne szczegóły, aktualizacja i deinstalacja: patrz
 [`TECHNICAL.pl.md`](TECHNICAL.pl.md).
 
 Przy pierwszym logowaniu do całkiem świeżo zainstalowanego EasyPDM: login `admin`, hasło

@@ -2,6 +2,15 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.7]
+
+### Changed
+- **The native Linux installer picks a free port, keeps it on update and only says it is running once it is.** The port used to be fixed at 5000: with something else already there — say EasyPDM in Docker on the same machine — the service died on start while the installer still announced it at `:5000`. A fresh install now takes the first free port from 5000, an update keeps the port the service already uses, and `sudo PDM_PORT=8080 ./install-easypdm-linux.sh` sets one explicitly. The address is printed only after EasyPDM itself has answered on it.
+- **The native Linux installer and uninstaller speak your language**, picking Polish, German or English from the system settings like the Docker installer and the CAD macros; `sudo EASYPDM_LANG=en ./install-easypdm-linux.sh` forces one.
+
+### Fixed
+- **On Arch and CachyOS, the PostgreSQL the installer sets up no longer lets every local user in without a password.** It created the database cluster with a bare `initdb`, which allows any local user to connect as any role, the database superuser included. New clusters now require the system account locally and a password over the network, as Debian and Ubuntu do by default. A cluster created by an earlier version is left untouched; to tighten it, change `trust` in `/var/lib/postgres/data/pg_hba.conf` to `peer` for local and `scram-sha-256` for host lines and restart PostgreSQL.
+
 ## [0.6]
 
 ### Added

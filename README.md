@@ -79,7 +79,8 @@ it can continue).
   starts automatically with the machine.
 
 Either way, EasyPDM ends up at `http://localhost:5000` (or the machine's address on
-your network, from another computer). Full details, updating, and uninstalling: see
+your network, from another computer) — or at the next free port if 5000 is already taken;
+the installer prints the address at the end. Full details, updating, and uninstalling: see
 [`TECHNICAL.md`](TECHNICAL.md).
 
 First login on a freshly installed EasyPDM: username `admin`, password `admin` — change

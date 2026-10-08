@@ -87,7 +87,8 @@ verweist er auf die Download-Seite, bevor er fortfahren kann).
   `systemd`-Dienst, der automatisch mit der Maschine startet.
 
 In beiden Fällen landet EasyPDM unter `http://localhost:5000` (oder der Adresse der
-Maschine im Netzwerk, von einem anderen Computer aus). Vollständige Details,
+Maschine im Netzwerk, von einem anderen Computer aus) — oder am nächsten freien Port, falls
+5000 schon belegt ist; das Installationsprogramm nennt die Adresse am Ende. Vollständige Details,
 Aktualisierung und Deinstallation: siehe [`TECHNICAL.de.md`](TECHNICAL.de.md).
 
 Erste Anmeldung bei einem frisch installierten EasyPDM: Benutzername `admin`, Passwort

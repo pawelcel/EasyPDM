@@ -881,11 +881,26 @@ service no longer requires .NET to be installed, only at build time), creates a
 dedicated, unprivileged system account `easypdm`, and installs a systemd service
 (`easypdm.service`, autostart, `ProtectSystem=strict` + `ReadWritePaths` limited to
 `/var/lib/easypdm` — the service cannot write anywhere else in the system). After
-installation: `http://localhost:5000`, status via `systemctl status easypdm`, live logs
+installation: the address the installer prints (usually `http://localhost:5000`), status via `systemctl status easypdm`, live logs
 via `journalctl -u easypdm -f` (independent of the application's own log under Settings
 → Logs). Uninstalling: `sudo ./uninstall-easypdm-linux.sh` (deliberately does NOT touch
 the database itself or PostgreSQL — that's a decision made manually, so data isn't
 deleted by accident).
+
+**Port, language, PostgreSQL authentication.** A fresh install listens on the first free port
+from 5000 (normally 5000 itself); an update keeps the port the service already uses, so
+bookmarks, CAD macros and other computers keep working; `sudo PDM_PORT=8080
+./install-easypdm-linux.sh` sets one explicitly, on an update too. Success is announced only
+once EasyPDM itself answers on that port — the page title is checked, so another program
+holding the port does not count. Until 0.7 the port was fixed at 5000 and the script reported
+the service as running even when it had died on a port someone else held. Messages follow the
+system language (Polish, German, otherwise English, by the same rules as the Docker
+installer) and `sudo EASYPDM_LANG=en ./install-easypdm-linux.sh` forces one — the variable
+goes after `sudo`, which keeps `LANG`, `LANGUAGE` and `LC_*` but drops others. On Arch/CachyOS
+the cluster the installer creates uses `peer` for local connections and `scram-sha-256` over
+TCP; a bare `initdb` sets `trust`, under which any local user could connect as any role,
+`postgres` included. Clusters created before 0.7 are left as they are — check
+`/var/lib/postgres/data/pg_hba.conf`.
 
 **Update**: `git pull`, then `sudo ./install-easypdm-linux.sh` again — it detects the
 existing database/account (skips creating them), rebuilds and replaces only the

@@ -703,10 +703,12 @@ NIE wymaga już zainstalowanego .NET-a, tylko sam czas budowy), zakłada dedykow
 nieuprzywilejowane konto systemowe `easypdm`, i instaluje usługę systemd
 (`easypdm.service`, autostart, `ProtectSystem=strict` + `ReadWritePaths` ograniczone do
 `/var/lib/easypdm` — usługa nie może pisać nigdzie indziej w systemie). Po instalacji:
-`http://localhost:5000`, status przez `systemctl status easypdm`, logi na żywo przez
+adres podany przez instalator (zwykle `http://localhost:5000`), status przez `systemctl status easypdm`, logi na żywo przez
 `journalctl -u easypdm -f` (niezależnie od własnego dziennika aplikacji w Ustawienia ->
 Logi). Odinstalowanie: `sudo ./uninstall-easypdm-linux.sh` (celowo NIE rusza samej bazy danych ani
 PostgreSQL — o tym decyduje się ręcznie, żeby nie skasować danych przez pomyłkę).
+
+**Port, język, uwierzytelnianie PostgreSQL.** Świeża instalacja słucha na pierwszym wolnym porcie od 5000 (zwykle na samym 5000); aktualizacja zostawia port, na którym usługa już działa, żeby zakładki, makra CAD i inne komputery dalej trafiały; `sudo PDM_PORT=8080 ./install-easypdm-linux.sh` ustawia go jawnie, także przy aktualizacji. Sukces jest ogłaszany dopiero wtedy, gdy na tym porcie odpowiada samo EasyPDM — sprawdzany jest tytuł strony, więc inny program trzymający port się nie liczy. Do wersji 0.7 port był na sztywno 5000, a skrypt pisał, że usługa działa, nawet gdy padła na porcie zajętym przez kogoś innego. Komunikaty idą w języku systemu (polski, niemiecki, w pozostałych przypadkach angielski, według tych samych reguł co instalator dockerowy), a `sudo EASYPDM_LANG=en ./install-easypdm-linux.sh` wymusza język — zmienna stoi po `sudo`, które przepuszcza `LANG`, `LANGUAGE` i `LC_*`, ale inne odrzuca. Na Archu/CachyOS klaster zakładany przez instalator używa `peer` dla połączeń lokalnych i `scram-sha-256` przez TCP; gołe `initdb` ustawia `trust`, przy którym każdy użytkownik maszyny mógł się połączyć jako dowolna rola, łącznie z `postgres`. Klastry założone przed 0.7 zostają bez zmian — sprawdź `/var/lib/postgres/data/pg_hba.conf`.
 
 **Aktualizacja**: `git pull`, potem `sudo ./install-easypdm-linux.sh` ponownie — wykrywa istniejącą
 bazę/konto (pomija ich zakładanie), przebudowuje i podmienia tylko aplikację, jawnie

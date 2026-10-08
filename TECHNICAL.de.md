@@ -774,12 +774,14 @@ ausführbare Datei** (`dotnet publish -r linux-x64 --self-contained
 nur zur Bauzeit), legt ein dediziertes, unprivilegiertes Systemkonto `easypdm` an und
 installiert einen systemd-Dienst (`easypdm.service`, Autostart, `ProtectSystem=strict` +
 `ReadWritePaths` beschränkt auf `/var/lib/easypdm` — der Dienst kann nirgendwo sonst im
-System schreiben). Nach der Installation: `http://localhost:5000`, Status über
+System schreiben). Nach der Installation: die vom Installationsprogramm genannte Adresse (meist `http://localhost:5000`), Status über
 `systemctl status easypdm`, Live-Protokolle über `journalctl -u easypdm -f`
 (unabhängig vom eigenen Anwendungsprotokoll unter Einstellungen -> Protokolle).
 Deinstallation: `sudo ./uninstall-easypdm-linux.sh` (rührt bewusst NICHT die Datenbank
 selbst oder PostgreSQL an — das wird manuell entschieden, damit Daten nicht versehentlich
 gelöscht werden).
+
+**Port, Sprache, PostgreSQL-Authentifizierung.** Eine frische Installation lauscht auf dem ersten freien Port ab 5000 (normalerweise 5000 selbst); ein Update behält den Port, den der Dienst bereits nutzt, damit Lesezeichen, CAD-Makros und andere Rechner weiter funktionieren; `sudo PDM_PORT=8080 ./install-easypdm-linux.sh` setzt ihn ausdrücklich, auch bei einem Update. Erfolg wird erst gemeldet, wenn auf diesem Port EasyPDM selbst antwortet — geprüft wird der Seitentitel, ein anderes Programm auf dem Port zählt also nicht. Bis 0.7 war der Port fest 5000, und das Skript meldete den Dienst als laufend, auch wenn er auf einem von jemand anderem belegten Port abgestürzt war. Die Meldungen folgen der Systemsprache (Polnisch, Deutsch, sonst Englisch, nach denselben Regeln wie das Docker-Installationsprogramm), und `sudo EASYPDM_LANG=en ./install-easypdm-linux.sh` erzwingt eine — die Variable steht nach `sudo`, das `LANG`, `LANGUAGE` und `LC_*` durchlässt, andere aber verwirft. Unter Arch/CachyOS verwendet der vom Installationsprogramm angelegte Cluster `peer` für lokale Verbindungen und `scram-sha-256` über TCP; ein nacktes `initdb` setzt `trust`, wobei sich jeder Benutzer der Maschine als beliebige Rolle verbinden konnte, `postgres` eingeschlossen. Vor 0.7 angelegte Cluster bleiben unverändert — prüfen Sie `/var/lib/postgres/data/pg_hba.conf`.
 
 **Update**: `git pull`, dann `sudo ./install-easypdm-linux.sh` erneut ausführen — es
 erkennt die vorhandene Datenbank/das vorhandene Konto (überspringt deren Anlage), baut
