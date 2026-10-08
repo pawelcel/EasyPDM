@@ -779,7 +779,9 @@ For deployment: `npm run build` in `EasyPDM.Web/` overwrites `EasyPDM.Api/wwwroo
 database password if you don't supply your own), picks a FREE host port on its own
 (tries from 5000 upward — useful on a server where other services may already be
 holding onto ports, which in practice is a common case), builds and starts the
-containers. Run the same script again after `git pull` to update — it detects an
+containers. Its messages follow the system language (Polish, German, otherwise English; `LC_ALL`, then
+`LC_MESSAGES`, then `LANG`, with `LANGUAGE` taking precedence unless the locale is `C`), and
+`EASYPDM_LANG=en|pl|de` overrides all of it. Run the same script again after `git pull` to update — it detects an
 existing `.env` and doesn't overwrite anything in it.
 
 Or manually:

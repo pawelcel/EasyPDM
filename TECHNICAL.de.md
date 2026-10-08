@@ -667,7 +667,9 @@ Für die Bereitstellung: `npm run build` in `EasyPDM.Web/` überschreibt
 zufälliges Datenbankpasswort, falls Sie kein eigenes angeben), wählt selbst einen
 FREIEN Host-Port (versucht ab 5000 aufwärts — nützlich auf einem Server, auf dem andere
 Dienste möglicherweise schon Ports belegen, was in der Praxis ein häufiger Fall ist),
-baut und startet die Container. Führen Sie dasselbe Skript nach einem `git pull` erneut
+baut und startet die Container. Die Meldungen folgen der Systemsprache (Polnisch, Deutsch,
+sonst Englisch; `LC_ALL`, dann `LC_MESSAGES`, dann `LANG`, wobei `LANGUAGE` Vorrang hat, sofern
+die Locale nicht `C` ist), und `EASYPDM_LANG=en|pl|de` erzwingt eine Sprache. Führen Sie dasselbe Skript nach einem `git pull` erneut
 aus, um zu aktualisieren — es erkennt eine vorhandene `.env` und überschreibt darin
 nichts.
 

@@ -609,7 +609,9 @@ Do wdrożenia: `npm run build` w `EasyPDM.Web/` nadpisuje `EasyPDM.Api/wwwroot/`
 **Najprościej**: `./install-easypdm-docker.sh` — zakłada `.env` (generuje losowe hasło do
 bazy, jeśli nie podasz własnego), sam wybiera WOLNY port hosta (próbuje od 5000 wzwyż —
 przydatne na serwerze, gdzie inne usługi mogą już coś tam trzymać, co w praktyce jest częstym
-przypadkiem), buduje i uruchamia kontenery. Uruchom ten sam skrypt ponownie po `git pull`,
+przypadkiem), buduje i uruchamia kontenery. Komunikaty idą w języku systemu (polski, niemiecki, w pozostałych przypadkach angielski;
+`LC_ALL`, potem `LC_MESSAGES`, potem `LANG`, a `LANGUAGE` ma pierwszeństwo, o ile locale nie jest
+`C`), a `EASYPDM_LANG=en|pl|de` wymusza wybrany język. Uruchom ten sam skrypt ponownie po `git pull`,
 żeby zaktualizować — wykrywa istniejący `.env` i niczego w nim nie nadpisuje.
 
 Albo ręcznie:
