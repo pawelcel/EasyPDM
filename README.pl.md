@@ -72,7 +72,7 @@ nie, wskaże stronę, skąd go pobrać, zanim będzie mógł kontynuować).
   `EasyPDM-Linux-x64_v<wersja>.tar.gz` ze [strony Releases](https://github.com/pawelcel/EasyPDM/releases)
   albo sklonuj repo samodzielnie, potem:
   ```bash
-  tar xzf EasyPDM-Linux-x64_v<wersja>.tar.gz && cd EasyPDM-Linux-x64_v<wersja>   # jeśli pobrałeś paczkę
+  mkdir easypdm && tar xzf EasyPDM-Linux-x64_v<wersja>.tar.gz -C easypdm && cd easypdm   # jeśli pobrałeś paczkę
   sudo ./install-easypdm-linux.sh
   ```
   Instaluje PostgreSQL (jeśli go brakuje) i samo EasyPDM jako usługę `systemd`,

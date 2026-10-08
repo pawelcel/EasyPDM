@@ -72,7 +72,7 @@ it can continue).
   package from the [Releases page](https://github.com/pawelcel/EasyPDM/releases), or clone
   the repo yourself, then:
   ```bash
-  tar xzf EasyPDM-Linux-x64_v<version>.tar.gz && cd EasyPDM-Linux-x64_v<version>   # if you downloaded the package
+  mkdir easypdm && tar xzf EasyPDM-Linux-x64_v<version>.tar.gz -C easypdm && cd easypdm   # if you downloaded the package
   sudo ./install-easypdm-linux.sh
   ```
   This installs PostgreSQL (if missing) and EasyPDM itself as a `systemd` service that

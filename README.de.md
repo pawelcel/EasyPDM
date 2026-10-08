@@ -80,7 +80,7 @@ verweist er auf die Download-Seite, bevor er fortfahren kann).
   [Releases-Seite](https://github.com/pawelcel/EasyPDM/releases) herunter oder klonen Sie
   das Repo selbst, dann:
   ```bash
-  tar xzf EasyPDM-Linux-x64_v<Version>.tar.gz && cd EasyPDM-Linux-x64_v<Version>   # falls Sie das Paket heruntergeladen haben
+  mkdir easypdm && tar xzf EasyPDM-Linux-x64_v<Version>.tar.gz -C easypdm && cd easypdm   # falls Sie das Paket heruntergeladen haben
   sudo ./install-easypdm-linux.sh
   ```
   Installiert PostgreSQL (falls nicht vorhanden) und EasyPDM selbst als

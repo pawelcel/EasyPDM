@@ -914,8 +914,9 @@ scripts, same trigger pattern as `build-windows-installer.yml` below. The target
 then needs only `sudo`, no `.NET SDK` or `Node.js` at all:
 
 ```bash
-tar xzf EasyPDM-Linux-x64_v<version>.tar.gz
-cd EasyPDM-Linux-x64_v<version>   # whatever directory you extracted into
+mkdir easypdm
+tar xzf EasyPDM-Linux-x64_v<version>.tar.gz -C easypdm   # the archive has no top-level folder
+cd easypdm
 sudo ./install-easypdm-linux.sh
 ```
 
