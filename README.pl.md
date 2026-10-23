@@ -5,7 +5,8 @@
 [![Postaw kawę na buycoffee.to](https://img.shields.io/badge/☕_Postaw_kawę-buycoffee.to-FFDD00?style=for-the-badge)](https://buycoffee.to/easypdm)
 
 ▶️ **Seria filmów na YouTube** (po angielsku, [playlista](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)): [1. Po co PDM i czym jest EasyPDM](https://youtu.be/OaqyJQCHkt4) ·
-[2. Instalacja — Windows, Docker albo Linux](https://youtu.be/ZwAWCJN9tWg)
+[2. Instalacja — Windows, Docker albo Linux](https://youtu.be/ZwAWCJN9tWg) ·
+[3. Projekty i struktura](https://youtu.be/ZB3pXQY6-e0)
 
 EasyPDM to miejsce, w którym Twoje Części i Złożenia mają jeden, wspólny dla całego
 zespołu porządek: każdy element ma swój numer, rewizję, status i historię zmian, a
