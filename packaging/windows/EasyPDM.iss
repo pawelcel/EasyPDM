@@ -49,7 +49,7 @@
 ; ręcznie przetestowana — przy pierwszym uruchomieniu obserwuj przebieg i zgłoś, co nie zagra.
 
 #define MyAppName "EasyPDM"
-#define MyAppVersion "0.7"
+#define MyAppVersion "0.8"
 #define MyAppExeName "EasyPDM.Api.exe"
 #define MyServiceName "EasyPDM"
 #define MyDataDir "{commonappdata}\EasyPDM"
