@@ -118,6 +118,9 @@ Private gTopPresetPdf As Boolean
 ' Lista plikow z blokujacym statusem pokazana juz przed wysylka -- wtedy main nie powtarza
 ' jej na koncu biegu.
 Private gLockedShown As Boolean
+' Czy ten bieg zalozyl juz liste postepu (zob. ProgressStart) -- pojedyncza czesc nie
+' przechodzi przez drzewo zlozenia, wiec main zaklada wtedy liste z jedna pozycja.
+Private gProgressStarted As Boolean
 ' Uzytkownik kliknal "Anuluj" w panelu postepu -- zob. TransferCancelled. Zerowana na
 ' starcie main: zmienne modulu VBA potrafia przezyc miedzy uruchomieniami makra, a
 ' pozostawiona tu prawda zatrzymywalaby kazdy kolejny bieg, zanim by ruszyl.
@@ -1522,6 +1525,7 @@ Sub ProgressStart(ByVal kind As String, ByRef keys As Collection, ByRef labels A
     End If
     body = body & "}"
     ProgressSend "PUT", "/progress", body
+    gProgressStarted = True
     LogLine "Progress: started " & kind & " with " & keys.Count & " entry(ies)."
     On Error GoTo 0
 End Sub
@@ -4265,12 +4269,25 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
     gTopPresetStep = False
     gTopPresetPdf = False
     gLockedShown = False
+    gProgressStarted = False
     If itemTypeGuess = "assembly" Then
         If ProcessAssemblyTree(oDoc, edgesForTop, targetFolder, lockedComponents) Then
             LogLine "Cancelled during assembly tree processing -- done."
             Exit Function
         End If
     End If
+
+    ' Pojedyncza czesc (albo zlozenie bez komponentow) nie przeszla przez drzewo, wiec lista
+    ' postepu jeszcze nie istnieje -- bez tego panel w przegladarce w ogole sie nie
+    ' pokazywal, a odhaczenie dokumentu na koncu trafialo w nicosc. Jedna pozycja wystarczy.
+    If Not gProgressStarted Then
+        Dim singleKeys As New Collection
+        Dim singleLabels As New Collection
+        singleKeys.Add TOP_DOCUMENT_PROGRESS_KEY
+        singleLabels.Add ProgressLabelFor(filePath)
+        ProgressStart "upload", singleKeys, singleLabels
+    End If
+    ProgressMark TOP_DOCUMENT_PROGRESS_KEY, "active"
 
     Dim linkedItemId As String
     linkedItemId = GetLinkedItemIdOn(oDoc)

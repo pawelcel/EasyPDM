@@ -604,7 +604,8 @@ TOP_DOCUMENT_PROGRESS_KEY = "__top__"
 # Dlatego PIERWSZY komponent biegu zawsze otwiera kartę — i dopiero ta karta, znając runId,
 # obsługuje resztę bez kolejnych kart i bez okien.
 # "cancelled" -- użytkownik kliknął „Anuluj" w panelu postępu, zob. transfer_cancelled.
-_RUN = {"id": None, "tab_opened": False, "cancelled": False, "top_preset": None, "locked_shown": False}
+_RUN = {"id": None, "tab_opened": False, "cancelled": False, "top_preset": None, "locked_shown": False,
+        "progress_started": False}
 
 
 def run_id():
@@ -856,6 +857,7 @@ def progress_start(kind, entries, edges=None):
     if edges:
         payload["edges"] = [{"parent": p, "child": c} for p, c in edges]
     _progress_send("PUT", "/progress", payload)
+    _RUN["progress_started"] = True
 
 
 def progress_mark(key, status):
@@ -3078,6 +3080,14 @@ def _send_and_link(doc, target_folder):
         if not _RUN["cancelled"]:
             QtWidgets.QMessageBox.information(None, t("pdm_title"), t("cancelled_upload"))
         return
+
+    # Pojedyncza część (albo złożenie bez komponentów) nie przeszła przez drzewo, więc lista
+    # postępu jeszcze nie istnieje -- bez tego panel w przeglądarce w ogóle się nie pokazywał
+    # (zgłoszone z praktyki), a odhaczenie dokumentu na końcu trafiało w nicość. Jedna pozycja
+    # wystarczy: ten sam panel, ten sam raport w powiadomieniach co przy złożeniu.
+    if not _RUN["progress_started"]:
+        progress_start("upload", [(TOP_DOCUMENT_PROGRESS_KEY, progress_label_for(getattr(doc, "FileName", "")))])
+    progress_mark(TOP_DOCUMENT_PROGRESS_KEY, "active")
 
     # Krok 2: nowy element czy dogranie do istniejącego? Makro już o to w ogóle nie pyta —
     # ta decyzja, razem z wyborem CO/KTÓRY, zapada w przeglądarce (zob. submit_via_browser).
