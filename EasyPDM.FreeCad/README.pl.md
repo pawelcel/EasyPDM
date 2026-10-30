@@ -206,6 +206,17 @@ dwie osobne.
      ten jeden załącznik jest **cicho pomijany**, nie przerywa ani nie cofa reszty wysyłki
      (plik `.FCStd` w PDM jest już bezpiecznie zapisany w tym momencie).
 
+5a. **Materiał i masa części trafiają do PDM, tak jak w makrach SolidWorks i Inventor.**
+   Makro odczytuje materiał nadany we FreeCAD-zie (`ShapeMaterial`) z widocznych, końcowych
+   brył części — PartDesign Body albo wyniku operacji Part, nigdy z jej szkiców ani cech
+   pośrednich. Materiał jest podstawiany (zablokowany) w formularzu w przeglądarce, a po
+   wysyłce pliku makro zapisuje w elemencie PDM materiał i masę. FreeCAD nie przechowuje masy,
+   więc jest liczona jako objętość × gęstość materiału: to migawka z chwili wysyłki, po zmianie
+   geometrii trzeba wysłać ponownie. Materiał idzie tylko wtedy, gdy wszystkie bryły mają ten
+   sam, nadany materiał; masa tylko wtedy, gdy każda bryła ma materiał z gęstością, bo masa bez
+   części brył byłaby zaniżona. Domyślny materiał „Default” liczy się jako brak materiału.
+   Złożenia są pomijane.
+
 6. **Na koniec zwykły zapis (nie „Zapisz jako”) wszystkich otwartych dokumentów** —
    złożenia i każdej Części/pod-złożenia otwartego w tym biegu. Dzieje się to niezależnie
    od tego, jak bieg się kończy: po sukcesie, po anulowaniu w przeglądarce, po odmowie

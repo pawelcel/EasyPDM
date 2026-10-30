@@ -235,6 +235,18 @@ getrennte.
      rückgängig (die `.FCStd`-Datei ist zu diesem Zeitpunkt bereits sicher im PDM
      gespeichert).
 
+5a. **Material und Masse eines Teils gehen ins PDM, wie bei den Makros für SolidWorks und
+   Inventor.** Das Makro liest das in FreeCAD zugewiesene Material (`ShapeMaterial`) aus den
+   sichtbaren, endgültigen Körpern des Teils — einem PartDesign-Body oder dem Ergebnis einer
+   Part-Operation, nie aus Skizzen oder Zwischen-Features. Das Material wird im Formular im
+   Browser (gesperrt) vorausgefüllt, und nach dem Senden der Datei speichert das Makro Material
+   und Masse im PDM-Element. FreeCAD speichert keine Masse, daher wird sie als Volumen × Dichte
+   des Materials berechnet: ein Stand vom Zeitpunkt des Hochladens, nach einer Geometrieänderung
+   erneut senden. Das Material wird nur gesendet, wenn alle Körper dasselbe zugewiesene Material
+   haben; die Masse nur, wenn jeder Körper ein Material mit Dichte hat, da eine Masse ohne einige
+   Körper zu niedrig wäre. Das Standardmaterial „Default“ gilt als keines. Baugruppen werden
+   übersprungen.
+
 6. **Zum Schluss ein normales Speichern (nicht „Speichern unter“) aller geöffneten
    Dokumente** — der Baugruppe und jedes in diesem Lauf geöffneten Teils/jeder
    Unterbaugruppe. Das geschieht unabhängig davon, wie der Lauf endet: nach Erfolg, nach

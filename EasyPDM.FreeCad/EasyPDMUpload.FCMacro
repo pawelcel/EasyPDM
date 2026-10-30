@@ -1258,7 +1258,7 @@ def publish_cad_request(ticket, name, item_type=None, material=None, document_si
     return False
 
 
-def build_browser_create_url(name, ticket, suggested_item_number=None, document_size=None, item_type=None, component=False):
+def build_browser_create_url(name, ticket, suggested_item_number=None, document_size=None, item_type=None, component=False, material=None):
     """Adres, pod którym otwiera się przeglądarka systemowa zamiast natywnego formularza
     właściwości (zob. wait_for_ticket/submit_via_browser) — most logowania
     bilet->ciasteczko (GET /api/auth/browser-login) plus deep-link
@@ -1297,6 +1297,10 @@ def build_browser_create_url(name, ticket, suggested_item_number=None, document_
     # zamiast startować bez wyboru (zob. _cad_item_type).
     if item_type:
         deep_link_params["itemType"] = item_type
+    # Materiał z modelu podstawiony w formularzu (pole zablokowane) -- jak w makrach SolidWorks
+    # i Inventor. Po wysyłce i tak trafia do elementu, zob. _push_mass_and_material.
+    if material:
+        deep_link_params["material"] = material
     # Komponent złożenia trafia do projektu razem z elementem głównym, a pod rodzica podpina
     # go samo makro według drzewa CAD. Wybór projektu/rodzica w przeglądarce dla każdej
     # części z osobna pozwalał zbudować strukturę, która nie odpowiada złożeniu.
@@ -1458,6 +1462,127 @@ def match_existing_item_single(doc):
     return None
 
 
+# Materiał "Default" to to, co FreeCAD przypisuje bryle, której nikt nie nadał materiału --
+# wysłanie go do PDM dałoby każdej części materiał "Default" i masę z przypadkowej gęstości.
+_UNASSIGNED_MATERIAL_NAMES = {"", "default"}
+
+
+def _final_solids(doc):
+    """Widoczne, końcowe bryły części: obiekty z kształtem o niezerowej objętości, których nie
+    zużywa żaden inny obiekt z kształtem. PartDesign Body zostaje, jego cechy (Pad, Pocket...)
+    odpadają, bo wiszą pod Body; argumenty operacji Part (np. Cut) odpadają, bo zużywa je
+    wynik operacji; szkice i elementy pomocnicze odpadają, bo nie mają objętości. Kontener
+    App::Part nie jest obiektem z kształtem, więc bryły w nim zostają."""
+    result = []
+    for obj in doc.Objects:
+        try:
+            if not obj.isDerivedFrom("Part::Feature") or not getattr(obj, "Visibility", True):
+                continue
+            if any(p.isDerivedFrom("Part::Feature") for p in obj.InList):
+                continue
+            if obj.Shape.isNull() or obj.Shape.Volume <= 0:
+                continue
+            result.append(obj)
+        except Exception:
+            continue
+    return result
+
+
+def _material_density_kg_m3(material):
+    """Gęstość materiału w kg/m^3 albo None. FreeCAD trzyma ją jako tekst z jednostką
+    ("7900 kg/m^3"); przeliczenie robi jego własny system jednostek."""
+    raw = None
+    try:
+        raw = material.getPhysicalValue("Density")
+    except Exception:
+        pass
+    if raw is None:
+        try:
+            raw = (getattr(material, "PhysicalProperties", None) or {}).get("Density")
+        except Exception:
+            raw = None
+    if raw is None or raw == "":
+        return None
+    try:
+        q = App.Units.Quantity(raw) if isinstance(raw, str) else raw
+        value = q.getValueAs("kg/m^3")
+        value = float(getattr(value, "Value", value))
+        return value if value > 0 else None
+    except Exception:
+        return None
+
+
+def part_material_and_mass(doc):
+    """(nazwa materiału albo None, masa w kg albo None) dla CZĘŚCI -- złożenia świadomie
+    pomijamy (decyzja użytkownika: tylko części).
+
+    Odpowiednik tego, co makra SolidWorks i Inventor biorą z programu. FreeCAD nie trzyma masy
+    jako gotowej wartości, więc liczymy: objętość bryły (mm^3) x gęstość jej materiału, tak jak
+    Inventor -- migawka z chwili wysyłki, po zmianie geometrii trzeba wysłać ponownie.
+
+    Materiał: tylko gdy wszystkie końcowe bryły mają ten sam, nadany materiał.
+    Masa: tylko gdy KAŻDA bryła ma materiał z gęstością -- suma z brakującymi bryłami byłaby
+    zaniżona, a zaniżona masa w PDM jest gorsza niż żadna."""
+    try:
+        if _cad_item_type(doc) != "part":
+            return None, None
+        solids = _final_solids(doc)
+        if not solids:
+            return None, None
+        names = set()
+        mass = 0.0
+        mass_complete = True
+        for obj in solids:
+            material = getattr(obj, "ShapeMaterial", None)
+            name = (getattr(material, "Name", "") or "").strip()
+            if name.lower() in _UNASSIGNED_MATERIAL_NAMES:
+                names.add(None)
+                mass_complete = False
+                continue
+            names.add(name)
+            density = _material_density_kg_m3(material)
+            if density is None:
+                mass_complete = False
+                continue
+            mass += obj.Shape.Volume * 1e-9 * density
+        material_name = next(iter(names)) if len(names) == 1 else None
+        return material_name, (mass if mass_complete and mass > 0 else None)
+    except Exception as e:
+        App.Console.PrintMessage(f"EasyPDM: nie udalo sie odczytac materialu/masy: {e}\n")
+        return None, None
+
+
+def _mass_text(mass_kg):
+    """Masa w kg jako tekst z kropką: 4 miejsca po przecinku, a dla bardzo małych części tyle
+    cyfr znaczących, żeby nie wyszło "0"."""
+    text = f"{mass_kg:.4f}".rstrip("0").rstrip(".")
+    if text in ("", "0"):
+        # Trzy cyfry znaczące, ale zapisane zwykłym ułamkiem ("0.0000158"), nie naukowo
+        # ("1.58e-05") -- pole masy w PDM czytają ludzie i eksport BOM do CSV.
+        from decimal import Decimal
+        text = format(Decimal(f"{mass_kg:.3g}"), "f")
+    return text
+
+
+def _push_mass_and_material(doc, item_id):
+    """Po wysyłce pliku zapisuje w elemencie PDM masę i materiał z modelu -- to samo, co robią
+    makra SolidWorks i Inventor (PATCH /items/{id}/properties). Błąd tutaj nie psuje wysyłki:
+    plik już jest w PDM, a wartości można wpisać ręcznie."""
+    material, mass = part_material_and_mass(doc)
+    fields = {}
+    if mass is not None:
+        fields["mass"] = _mass_text(mass)
+    if material:
+        fields["material"] = material
+    if not fields:
+        return
+    try:
+        api_patch_json(f"/items/{item_id}/properties", fields)
+        App.Console.PrintMessage(f"EasyPDM: zapisano w PDM {fields}\n")
+    except Exception as e:
+        App.Console.PrintMessage(f"EasyPDM: nie udalo sie zapisac masy/materialu w PDM: {e}\n")
+
+
 def _rename_and_upload(doc, item_id, record_name, name, revision, target_folder=None, export_step=True, export_pdf=False):
     """Wspólna końcówka obu trybów: KOPIUJE bieżący plik dokumentu do PDM pod nazwą
     "numer (nazwa).REWIZJA.rozszerzenie" (ta sama konwencja numer/nazwa co itemDisplayLabel
@@ -1565,6 +1690,7 @@ def _rename_and_upload(doc, item_id, record_name, name, revision, target_folder=
             _upload_step_attachment(doc, item_id)
         if export_pdf:
             _upload_pdf_attachment(doc, item_id)
+        _push_mass_and_material(doc, item_id)
         return {
             "itemId": item_id,
             "itemNumber": record_name,
@@ -1601,6 +1727,7 @@ def _rename_and_upload(doc, item_id, record_name, name, revision, target_folder=
         _upload_step_attachment(doc, item_id)
     if export_pdf:
         _upload_pdf_attachment(doc, item_id)
+    _push_mass_and_material(doc, item_id)
     return {
         "itemId": item_id,
         "itemNumber": record_name,
@@ -2482,7 +2609,8 @@ def submit_via_browser(doc, target_folder):
 
     ticket = str(uuid.uuid4())
     try:
-        url = build_browser_create_url(doc.Label, ticket, suggested_item_number, _document_size(doc), _cad_item_type(doc))
+        url = build_browser_create_url(doc.Label, ticket, suggested_item_number, _document_size(doc), _cad_item_type(doc),
+                                       material=part_material_and_mass(doc)[0])
         open_in_browser(url)
     except Exception as e:
         QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
@@ -2836,8 +2964,9 @@ def process_assembly_tree(top_doc, target_folder=None):
             # przywraca możliwość przejęcia fokusu — tylko wtedy, gdy nikt jej nie podjął,
             # czyli gdy przeglądarka jest zamknięta.
             opened_tab = False
+            component_material = part_material_and_mass(doc)[0]
             if not publish_cad_request(ticket, suggested_name, _cad_item_type(doc),
-                                       None, _document_size(doc), component=True):
+                                       component_material, _document_size(doc), component=True):
                 # Okno TYLKO wtedy, gdy karta tego biegu już raz powstała. PIERWSZE otwarcie
                 # przeglądarki w biegu i tak przejmuje fokus (to ta reguła Windows kazała klikać
                 # OK przed KOLEJNYMI), więc dla pierwszego komponentu jest zbędne — a to on
@@ -2847,7 +2976,8 @@ def process_assembly_tree(top_doc, target_folder=None):
                         None, t("pdm_title"), t("new_component_browser_prompt", name=suggested_name)
                     )
                 try:
-                    url = build_browser_create_url(suggested_name, ticket, None, _document_size(doc), _cad_item_type(doc), component=True)
+                    url = build_browser_create_url(suggested_name, ticket, None, _document_size(doc), _cad_item_type(doc), component=True,
+                                                   material=component_material)
                     open_in_browser(url)
                     opened_tab = True
                 except Exception as e:

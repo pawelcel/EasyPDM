@@ -218,6 +218,17 @@ operation**, not two separate ones.
      the rest of the upload (the `.FCStd` file is already safely saved in the PDM at that
      point).
 
+5a. **Material and mass of a part go to the PDM, as in the SolidWorks and Inventor macros.**
+   The macro reads the material assigned in FreeCAD (`ShapeMaterial`) from the part's visible
+   final solids — a PartDesign Body or the result of a Part operation, never its sketches or
+   intermediate features. The material is filled in, locked, in the browser form, and after the
+   file is sent the macro saves material and mass in the PDM item. FreeCAD stores no mass, so it
+   is computed as volume × the material's density: a snapshot taken at upload, so send again
+   after changing the geometry. The material is sent only when every solid has the same,
+   assigned one; the mass only when every solid has a material with a density, since a mass
+   missing some solids would be too low. The default "Default" material counts as none.
+   Assemblies are skipped.
+
 6. **Finally, a plain Save (not Save As) of every open document** — the assembly and every
    Part/sub-assembly opened during this run. It happens however the run ends: after
    success, after cancelling in the browser, after declining a new revision, or after an

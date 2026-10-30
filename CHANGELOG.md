@@ -4,6 +4,9 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [0.8]
 
+### Added
+- **The FreeCAD macro sends a part's material and mass to the PDM**, as the SolidWorks and Inventor macros already did. The material assigned in FreeCAD is filled in, locked, in the browser form and saved in the item after upload, together with the mass, computed as volume × the material's density since FreeCAD stores none. The material is sent only when all of the part's solids share it, the mass only when every solid has a material with a density, and FreeCAD's "Default" material counts as none. Assemblies are skipped.
+
 ### Fixed
 - **Uploading a single part shows the progress panel too.** The panel on the right of the app appeared only when an assembly was sent; for a lone part or an assembly without components the macro never opened a list, so there was nothing to watch and no report in the notifications. A single upload now gets a one-line list that ticks off like any other, and the main document shows as in progress while it is being sent, also at the end of an assembly. Applies to the FreeCAD, SolidWorks and Inventor macros.
 
