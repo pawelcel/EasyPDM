@@ -72,9 +72,10 @@ operation**, not two separate ones.
 
 1b. **Local shortcut for an already-recognized document.** FreeCAD has no persistent
     Custom-Property equivalent to SolidWorks' `EasyPDM_ItemId` (see the SolidWorks macro
-    README for that mechanism) — instead, if the document's **label** looks like
-    `number (name).REVISION` and that number actually matches an existing PDM item's
-    number/filename (`match_existing_item`), the macro asks **locally, natively**:
+    README for that mechanism) — instead, if the document's **label** is an existing PDM item's
+    full record name — prefix, number and name in brackets, exactly as the PDM shows it —
+    followed by the revision (`match_existing_item`; the number only narrows the lookup, so
+    an ordinary label such as `testc2` is never taken for item #2), the macro asks **locally, natively**:
     attach the current version to that item as a new revision? Confirming shows two more
     native Yes/No prompts (Export STEP — default Yes; Export PDF — default No) and
     attaches straight to that item, **skipping the browser entirely** for this document.
@@ -253,9 +254,8 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
 - **Upload order**: leaves first (parts with no further links), then sub-assemblies, and
   finally the main document — so that every component exists in the PDM before being
   attached as a child item.
-- **Already-uploaded components**: recognized by a label in the format
-  `number (name).REVISION` matching an existing PDM item's number/filename (the same
-  `match_existing_item` check as the top-level "local shortcut", step 1b above) — such a
+- **Already-uploaded components**: recognized by a label that is an existing PDM
+  item's full record name followed by the revision (the same `match_existing_item` check as the top-level "local shortcut", step 1b above) — such a
   component gets no browser ticket and is attached to the BOM with the calculated
   quantity using its existing item ID. **If any of them are "In work"**, answering "Yes" in the "Assembly detected" window also updates them: each one's CAD file
   replaces the same revision in the PDM, and two checkboxes in that same window decide
@@ -266,13 +266,12 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
   taking them out of review first): the "Assembly detected" window marks them, and after
   "Yes" one information window lists them.
 - **New components go through the browser too, one at a time** — each not-yet-recognized
-  file gets its OWN browser ticket (same New item/Duplicate/Attach to existing choice,
-  including its own STEP/PDF checkboxes, as the top-level document), opened sequentially,
-  never several tabs at once, leaves first. Since only one browser tab per macro run can
-  reliably grab Windows' foreground focus, a native "click OK to continue" `MsgBox`
-  appears right before each tab after the first — clicking it counts as fresh user input
-  that lets the next browser window take focus instead of opening silently in the
-  background (check the taskbar if a step seems to hang). The suggested type (Part/
+  file gets its OWN form (same New item/Duplicate/Attach to existing choice, including its
+  own STEP/PDF checkboxes, as the top-level document, but with no project or parent to
+  pick: a component follows the FreeCAD tree and joins the top-level item's project when it
+  is attached), leaves first. The form appears in the browser tab that is already open —
+  no new tab and no click per component. Only if no browser takes the request within a few
+  seconds does the macro fall back to a message and a new tab. The suggested type (Part/
   Assembly) pre-fills the browser form based on whether that file itself has further
   links.
 - **Newly-created components are hidden from the project tree root** once attached to

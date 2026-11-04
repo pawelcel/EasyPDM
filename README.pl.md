@@ -116,10 +116,13 @@ Instalacja i szczegóły:
 właściwości, bez plików) czy dogranie nowej wersji do już istniejącego elementu. Wybierasz,
 zatwierdzasz w przeglądarce — makro samo wykrywa zakończenie i kończy wysyłkę (zmienia
 nazwę lokalnego pliku na numer z PDM, dogrywa plik i — jeśli zaznaczysz to w przeglądarce —
-eksportuje STEP i/lub PDF, i zapisuje zdjęcie modelu). Dla całego złożenia z nowymi, jeszcze niewysłanymi
-komponentami: makro samo je wykrywa i przeprowadza przez każdy z osobna, zanim wyśle główny
-plik. Każdy taki komponent można utworzyć bez przypisania do jakiegokolwiek projektu — żeby
-część istniejąca wyłącznie jako pozycja w BOM nie zaśmiecała drzewka projektu.
+eksportuje STEP i/lub PDF, i zapisuje zdjęcie modelu). Dla całego złożenia: makro samo wykrywa
+jego komponenty i pokazuje je w jednym oknie jako drzewo, a potem przeprowadza przez każdy
+nowy, zanim wyśle główny plik. Tylko główny plik pyta, gdzie ma trafić — jego komponenty idą
+za drzewem z CAD-a i trafiają do jego projektu jako pozycje BOM, nie zaśmiecając drzewka
+projektu same z siebie. Komponenty, które już są w PDM i są w pracy, są w tym samym biegu
+aktualizowane (plik CAD oraz STEP/PDF, jeśli chcesz); wydane albo sprawdzane są wymienione
+raz, na początku, i zostają nietknięte.
 
 **Rysunki techniczne** są rozpoznawane jako rysunki (plik `.SLDDRW`/`.idw`/`.dwg` albo strona
 TechDraw z FreeCAD-a) i dopasowywane do Części/Złożenia, które dokumentują — przez odczytanie,
@@ -142,6 +145,11 @@ materiałów, żeby dało się go wybrać ponownie i filtrować po nim. To ona
 sprawia, że usunięcie nazwy z nazwy pliku jest praktyczne: nazwa dalej wędruje razem z
 dokumentem, tyle że nie w jego nazwie.
 
+Makro FreeCAD wysyła również **materiał i masę części**. FreeCAD nie przechowuje masy, więc
+makro liczy ją z objętości i gęstości materiału nadanego części, w chwili wysyłki; po zmianie
+części wyślij ją ponownie, żeby odświeżyć wartość. Złożenia są pomijane, a część, której
+bryły mają różne materiały albo nie mają materiału, nie dostaje wartości zamiast złej.
+
 **Download** — klikasz Download, w przeglądarce wskazujesz Część/Złożenie do pobrania.
 Dla złożenia od razu ściąga się CAŁE drzewo komponentów, a główny plik otwiera się
 automatycznie w CAD-zie. Aktualny rysunek, jeśli istnieje, zapisuje się obok pliku modelu,
@@ -155,10 +163,12 @@ Każdy projekt ma drzewko: Foldery (czyste kontenery do porządkowania), Częśc
 (mają numer/status/rewizję), oraz Inne pliki (dowolny dokument bez własnej struktury pod
 sobą). Złożenie może zawierać Części i inne Złożenia (BOM) — ten sam komponent może być
 używany w wielu złożeniach i projektach naraz, więc zmiana w jednym miejscu jest widoczna
-wszędzie, gdzie ten komponent jest użyty.
+wszędzie, gdzie ten komponent jest użyty. Foldery i pliki można współdzielić tak samo: jedna
+karta katalogowa może leżeć w kilku folderach, a „Istniejący element” w oknie dodawania
+przywraca wszystko, co zostało odpięte ze struktury.
 
-Element można **odpiąć ze struktury** (zostaje w bazie, znika tylko z tego miejsca w
-drzewku) albo **usunąć całkowicie** (tylko administrator). Usunięcie Złożenia usuwa samo
+Element można **odpiąć ze struktury** (zostaje w bazie, znika tylko z tego jednego miejsca w
+drzewku, które kliknięto — pozostałe miejsca, w których jest użyty, zostają) albo **usunąć całkowicie** (tylko administrator). Usunięcie Złożenia usuwa samo
 Złożenie — jego komponenty zostają i tracą jedynie tę jedną pozycję w BOM, bo Złożenie
 swoich części tylko *używa*, podczas gdy Folder swoją zawartość *posiada*. Usunięcie
 Folderu zabiera więc jego zawartość ze sobą, poza tym, co leży również gdzieś poza nim.
@@ -269,7 +279,7 @@ Jeśli żadna przeglądarka nie jest otwarta, makro zauważa to w kilka sekund i
 
 ### Podgląd wysyłki i pobierania
 
-Gdy makro wysyła pliki do PDM albo je pobiera, aplikacja pokazuje po prawej stronie listę tych plików. Każdy jest odhaczany po zakończeniu, bieżący się kręci, a licznik mówi „3 z 7". Jeśli coś się nie uda, pozycja jest zaznaczona na czerwono, a reszta leci dalej. Lista złożenia jest ułożona tak jak jego drzewo — podzłożenia i części z wcięciem pod złożeniem, w którym są — a część użyta w kilku miejscach stoi raz, pod pierwszym z nich.
+Gdy makro wysyła pliki do PDM albo je pobiera, aplikacja pokazuje po prawej stronie listę tych plików. Każdy jest odhaczany po zakończeniu, bieżący się kręci, a licznik mówi „3 z 7". Jeśli coś się nie uda, pozycja jest zaznaczona na czerwono, a reszta leci dalej. Lista złożenia jest ułożona tak jak jego drzewo — podzłożenia i części z wcięciem pod złożeniem, w którym są — a część użyta w kilku miejscach stoi pod każdym z nich; wysyłana jest raz, więc wszystkie jej wiersze odhaczają się razem. Gdy złożenie i wszystko pod nim jest gotowe, zwija się do jednej linii z licznikiem „+N”, żeby lista pokazywała to, co jeszcze trwa; błąd zostawia swoją gałąź rozwiniętą. Pojedyncza część też dostaje listę, z jedną linią.
 
 Przycisk **Anuluj** na liście zatrzymuje resztę przesyłania — po potwierdzeniu. To, co już poszło, zostaje; makro staje przed kolejnym plikiem, więc ten, który akurat leci, zostanie dokończony. Formularz z makra, jeśli właśnie wisi na ekranie, znika, a w powiadomieniach zostaje raport, ile zdążyło przejść.
 

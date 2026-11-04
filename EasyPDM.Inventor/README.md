@@ -85,10 +85,13 @@ applies here identically.
    `MsgBox` lists every discovered component, flagging already-linked ones with their
    target PDM item number and filename. If confirmed, it walks leaves first (this
    document last); for each NOT-yet-linked component it opens its own browser ticket
-   (same New item/Duplicate/Attach to existing choice as the top-level document — one
-   browser tab at a time, a native "click OK to continue" `MsgBox` before each subsequent
-   tab, since only one program-initiated browser tab per macro run can reliably grab
-   Windows' foreground focus). Newly created components get their own STEP/PDF export
+   (same New item/Duplicate/Attach to existing choice as the top-level document, without a
+   project or parent to pick — a component follows the Inventor tree and joins the
+   top-level item's project when attached). The form appears in the browser tab that is
+   already open, with no new tab and no click per component; only if no browser takes the
+   request within a few seconds does the macro fall back to a "click OK to continue"
+   `MsgBox` and a new tab, since only one program-initiated browser tab per macro run can
+   reliably grab Windows' foreground focus. Newly created components get their own STEP/PDF export
    (per that component's own checkbox choice in the browser) and an `EasyPDM_LinkId`
    iProperty, and are automatically attached under their parent in the BOM structure.
    Already-linked components are attached to the BOM; those "In work" are updated on "Yes" in the "Assembly detected" question — their CAD file

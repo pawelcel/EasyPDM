@@ -122,7 +122,24 @@ Four item types (`item_type`): **Folder** (a plain container), **Part**/**Assemb
 (have a number from the global sequence, a status, a revision, and an owner), **Other
 file** (any file with no structure underneath). The tree/BOM structure is a separate
 `item_relations` table (`parent_id`, `child_id`, `quantity`, `position`) — this lets the
-same Part/Assembly be a shared component in several assemblies/projects at once.
+same Part/Assembly be a shared component in several assemblies/projects at once. Folders and
+Files are shared the same way: "Existing item" in the add dialog lists every folder and file
+in the database under a Folder or at a project root (under an Assembly only Parts and
+Assemblies, as the BOM holds nothing else), adding one only adds a relation, and a folder put
+into its own subtree is refused by the same cycle check that guards assemblies. `hasParent` in
+`GET /api/items` is what tells a root item hidden by "Remove from structure" from one shown
+inside a folder.
+
+An item without a project takes its project from the structure. When `POST
+/items/{id}/children` attaches a projectless item under one that has a project, the child —
+and every projectless item below it — gets that project with `show_in_tree = false`, so it
+shows as a BOM position rather than also loose at the root; `PATCH /project` does the same for
+the projectless contents of the item it moves — a folder put back after "Remove from structure"
+brings its files and subfolders along. Items that already have a project keep it, so a
+part shared between projects is never moved. This is what lets the CAD macros create assembly
+components with no project at all (`component: true` on the CAD request hides the project and
+parent pickers in the form): the tree from the CAD program decides where they go, and the
+top-level item's project reaches them when they are attached.
 
 What's allowed as a child of what (enforced both in the backend and the frontend):
 
@@ -286,7 +303,16 @@ detail panel above History.
 
 Attachments (`item_attachments`) are a mechanism separate from the structure — any file
 (e.g. CAD) can be attached to a Part/Assembly/File from the properties panel; they
-cannot be added or removed through the tree on the left. From a Project/Assembly/Part
+cannot be added or removed through the tree on the left.
+
+The dedicated roles come in two kinds. `pdf`, `step` and `image` are single-slot: a new one
+replaces the previous one. `cad` and `drawing` accumulate, so earlier revisions stay — but the
+macros name files `record name.REVISION.ext`, so the same file name on the same item means the
+same revision sent again, and that row is replaced instead of a second one being added
+(`ReplaceExistingRoleAttachmentAsync`). The old file is deleted only when it is not the path
+the new row uses, because `/register` with shared storage copies the new file over the same
+path first. Before this every re-send of a part in work added a row, and with shared storage
+all of them pointed at one file, so deleting any of them deleted it from under the rest. From a Project/Assembly/Part
 you can download **documentation** — a ZIP collected from all attachments within a given
 scope (the whole project, or a given Assembly/Part together with its subtree), with a
 choice of which file extensions to include.
@@ -343,6 +369,15 @@ logged and dropped rather than sent — that is how `SW-Material@@Default@C0014.
 reached an item's material field. Inventor has no equivalent expression, so there both
 properties hold a snapshot read from `ComponentDefinition` at upload time and need a re-upload
 to refresh.
+
+FreeCAD stores neither, so its macro computes both at upload and sends them straight to
+`PATCH /properties`, with no document property in between (`part_material_and_mass`). It looks
+only at the part's final solids — visible `Part::Feature` objects that no other `Part::Feature`
+consumes and that have a volume — so sketches, intermediate features and hidden helper bodies
+do not count. The material is sent only when all those solids share one that is not FreeCAD's
+"Default"; the mass, volume × density, only when every solid has a material with a density,
+because a partial sum would be a plausible-looking wrong number. A very small mass is written
+out in plain decimals rather than as `1.58e-05`. Assemblies are skipped, as in the other two.
 
 Drawings are skipped entirely, material is written for Parts only (an Assembly has none of
 its own), and a mass that is empty or not a plain number is logged and skipped — it is
@@ -575,10 +610,22 @@ once, on the server, for all three CAD programs. Upload macros send the parent�
 already hold for attaching the BOM (`edges` in `PUT /api/progress`); there is no other source,
 since new components do not exist in the PDM yet and the keys are local file paths. Downloads
 need no macro change at all: their keys are item ids, so the server reads the relations between
-them from `item_relations` itself. A part used in several assemblies is placed once, under the
-first parent the walk reaches — the decision was the user's, and it keeps the counter counting
-files rather than rows. Without any relations the list stays exactly as sent, flat; anything
-unreachable because of a cycle is appended flat rather than dropped. No icons mark assemblies
+them from `item_relations` itself. A file and a row are not the same thing: `Arrange` returns
+the files once each (`Entries`, in order of first appearance — ticking, the "x of y" counter
+and the report work on these) and the rows to display (`Rows`), where a part used in several
+assemblies, or a whole sub-assembly used twice, stands under every parent. Each row looks up
+the status of its file, so sending a file once ticks all its rows. Cycles are guarded by the
+ancestor path rather than by "already placed", since a file may appear in many branches but
+never under itself, and past 2000 rows only first occurrences are added, so heavily reused
+sub-assemblies cannot balloon the list. Without any relations the list stays exactly as sent,
+flat; anything unreachable because of a cycle is appended flat rather than dropped.
+
+The panel folds a branch whose own row and every row under it is done or skipped into one line
+with a "+N" count, keeping the eye on what is still running; a failure anywhere keeps the
+branch open. Rows arrive flattened in tree order, so a branch is simply the following rows with
+a deeper indent, and that is all the client needs. A manual click on the arrow overrides the
+automatic state for the rest of the run. A single document with no components gets a one-entry
+list too — without it the panel never appeared and no report reached the notifications. No icons mark assemblies
 or parts: an icon would suggest a kind of item (made, purchased…), which the list does not know.
 
 **Cancelling.** The panel's Cancel button cannot stop anything itself — the macro runs inside a

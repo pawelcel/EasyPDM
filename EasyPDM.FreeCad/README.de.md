@@ -79,8 +79,10 @@ getrennte.
     dauerhaftes Äquivalent zur Custom Property `EasyPDM_ItemId` des SolidWorks-Makros
     (siehe die README des SolidWorks-Makros für diesen Mechanismus) — stattdessen fragt
     das Makro **lokal, nativ**, wenn das **Label** des Dokuments wie
-    `Nummer (Name).REVISION` aussieht und diese Nummer tatsächlich zu einem vorhandenen
-    PDM-Element (Nummer/Dateiname) passt (`match_existing_item`): die aktuelle Version
+    der vollständige Datensatzname eines vorhandenen PDM-Elements ist — Präfix, Nummer und
+    Name in Klammern, genau wie das PDM sie zeigt — gefolgt von der Revision
+    (`match_existing_item`; die Nummer grenzt die Suche nur ein, ein gewöhnliches Label wie
+    `testc2` wird also nie für Element Nr. 2 gehalten): die aktuelle Version
     diesem Element als neue Revision anhängen? Eine Bestätigung zeigt zwei weitere
     native Ja/Nein-Abfragen (STEP exportieren — Standard Ja; PDF exportieren — Standard
     Nein) und hängt direkt an dieses Element an, **wobei der Browser für dieses Dokument
@@ -275,8 +277,8 @@ automatisch gesendet werden soll:
 - **Sendereihenfolge**: zuerst Blätter (Teile ohne weitere Links), dann Unterbaugruppen,
   zuletzt das Hauptdokument — damit jede Komponente im PDM existiert, bevor sie als
   Unterelement angehängt wird.
-- **Bereits gesendete Komponenten**: erkannt am Label im Format `Nummer (Name).REVISION`,
-  das zu Nummer/Dateiname eines vorhandenen PDM-Elements passt (dieselbe
+- **Bereits gesendete Komponenten**: erkannt an einem Label, das der vollständige
+  Datensatzname eines vorhandenen PDM-Elements mit angehängter Revision ist (dieselbe
   `match_existing_item`-Prüfung wie die lokale Abkürzung auf oberster Ebene, Schritt 1b
   oben) — eine solche Komponente erhält kein Browser-Ticket und wird mit der berechneten
   Menge und ihrer vorhandenen Element-ID an die Stückliste angehängt. **Sind welche davon
@@ -289,15 +291,13 @@ automatisch gesendet werden soll:
   Revision oder das Zurücknehmen aus der Prüfung): Das Fenster „Baugruppe erkannt" markiert
   sie, und nach „Ja" listet ein Hinweisfenster sie auf.
 - **Neue Komponenten laufen ebenfalls über den Browser, eine nach der anderen** — jede
-  noch nicht erkannte Datei erhält ihr EIGENES Browser-Ticket (dieselbe Wahl Neu/
-  Duplizieren/An Vorhandenes anhängen, einschließlich eigener STEP-/PDF-Checkboxen, wie
-  das Hauptdokument), nacheinander geöffnet, nie mehrere Tabs gleichzeitig, zuerst die
-  Blätter. Da pro Makrolauf nur ein Browser-Tab zuverlässig den Windows-Vordergrundfokus
-  erhalten kann, erscheint unmittelbar vor jedem weiteren Tab (nach dem ersten) ein
-  natives „Zum Fortfahren OK klicken"-`MsgBox` — der Klick zählt als frische
-  Benutzereingabe, die es dem nächsten Browserfenster erlaubt, den Fokus zu erhalten,
-  statt still im Hintergrund zu öffnen (Taskleiste prüfen, falls ein Schritt hängen zu
-  bleiben scheint). Der vorgeschlagene Typ (Teil/Baugruppe) füllt das Browser-Formular
+  noch nicht erkannte Datei erhält ihr EIGENES Formular (dieselbe Wahl Neu/Duplizieren/
+  An Vorhandenes anhängen, einschließlich eigener STEP-/PDF-Checkboxen, wie das
+  Hauptdokument, aber ohne Projekt- und Elternauswahl: Eine Komponente folgt dem
+  FreeCAD-Baum und kommt beim Anhängen in das Projekt des Hauptelements), zuerst die
+  Blätter. Das Formular erscheint im bereits geöffneten Browser-Tab — kein neuer Tab und
+  kein Klick je Komponente. Nur wenn kein Browser die Anfrage binnen weniger Sekunden
+  übernimmt, greift das Makro auf eine Meldung und einen neuen Tab zurück. Der vorgeschlagene Typ (Teil/Baugruppe) füllt das Browser-Formular
   danach vor, ob die betreffende Datei selbst weitere Links hat.
 - **Neu erstellte Komponenten werden aus dem Stamm des Projektbaums ausgeblendet**,
   sobald sie an ihrem eigentlichen Elternelement angehängt sind

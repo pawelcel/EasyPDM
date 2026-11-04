@@ -61,14 +61,14 @@ solved differently:
   for EVERY assembly component individually (see "assembly tree detection" below), not
   just for the main document.
 - **New assembly components go through the browser too, one at a time** — each
-  not-yet-linked component discovered while walking the tree opens its own ticket +
-  browser tab (leaves first, same New item/Duplicate/Attach to existing choice as the
-  top-level document), sequentially, never several tabs at once — this is the same
-  pattern the FreeCAD macro was later ported to match. Since only one browser tab can
-  reliably grab Windows' foreground focus per macro run, a native "click OK to continue"
-  `MsgBox` appears right before each subsequent tab opens — clicking it counts as fresh
-  user input that lets the next browser window take focus instead of opening silently in
-  the background (check the taskbar if a step seems to hang).
+  not-yet-linked component discovered while walking the tree gets its own form (leaves
+  first, same New item/Duplicate/Attach to existing choice as the top-level document, but
+  with no project or parent to pick: a component follows the SolidWorks tree and joins the
+  top-level item's project when it is attached). The form appears in the browser tab that
+  is already open — no new tab and no click per component. Only if no browser takes the
+  request within a few seconds does the macro fall back to a "click OK to continue"
+  `MsgBox` and a new tab, since only one browser tab per macro run can reliably grab
+  Windows' foreground focus (check the taskbar if a step seems to hang).
 - **STEP and PDF export are both optional everywhere** — a checkbox for each in the
   ticket-driven browser paths (new item/duplicate/attach to existing, at both the
   top-level document and per assembly component), or two native Yes/No prompts
@@ -99,8 +99,8 @@ solved differently:
    falsely "recognize" itself as an existing item if you're not paying attention to this
    summary. If confirmed, it walks leaves first (this document last); for each
    NOT-yet-linked component it opens its own browser ticket (same New item/Duplicate/
-   Attach to existing choice as the top-level document, see "Differences from the
-   FreeCAD macros" for the focus-stealing `MsgBox` shown before each tab). Newly created
+   Attach to existing choice as the top-level document, shown in the already-open browser
+   tab — see "Differences from the FreeCAD macros"). Newly created
    components get their own STEP/PDF export (per that component's own checkbox choice in
    the browser) and `EasyPDM_ItemId` entry, and are automatically attached under their
    parent in the BOM structure. **Already-linked components** are attached to the BOM with

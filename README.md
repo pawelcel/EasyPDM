@@ -116,11 +116,13 @@ Installation and details:
 properties, no files), or attach a new version to an already-existing item. You choose,
 confirm in the browser — the macro detects completion on its own and finishes the upload
 (renames the local file to the PDM number, attaches the file, and — if you tick the boxes
-in the browser — exports a STEP and/or a PDF, and saves a picture of the model). For a whole assembly with new,
-not-yet-uploaded components: the macro detects them on its own and walks through each one
-before sending the main file. Each of those components can be created without assigning it
-to any project, so that a part which only exists as a BOM entry does not clutter the
-project tree on its own.
+in the browser — exports a STEP and/or a PDF, and saves a picture of the model). For a whole assembly: the macro detects its components on
+its own and shows them in one window as a tree, then walks through each new one before
+sending the main file. Only the main file asks where it goes — its components follow the
+tree from the CAD program and join its project as BOM positions, without cluttering the
+project tree on their own. Components already in the PDM and still in work are updated in
+the same run (CAD file, and STEP/PDF if you want them); released or under-review ones are
+named once, up front, and left alone.
 
 **Technical drawings** are recognized as such (a `.SLDDRW`/`.idw`/`.dwg` file, or a FreeCAD
 TechDraw page) and matched to the Part/Assembly they document — by reading which models the
@@ -142,6 +144,12 @@ you can pick it again and filter by it. That is
 what makes dropping the name from the file name practical: the name still travels with the
 document, just not in its file name.
 
+The FreeCAD macro sends the **material and mass of a part** as well. FreeCAD stores no mass,
+so the macro computes it from the volume and the density of the material assigned to the
+part, at the moment of upload; send the part again after changing it to refresh the value.
+Assemblies are skipped, and a part whose solids have different materials, or one without a
+material, gets no value rather than a wrong one.
+
 **Download** — you click Download, and in the browser you point to the Part/Assembly to
 fetch. For an assembly, the ENTIRE component tree is fetched right away, and the main
 file opens automatically in the CAD program. A current drawing, if there is one, is saved
@@ -155,10 +163,12 @@ Every project has a tree: Folders (plain containers for organizing), Parts and
 Assemblies (have a number/status/revision), and Other files (any document with no
 structure of its own underneath). An Assembly can contain Parts and other Assemblies
 (BOM) — the same component can be used in several assemblies and projects at once, so a
-change in one place is visible everywhere that component is used.
+change in one place is visible everywhere that component is used. Folders and files can be
+shared the same way: one datasheet can sit in several folders, and "Existing item" in the
+add dialog brings back anything that was taken out of the structure.
 
 An item can be **detached from the structure** (stays in the database, only disappears
-from that spot in the tree) or **deleted completely** (administrator only). Deleting an
+from the one spot in the tree you clicked — any other places it is used are left alone) or **deleted completely** (administrator only). Deleting an
 Assembly removes just that Assembly — its components stay, losing only that one BOM
 entry, because an Assembly merely *uses* its parts while a Folder *owns* its contents.
 Deleting a Folder therefore does take its contents with it, minus anything that also
@@ -268,7 +278,7 @@ If no browser is open, the macro notices within a few seconds and falls back to 
 
 ### Watching an upload or a download
 
-While a macro is sending files to the PDM or fetching them back, the app shows a list of those files on the right. Each one is ticked off as it completes, the one in progress spins, and a counter says "3 of 7". If something fails it is marked in red and the rest carries on. An assembly's list is laid out like its tree — sub-assemblies and parts indented under the assembly they belong to — and a part used in several places is listed once, under the first of them.
+While a macro is sending files to the PDM or fetching them back, the app shows a list of those files on the right. Each one is ticked off as it completes, the one in progress spins, and a counter says "3 of 7". If something fails it is marked in red and the rest carries on. An assembly's list is laid out like its tree — sub-assemblies and parts indented under the assembly they belong to — and a part used in several places is listed under each of them; it is still sent once, so all its rows tick off together. Once an assembly and everything under it is done, it folds into one line with a "+N" count, so the list keeps showing what is still in progress; a failure keeps its branch open. A single part gets the list too, with one line.
 
 The list's **Cancel** button stops the rest of the transfer, after asking you to confirm. Whatever has gone through stays; the macro stops before the next file, so the one already on its way is finished first. A form from the macro that is waiting on screen goes away, and the notifications get a report of how far it got.
 

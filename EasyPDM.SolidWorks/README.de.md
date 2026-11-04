@@ -70,14 +70,14 @@ anders gelöst:
   Hauptdokument.
 - **Neue Baugruppenkomponenten laufen ebenfalls über den Browser, eine nach der
   anderen** — jede noch nicht verknüpfte Komponente, die beim Durchlaufen des Baums
-  gefunden wird, öffnet ihr eigenes Ticket + einen Browser-Tab (zuerst die Blätter,
-  dieselbe Wahl Neu/Duplizieren/An vorhandenes anhängen wie beim Hauptdokument),
-  nacheinander, nie mehrere Tabs gleichzeitig — dasselbe Muster, an das das
-  FreeCAD-Makro später angepasst wurde. Da pro Makrolauf nur ein Browser-Tab zuverlässig
-  den Windows-Vordergrundfokus erhalten kann, erscheint unmittelbar vor jedem weiteren
-  Tab ein natives „Zum Fortfahren OK klicken"-`MsgBox` — der Klick zählt als frische
-  Benutzereingabe, die es dem nächsten Browserfenster erlaubt, den Fokus zu erhalten,
-  statt still im Hintergrund zu öffnen (Taskleiste prüfen, falls ein Schritt hängen zu
+  gefunden wird, erhält ihr eigenes Formular (zuerst die Blätter, dieselbe Wahl
+  Neu/Duplizieren/An vorhandenes anhängen wie beim Hauptdokument, aber ohne Projekt- und
+  Elternauswahl: Eine Komponente folgt dem SolidWorks-Baum und kommt beim Anhängen in das
+  Projekt des Hauptelements). Das Formular erscheint im bereits geöffneten Browser-Tab —
+  kein neuer Tab und kein Klick je Komponente. Nur wenn kein Browser die Anfrage binnen
+  weniger Sekunden übernimmt, greift das Makro auf ein „Zum Fortfahren OK klicken"-`MsgBox`
+  und einen neuen Tab zurück, da pro Makrolauf nur ein Browser-Tab zuverlässig den
+  Windows-Vordergrundfokus erhalten kann (Taskleiste prüfen, falls ein Schritt hängen zu
   bleiben scheint).
 - **STEP- und PDF-Export sind überall optional** — je eine Checkbox auf den
   Ticket-basierten Browser-Pfaden (neues Element/Duplikat/an vorhandenes anhängen,
@@ -114,8 +114,8 @@ anders gelöst:
    Zusammenfassung keine Beachtung geschenkt wird. Nach Bestätigung wird zuerst mit den
    Blättern durchlaufen (dieses Dokument zuletzt); für jede NOCH NICHT verknüpfte
    Komponente wird ein eigenes Browser-Ticket geöffnet (dieselbe Wahl Neu/Duplizieren/
-   An vorhandenes anhängen wie beim Hauptdokument, siehe „Unterschiede zu den
-   FreeCAD-Makros" für das Fokus-`MsgBox` vor jedem Tab). Neu erstellte Komponenten
+   An vorhandenes anhängen wie beim Hauptdokument, angezeigt im bereits geöffneten Tab —
+   siehe „Unterschiede zu den FreeCAD-Makros"). Neu erstellte Komponenten
    erhalten ihren eigenen STEP/PDF-Export (je nach eigener Checkbox-Wahl dieser
    Komponente im Browser) und einen `EasyPDM_ItemId`-Eintrag und werden automatisch
    unter ihrem Elternelement in der Stücklistenstruktur eingehängt. **Bereits verknüpfte

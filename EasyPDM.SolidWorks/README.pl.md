@@ -62,15 +62,15 @@ inaczej:
   KAŻDEGO komponentu złożenia z osobna (patrz "wykrywanie drzewa złożenia" niżej), nie
   tylko dla dokumentu głównego.
 - **Nowe komponenty złożenia też idą przez przeglądarkę, jeden po drugim** — każdy
-  jeszcze niepodpięty komponent znaleziony podczas przechodzenia drzewa otwiera własny
-  bilet + kartę przeglądarki (liście najpierw, ten sam wybór Nowy/Duplikuj/Dograj do
-  istniejącego co dokument główny), sekwencyjnie, nigdy kilka kart naraz — to ten sam
-  wzorzec, do którego później dostosowano makro FreeCAD. Ponieważ tylko jedna karta
-  przeglądarki na uruchomienie makra może niezawodnie przejąć fokus Windows, tuż przed
-  otwarciem każdej kolejnej karty pojawia się natywny `MsgBox` "kliknij OK, aby
-  kontynuować" — kliknięcie liczy się jako świeże działanie użytkownika, które pozwala
-  kolejnemu oknu przeglądarki przejąć fokus zamiast otworzyć się cicho w tle (sprawdź
-  pasek zadań, jeśli krok wygląda na zawieszony).
+  jeszcze niepodpięty komponent znaleziony podczas przechodzenia drzewa dostaje własny
+  formularz (liście najpierw, ten sam wybór Nowy/Duplikuj/Dograj do istniejącego co
+  dokument główny, ale bez wyboru projektu i rodzica: komponent idzie za drzewem
+  SolidWorksa i trafia do projektu elementu głównego, gdy zostaje podpięty). Formularz
+  pojawia się w już otwartej karcie przeglądarki — bez nowej karty i bez klikania przy
+  każdym komponencie. Dopiero gdy żadna przeglądarka nie odbierze prośby w ciągu kilku
+  sekund, makro wraca do `MsgBox` "kliknij OK, aby kontynuować" i nowej karty, bo tylko
+  jedna karta przeglądarki na uruchomienie makra może niezawodnie przejąć fokus Windows
+  (sprawdź pasek zadań, jeśli krok wygląda na zawieszony).
 - **Eksport STEP i PDF są opcjonalne wszędzie** — checkbox na każdy z nich na ścieżkach
   przez bilet w przeglądarce (nowy element/duplikat/dograj do istniejącego, zarówno dla
   dokumentu głównego, jak i każdego komponentu złożenia), albo dwa natywne pytania
@@ -102,7 +102,7 @@ inaczej:
    zwróci się uwagi na to podsumowanie. Po potwierdzeniu przechodzi liśćmi najpierw (ten
    dokument na końcu); dla każdego JESZCZE niepodpiętego komponentu otwiera własny bilet
    w przeglądarce (ten sam wybór Nowy/Duplikuj/Dograj do istniejącego co dokument główny,
-   patrz "Różnice względem makr FreeCAD" po opis natywnego `MsgBox` przed każdą kartą).
+   pokazywany w już otwartej karcie — patrz "Różnice względem makr FreeCAD").
    Nowo utworzone komponenty dostają własny eksport STEP/PDF (wg wyboru checkboxa tego
    konkretnego komponentu w przeglądarce) i wpis `EasyPDM_ItemId`, i są automatycznie
    podpinane pod swojego rodzica w strukturze BOM. **Już podpięte komponenty** są podpinane do

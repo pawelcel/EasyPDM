@@ -92,10 +92,13 @@ Verhaltensbeschreibung in deren eigenem README gilt hier identisch.
    verknüpfte mit ihrer Ziel-PDM-Elementnummer und ihrem Dateinamen. Nach Bestätigung
    wird zuerst mit den Blättern durchlaufen (dieses Dokument zuletzt); für jede NOCH
    NICHT verknüpfte Komponente wird ein eigenes Browser-Ticket geöffnet (dieselbe Auswahl
-   Neues Element/Duplikat/An vorhandenes anhängen wie beim übergeordneten Dokument — ein
-   Browser-Tab nach dem anderen, mit einer nativen "OK klicken, um fortzufahren"-MsgBox
-   vor jedem weiteren Tab, da nur ein programmatisch geöffneter Browser-Tab pro
-   Makrolauf zuverlässig den Windows-Vordergrundfokus erhalten kann). Neu erstellte
+   Neues Element/Duplikat/An vorhandenes anhängen wie beim übergeordneten Dokument, ohne
+   Projekt- und Elternauswahl — eine Komponente folgt dem Inventor-Baum und kommt beim
+   Anhängen in das Projekt des Hauptelements). Das Formular erscheint im bereits
+   geöffneten Tab, ohne neuen Tab und ohne Klick je Komponente; nur wenn kein Browser die
+   Anfrage binnen weniger Sekunden übernimmt, greift das Makro auf eine "OK klicken, um
+   fortzufahren"-MsgBox und einen neuen Tab zurück, da nur ein programmatisch geöffneter
+   Browser-Tab pro Makrolauf zuverlässig den Windows-Vordergrundfokus erhalten kann. Neu erstellte
    Komponenten erhalten ihren eigenen STEP/PDF-Export (gemäß der eigenen
    Kontrollkästchen-Wahl dieser Komponente im Browser) und eine `EasyPDM_LinkId`-
    iProperty und werden automatisch unter ihrem übergeordneten Element in der

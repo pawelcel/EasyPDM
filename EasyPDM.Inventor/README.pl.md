@@ -88,9 +88,12 @@ stosuje się tutaj identycznie.
    numerem elementu i nazwą pliku w PDM. Po potwierdzeniu przechodzi liśćmi najpierw (ten
    dokument na końcu); dla każdego JESZCZE niepodpiętego komponentu otwiera własny bilet
    w przeglądarce (ten sam wybór Nowy element/Duplikat/Dograj do istniejącego co dla
-   dokumentu głównego — jedna karta przeglądarki naraz, natywny `MsgBox` "kliknij OK, aby
-   kontynuować" przed każdą kolejną kartą, bo tylko jedna karta otwarta programowo na
-   uruchomienie makra może niezawodnie przejąć fokus Windows). Nowo utworzone komponenty
+   dokumentu głównego, bez wyboru projektu i rodzica — komponent idzie za drzewem
+   Inventora i trafia do projektu elementu głównego, gdy zostaje podpięty). Formularz
+   pojawia się w już otwartej karcie, bez nowej karty i bez klikania przy każdym
+   komponencie; dopiero gdy żadna przeglądarka nie odbierze prośby w ciągu kilku sekund,
+   makro wraca do `MsgBox` "kliknij OK, aby kontynuować" i nowej karty, bo tylko jedna
+   karta otwarta programowo na uruchomienie makra może niezawodnie przejąć fokus Windows. Nowo utworzone komponenty
    dostają własny eksport STEP/PDF (wg własnego wyboru checkboxa tego komponentu w
    przeglądarce) oraz iProperty `EasyPDM_LinkId`, i są automatycznie dołączane pod swoim
    rodzicem w strukturze BOM. Już podpięte komponenty są podpinane do BOM-u; te „W pracy” są aktualizowane po „Tak” w pytaniu „Wykryto złożenie” — ich plik CAD

@@ -126,11 +126,13 @@ eines vorhandenen (kopiert dessen Eigenschaften, ohne Dateien) oder eine neue Ve
 ein bereits vorhandenes Element anhängen. Sie wählen, bestätigen im Browser — das Makro
 erkennt den Abschluss selbstständig und beendet den Upload (benennt die lokale Datei in
 die PDM-Nummer um, hängt die Datei an und exportiert — wenn Sie es im Browser ankreuzen —
-ein STEP und/oder ein PDF und speichert ein Bild des Modells). Für eine ganze Baugruppe mit neuen, noch nicht
-hochgeladenen Komponenten: Das Makro erkennt sie selbstständig und führt Sie durch jede
-einzelne, bevor die Hauptdatei gesendet wird. Jede dieser Komponenten lässt sich anlegen,
-ohne sie einem Projekt zuzuordnen — damit ein Teil, das nur als Stücklistenposition
-existiert, den Projektbaum nicht unnötig füllt.
+ein STEP und/oder ein PDF und speichert ein Bild des Modells). Für eine ganze Baugruppe: Das Makro erkennt ihre
+Komponenten selbstständig, zeigt sie in einem Fenster als Baum und führt Sie durch jede neue,
+bevor die Hauptdatei gesendet wird. Nur die Hauptdatei fragt, wohin sie gehört — ihre
+Komponenten folgen dem Baum aus dem CAD-Programm und kommen als Stücklistenpositionen in ihr
+Projekt, ohne den Projektbaum für sich allein zu füllen. Komponenten, die schon im PDM und
+in Arbeit sind, werden im selben Lauf aktualisiert (CAD-Datei sowie auf Wunsch STEP/PDF);
+freigegebene oder in Prüfung befindliche werden einmal, vorab, genannt und nicht angetastet.
 
 **Technische Zeichnungen** werden als solche erkannt (eine `.SLDDRW`-/`.idw`-/`.dwg`-Datei
 oder eine TechDraw-Seite aus FreeCAD) und dem Teil/der Baugruppe zugeordnet, die sie
@@ -154,6 +156,12 @@ Materialkatalog aufgenommen, damit es sich erneut auswählen und als Filter nutz
 lässt. Genau das macht das Weglassen des Namens im Dateinamen praktikabel:
 Der Name reist weiterhin mit dem Dokument, nur eben nicht in dessen Dateinamen.
 
+Das FreeCAD-Makro sendet ebenfalls **Material und Masse eines Teils**. FreeCAD speichert
+keine Masse, daher berechnet das Makro sie beim Hochladen aus dem Volumen und der Dichte des
+dem Teil zugewiesenen Materials; senden Sie das Teil nach einer Änderung erneut, um den Wert
+zu aktualisieren. Baugruppen werden übersprungen, und ein Teil, dessen Körper verschiedene
+oder keine Materialien haben, bekommt lieber keinen Wert als einen falschen.
+
 **Download** — Sie klicken auf Download und geben im Browser das abzurufende
 Teil/Baugruppe an. Bei einer Baugruppe wird sofort der GESAMTE Komponentenbaum
 abgerufen, und die Hauptdatei öffnet sich automatisch im CAD-Programm. Eine aktuelle
@@ -169,10 +177,13 @@ Baugruppen (haben eine Nummer/Status/Revision) sowie Sonstige Dateien (ein belie
 Dokument ohne eigene Struktur darunter). Eine Baugruppe kann Teile und andere Baugruppen
 enthalten (Stückliste) — dieselbe Komponente kann gleichzeitig in mehreren Baugruppen
 und Projekten verwendet werden, sodass eine Änderung an einer Stelle überall dort
-sichtbar ist, wo diese Komponente verwendet wird.
+sichtbar ist, wo diese Komponente verwendet wird. Ordner und Dateien lassen sich genauso
+teilen: Ein Datenblatt kann in mehreren Ordnern liegen, und „Vorhandenes Element“ im
+Hinzufügen-Dialog holt alles zurück, was aus der Struktur gelöst wurde.
 
 Ein Element kann **aus der Struktur gelöst** werden (bleibt in der Datenbank, verschwindet
-nur an dieser Stelle im Baum) oder **vollständig gelöscht** werden (nur Administrator). Das
+nur an der einen angeklickten Stelle im Baum — andere Stellen, an denen es verwendet wird,
+bleiben unberührt) oder **vollständig gelöscht** werden (nur Administrator). Das
 Löschen einer Baugruppe entfernt nur diese Baugruppe — ihre Komponenten bleiben und
 verlieren lediglich diese eine Stücklistenposition, denn eine Baugruppe *verwendet* ihre
 Teile nur, während ein Ordner seinen Inhalt *besitzt*. Das Löschen eines Ordners nimmt
@@ -291,7 +302,7 @@ Ist kein Browser offen, bemerkt das Makro das binnen weniger Sekunden und kehrt 
 
 ### Hoch- und Herunterladen mitverfolgen
 
-Während ein Makro Dateien ins PDM sendet oder zurückholt, zeigt die Anwendung rechts eine Liste dieser Dateien. Jede wird nach Abschluss abgehakt, die laufende dreht sich, und ein Zähler sagt „3 von 7". Schlägt etwas fehl, wird der Eintrag rot markiert und der Rest läuft weiter. Die Liste einer Baugruppe ist wie ihr Baum aufgebaut — Unterbaugruppen und Teile eingerückt unter der Baugruppe, zu der sie gehören —, und ein mehrfach verwendetes Teil steht einmal, unter der ersten davon.
+Während ein Makro Dateien ins PDM sendet oder zurückholt, zeigt die Anwendung rechts eine Liste dieser Dateien. Jede wird nach Abschluss abgehakt, die laufende dreht sich, und ein Zähler sagt „3 von 7". Schlägt etwas fehl, wird der Eintrag rot markiert und der Rest läuft weiter. Die Liste einer Baugruppe ist wie ihr Baum aufgebaut — Unterbaugruppen und Teile eingerückt unter der Baugruppe, zu der sie gehören —, und ein mehrfach verwendetes Teil steht unter jeder davon; gesendet wird es einmal, daher werden alle seine Zeilen gemeinsam abgehakt. Sobald eine Baugruppe samt allem darunter fertig ist, klappt sie zu einer Zeile mit „+N“ zusammen, damit die Liste zeigt, was noch läuft; ein Fehler hält seinen Zweig offen. Auch ein einzelnes Teil bekommt die Liste, mit einer Zeile.
 
 Die Schaltfläche **Abbrechen** an der Liste stoppt den Rest der Übertragung — nach einer Rückfrage. Was schon übertragen ist, bleibt; das Makro hält vor der nächsten Datei an, die gerade laufende wird also noch fertig. Ein Formular des Makros, das gerade auf dem Bildschirm steht, verschwindet, und in den Benachrichtigungen bleibt ein Bericht, wie weit es gekommen ist.
 

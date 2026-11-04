@@ -69,8 +69,10 @@ dwie osobne.
 1b. **Lokalny skrót dla już rozpoznanego dokumentu.** FreeCAD nie ma trwałego odpowiednika
     Właściwości niestandardowej `EasyPDM_ItemId` z makra SolidWorks (patrz README makra
     SolidWorks po opis tego mechanizmu) — zamiast tego, jeśli **etykieta** dokumentu
-    wygląda jak `numer (nazwa).REWIZJA`, a ten numer faktycznie pasuje do istniejącego
-    elementu PDM po numerze/nazwie pliku (`match_existing_item`), makro pyta **lokalnie,
+    jest pełną nazwą rekordu istniejącego elementu PDM — prefiks, numer i nazwa w
+    nawiasie, dokładnie tak, jak pokazuje je PDM — z dopisaną rewizją (`match_existing_item`;
+    numer tylko zawęża wyszukiwanie, więc zwykła etykieta jak `testc2` nigdy nie zostanie
+    wzięta za element nr 2), makro pyta **lokalnie,
     natywnie**: dograć bieżącą wersję do tego elementu jako nową rewizję? Potwierdzenie
     pokazuje jeszcze dwa natywne pytania Tak/Nie (Eksportuj STEP — domyślnie Tak;
     Eksportuj PDF — domyślnie Nie) i dogrywa wprost do tego elementu, **całkowicie
@@ -241,8 +243,8 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
 - **Kolejność wysyłki**: liście najpierw (części bez dalszych linków), potem pod-złożenia,
   na końcu główny dokument — żeby każdy komponent istniał w PDM, zanim zostanie podpięty
   jako podelement.
-- **Już wysłane komponenty**: rozpoznawane po etykiecie w formacie `numer (nazwa).REWIZJA`
-  pasującej do numeru/nazwy pliku istniejącego elementu PDM (to samo sprawdzenie
+- **Już wysłane komponenty**: rozpoznawane po etykiecie, która jest pełną nazwą rekordu
+  istniejącego elementu PDM z dopisaną rewizją (to samo sprawdzenie
   `match_existing_item` co lokalny skrót na górnym poziomie, krok 1b wyżej) — taki
   komponent nie dostaje biletu przeglądarki i jest podpinany do BOM-u z wyliczoną ilością,
   po swoim istniejącym ID. **Jeśli któreś z nich są „W pracy”**, „Tak” w oknie „Wykryto złożenie” aktualizuje je też: plik CAD każdego z nich zastępuje tę
@@ -253,14 +255,13 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   zdjęcia ze sprawdzania): okno „Wykryto złożenie” je oznacza, a po „Tak” jedno okno
   informacyjne je wypisuje.
 - **Nowe komponenty też idą przez przeglądarkę, jeden po drugim** — każdy jeszcze
-  nierozpoznany plik dostaje WŁASNY bilet przeglądarki (ten sam wybór Nowy element/
-  Duplikuj/Dograj do istniejącego, wraz z własnymi checkboksami STEP/PDF, co dokument
-  główny), otwierany sekwencyjnie, nigdy kilka kart naraz, liście najpierw. Ponieważ
-  tylko jedna karta przeglądarki na uruchomienie makra może niezawodnie przejąć fokus
-  Windows, tuż przed każdą kolejną kartą (po pierwszej) pojawia się natywny `MsgBox`
-  "kliknij OK, aby kontynuować" — kliknięcie liczy się jako świeże działanie użytkownika,
-  które pozwala kolejnemu oknu przeglądarki przejąć fokus zamiast otworzyć się cicho w
-  tle (sprawdź pasek zadań, jeśli krok wygląda na zawieszony). Podpowiadany typ (Część/
+  nierozpoznany plik dostaje WŁASNY formularz (ten sam wybór Nowy element/Duplikuj/
+  Dograj do istniejącego, wraz z własnymi checkboksami STEP/PDF, co dokument główny, ale
+  bez wyboru projektu i rodzica: komponent idzie za drzewem FreeCAD-a i trafia do projektu
+  elementu głównego, gdy zostaje podpięty), liście najpierw. Formularz pojawia się w już
+  otwartej karcie przeglądarki — bez nowej karty i bez klikania przy każdym komponencie.
+  Dopiero gdy żadna przeglądarka nie odbierze prośby w ciągu kilku sekund, makro wraca do
+  komunikatu i nowej karty. Podpowiadany typ (Część/
   Złożenie) wstępnie wypełnia formularz w przeglądarce na podstawie tego, czy dany plik
   sam ma dalsze linki.
 - **Nowo utworzone komponenty są ukrywane z korzenia drzewa projektu** po podpięciu do
