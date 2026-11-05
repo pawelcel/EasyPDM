@@ -1512,6 +1512,48 @@ def _material_density_kg_m3(material):
         return None
 
 
+def _insertable_object(doc):
+    """Obiekt, który złożenie pokazuje przy wstawianiu tej części: jej jedyna końcowa bryła,
+    a jeśli ta siedzi w kontenerze App::Part -- najbardziej zewnętrzny taki kontener (to on
+    jest wtedy wstawiany). Kilka brył albo żadna -> None: nie ma jednego obiektu, który
+    można by sensownie nazwać jak element w PDM."""
+    solids = _final_solids(doc)
+    if len(solids) != 1:
+        return None
+    obj = solids[0]
+    try:
+        parent = obj.getParentGeoFeatureGroup()
+        while parent is not None:
+            if parent.TypeId == "App::Part":
+                obj = parent
+            parent = parent.getParentGeoFeatureGroup()
+    except Exception:
+        pass
+    return obj
+
+
+def _label_main_object(doc, record_name):
+    """Nadaje bryle części nazwę rekordu z PDM, BEZ rewizji -- np. "1(Cube)" przy pliku
+    "1(Cube).A.FCStd".
+
+    Złożenie (Assembly, App::Link) pokazuje przy wstawianiu etykiety obiektów, nie nazwę
+    pliku, więc po samej zmianie nazwy pliku w oknie wstawiania dalej stało "Body" -- przy
+    kilku częściach nie do odróżnienia (zgłoszone przez użytkownika). Rewizja zostaje tylko
+    w nazwie pliku: etykieta bryły nie musiałaby się zmieniać przy każdej nowej rewizji.
+
+    Tylko części: złożenie nie ma jednej bryły. Błąd niczego nie zatrzymuje -- to wygoda,
+    nie warunek wysyłki."""
+    try:
+        if _cad_item_type(doc) != "part":
+            return
+        obj = _insertable_object(doc)
+        if obj is not None and obj.Label != record_name:
+            App.Console.PrintMessage(f"EasyPDM: etykieta '{obj.Label}' -> '{record_name}'\n")
+            obj.Label = record_name
+    except Exception as e:
+        App.Console.PrintWarning(f"EasyPDM: nie udalo sie zmienic etykiety bryly: {e}\n")
+
+
 def part_material_and_mass(doc):
     """(nazwa materiału albo None, masa w kg albo None) dla CZĘŚCI -- złożenia świadomie
     pomijamy (decyzja użytkownika: tylko części).
@@ -1648,6 +1690,7 @@ def _rename_and_upload(doc, item_id, record_name, name, revision, target_folder=
     # po etykiecie (zob. match_existing_item) i zaproponuje dogranie do tego samego elementu.
     doc = _ensure_fully_loaded(doc)
     doc.Label = new_label
+    _label_main_object(doc, record_name)
     local_renamed = _save_local_as_pdm_name(doc, new_local_path)
     if local_renamed:
         _refresh_links_to(doc)

@@ -230,6 +230,14 @@ operation**, not two separate ones.
    missing some solids would be too low. The default "Default" material counts as none.
    Assemblies are skipped.
 
+5b. **The part's solid gets the PDM name too, without the revision** — e.g. `1(Cube)` in
+   the file `1(Cube).A.FCStd`. An assembly shows object labels, not file names, when you
+   insert a component, so without this every part would still be listed as "Body". The
+   revision stays in the file name only, so the label does not change with each revision.
+   Renamed is the part's single final solid, or the outermost `App::Part` container holding
+   it, since that is what gets inserted; a part with several solids is left as it is.
+   Assemblies are skipped.
+
 6. **Finally, a plain Save (not Save As) of every open document** — the assembly and every
    Part/sub-assembly opened during this run. It happens however the run ends: after
    success, after cancelling in the browser, after declining a new revision, or after an

@@ -249,6 +249,14 @@ getrennte.
    Körper zu niedrig wäre. Das Standardmaterial „Default“ gilt als keines. Baugruppen werden
    übersprungen.
 
+5b. **Auch der Körper des Teils erhält den PDM-Namen, ohne Revision** — z. B. `1(Cube)` in
+   der Datei `1(Cube).A.FCStd`. Eine Baugruppe zeigt beim Einfügen einer Komponente
+   Objektbeschriftungen, keine Dateinamen, sodass ohne dies jedes Teil weiterhin als „Body“
+   erschiene. Die Revision bleibt nur im Dateinamen, damit sich die Beschriftung nicht mit
+   jeder Revision ändert. Umbenannt wird der einzige endgültige Körper des Teils oder der
+   äußerste `App::Part`-Container, in dem er steckt, da dieser eingefügt wird; ein Teil mit
+   mehreren Körpern bleibt unverändert. Baugruppen werden übersprungen.
+
 6. **Zum Schluss ein normales Speichern (nicht „Speichern unter“) aller geöffneten
    Dokumente** — der Baugruppe und jedes in diesem Lauf geöffneten Teils/jeder
    Unterbaugruppe. Das geschieht unabhängig davon, wie der Lauf endet: nach Erfolg, nach

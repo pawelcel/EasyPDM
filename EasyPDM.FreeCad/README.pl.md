@@ -219,6 +219,13 @@ dwie osobne.
    części brył byłaby zaniżona. Domyślny materiał „Default” liczy się jako brak materiału.
    Złożenia są pomijane.
 
+5b. **Bryła części też dostaje nazwę z PDM, bez rewizji** — np. `1(Cube)` w pliku
+   `1(Cube).A.FCStd`. Złożenie przy wstawianiu komponentu pokazuje etykiety obiektów, a nie
+   nazwy plików, więc bez tego każda część dalej widniałaby jako „Body”. Rewizja zostaje tylko
+   w nazwie pliku, żeby etykieta nie zmieniała się przy każdej rewizji. Zmieniana jest jedyna
+   końcowa bryła części albo najbardziej zewnętrzny kontener `App::Part`, w którym siedzi, bo to
+   on jest wstawiany; część z kilkoma bryłami zostaje bez zmian. Złożenia są pomijane.
+
 6. **Na koniec zwykły zapis (nie „Zapisz jako”) wszystkich otwartych dokumentów** —
    złożenia i każdej Części/pod-złożenia otwartego w tym biegu. Dzieje się to niezależnie
    od tego, jak bieg się kończy: po sukcesie, po anulowaniu w przeglądarce, po odmowie
