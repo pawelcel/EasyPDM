@@ -4207,7 +4207,14 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
         ' submit_via_browser. See BuildBrowserCreateUrl/WaitForTicket above.
         Dim ticket As String
         ticket = NewGuid()
-        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(swModel), DocumentSizeOf(swModel), ItemTypeOf(swModel))
+        ' Po komponentach zlozenia karta tego biegu juz jest otwarta i wlasnie podjela ich
+        ' formularze -- glowny dokument trafia do niej tak samo. Wczesniej szedl zawsze
+        ' przez nowa karte, wiec po ostatnim komponencie wyskakiwala druga karta tylko po
+        ' to, zeby wypelnic formularz zlozenia (zgloszone przez uzytkownika). Przy
+        ' pojedynczym pliku karty jeszcze nie ma i PublishCadRequest od razu oddaje False.
+        If Not PublishCadRequest(ticket, defaultName, ItemTypeOf(swModel), MaterialNameOf(swModel), DocumentSizeOf(swModel)) Then
+            OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(swModel), DocumentSizeOf(swModel), ItemTypeOf(swModel))
+        End If
 
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)

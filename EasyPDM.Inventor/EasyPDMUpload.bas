@@ -4380,7 +4380,14 @@ Function UploadPartOrAssemblyDoc(ByVal oDoc As Object, ByVal filePath As String,
         ' this macro family. See BuildBrowserCreateUrl/WaitForTicket above.
         Dim ticket As String
         ticket = NewGuid()
-        OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(oDoc), DocumentSizeOf(oDoc), DocKind(oDoc))
+        ' Po komponentach zlozenia karta tego biegu juz jest otwarta i wlasnie podjela ich
+        ' formularze -- glowny dokument trafia do niej tak samo. Wczesniej szedl zawsze
+        ' przez nowa karte, wiec po ostatnim komponencie wyskakiwala druga karta tylko po
+        ' to, zeby wypelnic formularz zlozenia (zgloszone przez uzytkownika). Przy
+        ' pojedynczym pliku karty jeszcze nie ma i PublishCadRequest od razu oddaje False.
+        If Not PublishCadRequest(ticket, defaultName, DocKind(oDoc), MaterialNameOf(oDoc), DocumentSizeOf(oDoc)) Then
+            OpenUrlInBrowser BuildBrowserCreateUrl(ticket, defaultName, MaterialNameOf(oDoc), DocumentSizeOf(oDoc), DocKind(oDoc))
+        End If
 
         Dim ticketData As Object
         Set ticketData = WaitForTicket(ticket)

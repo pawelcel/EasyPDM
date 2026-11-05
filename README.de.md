@@ -296,7 +296,7 @@ das Programm belegt.
 
 ### Eine Baugruppe hochladen
 
-Das Makro braucht für jede neue Komponente ein Formular. Es öffnet dafür keinen eigenen Browser-Tab mehr und bittet auch nicht mehr vor jedem um einen Klick auf OK: Der bereits offene Tab nimmt die Anfrage an und zeigt das Formular an Ort und Stelle. Bei einer Baugruppe mit vierzig Teilen waren das bisher vierzig Klicks und vierzig Tabs.
+Das Makro braucht für jede neue Komponente ein Formular. Es öffnet dafür keinen eigenen Browser-Tab mehr und bittet auch nicht mehr vor jedem um einen Klick auf OK: Der bereits offene Tab nimmt die Anfrage an und zeigt das Formular an Ort und Stelle. Bei einer Baugruppe mit vierzig Teilen waren das bisher vierzig Klicks und vierzig Tabs. Das Formular für die Hauptbaugruppe, die zuletzt kommt, erscheint im selben Tab.
 
 Ist kein Browser offen, bemerkt das Makro das binnen weniger Sekunden und kehrt zum alten Weg zurück — Meldung und neuer Tab —, sodass in keinem Fall etwas verloren geht.
 

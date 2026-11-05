@@ -273,7 +273,7 @@ czas.
 
 ### Wysyłka złożenia
 
-Makro potrzebuje jednego formularza na każdy nowy komponent. Nie otwiera już na to osobnej karty przeglądarki ani nie prosi o kliknięcie OK przed każdą z nich: prośbę podejmuje karta, którą masz już otwartą, i pokazuje formularz na miejscu. Przy złożeniu na czterdzieści części było to czterdzieści kliknięć i czterdzieści kart.
+Makro potrzebuje jednego formularza na każdy nowy komponent. Nie otwiera już na to osobnej karty przeglądarki ani nie prosi o kliknięcie OK przed każdą z nich: prośbę podejmuje karta, którą masz już otwartą, i pokazuje formularz na miejscu. Przy złożeniu na czterdzieści części było to czterdzieści kliknięć i czterdzieści kart. Formularz złożenia głównego, które idzie na końcu, pojawia się w tej samej karcie.
 
 Jeśli żadna przeglądarka nie jest otwarta, makro zauważa to w kilka sekund i wraca do starego sposobu — komunikat i nowa karta — więc nic nie przepada.
 

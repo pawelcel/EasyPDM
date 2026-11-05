@@ -7,6 +7,9 @@ All notable changes to EasyPDM are documented in this file.
 ### Added
 - **The FreeCAD macro names the part's solid after the PDM item, without the revision**, e.g. `1(Cube)` in `1(Cube).A.FCStd`. An assembly lists object labels, not file names, when a component is inserted, so every part used to show up as "Body". The single final solid is renamed, or the outermost App::Part container holding it; a part with several solids and assemblies are left as they are.
 
+### Fixed
+- **The main assembly's form opens in the same browser tab as its components'.** Its components' forms already went to the tab left open by the first of them, but the main document, sent last, always opened a new tab, so every assembly upload ended with a second tab just for its own form. The main document now goes to that tab too and opens one only when no tab of this run is there to take it, as a single part still does. Applies to the FreeCAD, SolidWorks and Inventor macros.
+
 ## [0.7.1]
 
 ### Added

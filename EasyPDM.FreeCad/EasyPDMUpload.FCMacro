@@ -1160,7 +1160,8 @@ def _focus_browser_window():
     return False
 
 
-def publish_cad_request(ticket, name, item_type=None, material=None, document_size=None, component=False):
+def publish_cad_request(ticket, name, item_type=None, material=None, document_size=None, component=False,
+                        suggested_item_number=None):
     """Zostawia na serwerze prośbę o formularz dla JUŻ OTWARTEJ karty przeglądarki i czeka
     chwilę na sygnał, że ktoś ją podjął. Zwraca True, gdy podjęta — wtedy NIE otwieramy
     nowej karty.
@@ -1202,6 +1203,8 @@ def publish_cad_request(ticket, name, item_type=None, material=None, document_si
     # pokazuje dla niego wyboru projektu ani rodzica (zob. build_browser_create_url).
     if component:
         payload["component"] = True
+    if suggested_item_number is not None:
+        payload["suggestedItemNumber"] = int(suggested_item_number)
 
     try:
         data = json.dumps(payload).encode("utf-8")
@@ -2651,15 +2654,25 @@ def submit_via_browser(doc, target_folder):
     suggested_item_number = matched["itemNumber"] if matched else None
 
     ticket = str(uuid.uuid4())
-    try:
-        url = build_browser_create_url(doc.Label, ticket, suggested_item_number, _document_size(doc), _cad_item_type(doc),
-                                       material=part_material_and_mass(doc)[0])
-        open_in_browser(url)
-    except Exception as e:
-        QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
-        return None
+    top_material = part_material_and_mass(doc)[0]
+    # Po komponentach złożenia karta tego biegu już jest otwarta i właśnie podjęła ich
+    # formularze -- główny dokument trafia do niej tak samo. Wcześniej szedł zawsze przez
+    # nową kartę, więc po ostatnim komponencie wyskakiwała druga karta tylko po to, żeby
+    # wypełnić formularz złożenia (zgłoszone przez użytkownika). Przy pojedynczym pliku
+    # karty jeszcze nie ma i publish_cad_request od razu oddaje False.
+    opened_tab = False
+    if not publish_cad_request(ticket, doc.Label, _cad_item_type(doc), top_material, _document_size(doc),
+                               suggested_item_number=suggested_item_number):
+        try:
+            url = build_browser_create_url(doc.Label, ticket, suggested_item_number, _document_size(doc), _cad_item_type(doc),
+                                           material=top_material)
+            open_in_browser(url)
+            opened_tab = True
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("open_browser_failed", error=e))
+            return None
 
-    ticket_data = wait_for_ticket(ticket, raise_browser=True)
+    ticket_data = wait_for_ticket(ticket, raise_browser=opened_tab)
     if ticket_data is None:
         return None
 

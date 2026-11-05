@@ -272,7 +272,7 @@ throughout.
 
 ### Sending an assembly
 
-The macro needs one form per new component. It no longer opens a browser tab for each of them, and no longer asks you to click OK before each one: the tab you already have open picks the request up and shows the form in place. On an assembly with forty parts that used to be forty clicks and forty tabs.
+The macro needs one form per new component. It no longer opens a browser tab for each of them, and no longer asks you to click OK before each one: the tab you already have open picks the request up and shows the form in place. On an assembly with forty parts that used to be forty clicks and forty tabs. The form for the main assembly, which comes last, appears in the same tab.
 
 If no browser is open, the macro notices within a few seconds and falls back to the old way — a message and a new tab — so nothing is lost either way.
 
