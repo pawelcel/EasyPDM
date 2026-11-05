@@ -401,7 +401,7 @@ APP_WINDOW_TITLE = "EasyPDM — CAD item browser"
 _KWIN_RAISE_SCRIPT = """
 const wins = workspace.windowList ? workspace.windowList() : workspace.clientList();
 for (const w of wins) {
-    if (w.normalWindow && (w.caption || "").indexOf(%(title)s) === 0) {
+    if (w.normalWindow && (%(match)s)) {
         if (workspace.activeWindow !== undefined) workspace.activeWindow = w;
         else workspace.activeClient = w;
         break;
@@ -409,8 +409,15 @@ for (const w of wins) {
 }
 """
 
+# Okno FreeCAD-a: najpierw po numerze procesu, a gdy nie pasuje (FreeCAD z Flatpaka ma w
+# piaskownicy inny pid niż ten, który widzi KWin) -- po klasie okna.
+_KWIN_FREECAD_MATCH = (
+    "w.pid === %(pid)d || !wins.some(function (x) { return x.normalWindow && x.pid === %(pid)d; })"
+    " && (w.resourceClass || \"\").toLowerCase().indexOf(\"freecad\") >= 0"
+)
 
-def _raise_via_kwin():
+
+def _raise_via_kwin(match_js=None):
     """Wyciąga okno przeglądarki na wierzch przez KWin — działa na KDE, także pod Wayland.
 
     Pod Wayland żadna aplikacja nie może sama aktywować okna innej. Może to jednak zrobić
@@ -423,6 +430,10 @@ def _raise_via_kwin():
     pośredniczący, który przekazuje adres do działającego okna — a czy to okno skorzysta z
     tokenu, zależy od przeglądarki (zgłoszone z praktyki: zamknięta przeglądarka wychodziła na
     wierzch, otwarta — nie).
+
+    `match_js` to warunek JS na oknie `w`; domyślnie okno przeglądarki z EasyPDM (po
+    początku tytułu). Ten sam mechanizm wyciąga na wierzch sam FreeCAD -- zob.
+    _show_on_top.
 
     Zwraca True, gdy skrypt udało się uruchomić — nie mówi, czy okno znalazł. Poza KDE (brak
     gdbus albo usługi org.kde.KWin) po prostu zwraca False."""
@@ -442,7 +453,9 @@ def _raise_via_kwin():
         fd, path = tempfile.mkstemp(prefix="easypdm-kwin-", suffix=".js")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             # json.dumps daje poprawny literał JS, z polskimi znakami jako \uXXXX.
-            f.write(_KWIN_RAISE_SCRIPT % {"title": json.dumps(APP_WINDOW_TITLE)})
+            if match_js is None:
+                match_js = '(w.caption || "").indexOf(%s) === 0' % json.dumps(APP_WINDOW_TITLE)
+            f.write(_KWIN_RAISE_SCRIPT % {"match": match_js})
         # Gdyby poprzednie uruchomienie zostawiło skrypt wczytany, loadScript by odmówił.
         call("/Scripting", "org.kde.kwin.Scripting.unloadScript", plugin)
         loaded = call("/Scripting", "org.kde.kwin.Scripting.loadScript", path, plugin)
@@ -460,6 +473,35 @@ def _raise_via_kwin():
                 os.remove(path)
             except OSError:
                 pass
+
+
+def _main_window():
+    """Główne okno FreeCAD jako rodzic dla okien makra (None bez GUI)."""
+    try:
+        import FreeCADGui as Gui
+
+        return Gui.getMainWindow()
+    except Exception:
+        return None
+
+
+def _show_on_top(icon, title, text):
+    """Komunikat, który wychodzi NA WIERZCH, także spod przeglądarki.
+
+    Okna po wyborze elementu pojawiają się, gdy na wierzchu jest przeglądarka -- to w niej
+    właśnie coś kliknięto. Okno bez rodzica lądowało pod nią (i pod samym FreeCAD-em), więc
+    podsumowanie pobierania czekało niewidoczne, a nie było wiadomo, czy coś się jeszcze
+    dzieje (zgłoszone przez użytkownika, KDE/Wayland). Pod Waylandem FreeCAD sam nie może
+    wyjść przed inne okno, więc najpierw prosi o to KWin (jak przy przeglądarce, zob.
+    _raise_via_kwin), a okno dostaje FreeCAD za rodzica -- menedżer okien trzyma je wtedy
+    nad nim."""
+    if sys.platform.startswith("linux"):
+        _raise_via_kwin(_KWIN_FREECAD_MATCH % {"pid": os.getpid()})
+    box = QtWidgets.QMessageBox(icon, title, text, QtWidgets.QMessageBox.Ok, _main_window())
+    box.show()
+    box.raise_()
+    box.activateWindow()
+    box.exec()
 
 
 def _focus_browser_window():
@@ -1251,12 +1293,10 @@ def main():
     try:
         top_item = api_get(f"/items/{ticket_data['itemId']}")
     except Exception as e:
-        QtWidgets.QMessageBox.critical(
-            None, t("pdm_title"), t("fetch_selected_item_failed", error=e)
-        )
+        _show_on_top(QtWidgets.QMessageBox.Critical, t("pdm_title"), t("fetch_selected_item_failed", error=e))
         return
     if top_item is None:
-        QtWidgets.QMessageBox.critical(None, t("pdm_title"), t("item_no_longer_exists"))
+        _show_on_top(QtWidgets.QMessageBox.Critical, t("pdm_title"), t("item_no_longer_exists"))
         return
 
     log_lines = []
@@ -1272,8 +1312,8 @@ def main():
 
         tb = traceback.format_exc()
         App.Console.PrintError(tb + "\n")
-        QtWidgets.QMessageBox.critical(
-            None,
+        _show_on_top(
+            QtWidgets.QMessageBox.Critical,
             t("easypdm_error_title"),
             t("download_interrupted")
             + tb
@@ -1286,7 +1326,7 @@ def main():
     # tam, gdzie kliknięto. Zapis przebiegu został w Report View.
     if _CANCEL["requested"]:
         return
-    QtWidgets.QMessageBox.information(None, t("easypdm_title"), "\n".join(log_lines[-25:]))
+    _show_on_top(QtWidgets.QMessageBox.Information, t("easypdm_title"), "\n".join(log_lines[-25:]))
 
 
 if __name__ == "__main__":

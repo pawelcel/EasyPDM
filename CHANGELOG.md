@@ -9,6 +9,7 @@ All notable changes to EasyPDM are documented in this file.
 
 ### Fixed
 - **The main assembly's form opens in the same browser tab as its components'.** Its components' forms already went to the tab left open by the first of them, but the main document, sent last, always opened a new tab, so every assembly upload ended with a second tab just for its own form. The main document now goes to that tab too and opens one only when no tab of this run is there to take it, as a single part still does. Applies to the FreeCAD, SolidWorks and Inventor macros.
+- **The FreeCAD download macro's summary window comes to the front.** It opened while the browser, where the item had just been picked, was on top, and as a window of its own it stayed hidden behind it, so there was no telling whether the download had finished. FreeCAD is now brought forward first (through KWin on KDE, as the macro already does for the browser) and the summary opens over it; so do the error messages shown after the pick.
 
 ## [0.7.1]
 
