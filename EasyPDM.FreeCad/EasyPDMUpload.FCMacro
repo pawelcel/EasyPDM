@@ -1931,6 +1931,17 @@ def _save_local_as_pdm_name(doc, new_local_path):
     częściowo (zob. _ensure_fully_loaded) nie rzuca błędem, tylko cicho nic nie robi -- bez
     tej weryfikacji wracaliśmy stąd z True dla pliku, którego na dysku w ogóle nie ma."""
     if os.path.abspath(new_local_path) == os.path.abspath(doc.FileName):
+        # Ta sama ścieżka (ponowna wysyłka już przemianowanego pliku) -- nie ma czego
+        # przemianowywać, ale ZAPISAĆ trzeba: _rename_and_upload właśnie zmienił etykiety
+        # (dokumentu, bryły, linków złożenia), a do PDM zaraz idzie kopia pliku Z DYSKU. Bez
+        # tego zapisu w PDM lądowała wersja sprzed zmian -- po pobraniu złożenie znów miało
+        # linki "Body", "Body001", choć lokalnie po wysyłce wszystko wyglądało dobrze
+        # (zgłoszone przez użytkownika; lokalnie zapisywało się dopiero na końcu biegu).
+        try:
+            doc.recompute()
+            doc.save()
+        except Exception as e:
+            App.Console.PrintMessage(f"EasyPDM: zapis '{new_local_path}' nie powiodl sie: {e}\n")
         return False
     try:
         doc.recompute()
