@@ -226,6 +226,13 @@ dwie osobne.
    końcowa bryła części albo najbardziej zewnętrzny kontener `App::Part`, w którym siedzi, bo to
    on jest wstawiany; część z kilkoma bryłami zostaje bez zmian. Złożenia są pomijane.
 
+5c. **Linki w złożeniu też dostają nazwy komponentów z PDM** — np. `2(Plate 1)` zamiast
+   `Body001`. Link zachowuje etykietę nadaną przy wstawieniu, więc sama zmiana nazwy pliku i
+   bryły komponentu zostawiała w drzewie złożenia „Body”, „Body001”… Nazwy są poprawiane przy
+   każdej wysyłce złożenia, także takiego, które już jest w PDM. Kolejny egzemplarz tej samej
+   części dostaje końcówkę od FreeCAD-a (`2(Plate 1)001`); linki do plików spoza PDM zostają
+   bez zmian.
+
 6. **Na koniec zwykły zapis (nie „Zapisz jako”) wszystkich otwartych dokumentów** —
    złożenia i każdej Części/pod-złożenia otwartego w tym biegu. Dzieje się to niezależnie
    od tego, jak bieg się kończy: po sukcesie, po anulowaniu w przeglądarce, po odmowie

@@ -238,6 +238,13 @@ operation**, not two separate ones.
    it, since that is what gets inserted; a part with several solids is left as it is.
    Assemblies are skipped.
 
+5c. **An assembly's links get their components' PDM names too** — e.g. `2(Plate 1)` instead
+   of `Body001`. A link keeps the label it was given when it was inserted, so renaming the
+   component's file and solid alone left the assembly tree full of "Body", "Body001"… It is
+   updated whenever the assembly is sent, including an assembly already in the PDM. A second
+   copy of the same part gets FreeCAD's own suffix (`2(Plate 1)001`); links to files not in
+   the PDM are left alone.
+
 6. **Finally, a plain Save (not Save As) of every open document** — the assembly and every
    Part/sub-assembly opened during this run. It happens however the run ends: after
    success, after cancelling in the browser, after declining a new revision, or after an

@@ -257,6 +257,13 @@ getrennte.
    äußerste `App::Part`-Container, in dem er steckt, da dieser eingefügt wird; ein Teil mit
    mehreren Körpern bleibt unverändert. Baugruppen werden übersprungen.
 
+5c. **Auch die Links einer Baugruppe erhalten die PDM-Namen ihrer Komponenten** — z. B.
+   `2(Plate 1)` statt `Body001`. Ein Link behält die Beschriftung vom Einfügen, daher ließ
+   das Umbenennen von Datei und Körper der Komponente allein den Baugruppenbaum voller
+   „Body“, „Body001“… Sie werden bei jedem Senden der Baugruppe aktualisiert, auch einer, die
+   schon im PDM ist. Ein zweites Exemplar desselben Teils erhält FreeCADs eigenes Suffix
+   (`2(Plate 1)001`); Links auf Dateien außerhalb des PDM bleiben unverändert.
+
 6. **Zum Schluss ein normales Speichern (nicht „Speichern unter“) aller geöffneten
    Dokumente** — der Baugruppe und jedes in diesem Lauf geöffneten Teils/jeder
    Unterbaugruppe. Das geschieht unabhängig davon, wie der Lauf endet: nach Erfolg, nach

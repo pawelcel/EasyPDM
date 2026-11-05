@@ -1557,6 +1557,55 @@ def _label_main_object(doc, record_name):
         App.Console.PrintWarning(f"EasyPDM: nie udalo sie zmienic etykiety bryly: {e}\n")
 
 
+def _component_record_name(linked_doc):
+    """Nazwa rekordu PDM komponentu (bez rewizji) albo None, gdy plik nie jest z PDM.
+
+    Plik wysłany przez to makro nazywa się "rekord.REWIZJA.FCStd", a etykieta dokumentu to
+    ta sama nazwa bez rozszerzenia -- oba ustawia _rename_and_upload. Zgodność tych dwóch
+    wystarcza, żeby rozpoznać plik z PDM bez pytania serwera: zwykły plik ("Plate.FCStd",
+    etykieta "Plate") nie ma kropki z rewizją, a ręcznie zmieniona etykieta nie zgadza się z
+    nazwą pliku."""
+    try:
+        base = os.path.splitext(os.path.basename(linked_doc.FileName or ""))[0]
+    except Exception:
+        return None
+    if not base or base != linked_doc.Label or "." not in base:
+        return None
+    return base.rsplit(".", 1)[0]
+
+
+def _label_links(doc):
+    """Nadaje linkom złożenia nazwy komponentów z PDM, np. "2(Plate 1)" zamiast "Body001".
+
+    Link ma WŁASNĄ etykietę, skopiowaną z obiektu w chwili wstawienia ("Body", a przy kolejnej
+    części "Body001"). Późniejsza zmiana nazwy pliku i bryły komponentu (zob.
+    _label_main_object) jej nie rusza, więc drzewo złożenia dalej pokazywało "Body", "Body001",
+    "Zawartość"... mimo że linki wskazywały już właściwe pliki (zgłoszone przez użytkownika).
+
+    Link zmienia nazwę tylko wtedy, gdy nie nosi już nazwy swojego komponentu -- także z
+    końcówką, którą FreeCAD dokleja przy kilku egzemplarzach tej samej części
+    ("2(Plate 1)001"), żeby kolejne wysyłki niczego nie przestawiały. Link do pliku spoza
+    PDM zostaje bez zmian. Błąd tylko trafia do logu: to wygoda, nie warunek wysyłki."""
+    for obj in doc.Objects:
+        try:
+            if not obj.isDerivedFrom("App::Link"):
+                continue
+            linked = getattr(obj, "LinkedObject", None)
+            linked_doc = getattr(linked, "Document", None)
+            if linked_doc is None or linked_doc is doc:
+                continue
+            record_name = _component_record_name(linked_doc)
+            if record_name is None:
+                continue
+            label = obj.Label
+            if label == record_name or (label.startswith(record_name) and label[len(record_name):].isdigit()):
+                continue
+            App.Console.PrintMessage(f"EasyPDM: link '{label}' -> '{record_name}'\n")
+            obj.Label = record_name
+        except Exception as e:
+            App.Console.PrintWarning(f"EasyPDM: nie udalo sie zmienic etykiety linku: {e}\n")
+
+
 def part_material_and_mass(doc):
     """(nazwa materiału albo None, masa w kg albo None) dla CZĘŚCI -- złożenia świadomie
     pomijamy (decyzja użytkownika: tylko części).
@@ -1694,6 +1743,7 @@ def _rename_and_upload(doc, item_id, record_name, name, revision, target_folder=
     doc = _ensure_fully_loaded(doc)
     doc.Label = new_label
     _label_main_object(doc, record_name)
+    _label_links(doc)
     local_renamed = _save_local_as_pdm_name(doc, new_local_path)
     if local_renamed:
         _refresh_links_to(doc)
