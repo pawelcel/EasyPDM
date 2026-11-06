@@ -380,21 +380,22 @@ function AttachmentsPanel({
         </div>
       </div>
 
+      {/* STEP pod plikami CAD, PDF pod rysunkami: każdy eksport stoi pod tym, z czego powstaje. */}
       <div className="mb-3 flex gap-2">
-        <RoleSlot
-          role="pdf"
-          attachment={pdfAttachment}
-          onUpload={(file) => handleRoleUpload("pdf", file)}
-          onDelete={() => pdfAttachment && handleDelete(pdfAttachment)}
-          onPreview={() => pdfAttachment && setPreviewing(pdfAttachment)}
-          disabled={locked || uploading}
-        />
         <RoleSlot
           role="step"
           attachment={stepAttachment}
           onUpload={(file) => handleRoleUpload("step", file)}
           onDelete={() => stepAttachment && handleDelete(stepAttachment)}
           onPreview={() => stepAttachment && setPreviewing(stepAttachment)}
+          disabled={locked || uploading}
+        />
+        <RoleSlot
+          role="pdf"
+          attachment={pdfAttachment}
+          onUpload={(file) => handleRoleUpload("pdf", file)}
+          onDelete={() => pdfAttachment && handleDelete(pdfAttachment)}
+          onPreview={() => pdfAttachment && setPreviewing(pdfAttachment)}
           disabled={locked || uploading}
         />
       </div>
