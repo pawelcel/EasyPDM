@@ -72,7 +72,11 @@ function PendingTicketBanner() {
     setScreen(pendingTicket?.mode === "download" ? "attach" : "choice")
   }, [pendingTicket])
 
-  const candidates = items.filter((i) => i.itemType === "part" || i.itemType === "assembly")
+  // Najnowsze na górze: zwykle pobiera się (albo dogrywa) to, nad czym się ostatnio pracowało.
+  // API zwraca listę po nazwie, przez co numery na liście skakały i wyglądało to na losowe.
+  const candidates = items
+    .filter((i) => i.itemType === "part" || i.itemType === "assembly")
+    .sort((a, b) => (b.itemNumber ?? 0) - (a.itemNumber ?? 0))
 
   // Podpowiedź z makra (etykieta lokalnego dokumentu wygląda jak już wysłany element) —
   // zaznaczana automatycznie przy pierwszym pokazaniu wyszukiwarki "Dograj do istniejącego",

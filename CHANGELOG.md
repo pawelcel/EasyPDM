@@ -10,6 +10,7 @@ All notable changes to EasyPDM are documented in this file.
 
 ### Changed
 - **In an item's attachments the 3D (STEP) slot sits under the CAD files and the PDF slot under the drawings**, so each export stands under what it is made from. They were the other way round.
+- **The list of items to pick when a CAD macro asks for one is ordered by number, newest first.** It came sorted by name alone, so the numbers jumped about and the order looked random. Applies to downloading, and to attaching to or duplicating an existing item on upload.
 
 ### Fixed
 - **The main assembly's form opens in the same browser tab as its components'.** Its components' forms already went to the tab left open by the first of them, but the main document, sent last, always opened a new tab, so every assembly upload ended with a second tab just for its own form. The main document now goes to that tab too and opens one only when no tab of this run is there to take it, as a single part still does. Applies to the FreeCAD, SolidWorks and Inventor macros.
