@@ -191,7 +191,8 @@ getrennte.
    Web-Anwendung), FreeCAD und der Server müssen also nicht dieselbe Festplatte sehen. **Das
    PDM BEHÄLT Kopien früherer Revisionen** — z. B. bleibt `67 (Name).A.FCStd` erhalten, wenn
    Revision B entsteht; ersetzt wird nur die Kopie DERSELBEN Revision (also ein erneutes
-   Senden ohne Statusänderung).
+   Senden ohne Statusänderung). Schlägt das Hochladen der Hauptdatei fehl, nennt ein Fenster
+   den Grund, und die Fortschrittsliste im Browser markiert sie rot und schließt sich.
 5. **Exportiert optional STEP und/oder PDF und lädt sie automatisch als Anhänge mit den
    Rollen „step"/„pdf" hoch.** Woher das Ja/Nein kommt, hängt vom gewählten Pfad oben ab:
    für ein **neues Element** oder **An Vorhandenes anhängen**, im Browser entschieden

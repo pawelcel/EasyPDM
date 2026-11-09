@@ -168,7 +168,9 @@ dwie osobne.
    mechanizm co dogrywanie plików CAD z panelu właściwości w aplikacji webowej), więc FreeCAD
    i serwer nie muszą widzieć tego samego dysku. **PDM ZACHOWUJE kopie poprzednich rewizji**
    — np. `67 (nazwa).A.FCStd` zostaje, gdy powstaje rewizja B; zastępowana jest tylko kopia
-   TEJ SAMEJ rewizji (czyli powtórna wysyłka bez zmiany statusu).
+   TEJ SAMEJ rewizji (czyli powtórna wysyłka bez zmiany statusu). Gdy wysyłka głównego pliku
+   się nie uda, okno podaje przyczynę, a lista postępu w przeglądarce oznacza go na czerwono
+   i się zamyka.
 5. **Opcjonalnie eksportuje STEP i/lub PDF i wgrywa je automatycznie jako załączniki z
    rolami "step"/"pdf".** Skąd bierze się Tak/Nie, zależy od wybranej wcześniej ścieżki:
    dla **nowego elementu** albo **dogrania do istniejącego** zdecydowanego w przeglądarce

@@ -177,7 +177,9 @@ operation**, not two separate ones.
    mechanism as attaching CAD files from the properties panel in the web application), so
    FreeCAD and the server need not share a disk. **The PDM KEEPS copies of previous
    revisions** — e.g. `67 (name).A.FCStd` stays when revision B is created; only the copy
-   of THAT SAME revision gets replaced (i.e. a repeat upload with no status change).
+   of THAT SAME revision gets replaced (i.e. a repeat upload with no status change). If the
+   upload of the main file fails, a window says why, and the progress list in the browser
+   marks it red and closes.
 5. **Optionally exports STEP and/or PDF and uploads them automatically as attachments
    with the "step"/"pdf" roles.** Where the Yes/No comes from depends on the path taken
    above: for a **new item** or **attach to existing** decided in the browser (step 2), it

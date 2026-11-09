@@ -1043,7 +1043,7 @@ APP_WINDOW_TITLE = "EasyPDM — CAD item browser"
 _KWIN_RAISE_SCRIPT = """
 const wins = workspace.windowList ? workspace.windowList() : workspace.clientList();
 for (const w of wins) {
-    if (w.normalWindow && (w.caption || "").indexOf(%(title)s) === 0) {
+    if (w.normalWindow && (%(match)s)) {
         if (workspace.activeWindow !== undefined) workspace.activeWindow = w;
         else workspace.activeClient = w;
         break;
@@ -1051,8 +1051,16 @@ for (const w of wins) {
 }
 """
 
+# Okno FreeCAD-a: najpierw po numerze procesu, a gdy nie pasuje (FreeCAD z Flatpaka ma w
+# piaskownicy inny pid niż ten, który widzi KWin) -- po klasie okna. Kopia z
+# EasyPDMDownload.FCMacro.
+_KWIN_FREECAD_MATCH = (
+    "w.pid === %(pid)d || !wins.some(function (x) { return x.normalWindow && x.pid === %(pid)d; })"
+    " && (w.resourceClass || \"\").toLowerCase().indexOf(\"freecad\") >= 0"
+)
 
-def _raise_via_kwin():
+
+def _raise_via_kwin(match_js=None):
     """Wyciąga okno przeglądarki na wierzch przez KWin — działa na KDE, także pod Wayland.
 
     Pod Wayland żadna aplikacja nie może sama aktywować okna innej. Może to jednak zrobić
@@ -1065,6 +1073,9 @@ def _raise_via_kwin():
     pośredniczący, który przekazuje adres do działającego okna — a czy to okno skorzysta z
     tokenu, zależy od przeglądarki (zgłoszone z praktyki: zamknięta przeglądarka wychodziła na
     wierzch, otwarta — nie).
+
+    `match_js` to warunek JS na oknie `w`; domyślnie okno przeglądarki z EasyPDM (po
+    początku tytułu). Ten sam mechanizm wyciąga na wierzch sam FreeCAD -- zob. _show_on_top.
 
     Zwraca True, gdy skrypt udało się uruchomić — nie mówi, czy okno znalazł. Poza KDE (brak
     gdbus albo usługi org.kde.KWin) po prostu zwraca False."""
@@ -1084,7 +1095,9 @@ def _raise_via_kwin():
         fd, path = tempfile.mkstemp(prefix="easypdm-kwin-", suffix=".js")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             # json.dumps daje poprawny literał JS, z polskimi znakami jako \uXXXX.
-            f.write(_KWIN_RAISE_SCRIPT % {"title": json.dumps(APP_WINDOW_TITLE)})
+            if match_js is None:
+                match_js = '(w.caption || "").indexOf(%s) === 0' % json.dumps(APP_WINDOW_TITLE)
+            f.write(_KWIN_RAISE_SCRIPT % {"match": match_js})
         # Gdyby poprzednie uruchomienie zostawiło skrypt wczytany, loadScript by odmówił.
         call("/Scripting", "org.kde.kwin.Scripting.unloadScript", plugin)
         loaded = call("/Scripting", "org.kde.kwin.Scripting.loadScript", path, plugin)
@@ -2409,6 +2422,19 @@ def _main_window():
         return None
 
 
+def _show_on_top(icon, title, text):
+    """Komunikat, który wychodzi NA WIERZCH, także spod przeglądarki -- zob. tak samo nazwana
+    funkcja w EasyPDMDownload.FCMacro. Błąd głównego pliku pada zaraz po wypełnieniu
+    formularza, czyli gdy na wierzchu jest przeglądarka."""
+    if sys.platform.startswith("linux"):
+        _raise_via_kwin(_KWIN_FREECAD_MATCH % {"pid": os.getpid()})
+    box = QtWidgets.QMessageBox(icon, title, text, QtWidgets.QMessageBox.Ok, _main_window())
+    box.show()
+    box.raise_()
+    box.activateWindow()
+    box.exec()
+
+
 def _ask_yes_no(text, default_yes):
     """Pytanie Tak/Nie, które zawsze leży NAD oknem FreeCAD.
 
@@ -3160,10 +3186,29 @@ def run():
     # jak bieg się skończy -- także po anulowaniu w przeglądarce, odmowie nowej rewizji albo
     # wyjątku w połowie. Wcześniej był tylko na końcu udanej ścieżki: złożenie w pamięci
     # wskazywało już nowe nazwy części, a plik na dysku stare, aż do ręcznego Ctrl+S.
+    #
+    # Błąd głównego pliku (albo nieprzewidziany w innym miejscu) kończy bieg tutaj. Bez tego
+    # bieg nie był zamykany: panel w przeglądarce kręcił się dalej przy pliku, którego już nikt
+    # nie wysyłał, raport nie powstawał, a sam błąd lądował tylko w Report View. Okno dopiero po
+    # zapisie, żeby zapis nie czekał, aż ktoś je zamknie.
+    failure = None
     try:
         _send_and_link(doc, target_folder)
+    except Exception as e:
+        failure = e
+        import traceback
+
+        App.Console.PrintError("EasyPDM: " + traceback.format_exc() + "\n")
+        progress_mark(TOP_DOCUMENT_PROGRESS_KEY, "failed")
+        progress_finish()
     finally:
         _save_open_documents()
+
+    if failure is not None:
+        _show_on_top(
+            QtWidgets.QMessageBox.Critical, t("pdm_title"),
+            t("upload_component_failed", file=os.path.basename(doc.FileName), error=failure),
+        )
 
 
 def _save_open_documents():
