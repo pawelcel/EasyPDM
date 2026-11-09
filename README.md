@@ -7,7 +7,8 @@
 ▶️ **Video series on YouTube** ([playlist](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)): [1. What a PDM is and why EasyPDM](https://youtu.be/OaqyJQCHkt4) ·
 [2. Installation — Windows, Docker or Linux](https://youtu.be/ZwAWCJN9tWg) ·
 [3. Projects and structure](https://youtu.be/ZB3pXQY6-e0) ·
-[4. From CAD to PDM — the upload macro](https://youtu.be/vMQPxwWQrGc)
+[4. From CAD to PDM — the upload macro](https://youtu.be/vMQPxwWQrGc) ·
+[5. A whole assembly — upload, download, update and drawings](https://youtu.be/vXHYbRlPu_s)
 
 EasyPDM is where your Parts and Assemblies get one, shared order for the whole team:
 every item has its own number, revision, status and change history, and assemblies get

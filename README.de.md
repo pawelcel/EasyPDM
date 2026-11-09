@@ -7,7 +7,8 @@
 ▶️ **Videoserie auf YouTube** (auf Englisch, [Playlist](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)): [1. Wozu PDM und was EasyPDM ist](https://youtu.be/OaqyJQCHkt4) ·
 [2. Installation — Windows, Docker oder Linux](https://youtu.be/ZwAWCJN9tWg) ·
 [3. Projekte und Struktur](https://youtu.be/ZB3pXQY6-e0) ·
-[4. Von CAD ins PDM — das Upload-Makro](https://youtu.be/vMQPxwWQrGc)
+[4. Von CAD ins PDM — das Upload-Makro](https://youtu.be/vMQPxwWQrGc) ·
+[5. Eine ganze Baugruppe — Hochladen, Herunterladen, Aktualisieren und Zeichnungen](https://youtu.be/vXHYbRlPu_s)
 
 EasyPDM ist der Ort, an dem Ihre Teile und Baugruppen eine einzige, für das ganze Team
 gemeinsame Ordnung erhalten: Jedes Element hat seine eigene Nummer, Revision, Status und
