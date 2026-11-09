@@ -152,11 +152,10 @@ inaczej:
    (ta sama konwencja co w aplikacji webowej i makrach FreeCAD). **Lokalny plik NIE jest
    ruszany** — nie jest ani przenoszony, ani usuwany. Jeśli magazyn PDM jest widoczny
    z tej maszyny (`GET /api/config`), kopia trafia do wspólnego `storage/components/` i
-   jest **rejestrowana** bez ponownego przesyłania przez HTTP (zachowuje historię
-   rewizji); jeśli nie (typowe, gdy SolidWorks i usługa EasyPDM działają jako różni
+   jest **rejestrowana** bez ponownego przesyłania przez HTTP; jeśli nie (typowe, gdy SolidWorks i usługa EasyPDM działają jako różni
    użytkownicy Windows — magazyn jest w `C:\ProgramData\...`, do którego zwykły
-   użytkownik zwykle nie ma prawa zapisu), zwykły upload HTTP (fallback bez zachowania
-   historii rewizji, korzystający specjalnie do tego wywołania z
+   użytkownik zwykle nie ma prawa zapisu), zwykły upload HTTP (fallback, który też zachowuje
+   wcześniejsze rewizje, korzystający specjalnie do tego wywołania z
    `WinHttp.WinHttpRequest.5.1` — zob. "Historia naprawionych problemów" niżej) — **to
    nie błąd**, tylko poprawnie zadziałane zabezpieczenie. Ta ścieżka zapasowa sprawdza
    też i kasuje istniejący załącznik z rolą `"cad"` o dokładnie tej samej nazwie pliku

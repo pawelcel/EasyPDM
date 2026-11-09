@@ -149,10 +149,10 @@ solved differently:
    the FreeCAD macros). **The local file is NOT touched** — it is neither moved nor
    deleted. If the PDM storage is visible from this machine (`GET /api/config`), the copy
    goes to the shared `storage/components/` and is **registered** without re-uploading
-   over HTTP (preserves revision history); if not (typical when SolidWorks and the
+   over HTTP; if not (typical when SolidWorks and the
    EasyPDM service run as different Windows users — the storage is under
    `C:\ProgramData\...`, which a regular user usually has no write access to), a plain
-   HTTP upload (fallback, without preserving revision history, and uses
+   HTTP upload (fallback, which keeps earlier revisions too and uses
    `WinHttp.WinHttpRequest.5.1` specifically for this call — see "History of fixed
    issues" below) — **this is not a bug**, just a security measure working correctly.
    This fallback path also checks for and deletes any existing `"cad"`-role attachment

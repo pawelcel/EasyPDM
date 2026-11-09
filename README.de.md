@@ -161,7 +161,7 @@ Das FreeCAD-Makro sendet ebenfalls **Material und Masse eines Teils**. FreeCAD s
 keine Masse, daher berechnet das Makro sie beim Hochladen aus dem Volumen und der Dichte des
 dem Teil zugewiesenen Materials; senden Sie das Teil nach einer Änderung erneut, um den Wert
 zu aktualisieren. Baugruppen werden übersprungen, und ein Teil, dessen Körper verschiedene
-oder keine Materialien haben, bekommt lieber keinen Wert als einen falschen.
+oder keine Materialien haben, bekommt lieber keinen Wert als einen falschen. Das Makro benennt außerdem den Körper eines Teils und die Links einer Baugruppe nach ihren Elementen im PDM, sodass man beim Einfügen einer Komponente nicht mehr zwischen „Body“ und „Body001“ wählt.
 
 **Download** — Sie klicken auf Download und geben im Browser das abzurufende
 Teil/Baugruppe an. Bei einer Baugruppe wird sofort der GESAMTE Komponentenbaum

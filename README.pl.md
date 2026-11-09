@@ -149,7 +149,7 @@ dokumentem, tyle że nie w jego nazwie.
 Makro FreeCAD wysyła również **materiał i masę części**. FreeCAD nie przechowuje masy, więc
 makro liczy ją z objętości i gęstości materiału nadanego części, w chwili wysyłki; po zmianie
 części wyślij ją ponownie, żeby odświeżyć wartość. Złożenia są pomijane, a część, której
-bryły mają różne materiały albo nie mają materiału, nie dostaje wartości zamiast złej.
+bryły mają różne materiały albo nie mają materiału, nie dostaje wartości zamiast złej. Makro nadaje też bryle części i linkom w złożeniu nazwy ich elementów z PDM, więc przy wstawianiu komponentu nie wybiera się już między „Body” a „Body001”.
 
 **Download** — klikasz Download, w przeglądarce wskazujesz Część/Złożenie do pobrania.
 Dla złożenia od razu ściąga się CAŁE drzewo komponentów, a główny plik otwiera się

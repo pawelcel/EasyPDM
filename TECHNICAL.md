@@ -379,6 +379,8 @@ do not count. The material is sent only when all those solids share one that is 
 because a partial sum would be a plausible-looking wrong number. A very small mass is written
 out in plain decimals rather than as `1.58e-05`. Assemblies are skipped, as in the other two.
 
+FreeCAD also shows names inside the file, so a renamed file alone is not enough: inserting a component lists object labels, and the assembly tree lists the labels of its links, which were copied from the object at insertion ("Body", then "Body001"). `_label_main_object` therefore gives a part's single final solid, or the outermost `App::Part` holding it, the record name without the revision, and `_label_links` gives an assembly's links the record names of their components. A linked document counts as a PDM file when its label equals its file name and carries the revision, the pair the macro itself sets, so no server lookup is needed. A label that already is the record name, or that name plus FreeCAD's numeric suffix for a second copy, is left alone. Since what reaches the PDM is the file on disk, `_save_local_as_pdm_name` saves even when the path does not change; without that a re-sent assembly went up with its old labels.
+
 Drawings are skipped entirely, material is written for Parts only (an Assembly has none of
 its own), and a mass that is empty or not a plain number is logged and skipped — it is
 normalized to digits and one decimal point first, since it can arrive with a unit and a
@@ -507,6 +509,8 @@ That first open no longer shows a message box, because the first browser-open of
 focus by itself — the Windows rule above only bites from the second onwards. A normal run is
 therefore one tab and no clicks, against one tab and one click per component before.
 
+The main document, sent last, takes the same route, without the `component` flag, so its form keeps the project and parent pickers. It used to build a deep link every time, which left a second tab at the end of each assembly upload for that one form. A single part has no tab of its run yet, so it opens one as before. The picker in that form, like the one for downloading, is sorted newest number first in `PendingTicketBanner`; `GET /api/items` still returns name order for the screens that rely on it.
+
 Once a tab has claimed a request, the macro calls `AppActivate "EasyPDM"` to hand focus back.
 The CAD program comes forward in between for a good reason — for the previous component it saved
 the file, exported the STEP and redrew the graphics window for the screenshot — but the next
@@ -541,6 +545,8 @@ back to FreeCAD on purpose. The window is matched by the app's full `<title>` at
 its caption: matching on "EasyPDM" alone was ruled out by a probe of a live session, where a
 Shotcut project called `EasyPDM2.mlt` would have been raised instead. Outside KDE it falls
 back to `wmctrl`/`xdotool` (X11), and on Windows none of this runs.
+
+The same KWin route works the other way round in the download macro. Its summary opens right after the item was picked in the browser, so as a parentless window it stayed hidden behind it. `_show_on_top` first asks KWin to activate FreeCAD's window, matched by process id and, for a sandboxed FreeCAD whose pid KWin does not see, by window class, and then opens the box with the main window as its parent.
 
 That is also why the app itself can call the person back: when a request is taken and the tab
 does not have focus, it shows a desktop notification whose click switches to it. A click is
@@ -1091,10 +1097,11 @@ right after logging in.
    `ScheduledBackupService` in the background, saved to a separate `backups/` directory
    (independent of `storage/`, so a backup doesn't pack itself), with a configurable
    number of kept recent copies (14 by default — older ones are automatically deleted).
-   File versioning on a revision change only works today in the FreeCAD macro flow
-   (`storage/components/`, one file per revision, see `EasyPDM.FreeCad/README.md`) —
-   plain attachments added from the web application have no automatic link to the
-   revision number.
+   One CAD file per revision comes from the file names the macros give
+   (`record name.REVISION.ext`, in all three macros, registered in `storage/components/`
+   or uploaded over HTTP alike): the same name replaces that revision's file and a new
+   name stands beside it. A file attached by hand to a CAD slot under the same name
+   replaces the earlier one, whatever revision that one belonged to.
 3. **Not every operation records "who did it"** — creating an item (`created_by`), a
    status change, a revision comment, adding/removing an attachment, and owner
    lock/release already do (visible in the "History"), but e.g. changing

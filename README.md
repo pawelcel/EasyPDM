@@ -149,7 +149,7 @@ The FreeCAD macro sends the **material and mass of a part** as well. FreeCAD sto
 so the macro computes it from the volume and the density of the material assigned to the
 part, at the moment of upload; send the part again after changing it to refresh the value.
 Assemblies are skipped, and a part whose solids have different materials, or one without a
-material, gets no value rather than a wrong one.
+material, gets no value rather than a wrong one. The macro also names the part's solid and an assembly's links after their items in the PDM, so inserting a component no longer means choosing between "Body" and "Body001".
 
 **Download** — you click Download, and in the browser you point to the Part/Assembly to
 fetch. For an assembly, the ENTIRE component tree is fetched right away, and the main

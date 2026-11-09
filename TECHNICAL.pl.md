@@ -348,6 +348,8 @@ dziesiętnym.
 
 FreeCAD nie przechowuje żadnej z nich, więc jego makro liczy obie przy wysyłce i wysyła je od razu do `PATCH /properties`, bez właściwości dokumentu po drodze (`part_material_and_mass`). Patrzy tylko na końcowe bryły części — widoczne obiekty `Part::Feature`, których nie zużywa żaden inny `Part::Feature` i które mają objętość — więc szkice, cechy pośrednie i ukryte bryły pomocnicze się nie liczą. Materiał idzie tylko wtedy, gdy wszystkie te bryły mają ten sam i nie jest to „Default” FreeCAD-a; masa (objętość × gęstość) tylko wtedy, gdy każda bryła ma materiał z gęstością, bo suma częściowa byłaby wiarygodnie wyglądającą złą liczbą. Bardzo mała masa jest zapisywana zwykłymi cyframi, nie jako `1.58e-05`. Złożenia są pomijane, jak w pozostałych dwóch.
 
+FreeCAD pokazuje też nazwy wewnątrz pliku, więc sama zmiana nazwy pliku nie wystarcza: wstawianie komponentu pokazuje etykiety obiektów, a drzewo złożenia etykiety linków, skopiowane z obiektu przy wstawieniu („Body”, potem „Body001”). Dlatego `_label_main_object` nadaje jedynej końcowej bryle części albo najbardziej zewnętrznemu `App::Part`, w którym siedzi, nazwę rekordu bez rewizji, a `_label_links` nadaje linkom złożenia nazwy rekordów ich komponentów. Dokument linkowany uchodzi za plik z PDM, gdy jego etykieta równa się nazwie pliku i zawiera rewizję, bo tę parę ustawia samo makro, więc serwer nie jest potrzebny. Etykieta, która już jest nazwą rekordu albo tą nazwą z numeryczną końcówką FreeCAD-a dla kolejnego egzemplarza, zostaje. Do PDM trafia plik z dysku, więc `_save_local_as_pdm_name` zapisuje dokument także wtedy, gdy ścieżka się nie zmienia; bez tego ponownie wysłane złożenie szło ze starymi etykietami.
+
 Zanim do tego dojdzie, otwierając przeglądarkę w celu utworzenia nowego elementu makro
 przekazuje materiał dokumentu w deep-linku (`&material=`), odczytany wprost z API CAD-a, a nie
 z `EasyPDM_Material` — w tym momencie nic jeszcze nie zostało zapisane, więc wyrażenie nie
@@ -434,11 +436,15 @@ Prośba jest adresowana do **jednego biegu makra**, nie do konta. CAD generuje i
 
 Z tego samego wynika, że **pierwszy** komponent biegu nadal otwiera kartę: to otwarcie jest jedynym sposobem, żeby karta na tej maszynie poznała identyfikator biegu, a dopóki żadna go nie zna, makro nie ma komu podać prośby. To pierwsze otwarcie nie pokazuje już okna, bo pierwsze otwarcie przeglądarki w biegu i tak przejmuje fokus — reguła Windows opisana wyżej gryzie dopiero od drugiego. Normalny bieg to więc jedna karta i zero kliknięć, zamiast jednej karty i jednego kliknięcia na komponent.
 
+Dokument główny, wysyłany na końcu, idzie tą samą drogą, bez flagi `component`, więc jego formularz zachowuje wybór projektu i rodzica. Wcześniej za każdym razem budował głęboki link, przez co każda wysyłka złożenia kończyła się drugą kartą tylko dla tego jednego formularza. Pojedyncza część nie ma jeszcze karty swojego biegu, więc otwiera ją jak dotąd. Lista wyboru w tym oknie, tak samo jak przy pobieraniu, jest sortowana w `PendingTicketBanner` od najwyższego numeru; `GET /api/items` zwraca nadal kolejność po nazwie dla ekranów, które na niej polegają.
+
 Gdy karta podejmie prośbę, makro oddaje fokus przez `AppActivate "EasyPDM"`. CAD wychodzi w międzyczasie na wierzch nie bez powodu — dla poprzedniego komponentu zapisywał plik, eksportował STEP i przerysowywał okno graficzne na potrzeby zrzutu — ale teraz potrzebny jest formularz. Działa to, bo Windows pozwala oddać fokus aplikacji, która *aktualnie* go ma: ta sama reguła, która wymuszała klikanie, użyta w drugą stronę. Dopasowanie idzie po początku tytułu okna, więc gdy EasyPDM siedzi w karcie w tle, nic się nie dzieje, a błąd jest połykany — to wygoda, a nie część wysyłki. We FreeCAD problem był odwrotny: niczego nie trzeba było wyciągać, bo karta wychodzi na wierzch sama, gdy podejmie prośbę — fokus odbierało jej dopiero własne okno oczekiwania makra, tworzone chwilę potem, bo Qt aktywuje nowe okno przy tworzeniu. `WA_ShowWithoutActivating` tego nie powstrzymało: pod Wayland o tym, czy nowe okno dostanie fokus, decyduje kompozytor, a nie aplikacja. Okna więc nie ma — FreeCAD czeka tak, jak makra SolidWorks i Inventor zawsze czekały: odpytując serwer z komunikatem na pasku stanu, a `processEvents` utrzymuje interfejs przy życiu. Próba przez `wmctrl`/`xdotool` zostaje jako zapas wyłącznie dla X11.
 
 Ta sama zasada tłumaczy, czemu nawet *pierwsze* otwarcie nie wyciągało przeglądarki. Pod Wayland uruchomiony program dostaje fokus tylko wtedy, gdy uruchamiający przekaże mu token xdg-activation, a Pythonowy `webbrowser.open` po prostu woła `xdg-open` bez żadnego. FreeCAD otwiera teraz adresy przez `QDesktopServices.openUrl` (`open_in_browser`), który od Qt 6.6 sam prosi kompozytor o token w imieniu FreeCAD-a i przekazuje go dalej — ważny w tej chwili, bo użytkownik właśnie uruchomił makro i fokus ma FreeCAD. `webbrowser.open` zostaje jako zapas.
 
 Token pomaga jednak tylko przeglądarce *uruchamianej*. Działająca dostaje adres od krótkiego procesu pośredniczącego i to od niej zależy, czy z tokenu skorzysta — w praktyce zamknięta przeglądarka wychodziła na wierzch, otwarta nie. Dlatego na Linuksie, po otwarciu karty, makro prosi też wprost kompozytor: `_raise_via_kwin` zapisuje mały skrypt KWin, wczytuje go przez DBus (`org.kde.KWin /Scripting`), uruchamia i zdejmuje — tą samą drogą co `kdotool`, na którą Wayland pozwala, bo okno aktywuje sam kompozytor. Próbuje przy pierwszych trzech odpytaniach, bo strona potrzebuje chwili, żeby się załadować i ustawić tytuł, i ani razu więcej, żeby nie wyrywać fokusu komuś, kto świadomie wrócił do FreeCAD-a. Okno jest rozpoznawane po pełnym `<title>` aplikacji na początku tytułu: dopasowanie po samym „EasyPDM” odpadło po sondzie na żywej sesji, gdzie na wierzch wyszedłby projekt Shotcuta o nazwie `EasyPDM2.mlt`. Poza KDE zostaje `wmctrl`/`xdotool` (X11), a na Windowsie nic z tego się nie uruchamia.
+
+Ta sama droga przez KWin działa w drugą stronę w makrze pobierania. Jego podsumowanie otwiera się tuż po wyborze elementu w przeglądarce, więc jako okno bez rodzica zostawało schowane za nią. `_show_on_top` najpierw prosi KWin o aktywację okna FreeCAD-a, wskazanego po numerze procesu, a dla FreeCAD-a w piaskownicy, którego pid KWin nie widzi, po klasie okna, i dopiero wtedy otwiera komunikat z głównym oknem jako rodzicem.
 
 Dlatego też aplikacja potrafi zawołać człowieka sama: gdy prośba zostaje podjęta, a karta nie ma fokusu, pokazuje powiadomienie systemowe, którego kliknięcie na nią przełącza. Kliknięcie to jedyny mechanizm, którego nie odrzuca żaden system okien — bo przełącza się sam użytkownik. O zgodę pytamy raz, z przycisku w oknie prośby z makra (przeglądarki odrzucają pytanie bez świeżej interakcji), a karta z fokusem nie pokazuje nic, bo nie ma od czego wołać.
 
@@ -813,10 +819,11 @@ razu po zalogowaniu.
    oraz dnia i godziny — sprawdzane co minutę przez `ScheduledBackupService` w tle, zapisywane
    do osobnego katalogu `backups/` (niezależnego od `storage/`, żeby kopia nie pakowała samej
    siebie), z konfigurowalną liczbą przechowywanych ostatnich kopii (domyślnie 14 — starsze
-   są automatycznie kasowane). Wersjonowanie pliku przy zmianie
-   rewizji działa dziś tylko w przepływie makra FreeCAD (`storage/components/`, jeden plik na
-   rewizję, zob. `EasyPDM.FreeCad/README.md`) — zwykłe załączniki dodawane z aplikacji
-   webowej nie mają automatycznego powiązania z numerem rewizji.
+   są automatycznie kasowane). Jeden plik CAD na rewizję wynika z nazw nadawanych przez makra
+   (`nazwa rekordu.REWIZJA.rozszerzenie`, we wszystkich trzech, tak samo przy rejestracji w
+   `storage/components/` i przy wysyłce HTTP): ta sama nazwa zastępuje plik tej rewizji, a nowa
+   staje obok. Plik dołączony ręcznie do miejsca CAD pod tą samą nazwą zastępuje poprzedni,
+   niezależnie od jego rewizji.
 3. **Nie każda operacja zapisuje "kto to zrobił"** — utworzenie elementu (`created_by`),
    zmiana statusu, komentarz do rewizji, dodanie/usunięcie załącznika i blokada/zwolnienie
    właściciela już to robią (widać w „Historii"), ale np. zmiana właściwości/nazwy/tagów

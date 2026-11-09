@@ -129,10 +129,10 @@ operation**, not two separate ones.
 
    One shared form/bar in the browser for EVERYTHING, so these rules can no longer drift
    apart between the macro and the web application. Once you've decided in the browser
-   (via any of the three routes above), FreeCAD (the "Waiting for the browser" window,
-   polling the server every ~2 s, 10-minute limit) detects completion on its own and
+   (via any of the three routes above), FreeCAD (polling the server every ~2 s with a
+   message in its status bar, 10-minute limit) detects completion on its own and
    continues from step 3 below — there's no need to go back to FreeCAD manually.
-   Cancelling in the browser or in the waiting window ends the macro with a message,
+   Cancelling in the browser ends the macro with a message,
    without creating/attaching a file (the item may already have been created in the PDM,
    if it was saved in the browser before cancelling — in that case, run the macro again
    and attach to it via the "pending request from the macro" bar).
@@ -183,8 +183,8 @@ operation**, not two separate ones.
    status change). If the storage is unreachable from this machine (e.g. FreeCAD on a
    different computer than the server), the copy goes through a plain HTTP upload instead
    (`POST /api/items/{id}/attachments`, the same mechanism as attaching CAD files from the
-   properties panel in the web application) — in that case revision history is not
-   preserved.
+   properties panel in the web application) — earlier revisions stay listed there too,
+   since only a copy of the same revision is replaced.
 5. **Optionally exports STEP and/or PDF and uploads them automatically as attachments
    with the "step"/"pdf" roles.** Where the Yes/No comes from depends on the path taken
    above: for a **new item** or **attach to existing** decided in the browser (step 2), it
@@ -315,8 +315,8 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
 - **Step 2** (new item/attach to existing, both through the browser) requires the default
   system browser to be able to open the PDM server's address (the same one as the API
   address in the macro preferences) — on a typical installation (client and server on the
-  same network) this works with no extra configuration. The waiting window in FreeCAD has
-  a **10-minute** limit — once exceeded (or on Cancel) the macro ends with a message,
+  same network) this works with no extra configuration. FreeCAD waits for the browser for
+  at most **10 minutes** — once exceeded (or on Cancel) the macro ends with a message,
   without creating/attaching a file.
 - Automatic assembly detection only works for references to **external, saved files**
   (`App::Link` and Link-derived types, e.g. the native Assembly workbench's
@@ -362,9 +362,8 @@ the Assembly/Assembly4 workbench) to **other, saved `.FCStd` files**, the macro 
   machine's file system** — today the client (FreeCAD) and the server (`EasyPDM.Api`) run
   on the same disk, so this works with no extra configuration. If `GET /api/config` is
   unreachable or the path isn't writable (e.g. FreeCAD on a different machine than the
-  server), the copy goes to the PDM via a plain HTTP upload instead — in this fallback
-  mode revision history is NOT preserved (every upload overwrites the previous copy on
-  the PDM side).
+  server), the copy goes to the PDM via a plain HTTP upload instead — earlier revisions stay there
+  too; only a copy of the same revision is replaced.
 - The registration endpoint only accepts paths that lie inside the configured storage
   (`StorageRoot`) — it can't be used to "attach" an arbitrary file from the server's disk.
 - The saved document is sent in its current state — the macro does not validate, for
@@ -389,10 +388,10 @@ component individually, the native "already-recognized document" shortcut (step 
 Save-As-under-the-PDM-name with correctly-resolving `App::Link` references after a
 later download, STEP export (including the fix for native-Assembly-workbench documents,
 which previously produced a geometry-less STEP file), and PDF export — all confirmed
-working against a live server by the user, not just reviewed statically (there is still
-no FreeCAD instance available in the environment these files are edited from, so every
-fix here came from the user reproducing an issue live — in one case pasting FreeCAD's
-own Report View output for line-by-line diagnosis — not from a build/test step).
+working against a live server by the user, not just reviewed statically (most
+fixes here came from the user reproducing an issue live — in one case pasting FreeCAD's
+own Report View output for line-by-line diagnosis). Since 2026-11 the upload flow is also
+run against a real FreeCAD 1.1 without its GUI, with the browser tab simulated.
 
 Earlier in this file's history, the underlying login/ticket/revision logic was also
 verified automatically via `freecadcmd` against a live `EasyPDM.Api` (session handling,
@@ -423,11 +422,10 @@ native window — the macro only asks locally about the target folder.
    opens the **system browser**, already logged in (token→cookie bridge), on a bar
    saying "a download request from a CAD macro is pending" (visible on every screen of
    the web application) — only there do you search for a Part/Assembly from the **whole
-   database** (by number or name) and confirm the choice. FreeCAD (the "Waiting for the
-   browser" window, polling every ~2 s, **10-minute** limit) detects the confirmation on
+   database** (by number or name) and confirm the choice. FreeCAD (polling every ~2 s with a
+   message in its status bar, **10-minute** limit) detects the confirmation on
    its own and the download starts automatically — there's no need to go back to FreeCAD
-   manually. Cancelling in the browser/waiting window ends the macro without downloading
-   anything.
+   manually. Cancelling in the browser ends the macro without downloading anything.
 2. For an **Assembly**: it also downloads ALL of its components recursively (direct
    children, then their children, and so on — the whole BOM), into the SAME folder as the
    main file. Without this, an assembly built on `App::Link` references to external,
@@ -444,6 +442,9 @@ native window — the macro only asks locally about the target folder.
    component files stay only on disk, they are not automatically opened as separate
    documents (exactly the way FreeCAD itself opens an assembly: it loads linked files in
    the background).
+6. At the end a **summary** window (what was downloaded and what was skipped) opens in
+   FreeCAD, over the browser where the item was just picked. After Cancel there is no
+   window; the report is in the application's notifications.
 
 ## Where it gets files from
 
@@ -463,8 +464,8 @@ best approximation.
 - **Choosing the item** (step 1 above) requires the default system browser to be able to
   open the PDM server's address (the same one as the API address in the macro
   preferences) — on a typical installation (client and server on the same network) this
-  works with no extra configuration. The waiting window in FreeCAD has a **10-minute**
-  limit — once exceeded (or on Cancel) the macro ends without downloading anything.
+  works with no extra configuration. FreeCAD waits for the browser for at most **10 minutes**
+  — once exceeded (or on Cancel) the macro ends without downloading anything.
 - It always targets the CURRENT revision — it cannot be used to download a specific,
   chosen older revision (older local copies serve only to detect "you have an outdated
   version", point 4 above).
@@ -486,22 +487,4 @@ best approximation.
 
 ## Verification status
 
-⚠️ **Not yet confirmed live on FreeCAD**, as opposed to `EasyPDMUpload.FCMacro` above
-(which has, across several rounds of testing). This macro shares the same underlying
-browser-ticket mechanism (`GET /api/auth/browser-login`, `GET
-/api/create-tickets/{ticket}` + `POST /create-tickets/{ticket}/attach-existing`, the
-"pending request from the macro" bar in the web application) already exercised live by
-`EasyPDMUpload.FCMacro`, so the ticket/waiting-window plumbing itself is not new or
-unusual — but the specifics of THIS macro (recursive component download, the
-already-downloaded/outdated-revision detection by filename, opening the result with
-`App.openDocument`) have only been verified: syntactically (`ast.parse`), for
-correctness of Polish characters (a script checking character frequency — zero
-corruption), and through a careful review of the logic against the actual API endpoints
-(`GET /api/items`, `/items/{id}/attachments`, `/items/{id}/children`,
-`/attachments/{id}/file`, each checked against the `EasyPDM.Api` code). On the first run
-on live FreeCAD, watch the process (the log in the window at the end, and in the FreeCAD
-Report view console) and report anything that doesn't work — the riskiest spots are:
-recognizing attachment names via regex (if a file has an unusual name), and whether the
-`App::Link` references in the downloaded assembly actually resolve automatically once
-all files are placed in one flat folder (this depends on how the link paths are saved in
-the original file — see "Limitations" above).
+**Confirmed live on real FreeCAD 1.1** against a live server: picking the item in the browser, downloading a whole assembly with its components, the check for files already in the folder, and opening the result, including a round trip of an assembly uploaded and downloaded again.

@@ -124,9 +124,9 @@ dwie osobne.
 
    Jeden wspólny formularz/pasek w przeglądarce dla WSZYSTKIEGO, więc te reguły nie mogą
    się już rozjechać między makrem a aplikacją webową. Po zdecydowaniu w przeglądarce
-   (dowolną z trzech dróg wyżej), FreeCAD (okno "Czekam na przeglądarkę", odpytujące serwer
-   co ~2 s, limit 10 minut) samo wykrywa zakończenie i kontynuuje od kroku 3 niżej — nie
-   trzeba wracać do FreeCAD ręcznie. Anulowanie w przeglądarce albo w oknie oczekiwania
+   (dowolną z trzech dróg wyżej), FreeCAD (odpytując serwer co ~2 s, z komunikatem na pasku
+   stanu, limit 10 minut) samo wykrywa zakończenie i kontynuuje od kroku 3 niżej — nie
+   trzeba wracać do FreeCAD ręcznie. Anulowanie w przeglądarce
    kończy makro komunikatem bez tworzenia/dogrania pliku (element mógł już powstać w PDM,
    jeśli zdążono go zapisać w przeglądarce — wtedy trzeba uruchomić makro ponownie i
    dograć do niego przez pasek "oczekujące żądanie z makra").
@@ -173,8 +173,8 @@ dwie osobne.
    TEJ SAMEJ rewizji (czyli powtórna wysyłka bez zmiany statusu). Jeśli magazyn jest
    nieosiągalny z tej maszyny (np. FreeCAD na innym komputerze niż serwer), kopia trafia
    przez zwykły upload HTTP (`POST /api/items/{id}/attachments`, ten sam mechanizm co
-   dogrywanie plików CAD z panelu właściwości w aplikacji webowej) — wtedy historia rewizji
-   nie jest zachowywana.
+   dogrywanie plików CAD z panelu właściwości w aplikacji webowej) — wcześniejsze rewizje też tam
+   zostają, bo zastępowana jest tylko kopia tej samej rewizji.
 5. **Opcjonalnie eksportuje STEP i/lub PDF i wgrywa je automatycznie jako załączniki z
    rolami "step"/"pdf".** Skąd bierze się Tak/Nie, zależy od wybranej wcześniej ścieżki:
    dla **nowego elementu** albo **dogrania do istniejącego** zdecydowanego w przeglądarce
@@ -304,7 +304,7 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
 - **Krok 2** (nowy element/dogranie do istniejącego, oba przez przeglądarkę) wymaga, żeby
   domyślna przeglądarka systemowa umiała otworzyć adres serwera PDM (ten sam, co adres API
   w preferencjach makra) — na typowej instalacji (klient i serwer w tej samej sieci)
-  działa to bez dodatkowej konfiguracji. Okno oczekiwania w FreeCAD ma limit **10 minut**
+  działa to bez dodatkowej konfiguracji. FreeCAD czeka na przeglądarkę najwyżej **10 minut**
   — po przekroczeniu (albo Anuluj) makro kończy się komunikatem, bez tworzenia/dogrania
   pliku.
 - Automatyczne wykrywanie złożenia działa tylko dla odnośników do **zewnętrznych, zapisanych
@@ -336,9 +336,8 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   w systemie plików tej maszyny** — dziś klient (FreeCAD) i serwer (`EasyPDM.Api`)
   działają na tym samym dysku, więc to działa bez dodatkowej konfiguracji. Jeśli
   `GET /api/config` jest nieosiągalne albo ścieżka niedostępna do zapisu (np. FreeCAD na
-  innej maszynie niż serwer), kopia trafia do PDM zwykłym uploadem HTTP — w tym trybie
-  fallbackowym historia rewizji NIE jest zachowywana (każda wysyłka nadpisuje poprzednią
-  kopię po stronie PDM).
+  innej maszynie niż serwer), kopia trafia do PDM zwykłym uploadem HTTP — wcześniejsze rewizje też tam
+  zostają, zastępowana jest tylko kopia tej samej rewizji.
 - Endpoint rejestracji akceptuje wyłącznie ścieżki leżące wewnątrz skonfigurowanego
   magazynu (`StorageRoot`) — nie da się nim "podpiąć" dowolnego pliku z dysku serwera.
 - Zapisany dokument jest wysyłany w swoim aktualnym stanie — makro nie waliduje np. czy
@@ -364,10 +363,10 @@ Save As pod nazwą PDM z poprawnie rozwiązującymi się odnośnikami `App::Link
 późniejszym pobraniu, eksport STEP (w tym naprawa dla dokumentów natywnego workbencha
 Assembly, które wcześniej produkowały plik STEP bez żadnej geometrii) i eksport PDF —
 wszystko potwierdzone na żywym serwerze przez użytkownika, nie tylko przeglądem
-statycznym (w środowisku, w którym te pliki są edytowane, wciąż nie ma dostępnego
-FreeCAD, więc każda poprawka tutaj wzięła się z tego, że użytkownik odtworzył problem na
+statycznym (większość poprawek wzięła się z tego, że użytkownik odtworzył problem na
 żywo — w jednym przypadku wklejając wynik z Panelu raportu FreeCAD do diagnozy linia po
-linii — nie z etapu budowania/testów).
+linii). Od 2026-11 przebieg wysyłki jest też uruchamiany na prawdziwym FreeCAD 1.1 bez
+interfejsu, z symulowaną kartą przeglądarki.
 
 Wcześniej w historii tego pliku, leżąca u podstaw logika logowania/biletów/rewizji była
 też weryfikowana automatycznie przez `freecadcmd` przeciwko żywemu `EasyPDM.Api`
@@ -398,10 +397,10 @@ TYLKO o folder docelowy.
    konto/**Wyloguj**. Po zatwierdzeniu makro od razu otwiera **przeglądarkę systemową**, już
    zalogowaną (most token→ciasteczko), na pasku "oczekuje żądanie pobrania z makra CAD"
    (widoczny na każdym ekranie aplikacji webowej) — tam dopiero wyszukuje się Część/Złożenie
-   z **całej bazy** (po numerze albo nazwie) i zatwierdza wybór. FreeCAD (okno "Czekam na
-   przeglądarkę", odpytujące co ~2 s, limit **10 minut**) samo wykrywa zatwierdzenie i
+   z **całej bazy** (po numerze albo nazwie) i zatwierdza wybór. FreeCAD (odpytując co ~2 s, z
+   komunikatem na pasku stanu, limit **10 minut**) samo wykrywa zatwierdzenie i
    pobieranie zaczyna się automatycznie — nie trzeba wracać do FreeCAD ręcznie. Anulowanie
-   w przeglądarce/oknie oczekiwania kończy makro bez pobierania niczego.
+   w przeglądarce kończy makro bez pobierania niczego.
 2. Dla **Złożenia**: pobiera też WSZYSTKIE jego składniki rekurencyjnie (bezpośrednie dzieci,
    potem ich dzieci, i tak dalej — cały BOM), do TEGO SAMEGO folderu co plik główny. Bez tego
    złożenie zbudowane na odnośnikach `App::Link` do zewnętrznych, zapisanych plików (standard
@@ -416,6 +415,9 @@ TYLKO o folder docelowy.
 5. Na końcu **otwiera** główny (wybrany) plik w FreeCAD (`App.openDocument`) — pliki
    składników zostają tylko na dysku, nie są automatycznie otwierane jako osobne dokumenty
    (dokładnie tak, jak FreeCAD sam otwiera złożenie: linkowane pliki wczytuje w tle).
+6. Na końcu w FreeCAD-zie otwiera się okno z **podsumowaniem** (co pobrano, a co pominięto),
+   nad przeglądarką, w której właśnie wybrano element. Po „Anuluj” okna nie ma, a raport trafia
+   do powiadomień aplikacji.
 
 ## Skąd bierze pliki
 
@@ -434,7 +436,7 @@ wgrany załącznik jako najlepsze przybliżenie.
 - **Wybór elementu** (krok 1 wyżej) wymaga, żeby domyślna przeglądarka systemowa umiała
   otworzyć adres serwera PDM (ten sam, co adres API w preferencjach makra) — na typowej
   instalacji (klient i serwer w tej samej sieci) działa to bez dodatkowej konfiguracji.
-  Okno oczekiwania w FreeCAD ma limit **10 minut** — po przekroczeniu (albo Anuluj) makro
+  FreeCAD czeka na przeglądarkę najwyżej **10 minut** — po przekroczeniu (albo Anuluj) makro
   kończy się bez pobierania niczego.
 - Zawsze celuje w AKTUALNĄ rewizję — nie da się nim pobrać konkretnej, wybranej starszej
   rewizji (starsze lokalne kopie służą wyłącznie do wykrycia "masz nieaktualną wersję",
@@ -456,21 +458,4 @@ wgrany załącznik jako najlepsze przybliżenie.
 
 ## Status weryfikacji
 
-⚠️ **Jeszcze niepotwierdzone na żywo na FreeCAD**, w odróżnieniu od `EasyPDMUpload.FCMacro`
-wyżej (które jest, w kilku rundach testów). To makro dzieli ten sam, leżący u podstaw
-mechanizm biletów przeglądarki (`GET /api/auth/browser-login`, `GET
-/api/create-tickets/{ticket}` + `POST /create-tickets/{ticket}/attach-existing`, pasek
-"oczekujące żądanie z makra" w aplikacji webowej) już przećwiczony na żywo przez
-`EasyPDMUpload.FCMacro`, więc sama hydraulika biletu/okna oczekiwania nie jest niczym
-nowym ani nietypowym — ale specyfika TEGO makra (rekurencyjne pobieranie komponentów,
-wykrywanie już-pobrane/nieaktualna-rewizja po nazwie pliku, otwieranie wyniku przez
-`App.openDocument`) była weryfikowana tylko: składniowo (`ast.parse`), pod kątem
-poprawności polskich znaków (skrypt sprawdzający częstość znaków — zero zniekształceń)
-i przez uważny przegląd logiki względem rzeczywistych endpointów API (`GET /api/items`,
-`/items/{id}/attachments`, `/items/{id}/children`, `/attachments/{id}/file`, każdy
-sprawdzony w kodzie `EasyPDM.Api`). Przy pierwszym uruchomieniu na żywym FreeCAD obserwuj
-przebieg (log w oknie na końcu i w konsoli raportów FreeCAD) i zgłoś, co nie zagra —
-najbardziej ryzykowne miejsca to: rozpoznawanie nazw załączników regexem (jeśli plik ma
-nietypową nazwę) i to, czy odnośniki `App::Link` w pobranym złożeniu faktycznie rozwiążą
-się automatycznie po umieszczeniu wszystkich plików w jednym, płaskim folderze (zależy od
-tego, jak zapisane są ścieżki linków w oryginalnym pliku — patrz "Ograniczenia" wyżej).
+**Potwierdzone na żywo na prawdziwym FreeCAD 1.1** i działającym serwerze: wybór elementu w przeglądarce, pobranie całego złożenia z komponentami, sprawdzanie plików obecnych już w folderze i otwarcie wyniku, także złożenia wysłanego i pobranego z powrotem.

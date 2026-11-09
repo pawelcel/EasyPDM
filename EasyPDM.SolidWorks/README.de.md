@@ -170,11 +170,10 @@ anders gelöst:
    den FreeCAD-Makros). **Die lokale Datei wird NICHT angetastet** — sie wird weder
    verschoben noch gelöscht. Wenn der PDM-Speicher von dieser Maschine aus sichtbar ist
    (`GET /api/config`), landet die Kopie im gemeinsamen `storage/components/` und wird
-   **registriert**, ohne erneut per HTTP hochgeladen zu werden (bewahrt die
-   Revisionshistorie); wenn nicht (typisch, wenn SolidWorks und der EasyPDM-Dienst als
+   **registriert**, ohne erneut per HTTP hochgeladen zu werden; wenn nicht (typisch, wenn SolidWorks und der EasyPDM-Dienst als
    unterschiedliche Windows-Benutzer laufen — der Speicher liegt unter
    `C:\ProgramData\...`, worauf ein gewöhnlicher Benutzer normalerweise kein Schreibrecht
-   hat), ein gewöhnlicher HTTP-Upload (Fallback ohne Erhalt der Revisionshistorie, der für
+   hat), ein gewöhnlicher HTTP-Upload (Fallback, der frühere Revisionen ebenfalls erhält und für
    genau diesen Aufruf `WinHttp.WinHttpRequest.5.1` verwendet — siehe „Historie
    behobener Probleme" unten) — **das ist kein Fehler**, sondern eine korrekt
    funktionierende Sicherheitsmaßnahme. Dieser Fallback-Pfad prüft außerdem vor dem

@@ -140,9 +140,9 @@ getrennte.
    Ein gemeinsames Formular/eine gemeinsame Leiste im Browser für ALLES, sodass diese
    Regeln zwischen dem Makro und der Web-Anwendung nicht mehr auseinanderlaufen können.
    Nachdem im Browser entschieden wurde (auf einem der drei oben genannten Wege), erkennt
-   FreeCAD (das Fenster "Warte auf Browser", das den Server alle ~2 s abfragt, Limit
+   FreeCAD (es fragt den Server alle ~2 s ab, mit einer Meldung in der Statusleiste, Limit
    10 Minuten) den Abschluss von selbst und fährt ab Schritt 3 unten fort — man muss nicht
-   manuell zu FreeCAD zurückkehren. Ein Abbruch im Browser oder im Wartefenster beendet
+   manuell zu FreeCAD zurückkehren. Ein Abbruch im Browser beendet
    das Makro mit einer Meldung, ohne eine Datei zu erstellen/anzuhängen (das Element
    könnte im PDM bereits entstanden sein, falls es im Browser noch rechtzeitig gespeichert
    wurde — dann muss das Makro erneut ausgeführt und über die Leiste "wartende Anfrage vom
@@ -198,7 +198,7 @@ getrennte.
    FreeCAD auf einem anderen Computer als der Server), gelangt die Kopie stattdessen über
    einen gewöhnlichen HTTP-Upload dorthin (`POST /api/items/{id}/attachments`, derselbe
    Mechanismus wie das Anhängen von CAD-Dateien über den Eigenschaftenbereich in der
-   Web-Anwendung) — in diesem Fall wird die Revisionshistorie nicht bewahrt.
+   Web-Anwendung) — frühere Revisionen bleiben auch dort erhalten, ersetzt wird nur eine Kopie derselben Revision.
 5. **Exportiert optional STEP und/oder PDF und lädt sie automatisch als Anhänge mit den
    Rollen „step"/„pdf" hoch.** Woher das Ja/Nein kommt, hängt vom gewählten Pfad oben ab:
    für ein **neues Element** oder **An Vorhandenes anhängen**, im Browser entschieden
@@ -343,7 +343,7 @@ automatisch gesendet werden soll:
   erfordert, dass der Standard-System-Browser die Adresse des PDM-Servers öffnen kann
   (dieselbe wie die API-Adresse in den Makro-Einstellungen) — bei einer typischen
   Installation (Client und Server im selben Netzwerk) funktioniert dies ohne zusätzliche
-  Konfiguration. Das Wartefenster in FreeCAD hat ein Limit von **10 Minuten** — wird es
+  Konfiguration. FreeCAD wartet höchstens **10 Minuten** auf den Browser — wird das
   überschritten (oder Abbrechen gedrückt), endet das Makro mit einer Meldung, ohne eine
   Datei zu erstellen/anzuhängen.
 - Die automatische Baugruppenerkennung funktioniert nur für Verweise auf **externe,
@@ -380,9 +380,8 @@ automatisch gesendet werden soll:
   (`EasyPDM.Api`) auf derselben Festplatte, sodass dies ohne zusätzliche Konfiguration
   funktioniert. Ist `GET /api/config` nicht erreichbar oder der Pfad nicht beschreibbar
   (z. B. FreeCAD auf einem anderen Rechner als der Server), gelangt die Kopie stattdessen
-  über einen gewöhnlichen HTTP-Upload ins PDM — in diesem Fallback-Modus wird die
-  Revisionshistorie NICHT bewahrt (jedes Senden überschreibt die vorherige Kopie auf der
-  PDM-Seite).
+  über einen gewöhnlichen HTTP-Upload ins PDM — frühere Revisionen bleiben auch
+  dort erhalten, ersetzt wird nur eine Kopie derselben Revision.
 - Der Registrierungs-Endpunkt akzeptiert ausschließlich Pfade innerhalb des
   konfigurierten Speichers (`StorageRoot`) — damit lässt sich keine beliebige Datei von
   der Festplatte des Servers "anhängen".
@@ -412,11 +411,11 @@ Baugruppenkomponente einzeln, die native „bereits erkanntes Dokument"-Abkürzu
 `App::Link`-Verweisen nach einem späteren Download, STEP-Export (einschließlich der
 Korrektur für Dokumente der nativen Assembly-Workbench, die zuvor eine geometrielose
 STEP-Datei erzeugten) und PDF-Export — alles vom Benutzer gegen einen echten Server
-bestätigt, nicht nur statisch durchgesehen (in der Umgebung, in der diese Dateien
-bearbeitet werden, gibt es weiterhin kein verfügbares FreeCAD, sodass jede Korrektur hier
-daher rührt, dass der Benutzer ein Problem live nachgestellt hat — in einem Fall durch
-Einfügen der Ausgabe von FreeCADs eigenem Report View zur zeilenweisen Diagnose — nicht
-aus einem Build-/Testschritt).
+bestätigt, nicht nur statisch durchgesehen (die meisten
+Korrekturen hier rühren daher, dass der Benutzer ein Problem live nachgestellt hat — in
+einem Fall durch Einfügen der Ausgabe von FreeCADs eigenem Report View zur zeilenweisen
+Diagnose). Seit 2026-11 läuft der Upload-Ablauf zusätzlich auf einem echten FreeCAD 1.1
+ohne Oberfläche, mit simuliertem Browser-Tab.
 
 Früher in der Historie dieser Datei wurde die zugrundeliegende Anmelde-/Ticket-/
 Revisionslogik zusätzlich automatisch über `freecadcmd` gegen ein echtes `EasyPDM.Api`
@@ -450,10 +449,10 @@ nicht in einem nativen Fenster — das Makro fragt lokal NUR nach dem Zielordner
    (Token→Cookie-Brücke), auf einer Leiste, die "eine Download-Anfrage von einem
    CAD-Makro wartet" anzeigt (sichtbar auf jedem Bildschirm der Web-Anwendung) — erst dort
    wird ein Teil/eine Baugruppe aus der **gesamten Datenbank** gesucht (nach Nummer oder
-   Name) und die Wahl bestätigt. FreeCAD (das Fenster "Warte auf Browser", das alle ~2 s
-   abfragt, Limit **10 Minuten**) erkennt die Bestätigung von selbst, und das
+   Name) und die Wahl bestätigt. FreeCAD (es fragt alle ~2 s ab, mit einer Meldung in der
+   Statusleiste, Limit **10 Minuten**) erkennt die Bestätigung von selbst, und das
    Herunterladen beginnt automatisch — man muss nicht manuell zu FreeCAD zurückkehren.
-   Ein Abbruch im Browser/Wartefenster beendet das Makro, ohne irgendetwas
+   Ein Abbruch im Browser beendet das Makro, ohne irgendetwas
    herunterzuladen.
 2. Für eine **Baugruppe**: lädt auch ALLE ihre Komponenten rekursiv herunter (direkte
    Kinder, dann deren Kinder, und so weiter — die gesamte Stückliste), in DENSELBEN
@@ -473,6 +472,10 @@ nicht in einem nativen Fenster — das Makro fragt lokal NUR nach dem Zielordner
    die Komponentendateien bleiben nur auf der Festplatte, sie werden nicht automatisch
    als separate Dokumente geöffnet (genau so, wie FreeCAD selbst eine Baugruppe öffnet:
    verlinkte Dateien werden im Hintergrund geladen).
+6. Zum Schluss öffnet sich in FreeCAD ein Fenster mit einer **Zusammenfassung** (was
+   heruntergeladen und was übersprungen wurde), über dem Browser, in dem das Element gerade
+   gewählt wurde. Nach „Abbrechen“ gibt es kein Fenster; der Bericht steht in den
+   Benachrichtigungen der Anwendung.
 
 ## Woher es die Dateien nimmt
 
@@ -492,8 +495,8 @@ nimmt es einfach den zuletzt hochgeladenen Anhang als beste Annäherung.
 - **Die Wahl des Elements** (Schritt 1 oben) erfordert, dass der Standard-System-Browser
   die Adresse des PDM-Servers öffnen kann (dieselbe wie die API-Adresse in den
   Makro-Einstellungen) — bei einer typischen Installation (Client und Server im selben
-  Netzwerk) funktioniert dies ohne zusätzliche Konfiguration. Das Wartefenster in
-  FreeCAD hat ein Limit von **10 Minuten** — wird es überschritten (oder Abbrechen
+  Netzwerk) funktioniert dies ohne zusätzliche Konfiguration. FreeCAD wartet
+  höchstens **10 Minuten** auf den Browser — wird das überschritten (oder Abbrechen
   gedrückt), endet das Makro, ohne irgendetwas herunterzuladen.
 - Es zielt immer auf die AKTUELLE Revision — es kann damit nicht eine bestimmte,
   ausgewählte ältere Revision heruntergeladen werden (ältere lokale Kopien dienen
@@ -518,25 +521,4 @@ nimmt es einfach den zuletzt hochgeladenen Anhang als beste Annäherung.
 
 ## Verifizierungsstatus
 
-⚠️ **Noch nicht live auf FreeCAD bestätigt**, im Gegensatz zu `EasyPDMUpload.FCMacro`
-oben (das es ist, über mehrere Testrunden hinweg). Dieses Makro teilt sich denselben
-zugrundeliegenden Browser-Ticket-Mechanismus (`GET /api/auth/browser-login`, `GET
-/api/create-tickets/{ticket}` + `POST /create-tickets/{ticket}/attach-existing`, die
-Leiste "wartende Anfrage vom Makro" in der Web-Anwendung), der von
-`EasyPDMUpload.FCMacro` bereits live durchgespielt wurde — die Ticket-/Wartefenster-
-Mechanik selbst ist also nichts Neues oder Ungewöhnliches —, aber die Besonderheiten
-DIESES Makros (rekursiver Komponenten-Download, die Erkennung von
-bereits-heruntergeladen/veraltete-Revision anhand des Dateinamens, das Öffnen des
-Ergebnisses mit `App.openDocument`) wurden nur verifiziert: syntaktisch (`ast.parse`),
-hinsichtlich der Korrektheit polnischer Zeichen (ein Skript zur Prüfung der
-Zeichenhäufigkeit — null Verfälschungen) und durch eine sorgfältige Überprüfung der
-Logik anhand der tatsächlichen API-Endpunkte (`GET /api/items`,
-`/items/{id}/attachments`, `/items/{id}/children`, `/attachments/{id}/file`, jeder im
-Code von `EasyPDM.Api` überprüft). Beobachten Sie beim ersten Start auf einem echten
-FreeCAD den Ablauf (das Log im Fenster am Ende und in der FreeCAD-Berichtskonsole) und
-melden Sie, was nicht funktioniert — die riskantesten Stellen sind: die Erkennung von
-Anhangsnamen per Regex (falls eine Datei einen untypischen Namen hat) und ob sich die
-`App::Link`-Verweise in der heruntergeladenen Baugruppe tatsächlich automatisch auflösen,
-nachdem alle Dateien in einem einzigen, flachen Ordner platziert wurden (dies hängt davon
-ab, wie die Link-Pfade in der ursprünglichen Datei gespeichert sind — siehe
-"Einschränkungen" oben).
+**Live bestätigt auf einem echten FreeCAD 1.1** mit laufendem Server: Auswahl des Elements im Browser, Herunterladen einer ganzen Baugruppe mit Komponenten, die Prüfung bereits im Ordner vorhandener Dateien und das Öffnen des Ergebnisses, auch bei einer hochgeladenen und wieder heruntergeladenen Baugruppe.
