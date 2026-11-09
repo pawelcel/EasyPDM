@@ -74,7 +74,7 @@ function AttachmentRow({
   attachment: ProjectAttachment
   onDelete: (attachment: ProjectAttachment) => void
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   return (
     <li className="flex items-start justify-between gap-2 text-[13px]">
       <div className="min-w-0 flex-1">
@@ -86,7 +86,7 @@ function AttachmentRow({
           {attachment.fileName}
         </a>
         <div className="truncate text-[11.5px] text-muted-foreground">
-          {new Date(attachment.uploadedAt).toLocaleString("pl-PL")}
+          {new Date(attachment.uploadedAt).toLocaleString(language)}
           {attachment.uploadedBy && ` · ${attachment.uploadedBy}`}
         </div>
       </div>

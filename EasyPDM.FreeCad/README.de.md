@@ -186,19 +186,12 @@ getrennte.
    die Baugruppe nach dem Herunterladen nach dem ursprünglichen, vor dem Senden gültigen
    Dateinamen suchen** (in der Praxis bestätigt durch die FreeCAD-Meldung: `Link broken!
    ... File: <Originalname>.FCStd`).
-4. Wenn der PDM-Speicher von diesem Rechner aus sichtbar ist (siehe `GET /api/config`),
-   landet die Kopie im **GEMEINSAMEN Ordner** `storage/components/` (einer für alle
-   Projekte — ein Teil/eine Baugruppe wird mitunter projektübergreifend als
-   BOM-Komponente gemeinsam genutzt) und wird **REGISTRIERT, OHNE erneut per HTTP
-   übertragen zu werden** (`POST /api/items/{id}/attachments/register`) — die Kopie liegt
-   bereits physisch im Speicher des Servers. **Das PDM BEHÄLT Kopien früherer
-   Revisionen** — z. B. bleibt `67 (Name).A.FCStd` erhalten, wenn Revision B entsteht;
-   überschrieben wird nur die Kopie DERSELBEN Revision (also ein erneutes Senden ohne
-   Statusänderung). Ist der Speicher von diesem Rechner aus nicht erreichbar (z. B.
-   FreeCAD auf einem anderen Computer als der Server), gelangt die Kopie stattdessen über
-   einen gewöhnlichen HTTP-Upload dorthin (`POST /api/items/{id}/attachments`, derselbe
-   Mechanismus wie das Anhängen von CAD-Dateien über den Eigenschaftenbereich in der
-   Web-Anwendung) — frühere Revisionen bleiben auch dort erhalten, ersetzt wird nur eine Kopie derselben Revision.
+4. Die Datei wird **immer per HTTP hochgeladen** (`POST /api/items/{id}/attachments`,
+   derselbe Mechanismus wie das Anhängen von CAD-Dateien über den Eigenschaftenbereich in der
+   Web-Anwendung), FreeCAD und der Server müssen also nicht dieselbe Festplatte sehen. **Das
+   PDM BEHÄLT Kopien früherer Revisionen** — z. B. bleibt `67 (Name).A.FCStd` erhalten, wenn
+   Revision B entsteht; ersetzt wird nur die Kopie DERSELBEN Revision (also ein erneutes
+   Senden ohne Statusänderung).
 5. **Exportiert optional STEP und/oder PDF und lädt sie automatisch als Anhänge mit den
    Rollen „step"/„pdf" hoch.** Woher das Ja/Nein kommt, hängt vom gewählten Pfad oben ab:
    für ein **neues Element** oder **An Vorhandenes anhängen**, im Browser entschieden
@@ -375,16 +368,6 @@ automatisch gesendet werden soll:
   Festplatte, wird aber nicht mehr aktiv bearbeitet/geöffnet; eine manuelle Änderung der
   alten Datei gelangt NICHT automatisch ins PDM (sie muss als weitere Revision
   zurückgesendet werden).
-- **Das Kopieren/Registrieren der Datei in `storage/` setzt voraus, dass dieser Ordner im
-  Dateisystem dieses Rechners sichtbar ist** — heute laufen Client (FreeCAD) und Server
-  (`EasyPDM.Api`) auf derselben Festplatte, sodass dies ohne zusätzliche Konfiguration
-  funktioniert. Ist `GET /api/config` nicht erreichbar oder der Pfad nicht beschreibbar
-  (z. B. FreeCAD auf einem anderen Rechner als der Server), gelangt die Kopie stattdessen
-  über einen gewöhnlichen HTTP-Upload ins PDM — frühere Revisionen bleiben auch
-  dort erhalten, ersetzt wird nur eine Kopie derselben Revision.
-- Der Registrierungs-Endpunkt akzeptiert ausschließlich Pfade innerhalb des
-  konfigurierten Speichers (`StorageRoot`) — damit lässt sich keine beliebige Datei von
-  der Festplatte des Servers "anhängen".
 - Das gespeicherte Dokument wird in seinem aktuellen Zustand gesendet — das Makro
   validiert z. B. nicht, ob das Dokument in anderen verknüpften Dateien ungespeicherte
   Änderungen offen hat.

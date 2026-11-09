@@ -322,4 +322,4 @@ save behavior.
 - The download's target folder is a plain `InputBox` with a path as text, not a system
   file browser.
 - Copying/registering/downloading a file through `storage/` assumes this folder is
-  visible in this machine's filesystem — same as in the FreeCAD macros.
+  visible in this machine's filesystem.

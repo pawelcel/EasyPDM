@@ -22,7 +22,7 @@ function NotificationBell({
   onNavigateToProject?: (id: string) => void
   onNavigateToSettings?: () => void
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { unreadCount, items, refetch, markRead, markAllRead, deleteNotification } = useNotifications()
   const [open, setOpen] = useState(false)
 
@@ -100,7 +100,7 @@ function NotificationBell({
                         <span className="block">{describe(entry, t)}</span>
                         {entry.type === "cad_transfer_finished" && <TransferReport entry={entry} t={t} />}
                         <span className="text-muted-foreground">
-                          {new Date(entry.createdAt).toLocaleString("pl-PL")}
+                          {new Date(entry.createdAt).toLocaleString(language)}
                         </span>
                       </span>
                     </button>

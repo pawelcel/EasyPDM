@@ -35,7 +35,7 @@ function ClientVerificationDialog({
   // Wywoływane po każdej zmianie listy — rodzic odświeża znaczniki w drzewku i panelu.
   onChanged?: () => void | Promise<void>
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -231,7 +231,7 @@ function ClientVerificationDialog({
                         )}
                       </Badge>
                       <div className="text-right text-[12px] text-muted-foreground">
-                        <div>{new Date(entry.createdAt).toLocaleString("pl-PL")}</div>
+                        <div>{new Date(entry.createdAt).toLocaleString(language)}</div>
                         <div>
                           {entry.createdBy ?? "—"}
                           {entry.revisionNumber !== null &&

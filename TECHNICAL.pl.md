@@ -290,6 +290,8 @@ Złożenie/Część razem z poddrzewem), z wyborem, które rozszerzenia plików 
 
 Dedykowane role są dwojakie. `pdf`, `step` i `image` mają jedno miejsce: nowy plik zastępuje poprzedni. `cad` i `drawing` się kumulują, żeby zostały wcześniejsze rewizje — ale makra nazywają pliki `nazwa rekordu.REWIZJA.rozszerzenie`, więc ta sama nazwa pliku na tym samym elemencie to ta sama rewizja wysłana ponownie i ten wiersz jest zastępowany, a nie dokładany drugi (`ReplaceExistingRoleAttachmentAsync`). Stary plik jest kasowany tylko wtedy, gdy nie jest ścieżką nowego wiersza, bo `/register` przy wspólnym magazynie najpierw kopiuje nowy plik w to samo miejsce. Wcześniej każda ponowna wysyłka części w pracy dokładała wiersz, a przy wspólnym magazynie wszystkie wskazywały jeden plik, więc usunięcie któregokolwiek kasowało go spod pozostałych.
 
+Makro FreeCAD zawsze wysyła plik przez HTTP. Ścieżka z `GET /api/config` nie dowodzi, że klient i serwer widzą ten sam dysk: przy FreeCAD-zie na Windowsie i serwerze w Dockerze `os.makedirs` zakładało lokalny `C:\data\storage`, kopia trafiała tam, a `/register` kończył się błędem; gdy wpis już istniał, ponowna wysyłka meldowała sukces, choć nic nie wysłała. Makra SolidWorks i Inventor nadal próbują najpierw `/register`, ale tworzą tylko ostatni poziom folderu, więc katalog magazynu, którego nie ma u klienta, kieruje je na HTTP.
+
 Numer elementu (`item_number`) pochodzi z jednej, globalnej sekwencji PostgreSQL —
 usunięcie elementu NIE zwalnia jego numeru automatycznie (standardowe zachowanie
 sekwencji). Administrator może ręcznie cofnąć sekwencję do wskazanego numeru (Ustawienia
@@ -571,7 +573,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET/PATCH | `/api/notification-preferences` | wyłączenie powiadomień per typ dla zalogowanego użytkownika |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | korelacja makro CAD ↔ przeglądarka (zob. `EasyPDM.FreeCad/README.md`) |
 | GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | korelacja makro SolidWorks ↔ przeglądarka dla "do którego elementu należy ten rysunek", gdy jego widoki wskazują na więcej niż jeden już podlinkowany element |
-| GET | `/api/config` | lokalizacja magazynu plików (do użytku np. przez makro FreeCAD) |
+| GET | `/api/config` | lokalizacja magazynu plików (używana przez makra SolidWorks i Inventor) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | lokalizacja/statystyki magazynu, przeniesienie, backup (pg_dump + pliki w ZIP), przywrócenie z backupu — **tylko administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | harmonogram automatycznej kopii zapasowej (włącz/wyłącz, częstotliwość, dzień, godzina, liczba przechowywanych kopii) — **tylko administrator** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | prefiksy-litery numeru elementu per rodzaj (4 rodzaje Części + `Zlozenie` = złożenie wykonywane; złożenie zakupowe/klienta używa prefiksu rodzaju Części) — **tylko administrator** |
@@ -820,8 +822,8 @@ razu po zalogowaniu.
    do osobnego katalogu `backups/` (niezależnego od `storage/`, żeby kopia nie pakowała samej
    siebie), z konfigurowalną liczbą przechowywanych ostatnich kopii (domyślnie 14 — starsze
    są automatycznie kasowane). Jeden plik CAD na rewizję wynika z nazw nadawanych przez makra
-   (`nazwa rekordu.REWIZJA.rozszerzenie`, we wszystkich trzech, tak samo przy rejestracji w
-   `storage/components/` i przy wysyłce HTTP): ta sama nazwa zastępuje plik tej rewizji, a nowa
+   (`nazwa rekordu.REWIZJA.rozszerzenie`, we wszystkich trzech, przy wysyłce HTTP albo, w
+   SolidWorksie i Inventorze, przy rejestracji w `storage/components/`): ta sama nazwa zastępuje plik tej rewizji, a nowa
    staje obok. Plik dołączony ręcznie do miejsca CAD pod tą samą nazwą zastępuje poprzedni,
    niezależnie od jego rewizji.
 3. **Nie każda operacja zapisuje "kto to zrobił"** — utworzenie elementu (`created_by`),

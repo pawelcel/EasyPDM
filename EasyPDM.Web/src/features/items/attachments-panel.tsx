@@ -16,9 +16,9 @@ function formatSize(size: number | null): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatUploadedAt(uploadedAt: string | null): string {
+function formatUploadedAt(uploadedAt: string | null, language: string): string {
   if (!uploadedAt) return ""
-  return new Date(uploadedAt).toLocaleString("pl-PL")
+  return new Date(uploadedAt).toLocaleString(language)
 }
 
 // Miejsce "PDF"/"STEP" — jeden załącznik na rolę, widoczny osobno OD załączników
@@ -39,7 +39,7 @@ function RoleSlot({
   onPreview: () => void
   disabled: boolean
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const inputRef = useRef<HTMLInputElement>(null)
   // "3D" zamiast "STEP" — slot przyjmuje STEP/IGES/STL, nie tylko dosłownie format STEP.
   // Krótka etykieta na przycisku, pełna lista formatów obok w nagłówku (za mało miejsca
@@ -86,7 +86,7 @@ function RoleSlot({
             {/* Data i rozmiar jak przy plikach CAD: nowy STEP/PDF zastępuje poprzedni pod
                 tą samą nazwą, więc bez daty nie widać, czy wysyłka go faktycznie nadpisała. */}
             <span className="text-muted-foreground">
-              {formatUploadedAt(attachment.uploadedAt)}
+              {formatUploadedAt(attachment.uploadedAt, language)}
               {attachment.uploadedAt && attachment.fileSize !== null && " · "}
               {formatSize(attachment.fileSize)}
             </span>
@@ -124,7 +124,7 @@ function AttachmentsPanel({
   lockedHint?: string
   onChanged?: () => void | Promise<void>
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -275,7 +275,7 @@ function AttachmentsPanel({
                   </a>
                   <div className="flex shrink-0 items-center gap-1">
                     <span className="text-muted-foreground">
-                      {formatUploadedAt(attachment.uploadedAt)}
+                      {formatUploadedAt(attachment.uploadedAt, language)}
                       {attachment.uploadedAt && attachment.fileSize !== null && " · "}
                       {formatSize(attachment.fileSize)}
                     </span>
@@ -345,7 +345,7 @@ function AttachmentsPanel({
                   </a>
                   <div className="flex shrink-0 items-center gap-1">
                     <span className="text-muted-foreground">
-                      {formatUploadedAt(attachment.uploadedAt)}
+                      {formatUploadedAt(attachment.uploadedAt, language)}
                       {attachment.uploadedAt && attachment.fileSize !== null && " · "}
                       {formatSize(attachment.fileSize)}
                     </span>
@@ -416,7 +416,7 @@ function AttachmentsPanel({
               </a>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="text-muted-foreground">
-                  {formatUploadedAt(attachment.uploadedAt)}
+                  {formatUploadedAt(attachment.uploadedAt, language)}
                   {attachment.uploadedAt && attachment.fileSize !== null && " · "}
                   {formatSize(attachment.fileSize)}
                 </span>

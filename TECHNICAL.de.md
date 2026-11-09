@@ -326,6 +326,8 @@ Teilbaum), mit Auswahl, welche Dateierweiterungen einbezogen werden sollen.
 
 Die festen Rollen gibt es in zwei Arten. `pdf`, `step` und `image` haben einen Platz: Eine neue Datei ersetzt die vorherige. `cad` und `drawing` sammeln sich an, damit frühere Revisionen bleiben — aber die Makros benennen Dateien `Datensatzname.REVISION.Endung`, also bedeutet derselbe Dateiname am selben Element dieselbe Revision, erneut gesendet, und diese Zeile wird ersetzt statt einer zweiten hinzugefügt (`ReplaceExistingRoleAttachmentAsync`). Die alte Datei wird nur gelöscht, wenn sie nicht der Pfad der neuen Zeile ist, denn `/register` kopiert bei gemeinsamem Speicher die neue Datei zuerst an dieselbe Stelle. Vorher fügte jedes erneute Senden eines Teils in Arbeit eine Zeile hinzu, und bei gemeinsamem Speicher zeigten alle auf eine Datei, sodass das Löschen einer davon sie den anderen entzog.
 
+Das FreeCAD-Makro sendet die Datei immer per HTTP. Ein Pfad aus `GET /api/config` beweist nicht, dass Client und Server dieselbe Festplatte sehen: Bei FreeCAD unter Windows und dem Server in Docker legte `os.makedirs` ein lokales `C:\data\storage` an, die Kopie landete dort, und `/register` schlug fehl; existierte der Eintrag bereits, meldete ein erneutes Senden Erfolg, ohne etwas zu senden. Die Makros für SolidWorks und Inventor versuchen weiterhin zuerst `/register`, legen aber nur die letzte Ordnerebene an, sodass ein Speicherstamm, den es auf dem Client nicht gibt, sie zu HTTP führt.
+
 Die Nummer eines Elements (`item_number`) stammt aus einer einzigen, globalen
 PostgreSQL-Sequenz — das Löschen eines Elements gibt seine Nummer NICHT automatisch
 frei (Standardverhalten von Sequenzen). Ein Administrator kann die Sequenz manuell auf
@@ -624,7 +626,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET/PATCH | `/api/notification-preferences` | Abschalten von Benachrichtigungen pro Typ für den angemeldeten Benutzer |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | Korrelation CAD-Makro ↔ Browser (siehe `EasyPDM.FreeCad/README.md`) |
 | GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | Korrelation SolidWorks-Makro ↔ Browser für "zu welchem Element gehört diese Zeichnung", wenn ihre Ansichten auf mehr als ein bereits verknüpftes Element verweisen |
-| GET | `/api/config` | Speicherort für Dateien (z. B. zur Verwendung durch das FreeCAD-Makro) |
+| GET | `/api/config` | Speicherort für Dateien (verwendet von den Makros für SolidWorks und Inventor) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | Speicherort/-statistiken, Verschieben, Sicherung (pg_dump + Dateien in einem ZIP), Wiederherstellung aus einer Sicherung — **nur Administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | Zeitplan für automatische Sicherung (ein-/ausschalten, Häufigkeit, Tag, Uhrzeit, Anzahl aufbewahrter Kopien) — **nur Administrator** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | Buchstaben-Präfixe der Elementnummer pro Art (die 4 Teile-Arten plus `Zlozenie` = gefertigte Baugruppe; zugekaufte/Kunden-Baugruppen nutzen das Präfix der Teile-Art) — **nur Administrator** |
@@ -904,8 +906,8 @@ Sie dieses Passwort sofort nach der Anmeldung.
    `backups/` (unabhängig von `storage/`, damit eine Sicherung sich nicht selbst
    einpackt), mit einer konfigurierbaren Anzahl aufbewahrter letzter Kopien
    (standardmäßig 14 — ältere werden automatisch gelöscht). Eine CAD-Datei pro Revision ergibt sich aus den Dateinamen der Makros
-   (`Datensatzname.REVISION.Endung`, in allen dreien, bei Registrierung in
-   `storage/components/` wie beim HTTP-Upload): Derselbe Name ersetzt die Datei dieser
+   (`Datensatzname.REVISION.Endung`, in allen dreien, per HTTP-Upload oder, in SolidWorks und
+   Inventor, per Registrierung in `storage/components/`): Derselbe Name ersetzt die Datei dieser
    Revision, ein neuer steht daneben. Eine von Hand unter demselben Namen in einen CAD-Platz
    gelegte Datei ersetzt die vorherige, egal zu welcher Revision sie gehörte.
 3. **Nicht jede Operation zeichnet auf, „wer es getan hat"** — die Erstellung eines

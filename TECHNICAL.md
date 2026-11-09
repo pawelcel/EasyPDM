@@ -317,6 +317,8 @@ you can download **documentation** — a ZIP collected from all attachments with
 scope (the whole project, or a given Assembly/Part together with its subtree), with a
 choice of which file extensions to include.
 
+The FreeCAD macro always sends the file over HTTP. A path from `GET /api/config` does not prove the client and the server share a disk: with FreeCAD on Windows and the server in Docker, `os.makedirs` happily created a local `C:\data\storage`, the copy went there, and `/register` failed; when the row already existed, a re-send reported success with nothing sent. The SolidWorks and Inventor macros still try `/register` first, but they create only the last folder level, so a storage root that does not exist on the client sends them to HTTP.
+
 An item's number (`item_number`) comes from a single, global PostgreSQL sequence —
 deleting an item does NOT automatically free its number (standard sequence behavior).
 An administrator can manually rewind the sequence to a given number (Settings →
@@ -776,7 +778,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET/PATCH | `/api/notification-preferences` | per-type notification opt-out for the logged-in user |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | CAD macro ↔ browser correlation (see `EasyPDM.FreeCad/README.md`) |
 | GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | SolidWorks macro ↔ browser correlation for "which item does this Drawing belong to" when its views reference more than one already-linked item |
-| GET | `/api/config` | file storage location (used e.g. by the FreeCAD macro) |
+| GET | `/api/config` | file storage location (used by the SolidWorks and Inventor macros) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | storage location/stats, moving it, backup (pg_dump + files in a ZIP), restore from backup — **administrator only** |
 | GET/PATCH | `/api/settings/backup-schedule` | automatic backup schedule (enable/disable, frequency, day, time, number of kept copies) — **administrator only** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | item number letter prefixes per kind (the 4 Part kinds plus `Zlozenie` = manufactured assembly; purchased/client assemblies reuse the Part kind's prefix) — **administrator only** |
@@ -1098,8 +1100,8 @@ right after logging in.
    (independent of `storage/`, so a backup doesn't pack itself), with a configurable
    number of kept recent copies (14 by default — older ones are automatically deleted).
    One CAD file per revision comes from the file names the macros give
-   (`record name.REVISION.ext`, in all three macros, registered in `storage/components/`
-   or uploaded over HTTP alike): the same name replaces that revision's file and a new
+   (`record name.REVISION.ext`, in all three macros, uploaded over HTTP or, in SolidWorks and
+   Inventor, registered in `storage/components/`): the same name replaces that revision's file and a new
    name stands beside it. A file attached by hand to a CAD slot under the same name
    replaces the earlier one, whatever revision that one belonged to.
 3. **Not every operation records "who did it"** — creating an item (`created_by`), a

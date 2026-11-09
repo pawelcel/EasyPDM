@@ -324,4 +324,4 @@ zawiodło przy eksporcie albo zapisie.
 - Folder docelowy pobierania to zwykły `InputBox` z tekstem ścieżki, nie przeglądarka
   systemowa plików.
 - Kopiowanie/rejestrowanie/pobieranie pliku przez `storage/` zakłada, że ten folder jest
-  widoczny w systemie plików tej maszyny — tak samo jak w makrach FreeCAD.
+  widoczny w systemie plików tej maszyny.

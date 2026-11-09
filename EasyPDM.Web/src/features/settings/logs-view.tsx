@@ -28,8 +28,8 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(1)} ${units[unitIndex]}`
 }
 
-function formatDate(date: string): string {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("pl-PL", {
+function formatDate(date: string, language: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString(language, {
     weekday: "short",
     year: "numeric",
     month: "long",
@@ -44,7 +44,7 @@ function lineClassName(line: string): string {
 }
 
 function LogsView() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [files, setFiles] = useState<LogFile[] | null>(null)
   const [selectedDate, setSelectedDate] = useState("")
   const [lines, setLines] = useState<string[]>([])
@@ -129,14 +129,14 @@ function LogsView() {
                     <SelectValue>
                       {(v: string) => {
                         const file = files.find((f) => f.date === v)
-                        return file ? `${formatDate(file.date)} · ${formatBytes(file.sizeBytes)}` : v
+                        return file ? `${formatDate(file.date, language)} · ${formatBytes(file.sizeBytes)}` : v
                       }}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {files.map((f) => (
                       <SelectItem key={f.date} value={f.date}>
-                        {formatDate(f.date)} · {formatBytes(f.sizeBytes)}
+                        {formatDate(f.date, language)} · {formatBytes(f.sizeBytes)}
                       </SelectItem>
                     ))}
                   </SelectContent>

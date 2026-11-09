@@ -178,7 +178,7 @@ function ItemDetailPanel({
   // się tam nie pokazuje (null), zgodnie z zasadą, że weryfikacja nie idzie za elementem.
   clientVerification?: ClientVerificationSummary | null
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { user } = useAuth()
   const [actionError, setActionError] = useState<string | null>(null)
   const canDuplicate =
@@ -235,7 +235,7 @@ function ItemDetailPanel({
     childEntries.filter((c) => c.item.itemType === "part" || c.item.itemType === "assembly"),
     (c) => c.item.id
   )
-  const modified = item.modifiedAt ? new Date(item.modifiedAt).toLocaleString("pl-PL") : "—"
+  const modified = item.modifiedAt ? new Date(item.modifiedAt).toLocaleString(language) : "—"
   const typeLabelKey = itemTypeLabelKey(item)
   const typeLabel = typeLabelKey ? t(typeLabelKey) : fileTypeLabel(item)
 
@@ -637,7 +637,7 @@ function ItemDetailPanel({
               )}
             </Badge>
             <span className="text-muted-foreground">
-              {new Date(clientVerification.createdAt).toLocaleString("pl-PL")}
+              {new Date(clientVerification.createdAt).toLocaleString(language)}
               {clientVerification.revisionNumber !== null &&
                 ` · ${t("item.revisionShort")} ${revisionLabel(clientVerification.revisionNumber)}`}
             </span>

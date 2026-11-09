@@ -22,7 +22,7 @@ function VerificationTable({
   emptyHint: string
   onSelectItem?: (itemId: string) => void
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
 
   return (
     <div className="mt-2">
@@ -69,7 +69,7 @@ function VerificationTable({
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(row.createdAt).toLocaleString("pl-PL")}
+                    {new Date(row.createdAt).toLocaleString(language)}
                   </TableCell>
                   <TableCell>
                     {/* Ten sam przycisk co w "Gdzie używane" (UsedInPanel) -- to jedyny

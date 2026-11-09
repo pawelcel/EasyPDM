@@ -98,7 +98,7 @@ function ProjectDetailPanel({
   // Skok do elementu w strukturze z wiersza zestawienia; brak = przycisk się nie pokazuje.
   onSelectItem?: (itemId: string) => void
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { clients } = useClients("")
   const [form, setForm] = useState(() => formFromProject(project))
   const name2s = clients.find((c) => c.id === form.clientId)?.name2s ?? []
@@ -187,7 +187,7 @@ function ProjectDetailPanel({
     }
   }
 
-  const created = new Date(project.createdAt).toLocaleString("pl-PL")
+  const created = new Date(project.createdAt).toLocaleString(language)
 
   return (
     <div>

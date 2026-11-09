@@ -20,7 +20,7 @@ function ItemHistoryPanel({
   // zmienia, więc bez tego panel nie wiedziałby, kiedy doczytać świeże dane.
   refreshSignal?: number
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [entries, setEntries] = useState<HistoryEntry[]>([])
 
   useEffect(() => {
@@ -86,7 +86,7 @@ function ItemHistoryPanel({
           {entries.map((entry, index) => (
             <li key={index} className="text-[12.5px]">
               <span className="text-muted-foreground">
-                {new Date(entry.at).toLocaleString("pl-PL")}
+                {new Date(entry.at).toLocaleString(language)}
               </span>
               {" — "}
               {describe(entry)}

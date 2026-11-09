@@ -2,6 +2,12 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.7.3]
+
+### Fixed
+- **The FreeCAD macro always uploads over HTTP, so a server on another machine works.** It asked the server where its storage was and took that path for a shared disk. With FreeCAD on Windows and the server in Docker it created the folder locally and copied the file there, so the upload ended in an error, and sending the same revision again reported success with nothing sent. Earlier revisions stay as before, and a repeated upload still replaces only its own revision.
+- **Dates follow the language of the interface.** They were always in the Polish format, also in English and German.
+
 ## [0.7.2]
 
 ### Added

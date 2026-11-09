@@ -282,7 +282,7 @@ function RestoreSection() {
 }
 
 function AutoBackupSection() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [schedule, setSchedule] = useState<BackupSchedule | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -450,7 +450,7 @@ function AutoBackupSection() {
 
         <Hint>
           {schedule.lastRunAt
-            ? t("backup.lastRun", { when: new Date(schedule.lastRunAt).toLocaleString("pl-PL") })
+            ? t("backup.lastRun", { when: new Date(schedule.lastRunAt).toLocaleString(language) })
             : t("backup.neverRun")}
         </Hint>
         <FormError>{error}</FormError>

@@ -366,5 +366,4 @@ oder Speichern schiefgeht.
 - Der Zielordner für den Download ist eine einfache `InputBox` mit einem Pfad als Text,
   kein System-Dateibrowser.
 - Das Kopieren/Registrieren/Herunterladen einer Datei über `storage/` setzt voraus, dass
-  dieser Ordner im Dateisystem dieser Maschine sichtbar ist — genau wie bei den
-  FreeCAD-Makros.
+  dieser Ordner im Dateisystem dieser Maschine sichtbar ist.

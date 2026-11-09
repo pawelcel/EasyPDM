@@ -164,17 +164,11 @@ dwie osobne.
    odnośniki po pobraniu od razu się zgadzają. **Bez tego złożenie po pobraniu szukałoby
    oryginalnej, sprzed-wysyłkowej nazwy pliku** (potwierdzone w praktyce komunikatem FreeCAD:
    `Link broken! ... File: <oryginalna_nazwa>.FCStd`).
-4. Jeśli magazyn PDM jest widoczny z tej maszyny (zob. `GET /api/config`), kopia trafia do
-   **WSPÓLNEGO folderu** `storage/components/` (jeden dla wszystkich projektów — Część/
-   Złożenie bywa współdzielone jako komponent BOM między projektami) i jest **REJESTROWANA
-   BEZ ponownego przesyłania przez HTTP** (`POST /api/items/{id}/attachments/register`) —
-   kopia już fizycznie leży w magazynie serwera. **PDM ZACHOWUJE kopie poprzednich rewizji**
-   — np. `67 (nazwa).A.FCStd` zostaje, gdy powstaje rewizja B; nadpisywana jest tylko kopia
-   TEJ SAMEJ rewizji (czyli powtórna wysyłka bez zmiany statusu). Jeśli magazyn jest
-   nieosiągalny z tej maszyny (np. FreeCAD na innym komputerze niż serwer), kopia trafia
-   przez zwykły upload HTTP (`POST /api/items/{id}/attachments`, ten sam mechanizm co
-   dogrywanie plików CAD z panelu właściwości w aplikacji webowej) — wcześniejsze rewizje też tam
-   zostają, bo zastępowana jest tylko kopia tej samej rewizji.
+4. Plik jest **zawsze wysyłany przez HTTP** (`POST /api/items/{id}/attachments`, ten sam
+   mechanizm co dogrywanie plików CAD z panelu właściwości w aplikacji webowej), więc FreeCAD
+   i serwer nie muszą widzieć tego samego dysku. **PDM ZACHOWUJE kopie poprzednich rewizji**
+   — np. `67 (nazwa).A.FCStd` zostaje, gdy powstaje rewizja B; zastępowana jest tylko kopia
+   TEJ SAMEJ rewizji (czyli powtórna wysyłka bez zmiany statusu).
 5. **Opcjonalnie eksportuje STEP i/lub PDF i wgrywa je automatycznie jako załączniki z
    rolami "step"/"pdf".** Skąd bierze się Tak/Nie, zależy od wybranej wcześniej ścieżki:
    dla **nowego elementu** albo **dogrania do istniejącego** zdecydowanego w przeglądarce
@@ -332,14 +326,6 @@ otwarciem głównego okna pyta, czy wysłać całe drzewo automatycznie:
   stary plik (pod oryginalną nazwą) zostaje na dysku, ale nie jest już aktywnie
   edytowany/otwarty; ręczna zmiana starego pliku NIE trafi automatycznie do PDM (trzeba
   wysłać ją z powrotem jako kolejną rewizję).
-- **Kopiowanie/rejestrowanie pliku w `storage/` zakłada, że ten folder jest widoczny
-  w systemie plików tej maszyny** — dziś klient (FreeCAD) i serwer (`EasyPDM.Api`)
-  działają na tym samym dysku, więc to działa bez dodatkowej konfiguracji. Jeśli
-  `GET /api/config` jest nieosiągalne albo ścieżka niedostępna do zapisu (np. FreeCAD na
-  innej maszynie niż serwer), kopia trafia do PDM zwykłym uploadem HTTP — wcześniejsze rewizje też tam
-  zostają, zastępowana jest tylko kopia tej samej rewizji.
-- Endpoint rejestracji akceptuje wyłącznie ścieżki leżące wewnątrz skonfigurowanego
-  magazynu (`StorageRoot`) — nie da się nim "podpiąć" dowolnego pliku z dysku serwera.
 - Zapisany dokument jest wysyłany w swoim aktualnym stanie — makro nie waliduje np. czy
   dokument ma otwarte niezapisane zmiany w innych powiązanych plikach.
 - **Gwiazdka "niezapisane zmiany" przy nazwie dokumentu może zostać widoczna nawet PO
