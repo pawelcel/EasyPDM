@@ -3,7 +3,6 @@ import { useState } from "react"
 import { api } from "@/api/client"
 import type { Project, ProjectLanguage } from "@/api/types"
 import { FormError } from "@/components/ui/form-error"
-import { Hint } from "@/components/ui/hint"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -88,7 +87,6 @@ function ProjectLanguagesField({
 
       {project.multilingual && (
         <div className="flex flex-col gap-1 pl-5">
-          <Hint>{t("project.languagesHint")}</Hint>
           {languages.map((lang) => {
             const isMain = lang.id === main
             return (
