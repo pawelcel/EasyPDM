@@ -2,6 +2,11 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [0.8]
+
+### Added
+- **An option to let only administrators release items.** Settings → Users has a new switch, off by default: when it is on, the "Released" status can be set only by an administrator, so an author sends an item for review and someone with the rights releases it. For other users the button is greyed out with an explanation, and the server refuses the change too, also when it comes from a CAD macro or with an assembly's components. Items already released stay released. Suggested by a fork of EasyPDM.
+
 ## [0.7.3]
 
 ### Fixed

@@ -302,6 +302,11 @@ ikonkę. Na dole panelu elementu widać pełną **historię**: kto utworzył, ka
 statusu, każda rewizja z komentarzem, każdy dodany/usunięty załącznik, każda blokada/
 zwolnienie.
 
+Domyślnie wydać element może każdy, kto ma do niego dostęp, także jego autor. Tam, gdzie
+potrzebna jest druga para oczu, administrator może włączyć w Ustawieniach → Użytkownicy
+opcję **„Tylko administrator może nadać status Wydany”**: autor przekazuje wtedy element do
+sprawdzenia, a wydaje go administrator.
+
 **Złożenie nie może wyprzedzać swojego zestawienia części.** Na "sprawdzany" przechodzi
 dopiero, gdy każdy komponent o jeden poziom niżej jest co najmniej sprawdzany, a na
 "wydany" — gdy każdy z nich jest wydany. Sprawdzany jest wyłącznie jeden poziom w dół; to,

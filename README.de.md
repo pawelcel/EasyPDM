@@ -326,6 +326,11 @@ Symbol eines stornierten Elements rot. Am unteren Rand des Elementbereichs sieht
 vollständige **Historie**: wer es erstellt hat, jede Statusänderung, jede Revision mit
 Kommentar, jeden hinzugefügten/entfernten Anhang, jede Sperrung/Freigabe.
 
+Standardmäßig kann jeder mit Zugriff auf ein Element es freigeben, auch sein Autor. Wo ein
+zweites Paar Augen gewünscht ist, kann ein Administrator unter Einstellungen → Benutzer
+**„Nur ein Administrator darf den Status Freigegeben setzen“** einschalten: Der Autor gibt
+das Element dann zur Prüfung, und ein Administrator gibt es frei.
+
 **Eine Baugruppe kann ihrer eigenen Stückliste nicht vorauseilen.** Sie geht erst dann
 "in Prüfung", wenn jede Komponente eine Ebene darunter mindestens in Prüfung ist, und erst
 dann "freigegeben", wenn jede von ihnen freigegeben ist. Geprüft wird ausschließlich eine

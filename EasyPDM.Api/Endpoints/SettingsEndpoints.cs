@@ -548,6 +548,37 @@ static class SettingsEndpoints
             });
         });
 
+        // GET /api/settings/release-policy
+        // Czy status "Wydany" może nadać tylko administrator. Czyta każdy zalogowany: zwykły
+        // użytkownik potrzebuje tej informacji, żeby przycisk "Wydany" był u niego wyszarzony
+        // z wyjaśnieniem, zamiast kończyć się błędem z serwera.
+        app.MapGet("/api/settings/release-policy", async () =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            return Results.Ok(new { adminOnly = await ReleasePolicy.GetAdminOnlyAsync(conn) });
+        });
+
+        // PATCH /api/settings/release-policy   body: { "adminOnly": true }
+        // Zmienia tylko administrator. Elementy już wydane zostają wydane -- reguła dotyczy
+        // wyłącznie kolejnych przejść na "Wydany" (PATCH /api/items/{id}/status).
+        app.MapPatch("/api/settings/release-policy", async (HttpContext ctx, ReleasePolicyRequest body) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            // Upsert z tego samego powodu co przy formacie numeru: system_state bywa pusta.
+            await using var cmd = new NpgsqlCommand("""
+                INSERT INTO system_state (id, release_admin_only) VALUES (true, @adminOnly)
+                ON CONFLICT (id) DO UPDATE SET release_admin_only = @adminOnly;
+                """, conn);
+            cmd.Parameters.AddWithValue("adminOnly", body.AdminOnly);
+            await cmd.ExecuteNonQueryAsync();
+            return Results.Ok(new { adminOnly = await ReleasePolicy.GetAdminOnlyAsync(conn) });
+        });
+
         // GET /api/settings/item-number-sequence
         // Podgląd stanu sekwencji numerów elementów -- jaki numer dostałby KOLEJNY nowo
         // utworzony element teraz (bez konsumowania go -- last_value/is_called to
@@ -801,4 +832,5 @@ record BackupScheduleRequest(
 
 record ItemNumberPrefixRequest(string? Prefix);
 record ItemNumberFormatRequest(int? Digits, bool? WithName);
+record ReleasePolicyRequest(bool AdminOnly);
 record ResetItemNumberSequenceRequest(int NextNumber);

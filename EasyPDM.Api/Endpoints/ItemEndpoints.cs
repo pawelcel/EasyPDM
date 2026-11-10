@@ -968,6 +968,15 @@ static class ItemEndpoints
             if (!isValidTransition)
                 return Results.BadRequest($"Nie można zmienić statusu z '{currentStatus}' na '{body.Status}'.");
 
+            // Opcjonalna reguła "wydaje tylko administrator" (Ustawienia -> Użytkownicy).
+            // Sprawdzana tutaj, nie tylko w interfejsie, bo status zmieniają też makra CAD.
+            // Pociągnięcie komponentów razem ze złożeniem nie omija jej: idzie tym samym
+            // żądaniem, więc odmowa dla złożenia zatrzymuje też komponenty.
+            if (body.Status == "wydany" && currentStatus != "wydany" && user.Role != "admin"
+                && await ReleasePolicy.GetAdminOnlyAsync(conn))
+                return Results.Text("Status \"Wydany\" może nadać tylko administrator.",
+                    statusCode: StatusCodes.Status403Forbidden);
+
             // Złożenie z anulowanym elementem w BOM-ie (na dowolnej głębokości, nie tylko
             // bezpośrednie dzieci) nie może zostać wydane — komunikat wskazuje który
             // element trafia bezpośrednio do okna potwierdzenia zmiany statusu na froncie

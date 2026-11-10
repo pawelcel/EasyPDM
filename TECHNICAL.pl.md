@@ -508,6 +508,8 @@ całkowicie z bazy ani zarządzać kontami. System pilnuje, żeby zawsze zostawa
 jeden administrator (nie da się usunąć ani zdegradować ostatniego). Ustawienia Języka i
 Wyglądu są dostępne dla każdego; Użytkownicy, Magazyn plików i Logi tylko dla administratora.
 
+`system_state.release_admin_only` (Ustawienia → Użytkownicy, domyślnie wyłączone) ogranicza przejście na „wydany” do administratorów. Pilnuje tego `PATCH /status`, a nie tylko interfejs, bo status zmieniają też makra CAD; pociągnięcie komponentów złożenia idzie tym samym żądaniem, więc odmowa dla złożenia zatrzymuje i je. `GET /api/settings/release-policy` czyta każdy zalogowany, żeby przyciski statusu mogły wyszarzyć „Wydany” z wyjaśnieniem zamiast kończyć się błędem po kliknięciu; tylko `PATCH` jest dla administratora. Elementy już wydane zostają nietknięte.
+
 Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
 **`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
 po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
@@ -578,6 +580,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET/PATCH | `/api/settings/backup-schedule` | harmonogram automatycznej kopii zapasowej (włącz/wyłącz, częstotliwość, dzień, godzina, liczba przechowywanych kopii) — **tylko administrator** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | prefiksy-litery numeru elementu per rodzaj (4 rodzaje Części + `Zlozenie` = złożenie wykonywane; złożenie zakupowe/klienta używa prefiksu rodzaju Części) — **tylko administrator** |
 | GET/PATCH | `/api/settings/item-number-format` | format numeru dla elementów tworzonych od teraz: `digits` (minimalna szerokość dopełnienia zerami, 0 = bez dopełniania) i `withName` (czy dochodzi nazwa elementu w nawiasie). Oba opcjonalne przy PATCH i zapisywane niezależnie, bo w interfejsie to dwie osobne sekcje; zamrażane na elemencie przy jego tworzeniu — **tylko administrator** |
+| GET/PATCH | `/api/settings/release-policy` | czy status „wydany” nadaje tylko administrator (`adminOnly`); odczyt dla każdego, zmiana tylko dla administratora |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | podgląd/cofnięcie sekwencji numerów elementów — **tylko administrator** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | lista dni z zapisanym logiem, ostatnie N wierszy z danego dnia, pobranie pełnego pliku — **tylko administrator** |
 

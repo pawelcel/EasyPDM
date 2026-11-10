@@ -528,7 +528,9 @@ CREATE TABLE system_state (
     -- zmiana działa wstecz na wszystkie elementy.
     item_number_digits     INTEGER NOT NULL DEFAULT 0 CHECK (item_number_digits BETWEEN 0 AND 10),
     -- Czy nazwa elementu wchodzi w nazwę rekordu: true = "C0005(płyta)", false = "C0005".
-    item_number_with_name  BOOLEAN NOT NULL DEFAULT true
+    item_number_with_name  BOOLEAN NOT NULL DEFAULT true,
+    -- Czy status "Wydany" może nadać tylko administrator (domyślnie każdy z dostępem).
+    release_admin_only     BOOLEAN NOT NULL DEFAULT false
 );
 GRANT SELECT, INSERT, UPDATE ON system_state TO CURRENT_USER;
 

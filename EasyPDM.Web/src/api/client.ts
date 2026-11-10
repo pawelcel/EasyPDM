@@ -687,6 +687,16 @@ export const api = {
       body: JSON.stringify({ prefix }),
     }).then((r) => handleResponse<{ rodzaj: string; prefix: string | null }>(r)),
 
+  getReleasePolicy: () =>
+    fetch(`${BASE}/settings/release-policy`).then((r) => handleResponse<{ adminOnly: boolean }>(r)),
+
+  setReleasePolicy: (adminOnly: boolean) =>
+    fetch(`${BASE}/settings/release-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adminOnly }),
+    }).then((r) => handleResponse<{ adminOnly: boolean }>(r)),
+
   getItemNumberFormat: () =>
     fetch(`${BASE}/settings/item-number-format`).then((r) =>
       handleResponse<{ digits: number; withName: boolean }>(r)

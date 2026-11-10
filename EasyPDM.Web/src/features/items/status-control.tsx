@@ -13,8 +13,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { buttonVariants } from "@/components/ui/button-variants"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import { Hint } from "@/components/ui/hint"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { useAuth } from "@/features/auth/use-auth"
 import { useLanguage } from "@/i18n/use-language"
 import { cn } from "@/lib/utils"
 
@@ -61,6 +63,15 @@ function StatusControl({
   // zapytanie albo przejście w ogóle reguły nie dotyczy, zob. needsBomCheck).
   const [precheck, setPrecheck] = useState<StatusPrecheck | null>(null)
   const [checking, setChecking] = useState(false)
+  // Ustawienie "wydaje tylko administrator" (Ustawienia -> Użytkownicy). Serwer i tak
+  // odmówi, ale wyszarzony przycisk z wyjaśnieniem jest czytelniejszy niż błąd po kliknięciu.
+  const { user } = useAuth()
+  const [releaseAdminOnly, setReleaseAdminOnly] = useState(false)
+  const releaseBlocked = releaseAdminOnly && user?.role !== "admin"
+
+  useEffect(() => {
+    api.getReleasePolicy().then((p) => setReleaseAdminOnly(p.adminOnly)).catch(() => setReleaseAdminOnly(false))
+  }, [])
 
   useEffect(() => {
     api.getRevisionComments(item.id).then(setRevisions).catch(() => setRevisions([]))
@@ -149,7 +160,8 @@ function StatusControl({
               key={s}
               size="sm"
               variant="outline"
-              disabled={disabled || !NEXT_STATUSES[status].includes(s)}
+              disabled={disabled || !NEXT_STATUSES[status].includes(s) || (s === "wydany" && releaseBlocked)}
+              title={s === "wydany" && releaseBlocked ? t("item.releaseAdminOnly") : undefined}
               onClick={() => void startChange(s)}
             >
               → {t(STATUS_LABEL_KEYS[s])}
@@ -157,6 +169,12 @@ function StatusControl({
           )
         )}
       </div>
+
+      {releaseBlocked && status === "sprawdzany" && (
+        <div className="w-full">
+          <Hint>{t("item.releaseAdminOnly")}</Hint>
+        </div>
+      )}
 
       {revisions.length > 0 && (
         <div className="flex w-full flex-col gap-0.5 text-[12.5px] text-muted-foreground">

@@ -301,6 +301,11 @@ bottom of an item's panel you can see the full **history**: who created it, ever
 change, every revision with its comment, every added/removed attachment, every
 lock/release.
 
+By default anyone with access to an item can release it, its author included. Where a
+second pair of eyes is wanted, an administrator can switch on **"Only an administrator can
+set the Released status"** under Settings → Users: the author then sends the item for
+review, and an administrator releases it.
+
 An **Assembly can't get ahead of its own bill of materials**. It goes "under review" only
 once every component one level below it is at least under review, and "released" only once
 every one of them is released. Only the direct children are checked — what sits deeper is

@@ -559,6 +559,8 @@ kann weder gelöscht noch degradiert werden). Die Einstellungen für Sprache und
 Erscheinungsbild stehen jedem zur Verfügung; Benutzer, Dateispeicher und Protokolle nur
 dem Administrator.
 
+`system_state.release_admin_only` (Einstellungen → Benutzer, standardmäßig aus) beschränkt den Übergang zu „freigegeben“ auf Administratoren. Durchgesetzt wird das von `PATCH /status`, nicht nur von der Oberfläche, denn auch die CAD-Makros ändern den Status; das Mitziehen der Komponenten einer Baugruppe läuft über dieselbe Anfrage, eine Ablehnung für die Baugruppe hält sie also ebenfalls auf. `GET /api/settings/release-policy` darf jeder Angemeldete lesen, damit die Statusschaltflächen „Freigegeben“ mit einer Erklärung ausgrauen können, statt beim Klick zu scheitern; nur `PATCH` ist dem Administrator vorbehalten. Bereits freigegebene Elemente bleiben unberührt.
+
 Wenn die Tabelle `users` beim Start der API leer ist, legt sie selbst ein Standardkonto
 **`admin` / `admin`** an (siehe Konsole beim ersten Start) — ändern Sie dieses Passwort
 sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwendung).
@@ -631,6 +633,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET/PATCH | `/api/settings/backup-schedule` | Zeitplan für automatische Sicherung (ein-/ausschalten, Häufigkeit, Tag, Uhrzeit, Anzahl aufbewahrter Kopien) — **nur Administrator** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | Buchstaben-Präfixe der Elementnummer pro Art (die 4 Teile-Arten plus `Zlozenie` = gefertigte Baugruppe; zugekaufte/Kunden-Baugruppen nutzen das Präfix der Teile-Art) — **nur Administrator** |
 | GET/PATCH | `/api/settings/item-number-format` | Nummernformat für ab jetzt erstellte Elemente: `digits` (Mindestbreite zum Auffüllen mit Nullen, 0 = kein Auffüllen) und `withName` (ob der Elementname in Klammern angehängt wird). Beide bei PATCH optional und unabhängig gespeichert, da es in der Oberfläche zwei getrennte Abschnitte sind; beim Erstellen am Element eingefroren — **nur Administrator** |
+| GET/PATCH | `/api/settings/release-policy` | ob nur Administratoren „freigegeben“ setzen dürfen (`adminOnly`); lesen darf jeder, ändern nur der Administrator |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | Vorschau/Zurückdrehen der Elementnummern-Sequenz — **nur Administrator** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | Liste der Tage mit gespeichertem Protokoll, die letzten N Zeilen eines bestimmten Tages, Download der vollständigen Datei — **nur Administrator** |
 

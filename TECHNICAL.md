@@ -713,6 +713,14 @@ sure at least one administrator always remains (the last one cannot be deleted o
 demoted). Language and Appearance settings are available to everyone; Users, File
 storage, and Logs only to the administrator.
 
+`system_state.release_admin_only` (Settings → Users, off by default) limits the move to
+"released" to administrators. `PATCH /status` enforces it, not just the UI, because the CAD
+macros change status too; promoting an assembly's components rides on the same request, so
+a refusal for the assembly stops them as well. `GET /api/settings/release-policy` is open to
+every logged-in user, so the status buttons can grey "Released" out with an explanation
+instead of failing on click; only `PATCH` is admin-only. Items already released are left
+alone.
+
 If the `users` table is empty when the API starts, it sets up a default
 **`admin` / `admin`** account on its own (see the console on first run) — change this
 password right after logging in (`PATCH /api/auth/password`, or from within the web
@@ -783,6 +791,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET/PATCH | `/api/settings/backup-schedule` | automatic backup schedule (enable/disable, frequency, day, time, number of kept copies) — **administrator only** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | item number letter prefixes per kind (the 4 Part kinds plus `Zlozenie` = manufactured assembly; purchased/client assemblies reuse the Part kind's prefix) — **administrator only** |
 | GET/PATCH | `/api/settings/item-number-format` | number format for items created from now on: `digits` (minimum width to zero-pad to, 0 = no padding) and `withName` (whether the item's name is appended in brackets). Both optional on PATCH and saved independently, since they are two separate sections in the UI; frozen onto each item as it is created — **administrator only** |
+| GET/PATCH | `/api/settings/release-policy` | whether only administrators can set "released" (`adminOnly`); read by everyone, changed by the administrator |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | preview/rewind the item number sequence — **administrator only** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | list of days with a saved log, the last N lines of a given day, download of the full file — **administrator only** |
 

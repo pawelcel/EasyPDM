@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { KeyRound, Trash2 } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
@@ -17,6 +17,7 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { SectionLabel } from "@/components/ui/section-label"
 import {
   Select,
   SelectContent,
@@ -137,6 +138,8 @@ function UsersView() {
 
         <ProjectAccessView users={users} />
       </div>
+
+      <ReleasePolicySection />
 
       {deletingUser && (
         <ConfirmDialog
@@ -309,6 +312,52 @@ function ResetPasswordDialog({ user, onClose }: { user: ManagedUser; onClose: ()
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Kto może nadać status "Wydany" — domyślnie każdy z dostępem do elementu. Osobna karta, bo
+// to reguła dla wszystkich, a nie ustawienie jednego konta.
+function ReleasePolicySection() {
+  const { t } = useLanguage()
+  const [adminOnly, setAdminOnly] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    api.getReleasePolicy().then((p) => setAdminOnly(p.adminOnly)).catch(() => {})
+  }, [])
+
+  async function save(next: boolean) {
+    const previous = adminOnly
+    setAdminOnly(next)
+    setSaving(true)
+    setError("")
+    try {
+      setAdminOnly((await api.setReleasePolicy(next)).adminOnly)
+    } catch (err) {
+      setAdminOnly(previous)
+      setError(err instanceof ApiError ? err.message : t("users.releaseSaveFailed"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+      <SectionLabel>{t("users.releaseTitle")}</SectionLabel>
+      <Hint>{t("users.releaseHint")}</Hint>
+      <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={adminOnly}
+          disabled={saving}
+          onChange={(e) => void save(e.target.checked)}
+          className="size-3.5 shrink-0 accent-primary"
+        />
+        {t("users.releaseLabel")}
+      </label>
+      <FormError>{error}</FormError>
+    </div>
   )
 }
 
