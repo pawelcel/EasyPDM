@@ -19,6 +19,7 @@ import { TransferProgressPanel } from "@/features/transfer/transfer-progress-pan
 import { useCadRequests } from "@/features/items/use-cad-requests"
 import { useItems } from "@/features/items/use-items"
 import { MaterialsView } from "@/features/materials/materials-view"
+import { ProcessesView } from "@/features/processes/processes-view"
 import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
 import { ClientsView } from "@/features/clients/clients-view"
 import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
@@ -41,9 +42,9 @@ import { LanguageSelect } from "@/i18n/language-select"
 import { useLanguage } from "@/i18n/use-language"
 import { APP_VERSION } from "@/version"
 
-type View = "welcome" | "projects" | "database" | "materials" | "manufacturers" | "clients" | "settings"
+type View = "welcome" | "projects" | "database" | "materials" | "processes" | "manufacturers" | "clients" | "settings"
 
-const VIEWS: View[] = ["welcome", "projects", "database", "materials", "manufacturers", "clients", "settings"]
+const VIEWS: View[] = ["welcome", "projects", "database", "materials", "processes", "manufacturers", "clients", "settings"]
 
 // Nawigacja żyje wyłącznie w stanie Reacta -- bez tego F5 zawsze zerowałoby użytkownika
 // do ekranu powitalnego. Odczytujemy początkowy widok/projekt/sekcję ustawień z query
@@ -316,6 +317,7 @@ function App() {
           )}
 
           {view === "materials" && <MaterialsView />}
+          {view === "processes" && <ProcessesView />}
 
           {view === "manufacturers" && <ManufacturersView />}
 

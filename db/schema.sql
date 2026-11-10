@@ -113,6 +113,20 @@ CREATE TABLE materials (
 );
 
 -- ============================================================
+-- Obróbki (katalog z menu "Obróbka"; elementy wykonywane zapisują wybrane nazwy w
+-- properties.processes)
+-- ============================================================
+CREATE TABLE processes (
+    id              SERIAL PRIMARY KEY,
+    name            TEXT NOT NULL,
+    description     TEXT,
+    for_parts       BOOLEAN NOT NULL DEFAULT true,   -- czy obróbkę można wybrać w Części
+    for_assemblies  BOOLEAN NOT NULL DEFAULT false,  -- czy obróbkę można wybrać w Złożeniu
+    CHECK (for_parts OR for_assemblies)
+);
+CREATE UNIQUE INDEX processes_name_lower_idx ON processes (lower(name));
+
+-- ============================================================
 -- Producenci (katalog z osobami kontaktowymi, zarządzany z panelu bocznego)
 -- ============================================================
 CREATE TABLE manufacturers (

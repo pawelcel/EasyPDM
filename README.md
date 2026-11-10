@@ -370,6 +370,12 @@ manufacturer has a name, contact people and a Series/Type + Subtype list of what
 supplies. You pick them from a list when filling in a Part's/Assembly's properties,
 instead of typing them in by hand.
 
+The **Processes** menu holds the company's processes — laser cutting, bending, welding,
+powder coating — each with a description and a choice of whether it applies to parts,
+assemblies or both. A manufactured Part or Assembly then picks any number of them, or none,
+from that list. Typing the name of a process that already exists into "Add process"
+switches the window to editing it, so the catalog does not end up with "Welding" twice.
+
 A **Client** has a name (plus an optional location), a list of second names/trade variants
 (add as many as you need — typing an existing client's name into "Add client" switches to
 adding it a new one instead of creating a duplicate), its own contact people, and its own

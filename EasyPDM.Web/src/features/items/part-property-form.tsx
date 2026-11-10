@@ -22,6 +22,7 @@ import {
   ProductTypeAndSubtypeFields,
   PropField,
 } from "@/features/items/property-fields"
+import { useProcesses } from "@/features/processes/use-processes"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -58,7 +59,7 @@ const ASSEMBLY_KINDS: { value: string; labelKey: TranslationKey }[] = [
 // rodzajów, nie "należy" do żadnego konkretnego. Tak samo "mass" — masę ma Część każdego
 // rodzaju i Złożenie, więc zmiana rodzaju nie ma prawa jej kasować.
 const PART_KIND_FIELDS: Record<string, string[]> = {
-  Wykonywana: ["material", "price", "currency", "priceType", "priceDate"],
+  Wykonywana: ["material", "price", "currency", "priceType", "priceDate", "processes"],
   Zakupowa: [
     "manufacturer",
     "productType",
@@ -78,7 +79,7 @@ const PART_KIND_FIELDS: Record<string, string[]> = {
 // blokami rodzajów), więc nie ma jej tu na liście do czyszczenia — tak samo jak w
 // PART_KIND_FIELDS wyżej.
 const ASSEMBLY_KIND_FIELDS: Record<string, string[]> = {
-  Wykonywane: [],
+  Wykonywane: ["processes"],
   Zakupowe: ["manufacturer", "productType", "productSubtype"],
   Klienta: ["client", "clientName2"],
 }
@@ -213,6 +214,16 @@ function PartPropertyForm({
   const locked = statusLocked || ownerBlocked
   const [error, setError] = useState<string | null>(null)
 
+  async function saveProcesses(next: string[]) {
+    try {
+      setError(null)
+      await api.updateProperties(item.id, { processes: next })
+      await onChanged()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("part.saveFieldFailed"))
+    }
+  }
+
   async function saveField(key: string, value: string) {
     // Producent → Seria/Typ → Podtyp to łańcuch zależności: każdy poziom należy do
     // konkretnej wartości poziomu wyżej, więc zmiana wyżej unieważnia to, co niżej
@@ -252,6 +263,7 @@ function PartPropertyForm({
 
       {rodzaj === "Wykonywana" && (
         <>
+          <ProcessesField item={item} target="part" disabled={locked} onSave={saveProcesses} />
           <PriceRow item={item} onChanged={onChanged} onError={setError} />
           <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
         </>
@@ -298,7 +310,10 @@ function PartPropertyForm({
       {/* Złożenie wykonywane: masa (wyżej) i dodatkowe informacje, jak przy części. Wcześniej
           miało tylko generyczny edytor klucz–wartość, z którym nie było wiadomo, co zrobić. */}
       {rodzaj === "Wykonywane" && (
-        <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
+        <>
+          <ProcessesField item={item} target="assembly" disabled={locked} onSave={saveProcesses} />
+          <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
+        </>
       )}
 
       {/* Złożenie zakupowe — kupiony podzespół ma producenta i typ produktu dokładnie tak
@@ -409,6 +424,68 @@ function PriceRow({
       <div className="-mt-1 text-[12.5px] text-muted-foreground">
         {priceDate && t("part.priceEnteredOn", { date: priceDate })}
       </div>
+    </>
+  )
+}
+
+
+// Obróbki elementu wykonywanego, wybierane z katalogu (menu "Obróbka") — kilka albo żadna.
+// Lista pokazuje tylko obróbki dla danego typu elementu, a obok nich te już zapisane w
+// elemencie, których w katalogu nie ma (usunięte albo przemianowane): zostają widoczne i da
+// się je odznaczyć, zamiast znikać po cichu.
+function ProcessesField({
+  item,
+  target,
+  disabled,
+  onSave,
+}: {
+  item: Item
+  target: "part" | "assembly"
+  disabled: boolean
+  onSave: (next: string[]) => void | Promise<void>
+}) {
+  const { t } = useLanguage()
+  const { processes } = useProcesses()
+  const stored = item.properties.processes
+  const selected = Array.isArray(stored) ? stored.filter((x): x is string => typeof x === "string") : []
+  const catalog = processes
+    .filter((p) => (target === "part" ? p.forParts : p.forAssemblies))
+    .map((p) => p.name)
+  const outside = selected.filter((name) => !catalog.includes(name))
+
+  return (
+    <>
+      <Label>{t("part.processes")}</Label>
+      {catalog.length === 0 && outside.length === 0 ? (
+        <Hint>{t("part.processesEmptyCatalog")}</Hint>
+      ) : (
+        <Select
+          multiple
+          value={selected}
+          disabled={disabled}
+          onValueChange={(v) => void onSave(v as string[])}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue>
+              {(v: string[]) => (
+                <span className="truncate">{v.length === 0 ? t("part.processesNone") : v.join(", ")}</span>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {catalog.map((name) => (
+              <SelectItem key={name} value={name}>
+                {name}
+              </SelectItem>
+            ))}
+            {outside.map((name) => (
+              <SelectItem key={name} value={name}>
+                {name} <span className="text-muted-foreground">({t("part.processesOutside")})</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </>
   )
 }

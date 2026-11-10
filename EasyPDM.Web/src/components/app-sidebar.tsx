@@ -9,6 +9,7 @@ import {
   Home,
   Layers,
   Settings,
+  Wrench,
   type LucideIcon,
 } from "lucide-react"
 
@@ -28,6 +29,7 @@ const OPTIONS: SidebarOption[] = [
   { id: "projects", labelKey: "nav.projects", icon: FolderKanban },
   { id: "database", labelKey: "nav.database", icon: Database },
   { id: "materials", labelKey: "nav.materials", icon: Layers },
+  { id: "processes", labelKey: "nav.processes", icon: Wrench },
   { id: "manufacturers", labelKey: "nav.manufacturers", icon: Factory },
   { id: "clients", labelKey: "nav.clients", icon: Building2 },
 ]

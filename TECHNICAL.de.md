@@ -425,6 +425,8 @@ Hochladens nicht kannte. Die Makros lesen das Material aus dem Dokument statt au
 Liste; ohne dies trüge das Element ein Material, das sich weder erneut auswählen noch als
 Filter nutzen ließe. Angelegt wird nur der Name; Gruppe und Untergruppe bleiben leer.
 
+**Bearbeitungen** (`processes`, Migration 061, Menü „Bearbeitung“) sind ein Katalog nach dem Vorbild der Materialien: Name, optionale Beschreibung sowie `for_parts`/`for_assemblies`, von denen mindestens eines wahr ist. Der Name ist unabhängig von Groß-/Kleinschreibung eindeutig (Index auf `lower(name)`), damit die Auswahlliste nicht in „Schweißen“ und „schweißen“ zerfällt. Ein gefertigtes Teil („Wykonywana“) oder eine gefertigte Baugruppe („Wykonywane“) speichert die Auswahl als Namensliste in `properties.processes`, per Name verknüpft wie das Material: Umbenennen oder Löschen einer Bearbeitung schreibt kein Element um, auch kein freigegebenes, und Namen, die nicht mehr im Katalog stehen, bleiben am Element sichtbar, damit man sie abwählen kann. Ein Wechsel weg von „gefertigt“ leert die Liste mit den übrigen Feldern dieser Art. Das Namensfeld im Hinzufügen-Dialog erkennt beim Tippen eine vorhandene Bearbeitung und wechselt zu deren Bearbeitung, statt ein Duplikat anzubieten, das der Server ohnehin ablehnen würde.
+
 ### Mehrere Elemente im Baum auswählen
 
 Zeilen werden mit Strg (Cmd) + Klick ausgewählt, neben der älteren Schaltfläche „Mehrere auswählen" und ihren Kontrollkästchen — die Schaltfläche bleibt, denn ein Tablet hat keine Strg-Taste. Ein Strg+Klick schaltet den Auswahlmodus selbst ein: Kontrollkästchen und Aktionsleiste gibt es nur dort, der erste solche Klick würde sonst etwas Unsichtbares auswählen.
@@ -623,6 +625,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET | `/api/items/{id}/revisions` | Historie der Revisionskommentare (nur Revisionen mit Kommentar) |
 | GET | `/api/items/{id}/history` | vollständige Historie: Erstellung, Statusänderungen, Revisionen, hinzugefügter/entfernter Anhang, Eigentümersperre/-freigabe (wann/wer/Beschreibung), chronologisch |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | Materialkatalog (Name + Gruppe/Untergruppe) |
+| GET/POST/PATCH/DELETE | `/api/processes[/{id}]` | Bearbeitungskatalog (Name, Beschreibung, `forParts`/`forAssemblies`) |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | Herstellerkatalog + Kontaktpersonen + Serien/Typen und deren Untertypen |
 | GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | Kundenkatalog + Kontaktpersonen + deren Namen-2-Liste |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | eigener Dokumentenbaum eines Kunden (Ordner/Dateien — Upload/Download/Umbenennen/Löschen/Suche) |

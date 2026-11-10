@@ -349,6 +349,16 @@ export interface Material {
   subgroup: string | null
 }
 
+// Obróbka z katalogu (menu "Obróbka"). Element wykonywany zapisuje wybrane obróbki jako
+// listę nazw w properties.processes.
+export interface Process {
+  id: number
+  name: string
+  description: string | null
+  forParts: boolean
+  forAssemblies: boolean
+}
+
 // Lekki wpis do listy/wyszukiwarki producentów — bez osób kontaktowych (te dociągane są
 // osobno, dopiero po zaznaczeniu konkretnego producenta).
 export interface Manufacturer {

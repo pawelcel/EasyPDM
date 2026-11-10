@@ -423,6 +423,17 @@ document rather than from a list, so without this the item would carry a materia
 neither be picked again nor used as a filter. Only the name is created; group and subgroup
 stay empty.
 
+**Processes** (`processes`, migration 061, the "Processes" menu) are a catalog like
+materials: name, optional description, and `for_parts`/`for_assemblies`, at least one of them
+true. The name is unique case-insensitively (`lower(name)` index), so the pick list cannot
+split into "Welding" and "welding". A manufactured Part ("Wykonywana") or Assembly
+("Wykonywane") stores its choice as a list of names in `properties.processes`, linked by
+name the way material is: renaming or deleting a process rewrites no item, released ones
+included, and names no longer in the catalog stay listed on the item so they can still be
+unticked. Switching the kind away from manufactured clears the list with the other fields of
+that kind. The add dialog's name field matches an existing process as you type and switches
+to editing it rather than offering a duplicate the server would refuse.
+
 ### Selecting several items in the tree
 
 Rows are selected with Ctrl (Cmd) + click, alongside the older "Select multiple" button and
@@ -785,6 +796,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET | `/api/items/{id}/revisions` | revision comment history (only revisions with a comment) |
 | GET | `/api/items/{id}/history` | full history: creation, status changes, revisions, attachment added/removed, owner lock/release (when/who/description), chronologically |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | material catalog (name + group/subgroup) |
+| GET/POST/PATCH/DELETE | `/api/processes[/{id}]` | process catalog (name, description, `forParts`/`forAssemblies`) |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | manufacturer catalog + contact people + series/types and their subtypes |
 | GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | client catalog + contact people + their Name 2 list |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | a client's own document tree (folders/files — upload/download/rename/delete/search) |

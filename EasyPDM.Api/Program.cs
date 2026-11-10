@@ -117,6 +117,7 @@ app.MapBomEndpoints(connectionString);
 app.MapDocumentationEndpoints(connectionString);
 app.MapHistoryEndpoints(connectionString);
 app.MapMaterialEndpoints(connectionString);
+app.MapProcessEndpoints(connectionString);
 app.MapManufacturerEndpoints(connectionString);
 app.MapClientEndpoints(connectionString, storage);
 app.MapSavedFilterEndpoints(connectionString);

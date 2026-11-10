@@ -380,6 +380,8 @@ nazwę, której katalog nie miał aż do zakończenia wysyłki. Makra czytają m
 a nie z listy wyboru, więc bez tego element miałby materiał, którego nie da się ani wybrać
 ponownie, ani użyć jako filtr. Zakładana jest sama nazwa; grupa i podgrupa zostają puste.
 
+**Obróbki** (`processes`, migracja 061, menu „Obróbka”) to katalog na wzór materiałów: nazwa, opcjonalny opis oraz `for_parts`/`for_assemblies`, z czego co najmniej jedno prawdziwe. Nazwa jest unikalna bez względu na wielkość liter (indeks `lower(name)`), więc lista wyboru nie rozjedzie się na „Spawanie” i „spawanie”. Część „Wykonywana” albo Złożenie „Wykonywane” zapisuje wybór jako listę nazw w `properties.processes`, powiązaną nazwą tak jak materiał: zmiana nazwy albo usunięcie obróbki nie przepisuje żadnego elementu, także wydanego, a nazwy spoza katalogu zostają widoczne w elemencie, żeby dało się je odznaczyć. Zmiana rodzaju z wykonywanego czyści listę razem z innymi polami tego rodzaju. Pole nazwy w oknie dodawania dopasowuje istniejącą obróbkę w trakcie pisania i przełącza się na jej edycję, zamiast proponować duplikat, który serwer i tak by odrzucił.
+
 ### Zaznaczanie wielu elementów w drzewie
 
 Wiersze zaznacza się Ctrl (Cmd) + klikiem, obok starszego przycisku „Zaznacz wiele" i jego checkboxów — przycisk zostaje, bo na tablecie nie ma klawisza Ctrl. Ctrl+klik sam włącza tryb zaznaczania: checkboxy i belka akcji istnieją tylko w nim, więc pierwszy taki klik zaznaczałby inaczej coś, czego nie widać.
@@ -570,6 +572,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET | `/api/items/{id}/revisions` | historia komentarzy rewizji (tylko rewizje z komentarzem) |
 | GET | `/api/items/{id}/history` | pełna historia: utworzenie, zmiany statusu, rewizje, dodanie/usunięcie załącznika, blokada/zwolnienie właściciela (kiedy/kto/opis), chronologicznie |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | katalog materiałów (nazwa + grupa/podgrupa) |
+| GET/POST/PATCH/DELETE | `/api/processes[/{id}]` | katalog obróbek (nazwa, opis, `forParts`/`forAssemblies`) |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | katalog producentów + osoby kontaktowe + serie/typy i ich podtypy |
 | GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | katalog klientów + osoby kontaktowe + ich lista Nazw 2 |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | własne drzewko dokumentów klienta (foldery/pliki — upload/pobranie/zmiana nazwy/usunięcie/wyszukiwanie) |

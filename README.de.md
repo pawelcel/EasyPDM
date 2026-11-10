@@ -402,6 +402,13 @@ Hersteller hat einen Namen, Kontaktpersonen und eine Serie/Typ + Untertyp-Liste 
 was er liefert. Sie werden beim Ausfüllen der Eigenschaften eines Teils/einer Baugruppe
 aus einer Liste ausgewählt, statt von Hand eingetippt zu werden.
 
+Das Menü **Bearbeitung** enthält die Bearbeitungsarten der Firma — Laserschneiden, Biegen,
+Schweißen, Pulverbeschichten —, jede mit einer Beschreibung und der Wahl, ob sie für Teile,
+Baugruppen oder beide gilt. Ein gefertigtes Teil oder eine gefertigte Baugruppe wählt
+daraus beliebig viele oder keine. Wer in „Bearbeitung hinzufügen“ den Namen einer schon
+vorhandenen eingibt, landet in deren Bearbeitung, sodass „Schweißen“ nicht zweimal im
+Katalog steht.
+
 Ein **Kunde** hat einen Namen (optional einen Standort), eine Liste zweiter Namen/
 Handelsvarianten (beliebig viele — die Eingabe des Namens eines bereits vorhandenen Kunden
 im Dialog „Kunde hinzufügen" fügt diesem stattdessen einen weiteren hinzu, statt einen

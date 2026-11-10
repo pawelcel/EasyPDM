@@ -371,6 +371,12 @@ Osobne, wspólne dla całej firmy katalogi (zakładki **Lista materiałów**, **
 osoby kontaktowe i listę Seria/Typ + Podtyp tego, co dostarcza. Wybiera się je z listy przy
 uzupełnianiu właściwości Części/Złożenia, zamiast wpisywać ręcznie.
 
+Menu **Obróbka** to firmowy katalog obróbek — cięcie laserem, gięcie, spawanie, malowanie
+proszkowe — każda z opisem i wyborem, czy dotyczy części, złożeń, czy obu. Część albo
+Złożenie wykonywane wybiera z tej listy dowolną liczbę obróbek albo żadną. Wpisanie w „Dodaj
+obróbkę” nazwy, która już istnieje, przełącza okno na jej edycję, więc w katalogu nie
+pojawi się dwa razy „Spawanie”.
+
 **Klient** ma nazwę (opcjonalnie lokalizację), listę drugich nazw/wariantów handlowych
 (dowolną liczbę — wpisanie w oknie "Dodaj klienta" nazwy już istniejącego klienta dodaje mu
 kolejną, zamiast zakładać duplikat), własne osoby kontaktowe i własne drzewko dokumentów,

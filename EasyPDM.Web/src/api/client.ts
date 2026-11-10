@@ -24,6 +24,7 @@ import type {
   NotificationEntry,
   NotificationPreference,
   NotificationType,
+  Process,
   Project,
   ProjectAttachment,
   ProjectUserAssignment,
@@ -54,6 +55,13 @@ type ProjectWriteBody = {
   closed: boolean
   startDate: string | null
   endDate: string | null
+}
+
+type ProcessWriteBody = {
+  name: string
+  description: string | null
+  forParts: boolean
+  forAssemblies: boolean
 }
 
 type MaterialWriteBody = {
@@ -411,6 +419,21 @@ export const api = {
 
   removeMaterial: (id: number) =>
     fetch(`${BASE}/materials/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  getProcesses: () => fetch(`${BASE}/processes`).then((r) => handleResponse<Process[]>(r)),
+
+  addProcess: (body: ProcessWriteBody) =>
+    fetch(`${BASE}/processes`, json(body)).then((r) => handleResponse<{ id: number }>(r)),
+
+  updateProcess: (id: number, body: ProcessWriteBody) =>
+    fetch(`${BASE}/processes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeProcess: (id: number) =>
+    fetch(`${BASE}/processes/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
   getManufacturers: (search?: string) =>
     fetch(`${BASE}/manufacturers${search ? `?search=${encodeURIComponent(search)}` : ""}`).then(
