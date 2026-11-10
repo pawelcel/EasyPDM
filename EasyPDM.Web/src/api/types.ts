@@ -215,6 +215,16 @@ export function canEditOwnerLocked(
 
 export type Tag = string
 
+// Ustawienia -> Język -> Języki projektu: języki dokumentacji firmy (nie interfejsu).
+// Skrót to 1-3 wielkie litery A-Z.
+export interface ProjectLanguage {
+  id: number
+  name: string
+  code: string
+  // Domyślny język dokumentacji — zawsze dokładnie jeden na liście.
+  isDefault: boolean
+}
+
 // Ustawienia -> Tagi (administrator): tag z liczbą elementów, które go noszą.
 export interface TagUsage {
   name: string

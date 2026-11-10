@@ -35,6 +35,7 @@ import type {
   CadRequest,
   Tag,
   TagUsage,
+  ProjectLanguage,
   TransferProgress,
   UsedInEntry,
   UserRole,
@@ -319,6 +320,29 @@ export const api = {
   fileDownloadUrl: (itemId: string) => `${BASE}/items/${itemId}/file`,
 
   getTags: () => fetch(`${BASE}/tags`).then((r) => handleResponse<Tag[]>(r)),
+
+  getProjectLanguages: () =>
+    fetch(`${BASE}/project-languages`).then((r) => handleResponse<ProjectLanguage[]>(r)),
+
+  addProjectLanguage: (body: { name: string; code: string }) =>
+    fetch(`${BASE}/project-languages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<{ id: number }>(r)),
+
+  updateProjectLanguage: (id: number, body: { name: string; code: string }) =>
+    fetch(`${BASE}/project-languages/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<void>(r)),
+
+  setDefaultProjectLanguage: (id: number) =>
+    fetch(`${BASE}/project-languages/${id}/default`, { method: "PUT" }).then((r) => handleResponse<void>(r)),
+
+  removeProjectLanguage: (id: number) =>
+    fetch(`${BASE}/project-languages/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
   getTagUsage: () => fetch(`${BASE}/settings/tags`).then((r) => handleResponse<TagUsage[]>(r)),
 

@@ -127,6 +127,23 @@ CREATE TABLE processes (
 );
 
 -- ============================================================
+-- Języki projektu (Ustawienia -> Język -> Języki projektu): języki dokumentacji firmy,
+-- niezależne od języka interfejsu. Skrót 1-3 wielkie litery, unikalny; nazwa unikalna bez
+-- względu na wielkość liter. Dokładnie jeden jest domyślnym językiem dokumentacji.
+-- ============================================================
+CREATE TABLE project_languages (
+    id          SERIAL PRIMARY KEY,
+    name        TEXT NOT NULL,
+    code        TEXT NOT NULL UNIQUE CHECK (code ~ '^[A-Z]{1,3}$'),
+    is_default  BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE UNIQUE INDEX project_languages_name_lower_idx ON project_languages (lower(name));
+CREATE UNIQUE INDEX project_languages_one_default_idx ON project_languages (is_default) WHERE is_default;
+
+INSERT INTO project_languages (name, code, is_default) VALUES ('English', 'EN', true), ('Polish', 'PL', false);
+
+-- ============================================================
 -- Producenci (katalog z osobami kontaktowymi, zarządzany z panelu bocznego)
 -- ============================================================
 CREATE TABLE manufacturers (
