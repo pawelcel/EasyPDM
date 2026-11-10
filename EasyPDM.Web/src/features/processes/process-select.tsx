@@ -106,13 +106,7 @@ function ProcessSelect({
       {value.length > 0 && (
         <ul className="flex flex-col gap-0.5 text-sm">
           {value.map((ref, i) => (
-            <li key={selectedKeys[i]} className="flex items-start justify-between gap-2">
-              <span>
-                <span className="font-medium">{ref.name}</span>
-                {ref.description && (
-                  <span className="whitespace-pre-line text-muted-foreground"> — {ref.description}</span>
-                )}
-              </span>
+            <li key={selectedKeys[i]} className="flex items-start gap-1.5">
               <Button
                 size="icon-xs"
                 variant="ghost"
@@ -122,6 +116,12 @@ function ProcessSelect({
               >
                 <X className="size-3.5 text-muted-foreground" />
               </Button>
+              <span className="pt-px">
+                <span className="font-medium">{ref.name}</span>
+                {ref.description && (
+                  <span className="whitespace-pre-line text-muted-foreground"> — {ref.description}</span>
+                )}
+              </span>
             </li>
           ))}
         </ul>
