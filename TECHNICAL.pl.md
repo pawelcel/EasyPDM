@@ -171,7 +171,9 @@ Złożenie ma trzy własne rodzaje w tym samym `properties.rodzaj`: **Wykonywane
 **Zakupowe** (Producent, Seria/Typ, Podtyp) i **Klienta** (Klient). Napisy są CELOWO inne niż dla Części
 ("Zakupowe" vs "Zakupowa"), bo ta sama wartość jest kluczem prefiksu numeracji — jedynym
 wspólnym napisem jest "Klienta", które i prefiks ma wspólny. Poza polami swojego rodzaju
-Złożenie ma dalej generyczny edytor właściwości (Masa i dowolne własne klucze). Złożenia
+Złożenie ma Masę i Dodatkowe informacje, jak Część. Generyczny edytor klucz–wartość pokazuje
+się tylko przy złożeniu, które ma już własne klucze (wpisane w ten edytor w starszej wersji),
+żeby ich nie schować; można je tam dalej poprawić albo usunąć. Złożenia
 sprzed tej wersji nie mają rodzaju i pokazują podpowiedź, żeby go wybrać.
 
 **Klient** (`properties.client`, tabela `clients`) — dla rodzaju Klienta, Część lub

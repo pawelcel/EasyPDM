@@ -192,7 +192,9 @@ An Assembly has three kinds of its own in the same `properties.rodzaj`: **Wykony
 (client-supplied — Client). The strings deliberately differ from the Part ones ("Zakupowe" vs
 "Zakupowa"), because that value doubles as the numbering-prefix key — the one shared
 string is "Klienta", which shares its prefix too. Beyond its kind's fields an Assembly
-still has the generic property editor (Mass and any custom keys). Assemblies created
+has Mass and Additional information, like a Part. The generic key-value editor shows up only
+for an assembly that already carries keys of its own (typed into that editor in an earlier
+version), so they are not hidden and can still be edited or deleted. Assemblies created
 before this version have no kind and show a hint prompting you to pick one.
 
 **Client** (`properties.client`, table `clients`) — for the Client-supplied kind, on a

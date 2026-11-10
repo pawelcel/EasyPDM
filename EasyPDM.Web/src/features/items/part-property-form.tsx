@@ -295,10 +295,15 @@ function PartPropertyForm({
         </>
       )}
 
+      {/* Złożenie wykonywane: masa (wyżej) i dodatkowe informacje, jak przy części. Wcześniej
+          miało tylko generyczny edytor klucz–wartość, z którym nie było wiadomo, co zrobić. */}
+      {rodzaj === "Wykonywane" && (
+        <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
+      )}
+
       {/* Złożenie zakupowe — kupiony podzespół ma producenta i typ produktu dokładnie tak
-          samo jak część zakupowa. Reszta jego właściwości (cena, cokolwiek własnego) zostaje
-          w generycznym PropertyEditorze pod spodem, zob. item-detail-panel.tsx; masa ma już
-          własne pole wyżej. */}
+          samo jak część zakupowa, i tak jak ona dodatkowe informacje. Masa ma własne pole
+          wyżej. */}
       {rodzaj === "Zakupowe" && (
         <>
           <ManufacturerField value={propValue("manufacturer")} onSave={saveField} disabled={locked} onError={setError} />
@@ -310,6 +315,7 @@ function PartPropertyForm({
             disabled={locked}
             onError={setError}
           />
+          <PropField label={t("part.notes")} propKey="notes" value={propValue("notes")} onSave={saveField} disabled={locked} onError={setError} />
         </>
       )}
 

@@ -195,8 +195,10 @@ Eine Baugruppe hat drei eigene Arten im selben `properties.rodzaj`: **Wykonywane
 Kunden — Kunde). Die Zeichenketten unterscheiden sich BEWUSST von denen des Teils ("Zakupowe"
 statt "Zakupowa"), denn dieser Wert dient zugleich als Schlüssel für das Nummernpräfix —
 die einzige gemeinsame Zeichenkette ist "Klienta", die sich auch das Präfix teilt. Über
-die Felder ihrer Art hinaus hat eine Baugruppe weiterhin den generischen
-Eigenschaften-Editor (Masse und beliebige eigene Schlüssel). Baugruppen aus früheren
+die Felder ihrer Art hinaus hat eine Baugruppe Masse und Zusätzliche Informationen, wie ein
+Teil. Der generische Schlüssel-Wert-Editor erscheint nur bei einer Baugruppe, die bereits
+eigene Schlüssel trägt (in einer früheren Version in diesen Editor eingegeben), damit sie
+nicht verborgen werden; dort lassen sie sich weiter bearbeiten oder löschen. Baugruppen aus früheren
 Versionen haben keine Art und zeigen einen Hinweis, eine auszuwählen.
 
 **Kunde** (`properties.client`, Tabelle `clients`) — für die Art Kundenteil, bei Teil

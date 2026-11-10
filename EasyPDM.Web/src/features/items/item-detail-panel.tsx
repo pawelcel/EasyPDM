@@ -74,6 +74,8 @@ const ASSEMBLY_MANAGED_PROPERTY_KEYS = new Set([
   // Masa ma własne pole w PartPropertyForm (wspólne dla wszystkich rodzajów) — bez tego
   // wpisu pokazałaby się dwa razy: jako pole i jako surowy klucz w edytorze niżej.
   "mass",
+  // Dodatkowe informacje — własne pole przy każdym rodzaju Złożenia, jak przy Części.
+  "notes",
 ])
 
 function propertyEditorEntries(item: Item): Record<string, unknown> {
@@ -459,25 +461,34 @@ function ItemDetailPanel({
       <AddTagRow onAdd={handleAddTag} className="mt-2" disabled={isLocked(item) || !ownerEditable} />
 
       <SectionLabel>{t("item.properties")}</SectionLabel>
-      {/* Część ma komplet pól zależnych od rodzaju i nie potrzebuje edytora surowych
-          właściwości. Złożenie dostaje z PartPropertyForm masę (pole wspólne) i pola swojego
-          rodzaju (dziś: producent i typ produktu dla zakupowego), a dowolne własne klucze —
-          dalej generyczny PropertyEditor pod spodem. */}
+      {/* Część i Złożenie mają komplet pól zależnych od rodzaju (masa, dodatkowe informacje,
+          pola rodzaju) i nie potrzebują edytora surowych właściwości klucz–wartość, z którym
+          nie było wiadomo, co zrobić. Złożenie pokazuje go tylko wtedy, gdy ma już wpisane
+          własne klucze — żeby ich nie schować; da się je tam poprawić albo usunąć. Folder i
+          Plik nie mają pól rodzaju, więc zostaje im edytor. */}
       {item.itemType === "part" ? (
         <PartPropertyForm item={item} onChanged={refreshAfterAction} />
-      ) : (
+      ) : item.itemType === "assembly" ? (
         <>
-          {item.itemType === "assembly" && (
-            <PartPropertyForm item={item} onChanged={refreshAfterAction} />
+          <PartPropertyForm item={item} onChanged={refreshAfterAction} />
+          {Object.keys(propertyEditorEntries(item)).length > 0 && (
+            <PropertyEditor
+              itemId={item.id}
+              properties={propertyEditorEntries(item)}
+              locked={isLocked(item) || !ownerEditable}
+              lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
+              onChanged={refreshAfterAction}
+            />
           )}
-          <PropertyEditor
-            itemId={item.id}
-            properties={propertyEditorEntries(item)}
-            locked={isLocked(item) || !ownerEditable}
-            lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
-            onChanged={refreshAfterAction}
-          />
         </>
+      ) : (
+        <PropertyEditor
+          itemId={item.id}
+          properties={propertyEditorEntries(item)}
+          locked={isLocked(item) || !ownerEditable}
+          lockedHint={!ownerEditable && !isLocked(item) ? t("item.ownerLockedHint") : undefined}
+          onChanged={refreshAfterAction}
+        />
       )}
 
       {item.itemType === "assembly" && (
