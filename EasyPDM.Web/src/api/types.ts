@@ -60,6 +60,12 @@ export interface Project {
   endDate: string | null
   createdAt: string
   itemCount: number
+  // Języki dokumentacji projektu. Język główny ma każdy projekt (na start domyślny z
+  // ustawień); wielojęzyczny ma dodatkowo listę languageIds, na której zawsze jest też główny.
+  // Jednojęzyczny ma listę pustą.
+  mainLanguageId: number
+  multilingual: boolean
+  languageIds: number[]
 }
 
 export type ItemType = "folder" | "part" | "file" | "assembly"

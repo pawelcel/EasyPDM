@@ -121,7 +121,8 @@ static partial class ProjectLanguageEndpoints
             return Results.Ok();
         });
 
-        // DELETE /api/project-languages/{id} — poza domyślnym: najpierw trzeba wybrać inny.
+        // DELETE /api/project-languages/{id} — poza domyślnym (najpierw trzeba wybrać inny) i poza
+        // językiem używanym w którymś projekcie.
         app.MapDelete("/api/project-languages/{id:int}", async (int id, HttpContext ctx) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
@@ -142,7 +143,16 @@ static partial class ProjectLanguageEndpoints
 
             await using var cmd = new NpgsqlCommand("DELETE FROM project_languages WHERE id = @id AND NOT is_default;", conn);
             cmd.Parameters.AddWithValue("id", id);
-            return await cmd.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.Ok();
+            try
+            {
+                return await cmd.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.Ok();
+            }
+            catch (PostgresException ex) when (ex.SqlState is "23001" or "23503")
+            {
+                // Język jest głównym językiem albo jednym z języków jakiegoś projektu
+                // (ON DELETE RESTRICT, migracja 064).
+                return Results.Conflict("Język jest używany w projekcie — najpierw zmień go we właściwościach projektu.");
+            }
         });
     }
 

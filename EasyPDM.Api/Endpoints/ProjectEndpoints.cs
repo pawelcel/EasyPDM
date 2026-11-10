@@ -23,7 +23,11 @@ static class ProjectEndpoints
                 SELECT p.id, p.name, p.description, p.client, p.client_id, c.name,
                        p.client_name2_id, n2.name2, p.closed,
                        p.start_date, p.end_date, p.created_at, COUNT(i.id) AS item_count,
-                       p.lead_contact_id, lc.first_name, lc.last_name
+                       p.lead_contact_id, lc.first_name, lc.last_name,
+                       p.main_language_id, p.multilingual,
+                       ARRAY(SELECT ll.language_id FROM project_language_links ll
+                             JOIN project_languages l ON l.id = ll.language_id
+                             WHERE ll.project_id = p.id ORDER BY lower(l.name)) AS language_ids
                 FROM projects p
                 LEFT JOIN items i ON i.project_id = p.id
                 LEFT JOIN clients c ON c.id = p.client_id
@@ -74,7 +78,11 @@ static class ProjectEndpoints
                     closed, start_date, end_date, created_at,
                     lead_contact_id,
                     (SELECT first_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_first_name,
-                    (SELECT last_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_last_name;
+                    (SELECT last_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_last_name,
+                    main_language_id, multilingual,
+                    ARRAY(SELECT ll.language_id FROM project_language_links ll
+                          JOIN project_languages l ON l.id = ll.language_id
+                          WHERE ll.project_id = projects.id ORDER BY lower(l.name)) AS language_ids;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("name", body.Name.Trim());
@@ -136,7 +144,11 @@ static class ProjectEndpoints
                     (SELECT COUNT(*) FROM items WHERE items.project_id = projects.id),
                     lead_contact_id,
                     (SELECT first_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_first_name,
-                    (SELECT last_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_last_name;
+                    (SELECT last_name FROM client_contacts WHERE client_contacts.id = lead_contact_id) AS lead_contact_last_name,
+                    main_language_id, multilingual,
+                    ARRAY(SELECT ll.language_id FROM project_language_links ll
+                          JOIN project_languages l ON l.id = ll.language_id
+                          WHERE ll.project_id = projects.id ORDER BY lower(l.name)) AS language_ids;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
@@ -188,6 +200,61 @@ static class ProjectEndpoints
                 return Results.NotFound();
 
             return Results.Ok(new { id, closed = body.Closed });
+        });
+
+        // PATCH /api/projects/{id}/languages   body: { mainLanguageId, multilingual, languageIds }
+        // Języki projektu zapisywane osobno od formularza właściwości -- z tego samego powodu
+        // co /closed wyżej: to przełącznik i lista pól wyboru, które zapisują się od razu po
+        // kliknięciu, a pełny PATCH formularza wysłany w tym samym momencie (blur pola)
+        // mógłby nadpisać jedno drugim. Projekt wielojęzyczny zawsze ma na liście swój język
+        // główny (dokładany tutaj, nawet jeśli nie przyszedł); jednojęzyczny ma listę pustą,
+        // a przysłane languageIds są wtedy ignorowane.
+        app.MapPatch("/api/projects/{id:guid}/languages", async (Guid id, HttpContext ctx, ProjectLanguagesRequest body) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            int[] languageIds = body.Multilingual
+                ? (body.LanguageIds ?? []).Append(body.MainLanguageId).Distinct().ToArray()
+                : [];
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using (var check = new NpgsqlCommand(
+                "SELECT COUNT(*) FROM project_languages WHERE id = ANY(@ids);", conn))
+            {
+                var all = languageIds.Append(body.MainLanguageId).Distinct().ToArray();
+                check.Parameters.AddWithValue("ids", all);
+                if ((long)(await check.ExecuteScalarAsync())! != all.Length)
+                    return Results.BadRequest("Wybrano język, którego nie ma na liście języków dokumentacji.");
+            }
+
+            await using var tx = await conn.BeginTransactionAsync();
+            await using (var update = new NpgsqlCommand(
+                "UPDATE projects SET main_language_id = @main, multilingual = @multi WHERE id = @id;", conn, tx))
+            {
+                update.Parameters.AddWithValue("id", id);
+                update.Parameters.AddWithValue("main", body.MainLanguageId);
+                update.Parameters.AddWithValue("multi", body.Multilingual);
+                if (await update.ExecuteNonQueryAsync() == 0)
+                    return Results.NotFound();
+            }
+            await using (var clear = new NpgsqlCommand("DELETE FROM project_language_links WHERE project_id = @id;", conn, tx))
+            {
+                clear.Parameters.AddWithValue("id", id);
+                await clear.ExecuteNonQueryAsync();
+            }
+            await using (var insert = new NpgsqlCommand(
+                "INSERT INTO project_language_links (project_id, language_id) SELECT @id, unnest(@ids);", conn, tx))
+            {
+                insert.Parameters.AddWithValue("id", id);
+                insert.Parameters.AddWithValue("ids", languageIds);
+                await insert.ExecuteNonQueryAsync();
+            }
+            await tx.CommitAsync();
+
+            return Results.Ok(new { id, mainLanguageId = body.MainLanguageId, multilingual = body.Multilingual, languageIds });
         });
 
         // DELETE /api/projects/{id} — usuwa TYLKO sam projekt. Części/Złożenia, które do
@@ -300,7 +367,10 @@ static class ProjectEndpoints
             createdAt = reader.GetDateTime(11),
             itemCount = itemCount ?? reader.GetInt64(12),
             leadContactId = reader.IsDBNull(leadBase) ? (int?)null : reader.GetInt32(leadBase),
-            leadContactName = BuildContactName(reader, leadBase + 1, leadBase + 2)
+            leadContactName = BuildContactName(reader, leadBase + 1, leadBase + 2),
+            mainLanguageId = reader.GetInt32(leadBase + 3),
+            multilingual = reader.GetBoolean(leadBase + 4),
+            languageIds = reader.GetFieldValue<int[]>(leadBase + 5)
         };
     }
 
@@ -359,6 +429,8 @@ static class ProjectEndpoints
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }
+
+record ProjectLanguagesRequest(int MainLanguageId, bool Multilingual, int[]? LanguageIds);
 
 record ProjectRequest(string Name, string? Description, int? ClientId, int? ClientName2Id, bool Closed, DateOnly? StartDate, DateOnly? EndDate, int? LeadContactId);
 

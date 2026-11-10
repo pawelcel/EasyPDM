@@ -143,6 +143,23 @@ CREATE UNIQUE INDEX project_languages_one_default_idx ON project_languages (is_d
 
 INSERT INTO project_languages (name, code, is_default) VALUES ('English', 'EN', true), ('Polish', 'PL', false);
 
+-- Języki projektu: główny (każdy projekt, domyślnie język domyślny z chwili utworzenia) oraz
+-- czy projekt jest wielojęzyczny i w jakich językach (lista zawiera też główny; jednojęzyczny
+-- ma ją pustą). Użytego języka nie da się usunąć (RESTRICT). Kolumny dokładane tutaj, bo
+-- project_languages musi już istnieć.
+CREATE FUNCTION default_project_language_id() RETURNS INTEGER
+LANGUAGE sql STABLE AS $$ SELECT id FROM project_languages WHERE is_default $$;
+
+ALTER TABLE projects ADD COLUMN main_language_id INTEGER NOT NULL
+    DEFAULT default_project_language_id() REFERENCES project_languages(id) ON DELETE RESTRICT;
+ALTER TABLE projects ADD COLUMN multilingual BOOLEAN NOT NULL DEFAULT false;
+
+CREATE TABLE project_language_links (
+    project_id   UUID    NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    language_id  INTEGER NOT NULL REFERENCES project_languages(id) ON DELETE RESTRICT,
+    PRIMARY KEY (project_id, language_id)
+);
+
 -- ============================================================
 -- Producenci (katalog z osobami kontaktowymi, zarządzany z panelu bocznego)
 -- ============================================================

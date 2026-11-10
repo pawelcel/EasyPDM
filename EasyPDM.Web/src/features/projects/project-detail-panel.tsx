@@ -23,6 +23,7 @@ import { useClients } from "@/features/clients/use-clients"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { ClientVerificationOverview } from "@/features/projects/client-verification-overview"
 import { ProjectAttachmentsPanel } from "@/features/projects/project-attachments-panel"
+import { ProjectLanguagesField } from "@/features/projects/project-languages-field"
 import { useLanguage } from "@/i18n/use-language"
 
 type ProjectForm = {
@@ -422,6 +423,8 @@ function ProjectDetailPanel({
         </div>
 
         <FormError>{error}</FormError>
+
+        <ProjectLanguagesField project={project} isAdmin={isAdmin} onUpdated={onUpdated} />
       </div>
 
       {/* Dokumenty całego zlecenia (oferta / potwierdzenie / pozostałe) -- poza blokiem

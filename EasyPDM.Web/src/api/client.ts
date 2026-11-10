@@ -141,6 +141,17 @@ export const api = {
       body: JSON.stringify({ closed }),
     }).then((r) => handleResponse<{ id: string; closed: boolean }>(r)),
 
+  // Języki projektu — osobno od pełnego formularza, z tego samego powodu co "zamknięty".
+  setProjectLanguages: (
+    id: string,
+    body: { mainLanguageId: number; multilingual: boolean; languageIds: number[] }
+  ) =>
+    fetch(`${BASE}/projects/${id}/languages`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => handleResponse<void>(r)),
+
   deleteProject: (id: string) =>
     fetch(`${BASE}/projects/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 

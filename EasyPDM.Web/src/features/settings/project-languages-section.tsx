@@ -104,7 +104,13 @@ function ProjectLanguagesSection({ isAdmin }: { isAdmin: boolean }) {
       setConfirming(null)
       await refetch()
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : t("projectLanguage.deleteFailed"))
+      setDeleteError(
+        err instanceof ApiError && err.status === 409
+          ? t("projectLanguage.inUse")
+          : err instanceof Error
+            ? err.message
+            : t("projectLanguage.deleteFailed")
+      )
     } finally {
       setDeletePending(false)
     }
