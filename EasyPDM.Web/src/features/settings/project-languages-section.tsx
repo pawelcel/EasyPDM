@@ -30,9 +30,10 @@ function toCode(raw: string) {
     .slice(0, 3)
 }
 
-// Ustawienia -> Język -> Języki projektu. Lista języków dokumentacji firmy (nie interfejsu):
-// pełna nazwa i skrót z 1-3 wielkich liter. Zmienia ją administrator, pozostali tylko widzą.
-function ProjectLanguagesView({ isAdmin }: { isAdmin: boolean }) {
+// Część strony Ustawienia -> Język, pod wyborem języka interfejsu: domyślny język
+// dokumentacji i lista języków dokumentacji firmy (nie interfejsu) — pełna nazwa i skrót z 1-3
+// wielkich liter. Zmienia ją administrator, pozostali tylko widzą.
+function ProjectLanguagesSection({ isAdmin }: { isAdmin: boolean }) {
   const { t } = useLanguage()
   const [languages, setLanguages] = useState<ProjectLanguage[] | null>(null)
   const [loadError, setLoadError] = useState(false)
@@ -110,11 +111,9 @@ function ProjectLanguagesView({ isAdmin }: { isAdmin: boolean }) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h2 className="mb-4 text-lg font-semibold tracking-tight">{t("settings.projectLanguages")}</h2>
-
+    <>
       {languages && languages.length > 0 && (
-        <div className="mb-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+        <div className="mt-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
           <SectionLabel>{t("projectLanguage.defaultLabel")}</SectionLabel>
           <Hint>{t("projectLanguage.defaultHint")}</Hint>
           <div className="mt-2">
@@ -153,7 +152,7 @@ function ProjectLanguagesView({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
 
-      <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+      <div className="mt-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         <SectionLabel>{t("projectLanguage.listLabel")}</SectionLabel>
         <Hint>
           {t("projectLanguage.hint")}
@@ -245,7 +244,7 @@ function ProjectLanguagesView({ isAdmin }: { isAdmin: boolean }) {
           error={deleteError}
         />
       )}
-    </div>
+    </>
   )
 }
 
@@ -300,7 +299,6 @@ function AddLanguageRow({ onAdd }: { onAdd: (name: string, code: string) => Prom
           {t("common.add")}
         </Button>
       </div>
-      <Hint>{t("projectLanguage.codeHint")}</Hint>
       {error && <FormError>{error}</FormError>}
     </form>
   )
@@ -370,4 +368,4 @@ function EditLanguageRow({
   )
 }
 
-export { ProjectLanguagesView }
+export { ProjectLanguagesSection }

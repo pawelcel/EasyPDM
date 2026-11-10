@@ -8,8 +8,6 @@ interface SettingsOption {
   id: string
   labelKey: TranslationKey
   adminOnly?: boolean
-  // Podpozycja poprzedniej sekcji — wcięta w liście, jak podmenu.
-  child?: boolean
 }
 
 const SETTINGS_OPTIONS: SettingsOption[] = [
@@ -21,7 +19,6 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
   { id: "notifications", labelKey: "settings.notifications" },
   { id: "appearance", labelKey: "settings.appearance" },
   { id: "language", labelKey: "settings.language" },
-  { id: "projectLanguages", labelKey: "settings.projectLanguages", child: true },
   { id: "author", labelKey: "settings.author" },
 ]
 
@@ -43,9 +40,9 @@ function SettingsSidebar({
   // tłumaczenia) wstawiamy tuż PRZED nim, zamiast zawsze na końcu.
   const authorIndex = options.findIndex((opt) => opt.id === "author")
   const entries = [
-    ...options.slice(0, authorIndex).map((opt) => ({ id: opt.id, label: t(opt.labelKey), child: opt.child })),
-    { id: "myProjects", label: myLabel, child: false },
-    ...options.slice(authorIndex).map((opt) => ({ id: opt.id, label: t(opt.labelKey), child: opt.child })),
+    ...options.slice(0, authorIndex).map((opt) => ({ id: opt.id, label: t(opt.labelKey) })),
+    { id: "myProjects", label: myLabel },
+    ...options.slice(authorIndex).map((opt) => ({ id: opt.id, label: t(opt.labelKey) })),
   ]
 
   return (
@@ -60,7 +57,6 @@ function SettingsSidebar({
           onClick={() => onSelect(entry.id)}
           className={cn(
             "truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground",
-            entry.child && "-mt-0.5 py-1 pl-5 text-[13px]",
             activeId === entry.id && "bg-accent text-foreground"
           )}
         >

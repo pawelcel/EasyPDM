@@ -30,7 +30,6 @@ import { MyProjectsView } from "@/features/settings/my-projects-view"
 import { SettingsSidebar } from "@/features/settings/settings-sidebar"
 import { NamingSettingsView } from "@/features/settings/naming-settings-view"
 import { NotificationSettingsView } from "@/features/settings/notification-settings-view"
-import { ProjectLanguagesView } from "@/features/settings/project-languages-view"
 import { NotificationBell } from "@/features/notifications/notification-bell"
 import { StorageSettingsView } from "@/features/settings/storage-settings-view"
 import { SupportSettingsView } from "@/features/settings/support-settings-view"
@@ -362,11 +361,7 @@ function App() {
 
           {view === "settings" && settingsSection === "appearance" && <AppearanceSettingsView />}
 
-          {view === "settings" && settingsSection === "language" && <LanguageSettingsView />}
-
-          {view === "settings" && settingsSection === "projectLanguages" && (
-            <ProjectLanguagesView isAdmin={isAdmin} />
-          )}
+          {view === "settings" && settingsSection === "language" && <LanguageSettingsView isAdmin={isAdmin} />}
 
           {view === "settings" && settingsSection === "author" && <AuthorSettingsView />}
 
