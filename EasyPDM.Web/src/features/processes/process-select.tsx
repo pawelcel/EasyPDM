@@ -1,16 +1,14 @@
-import { useRef } from "react"
+import { X } from "lucide-react"
 
 import type { ProcessRef } from "@/api/types"
+import { Button } from "@/components/ui/button"
 import {
   Combobox,
-  ComboboxChip,
-  ComboboxChips,
-  ComboboxChipsInput,
   ComboboxContent,
   ComboboxEmpty,
+  ComboboxInput,
   ComboboxItem,
   ComboboxList,
-  ComboboxValue,
 } from "@/components/ui/combobox"
 import { Hint } from "@/components/ui/hint"
 import { useProcesses } from "@/features/processes/use-processes"
@@ -22,10 +20,11 @@ interface Entry {
   outside: boolean
 }
 
-// Wybór obróbek z katalogu (menu "Obróbka") — kilka albo żadna. Pole jest dynamiczne: wpisany
-// tekst zawęża listę (po nazwie i opisie), wybrane obróbki stoją w polu jako etykiety z
-// krzyżykiem. Opis stoi przy obróbce na liście i pod polem przy każdej wybranej, bo ta sama
-// nazwa ("Hartowanie") bywa w katalogu kilka razy z różnym opisem.
+// Wybór obróbek z katalogu (menu "Obróbka") — kilka albo żadna. Pole zawsze mówi "Kliknij, aby
+// wybrać": kliknięcie otwiera listę, wpisany tekst ją zawęża (po nazwie i opisie), a kliknięcie
+// pozycji ją zaznacza albo odznacza. Wybrane obróbki NIE stoją w samym polu, tylko pod nim, z
+// opisem i krzyżykiem do usunięcia — tak, jak chciał użytkownik; ta sama nazwa ("Hartowanie")
+// bywa w katalogu kilka razy i dopiero opis mówi, o który wariant chodzi.
 //
 // Pozycje rozróżnia identyfikator, nie nazwa. Obróbka już wybrana zachowuje swoją kopię nazwy
 // i opisu; nowo wybrana bierze je z katalogu. Wybrane, których w katalogu nie ma (usunięte),
@@ -44,7 +43,6 @@ function ProcessSelect({
 }) {
   const { t } = useLanguage()
   const { processes } = useProcesses()
-  const anchor = useRef<HTMLDivElement>(null)
 
   const available = processes.filter((p) => (target === "part" ? p.forParts : p.forAssemblies))
   const inCatalog = (ref: ProcessRef) => ref.id !== null && available.some((p) => p.id === ref.id)
@@ -57,9 +55,6 @@ function ProcessSelect({
     ...value.flatMap((ref, i) => (inCatalog(ref) ? [] : [{ key: `s${i}`, ref, outside: true }])),
   ]
   const byKey = new Map(entries.map((e) => [e.key, e]))
-  const sameName = (name: string) => entries.filter((e) => e.ref.name === name).length > 1
-  const chipLabel = (ref: ProcessRef) =>
-    ref.description && sameName(ref.name) ? `${ref.name} · ${ref.description}` : ref.name
 
   if (entries.length === 0) return <Hint>{t("part.processesEmptyCatalog")}</Hint>
 
@@ -67,6 +62,7 @@ function ProcessSelect({
     <div className="flex flex-col gap-1">
       <Combobox
         multiple
+        openOnInputClick
         items={entries.map((e) => e.key)}
         value={selectedKeys}
         disabled={disabled}
@@ -81,26 +77,8 @@ function ProcessSelect({
           onChange((keys as string[]).flatMap((key) => (byKey.has(key) ? [byKey.get(key)!.ref] : [])))
         }}
       >
-        <ComboboxChips ref={anchor} className="w-full md:text-sm">
-          <ComboboxValue>
-            {(keys: string[]) => (
-              <>
-                {keys.map((key) => {
-                  const ref = byKey.get(key)?.ref
-                  // Czcionka jak w zwykłych polach (masa, cena) — domyślna, drobna etykieta była
-                  // tak mała, że na pierwszy rzut oka nie było widać, że coś jest wybrane.
-                  return ref ? (
-                    <ComboboxChip key={key} className="h-6 text-sm font-normal">
-                      {chipLabel(ref)}
-                    </ComboboxChip>
-                  ) : null
-                })}
-                <ComboboxChipsInput placeholder={keys.length === 0 ? t("part.processesSearch") : undefined} />
-              </>
-            )}
-          </ComboboxValue>
-        </ComboboxChips>
-        <ComboboxContent anchor={anchor}>
+        <ComboboxInput className="w-full" placeholder={t("part.processesPick")} disabled={disabled} />
+        <ComboboxContent>
           <ComboboxEmpty>{t("part.processesNoMatch")}</ComboboxEmpty>
           <ComboboxList>
             {(key: string) => {
@@ -126,13 +104,24 @@ function ProcessSelect({
         </ComboboxContent>
       </Combobox>
       {value.length > 0 && (
-        <ul className="flex flex-col gap-0.5 text-[12.5px]">
+        <ul className="flex flex-col gap-0.5 text-sm">
           {value.map((ref, i) => (
-            <li key={selectedKeys[i]}>
-              <span className="font-medium">{ref.name}</span>
-              {ref.description && (
-                <span className="whitespace-pre-line text-muted-foreground"> — {ref.description}</span>
-              )}
+            <li key={selectedKeys[i]} className="flex items-start justify-between gap-2">
+              <span>
+                <span className="font-medium">{ref.name}</span>
+                {ref.description && (
+                  <span className="whitespace-pre-line text-muted-foreground"> — {ref.description}</span>
+                )}
+              </span>
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                disabled={disabled}
+                aria-label={t("common.deleteNamed", { name: ref.name })}
+                onClick={() => onChange(value.filter((_, j) => j !== i))}
+              >
+                <X className="size-3.5 text-muted-foreground" />
+              </Button>
             </li>
           ))}
         </ul>

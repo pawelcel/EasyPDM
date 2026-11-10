@@ -374,11 +374,13 @@ The **Processes** menu holds the company's processes — laser cutting, bending,
 hardening — each with a description and a choice of whether it applies to parts, assemblies
 or both. The same name can appear several times with different descriptions: "Hardening, up
 to 50 HRC" and "Hardening, induction" are one process with two specifications. A
-manufactured Part or Assembly picks any number of them, or none — typing narrows the list,
-by name or description — and each one shows its description. An item keeps the name and
+manufactured Part or Assembly picks any number of them, or none: click the field to choose
+from the list, or type to narrow it by name or description. The picked processes are listed
+under the field with their descriptions, each with an × to remove it. An item keeps the name and
 description it picked, so a released part keeps the specification it was released with
 even if the catalog changes later. The chosen processes also appear as a column in the bill
-of materials and in both CSV exports.
+of materials and in both CSV exports. The catalog itself can be filtered by text and by
+whether a process applies to parts or assemblies.
 
 A **Client** has a name (plus an optional location), a list of second names/trade variants
 (add as many as you need — typing an existing client's name into "Add client" switches to

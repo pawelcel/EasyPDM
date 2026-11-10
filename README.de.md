@@ -406,12 +406,15 @@ Das Menü **Bearbeitung** enthält die Bearbeitungsarten der Firma — Laserschn
 Schweißen, Härten —, jede mit einer Beschreibung und der Wahl, ob sie für Teile, Baugruppen
 oder beide gilt. Derselbe Name darf mehrfach mit unterschiedlicher Beschreibung vorkommen:
 „Härten“ bis 50 HRC und „Härten“ induktiv sind ein Verfahren mit zwei Spezifikationen. Ein
-gefertigtes Teil oder eine gefertigte Baugruppe wählt daraus beliebig viele oder keine —
-Tippen grenzt die Liste nach Name und Beschreibung ein —, jeweils mit ihrer Beschreibung. Ein
+gefertigtes Teil oder eine gefertigte Baugruppe wählt daraus beliebig viele oder keine: Ein
+Klick ins Feld öffnet die Liste, Tippen grenzt sie nach Name und Beschreibung ein. Die
+gewählten Bearbeitungen stehen mit Beschreibung unter dem Feld, jede mit einem × zum
+Entfernen. Ein
 Element behält Name und Beschreibung aus dem Moment der Auswahl, ein freigegebenes Teil also
 die Spezifikation, mit der es freigegeben wurde, auch wenn sich der Katalog später ändert.
 Die gewählten Bearbeitungen erscheinen auch als Spalte in der Stückliste und in beiden
-CSV-Exporten.
+CSV-Exporten. Der Katalog selbst lässt sich per Text filtern und danach, ob eine
+Bearbeitung für Teile oder Baugruppen gilt.
 
 Ein **Kunde** hat einen Namen (optional einen Standort), eine Liste zweiter Namen/
 Handelsvarianten (beliebig viele — die Eingabe des Namens eines bereits vorhandenen Kunden

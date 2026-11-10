@@ -375,10 +375,11 @@ Menu **Obróbka** to firmowy katalog obróbek — cięcie laserem, gięcie, spaw
 każda z opisem i wyborem, czy dotyczy części, złożeń, czy obu. Ta sama nazwa może wystąpić
 kilka razy z różnym opisem: „Hartowanie” do 50 HRC i „Hartowanie” indukcyjne to jeden proces
 z dwiema specyfikacjami. Część albo Złożenie wykonywane wybiera z tej listy dowolną liczbę
-obróbek albo żadną — wpisywanie zawęża listę po nazwie i opisie — a przy każdej widać jej
-opis. Element zapamiętuje nazwę i opis z chwili wyboru, więc wydana część zachowuje
+obróbek albo żadną: kliknięcie pola otwiera listę, a wpisywanie zawęża ją po nazwie i opisie.
+Wybrane obróbki są wypisane pod polem razem z opisem, każda z × do usunięcia. Element zapamiętuje nazwę i opis z chwili wyboru, więc wydana część zachowuje
 specyfikację, z którą ją wydano, nawet gdy katalog później się zmieni. Wybrane obróbki widać
-też jako kolumnę w zestawieniu części (BOM) i w obu eksportach CSV.
+też jako kolumnę w zestawieniu części (BOM) i w obu eksportach CSV. Sam katalog można
+filtrować tekstem i tym, czy obróbka dotyczy części, czy złożeń.
 
 **Klient** ma nazwę (opcjonalnie lokalizację), listę drugich nazw/wariantów handlowych
 (dowolną liczbę — wpisanie w oknie "Dodaj klienta" nazwy już istniejącego klienta dodaje mu

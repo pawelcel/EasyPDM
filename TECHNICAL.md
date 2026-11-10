@@ -434,8 +434,11 @@ specification it was released with when the catalog entry is edited or deleted. 
 already chosen keeps its copy; a newly chosen one takes the catalog's current text. Entries
 whose id is no longer in the catalog stay listed so they can be unticked, and a plain string
 (the format before variants) still reads as a name. Switching the kind away from
-manufactured clears the list with the other fields of that kind. The picker is a chips
-combobox that filters by name and description; the add dialog's name field suggests
+manufactured clears the list with the other fields of that kind. The picker is a multiple
+combobox that opens on click and filters by name and description; the picks are not shown
+as chips inside the field but listed below it at body size, each with an × (Escape, which
+in Base UI's multiple mode clears the selection, is ignored). The catalog view filters by
+text and by applies-to. The add dialog's name field suggests
 existing processes and notes when a name is already used, without stopping a new variant.
 The BOM shows the processes as a column after Material, and both CSV exports carry them as
 the last column, `Name (description)` comma-separated, so existing columns keep their

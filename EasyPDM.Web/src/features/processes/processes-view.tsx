@@ -16,7 +16,15 @@ import {
 } from "@/components/ui/dialog"
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { SuggestInput } from "@/components/ui/suggest-input"
 import { Textarea } from "@/components/ui/textarea"
 import { useProcesses } from "@/features/processes/use-processes"
@@ -31,6 +39,18 @@ function ProcessesView() {
   const [deletingPending, setDeletingPending] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const confirmingDelete = processes.find((p) => p.id === confirmingDeleteId) ?? null
+
+  // Filtr listy: tekst po nazwie i opisie oraz to, czego obróbka dotyczy — przy kilku
+  // wariantach tej samej nazwy ("Hartowanie") lista szybko robi się długa.
+  const [query, setQuery] = useState("")
+  const [appliesTo, setAppliesTo] = useState<"all" | "parts" | "assemblies">("all")
+  const visible = processes.filter((p) => {
+    const q = query.trim().toLocaleLowerCase()
+    const matchesText =
+      !q || p.name.toLocaleLowerCase().includes(q) || (p.description ?? "").toLocaleLowerCase().includes(q)
+    const matchesTarget = appliesTo === "all" || (appliesTo === "parts" ? p.forParts : p.forAssemblies)
+    return matchesText && matchesTarget
+  })
 
   async function confirmDelete() {
     if (confirmingDeleteId === null) return
@@ -52,7 +72,7 @@ function ProcessesView() {
       <h2 className="mb-4 text-lg font-semibold tracking-tight">{t("nav.processes")}</h2>
 
       <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-        <div className="mb-3">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <ProcessDialog
             trigger={<Button>{t("process.addButton")}</Button>}
             title={t("process.addTitle")}
@@ -62,11 +82,31 @@ function ProcessesView() {
               await refetch()
             }}
           />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("process.searchPlaceholder")}
+            className="min-w-48 flex-1"
+          />
+          <Select value={appliesTo} onValueChange={(v) => setAppliesTo(v as typeof appliesTo)}>
+            <SelectTrigger className="min-w-36">
+              <SelectValue>
+                {(v: string) =>
+                  v === "parts" ? t("process.forParts") : v === "assemblies" ? t("process.forAssemblies") : t("process.filterAll")
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("process.filterAll")}</SelectItem>
+              <SelectItem value="parts">{t("process.forParts")}</SelectItem>
+              <SelectItem value="assemblies">{t("process.forAssemblies")}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        {processes.length > 0 ? (
+        {visible.length > 0 ? (
           <ul className="flex flex-col gap-0.5">
-            {processes.map((p) => (
+            {visible.map((p) => (
               <li
                 key={p.id}
                 className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
@@ -109,7 +149,7 @@ function ProcessesView() {
             ))}
           </ul>
         ) : (
-          <Hint>{t("process.emptyAll")}</Hint>
+          <Hint>{processes.length === 0 ? t("process.emptyAll") : t("process.emptyFiltered")}</Hint>
         )}
       </div>
 
