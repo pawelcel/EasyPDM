@@ -39,6 +39,7 @@ import {
   PropField,
 } from "@/features/items/property-fields"
 import { ASSEMBLY_KIND_FIELDS, PART_KIND_FIELDS } from "@/features/items/part-property-form"
+import { ProcessSelect } from "@/features/processes/process-select"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -252,7 +253,11 @@ function AddNodeDialog({
   // rodzaju czyszczone z lokalnego stanu, inaczej zostałyby zebrane przy submit mimo że
   // ich pola już się nie pokazują (extraProps przeżywa przełączenie rodzaju, bo to jeden
   // wspólny Record dla wszystkich rodzajów na raz — zob. PART_KIND_FIELDS/ASSEMBLY_KIND_FIELDS).
+  // Obróbki — lista, więc trzymana osobno od tekstowych extraProps. Mają je tylko elementy
+  // wykonywane; zmiana rodzaju na inny czyści wybór, tak jak w panelu elementu.
+  const [processes, setProcesses] = useState<string[]>([])
   function changeRodzaj(next: string) {
+    if (next !== "Wykonywana" && next !== "Wykonywane") setProcesses([])
     const staleFields = (mode === "assembly" ? ASSEMBLY_KIND_FIELDS : PART_KIND_FIELDS)[rodzaj] ?? []
     if (staleFields.length > 0) {
       setExtraProps((prev) => {
@@ -326,6 +331,7 @@ function AddNodeDialog({
     setExportStep(true)
     setFile(null)
     setPropsText("")
+    setProcesses([])
     setChildId("")
     setQuantity("1")
     setError("")
@@ -379,10 +385,12 @@ function AddNodeDialog({
       for (const [key, value] of Object.entries(extraProps)) {
         if (value.trim()) properties[key] = value.trim()
       }
+      if (rodzaj === "Wykonywana" && processes.length > 0) properties.processes = processes
     }
     if (itemType === "assembly") {
       properties.rodzaj = rodzaj
       if (mass.trim()) properties.mass = mass.trim()
+      if (rodzaj === "Wykonywane" && processes.length > 0) properties.processes = processes
       if (rodzaj === "Zakupowe") {
         for (const key of ["manufacturer", "productType", "productSubtype"]) {
           if (extraProps[key]?.trim()) properties[key] = extraProps[key].trim()
@@ -688,6 +696,12 @@ function AddNodeDialog({
                 locked={materialLocked}
               />
             )}
+            {rodzaj === "Wykonywana" && (
+              <>
+                <Label>{t("part.processes")}</Label>
+                <ProcessSelect target="part" value={processes} onChange={setProcesses} />
+              </>
+            )}
             {rodzaj === "Zakupowa" && (
               <>
                 <ManufacturerField value={extraProps.manufacturer ?? ""} onSave={setExtraField} disabled={false} />
@@ -818,6 +832,12 @@ function AddNodeDialog({
             <Label htmlFor="node-name">{t("common.name")}</Label>
             <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} />
 
+            {mode === "assembly" && rodzaj === "Wykonywane" && (
+              <>
+                <Label>{t("part.processes")}</Label>
+                <ProcessSelect target="assembly" value={processes} onChange={setProcesses} />
+              </>
+            )}
             {mode === "assembly" && rodzaj === "Zakupowe" && (
               <>
                 <ManufacturerField

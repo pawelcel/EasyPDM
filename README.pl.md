@@ -373,9 +373,11 @@ uzupełnianiu właściwości Części/Złożenia, zamiast wpisywać ręcznie.
 
 Menu **Obróbka** to firmowy katalog obróbek — cięcie laserem, gięcie, spawanie, malowanie
 proszkowe — każda z opisem i wyborem, czy dotyczy części, złożeń, czy obu. Część albo
-Złożenie wykonywane wybiera z tej listy dowolną liczbę obróbek albo żadną. Wpisanie w „Dodaj
-obróbkę” nazwy, która już istnieje, przełącza okno na jej edycję, więc w katalogu nie
-pojawi się dwa razy „Spawanie”.
+Złożenie wykonywane wybiera z tej listy dowolną liczbę obróbek albo żadną (wpisywanie zawęża
+listę), a przy każdej widać jej opis. Pole nazwy podpowiada w trakcie pisania obróbki, które już są w katalogu, i
+ostrzega, gdy nazwa jest zajęta — drugie malowanie dostaje więc własną nazwę, np. „Malowanie
+mokre” obok „Malowanie proszkowe”. Wybrane obróbki widać też jako kolumnę w zestawieniu
+części (BOM) i w obu eksportach CSV.
 
 **Klient** ma nazwę (opcjonalnie lokalizację), listę drugich nazw/wariantów handlowych
 (dowolną liczbę — wpisanie w oknie "Dodaj klienta" nazwy już istniejącego klienta dodaje mu

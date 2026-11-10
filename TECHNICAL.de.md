@@ -308,7 +308,7 @@ gelb (von jemand anderem), offen (freigegeben).
 
 Die Stückliste einer Baugruppe zeigt: Position (editierbar durch Eingabe einer
 Ganzzahl — muss innerhalb dieser Stückliste eindeutig sein — oder durch Ziehen der
-Zeile), Name, Menge, Material, Norm, Hersteller, Bestellnummer 1/2 (fehlende Felder als
+Zeile), Name, Menge, Material, Bearbeitung, Norm, Hersteller, Bestellnummer 1/2 (fehlende Felder als
 „-"), zusammen mit verschachtelten Elementen (Teile verschachtelter Baugruppen, Position in
 der Form `2.1`). CSV-Export in zwei Varianten: vollständig (jedes Vorkommen einzeln
 aufgeführt) und zusammengefasst (dieselbe Komponente mehrfach an verschiedenen Stellen
@@ -425,7 +425,7 @@ Hochladens nicht kannte. Die Makros lesen das Material aus dem Dokument statt au
 Liste; ohne dies trüge das Element ein Material, das sich weder erneut auswählen noch als
 Filter nutzen ließe. Angelegt wird nur der Name; Gruppe und Untergruppe bleiben leer.
 
-**Bearbeitungen** (`processes`, Migration 061, Menü „Bearbeitung“) sind ein Katalog nach dem Vorbild der Materialien: Name, optionale Beschreibung sowie `for_parts`/`for_assemblies`, von denen mindestens eines wahr ist. Der Name ist unabhängig von Groß-/Kleinschreibung eindeutig (Index auf `lower(name)`), damit die Auswahlliste nicht in „Schweißen“ und „schweißen“ zerfällt. Ein gefertigtes Teil („Wykonywana“) oder eine gefertigte Baugruppe („Wykonywane“) speichert die Auswahl als Namensliste in `properties.processes`, per Name verknüpft wie das Material: Umbenennen oder Löschen einer Bearbeitung schreibt kein Element um, auch kein freigegebenes, und Namen, die nicht mehr im Katalog stehen, bleiben am Element sichtbar, damit man sie abwählen kann. Ein Wechsel weg von „gefertigt“ leert die Liste mit den übrigen Feldern dieser Art. Das Namensfeld im Hinzufügen-Dialog erkennt beim Tippen eine vorhandene Bearbeitung und wechselt zu deren Bearbeitung, statt ein Duplikat anzubieten, das der Server ohnehin ablehnen würde.
+**Bearbeitungen** (`processes`, Migration 061, Menü „Bearbeitung“) sind ein Katalog nach dem Vorbild der Materialien: Name, optionale Beschreibung sowie `for_parts`/`for_assemblies`, von denen mindestens eines wahr ist. Der Name ist unabhängig von Groß-/Kleinschreibung eindeutig (Index auf `lower(name)`), damit die Auswahlliste nicht in „Schweißen“ und „schweißen“ zerfällt. Ein gefertigtes Teil („Wykonywana“) oder eine gefertigte Baugruppe („Wykonywane“) speichert die Auswahl als Namensliste in `properties.processes`, per Name verknüpft wie das Material: Umbenennen oder Löschen einer Bearbeitung schreibt kein Element um, auch kein freigegebenes, und Namen, die nicht mehr im Katalog stehen, bleiben am Element sichtbar, damit man sie abwählen kann. Ein Wechsel weg von „gefertigt“ leert die Liste mit den übrigen Feldern dieser Art. Das Namensfeld im Hinzufügen-Dialog schlägt beim Tippen vorhandene Bearbeitungen vor und warnt vor einem vergebenen Namen, speichert aber immer die darin eingegebene Bearbeitung: Eine frühere Version wechselte zur passenden Bearbeitung, wodurch sich „Nasslackieren“ neben „Lackieren“ nicht anlegen ließ. Die Stückliste zeigt die Bearbeitungen als Spalte nach dem Material, und beide CSV-Exporte führen sie als letzte Spalte, kommagetrennt, damit die vorhandenen Spalten ihre Position behalten. Das Leeren der Datenbank in den Einstellungen führt den Katalog als eigene Kategorie.
 
 ### Mehrere Elemente im Baum auswählen
 

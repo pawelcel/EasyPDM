@@ -405,9 +405,12 @@ aus einer Liste ausgewählt, statt von Hand eingetippt zu werden.
 Das Menü **Bearbeitung** enthält die Bearbeitungsarten der Firma — Laserschneiden, Biegen,
 Schweißen, Pulverbeschichten —, jede mit einer Beschreibung und der Wahl, ob sie für Teile,
 Baugruppen oder beide gilt. Ein gefertigtes Teil oder eine gefertigte Baugruppe wählt
-daraus beliebig viele oder keine. Wer in „Bearbeitung hinzufügen“ den Namen einer schon
-vorhandenen eingibt, landet in deren Bearbeitung, sodass „Schweißen“ nicht zweimal im
-Katalog steht.
+daraus beliebig viele oder keine — Tippen grenzt die Liste ein —, jeweils mit ihrer
+Beschreibung. Das Namensfeld schlägt beim
+Tippen vorhandene Bearbeitungen vor und warnt, wenn ein Name vergeben ist — eine zweite
+Lackierung bekommt also einen eigenen Namen, z. B. „Nasslackieren“ neben
+„Pulverbeschichten“. Die gewählten Bearbeitungen erscheinen auch als Spalte in der Stückliste
+und in beiden CSV-Exporten.
 
 Ein **Kunde** hat einen Namen (optional einen Standort), eine Liste zweiter Namen/
 Handelsvarianten (beliebig viele — die Eingabe des Namens eines bereits vorhandenen Kunden

@@ -22,7 +22,7 @@ import {
   ProductTypeAndSubtypeFields,
   PropField,
 } from "@/features/items/property-fields"
-import { useProcesses } from "@/features/processes/use-processes"
+import { ProcessSelect } from "@/features/processes/process-select"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -429,10 +429,7 @@ function PriceRow({
 }
 
 
-// Obróbki elementu wykonywanego, wybierane z katalogu (menu "Obróbka") — kilka albo żadna.
-// Lista pokazuje tylko obróbki dla danego typu elementu, a obok nich te już zapisane w
-// elemencie, których w katalogu nie ma (usunięte albo przemianowane): zostają widoczne i da
-// się je odznaczyć, zamiast znikać po cichu.
+// Obróbki elementu wykonywanego (properties.processes, lista nazw) — zob. ProcessSelect.
 function ProcessesField({
   item,
   target,
@@ -445,47 +442,13 @@ function ProcessesField({
   onSave: (next: string[]) => void | Promise<void>
 }) {
   const { t } = useLanguage()
-  const { processes } = useProcesses()
   const stored = item.properties.processes
   const selected = Array.isArray(stored) ? stored.filter((x): x is string => typeof x === "string") : []
-  const catalog = processes
-    .filter((p) => (target === "part" ? p.forParts : p.forAssemblies))
-    .map((p) => p.name)
-  const outside = selected.filter((name) => !catalog.includes(name))
 
   return (
     <>
       <Label>{t("part.processes")}</Label>
-      {catalog.length === 0 && outside.length === 0 ? (
-        <Hint>{t("part.processesEmptyCatalog")}</Hint>
-      ) : (
-        <Select
-          multiple
-          value={selected}
-          disabled={disabled}
-          onValueChange={(v) => void onSave(v as string[])}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue>
-              {(v: string[]) => (
-                <span className="truncate">{v.length === 0 ? t("part.processesNone") : v.join(", ")}</span>
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {catalog.map((name) => (
-              <SelectItem key={name} value={name}>
-                {name}
-              </SelectItem>
-            ))}
-            {outside.map((name) => (
-              <SelectItem key={name} value={name}>
-                {name} <span className="text-muted-foreground">({t("part.processesOutside")})</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      <ProcessSelect target={target} value={selected} disabled={disabled} onChange={(next) => void onSave(next)} />
     </>
   )
 }

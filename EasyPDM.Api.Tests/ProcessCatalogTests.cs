@@ -72,3 +72,28 @@ public class ProcessCatalogTests
         Assert.Contains(found.EnumerateArray(), i => i.GetProperty("id").GetGuid() == itemId);
     }
 }
+
+// Czyszczenie bazy w Ustawieniach obejmuje katalog obróbek jako osobną kategorię — osobna
+// klasa, bo kasuje cały katalog, a baza jest wspólna dla testów jednej klasy.
+[Collection("EasyPDM database")]
+public class ProcessClearDatabaseTests
+{
+    [Fact]
+    public async Task Czyszczenie_bazy_usuwa_katalog_obrobek_tylko_na_zyczenie()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync("admin", "admin");
+        (await client.PostAsJsonAsync("/api/processes",
+            new { name = "Giecie", forParts = true, forAssemblies = false })).EnsureSuccessStatusCode();
+
+        // Starszy klient bez pola "processes" nie rusza katalogu.
+        (await client.PostAsJsonAsync("/api/settings/storage/clear-database",
+            new { projects = false, materials = true, manufacturers = false, clients = false })).EnsureSuccessStatusCode();
+        Assert.Equal(1, (await client.GetFromJsonAsync<JsonElement>("/api/processes")).GetArrayLength());
+
+        (await client.PostAsJsonAsync("/api/settings/storage/clear-database",
+            new { projects = false, materials = false, manufacturers = false, clients = false, processes = true })).EnsureSuccessStatusCode();
+        Assert.Equal(0, (await client.GetFromJsonAsync<JsonElement>("/api/processes")).GetArrayLength());
+    }
+}

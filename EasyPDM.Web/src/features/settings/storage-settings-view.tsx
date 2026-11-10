@@ -472,11 +472,12 @@ function DangerZoneSection() {
   // czyszcząc tylko Projekty/Elementy.
   const [scopeProjects, setScopeProjects] = useState(true)
   const [scopeMaterials, setScopeMaterials] = useState(true)
+  const [scopeProcesses, setScopeProcesses] = useState(true)
   const [scopeManufacturers, setScopeManufacturers] = useState(true)
   const [scopeClients, setScopeClients] = useState(true)
 
   const phrase = t("storage.clearDatabasePhrase")
-  const noneSelected = !scopeProjects && !scopeMaterials && !scopeManufacturers && !scopeClients
+  const noneSelected = !scopeProjects && !scopeMaterials && !scopeProcesses && !scopeManufacturers && !scopeClients
 
   function openConfirm() {
     setTypedPhrase("")
@@ -484,6 +485,7 @@ function DangerZoneSection() {
     setDone(false)
     setScopeProjects(true)
     setScopeMaterials(true)
+    setScopeProcesses(true)
     setScopeManufacturers(true)
     setScopeClients(true)
     setConfirmOpen(true)
@@ -496,6 +498,7 @@ function DangerZoneSection() {
       await api.clearDatabase({
         projects: scopeProjects,
         materials: scopeMaterials,
+        processes: scopeProcesses,
         manufacturers: scopeManufacturers,
         clients: scopeClients,
       })
@@ -574,6 +577,15 @@ function DangerZoneSection() {
                       className="size-3.5 shrink-0 accent-primary"
                     />
                     {t("storage.clearScopeMaterials")}
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={scopeProcesses}
+                      onChange={(e) => setScopeProcesses(e.target.checked)}
+                      className="size-3.5 shrink-0 accent-primary"
+                    />
+                    {t("storage.clearScopeProcesses")}
                   </label>
                   <label className="flex cursor-pointer items-center gap-2 text-sm">
                     <input

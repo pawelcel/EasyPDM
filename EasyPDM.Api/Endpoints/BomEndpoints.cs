@@ -58,7 +58,7 @@ static class BomEndpoints
             var rows = await FetchBomRowsAsync(conn, id);
 
             var csv = new StringBuilder();
-            csv.Append("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2\r\n");
+            csv.Append("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka\r\n");
             foreach (var row in rows)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
@@ -76,6 +76,7 @@ static class BomEndpoints
                     CsvField(PropertyOrEmpty(props, "manufacturer")),
                     CsvField(PropertyOrEmpty(props, "orderNumber")),
                     CsvField(PropertyOrEmpty(props, "orderNumber2")),
+                    CsvField(ProcessesOrEmpty(props)),
                 }));
                 csv.Append("\r\n");
             }
@@ -183,7 +184,7 @@ static class BomEndpoints
                 .OrderBy(a => a.ItemNumber ?? int.MaxValue);
 
             var csv = new StringBuilder();
-            csv.Append("Nazwa;Ilość łącznie;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2\r\n");
+            csv.Append("Nazwa;Ilość łącznie;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka\r\n");
             foreach (var row in aggregated)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
@@ -200,6 +201,7 @@ static class BomEndpoints
                     CsvField(PropertyOrEmpty(props, "manufacturer")),
                     CsvField(PropertyOrEmpty(props, "orderNumber")),
                     CsvField(PropertyOrEmpty(props, "orderNumber2")),
+                    CsvField(ProcessesOrEmpty(props)),
                 }));
                 csv.Append("\r\n");
             }
@@ -237,6 +239,16 @@ static class BomEndpoints
         var withName = reader.IsDBNull(4) ? (bool?)null : reader.GetBoolean(4);
         return ItemNumbering.RecordName(number, prefix, digits, withName, fileName);
     }
+
+    // Obróbki elementu wykonywanego (properties.processes, lista nazw) w jednej komórce,
+    // po przecinku. Kolumna stoi na końcu, żeby nie przesuwać kolumn, na których ktoś mógł
+    // już oprzeć swój arkusz.
+    private static string ProcessesOrEmpty(JsonElement properties) =>
+        properties.TryGetProperty("processes", out var value) && value.ValueKind == JsonValueKind.Array
+            ? string.Join(", ", value.EnumerateArray()
+                .Where(x => x.ValueKind == JsonValueKind.String)
+                .Select(x => x.GetString()))
+            : "";
 
     private static string PropertyOrEmpty(JsonElement properties, string key) =>
         properties.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String

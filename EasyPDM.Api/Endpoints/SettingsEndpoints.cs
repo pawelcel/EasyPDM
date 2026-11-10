@@ -99,7 +99,8 @@ static class SettingsEndpoints
         });
 
         // POST /api/settings/storage/clear-database — kasuje wybrane kategorie danych
-        // (projekty/elementy, katalog Materiałów, katalog Producentów, katalog Klientów),
+        // (projekty/elementy, katalog Materiałów, katalog Obróbek, katalog Producentów,
+        // katalog Klientów),
         // niezależnie od siebie — do wyboru w body. Zawsze zostają nietknięte: konta
         // użytkowników i ustawienia serwera (backup, prefiksy numeracji).
         app.MapPost("/api/settings/storage/clear-database", async (HttpContext ctx, ClearDatabaseRequest body) =>
@@ -107,7 +108,7 @@ static class SettingsEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
-            if (!body.Projects && !body.Materials && !body.Manufacturers && !body.Clients)
+            if (!body.Projects && !body.Materials && !body.Processes && !body.Manufacturers && !body.Clients)
                 return Results.BadRequest("Wybierz przynajmniej jedną kategorię do wyczyszczenia.");
 
             await using var conn = new NpgsqlConnection(connectionString);
@@ -157,6 +158,14 @@ static class SettingsEndpoints
                 // Prosty, samodzielny katalog bez własnych plików na dysku (Części
                 // trzymają tylko nazwę materiału jako wolny tekst we properties, bez FK).
                 await using var cmd = new NpgsqlCommand("DELETE FROM materials;", conn);
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            if (body.Processes)
+            {
+                // Jak materiały: samodzielny katalog bez plików na dysku; elementy trzymają
+                // tylko nazwy obróbek w properties.processes, bez FK, więc zostają nietknięte.
+                await using var cmd = new NpgsqlCommand("DELETE FROM processes;", conn);
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -821,7 +830,9 @@ class BackupFailedException(string message) : Exception(message);
 
 record MoveStorageRequest(string NewPath, bool MigrateExisting);
 
-record ClearDatabaseRequest(bool Projects, bool Materials, bool Manufacturers, bool Clients);
+// Processes jest ostatnie i ma wartość domyślną: starszy klient, który pola nie wysyła,
+// nie czyści katalogu obróbek.
+record ClearDatabaseRequest(bool Projects, bool Materials, bool Manufacturers, bool Clients, bool Processes = false);
 
 record BackupSchedule(
     bool Enabled, string Frequency, int? DayOfWeek, int? DayOfMonth, int Hour, int Minute, DateTime? LastRunAt,

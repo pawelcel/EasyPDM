@@ -292,7 +292,7 @@ and has no owner — it cannot be locked. In the tree this is shown by a lock ic
 (locked by you), yellow (by someone else), open (released).
 
 An Assembly's BOM shows: position (editable by typing an integer — must be unique within
-that BOM — or by dragging the row), Name, Quantity, Material, Norm, Manufacturer, Order
+that BOM — or by dragging the row), Name, Quantity, Material, Processes, Norm, Manufacturer, Order
 number 1/2 (missing fields shown as "-"), together with nested items (parts of nested
 assemblies, position in the form `2.1`). CSV export in two variants: full (every
 occurrence listed separately) and aggregated (the same component used several times in
@@ -431,8 +431,12 @@ split into "Welding" and "welding". A manufactured Part ("Wykonywana") or Assemb
 name the way material is: renaming or deleting a process rewrites no item, released ones
 included, and names no longer in the catalog stay listed on the item so they can still be
 unticked. Switching the kind away from manufactured clears the list with the other fields of
-that kind. The add dialog's name field matches an existing process as you type and switches
-to editing it rather than offering a duplicate the server would refuse.
+that kind. The add dialog's name field suggests existing processes as you type and warns
+when the name is taken, but always saves the process typed into it: an earlier version
+switched to editing the matching process, which made "Painting, wet" impossible to add next
+to "Painting". The BOM shows the processes as a column after Material, and both CSV exports
+carry them as the last column, comma-separated, so existing columns keep their positions.
+Clearing the database in Settings has the catalog as a category of its own.
 
 ### Selecting several items in the tree
 

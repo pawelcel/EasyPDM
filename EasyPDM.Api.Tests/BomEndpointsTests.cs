@@ -113,7 +113,9 @@ public class BomEndpointsTests
         using var client = factory.CreateClient();
         await client.LoginAsync(AdminUsername, AdminPassword);
 
-        var (_, zlozenie1, _, _) = await BuildNestedAssemblyAsync(client);
+        var (_, zlozenie1, zlozenie2, _) = await BuildNestedAssemblyAsync(client);
+        (await client.PatchAsJsonAsync($"/api/items/{zlozenie2}/properties",
+            new { processes = new[] { "Spawanie", "Malowanie" } })).EnsureSuccessStatusCode();
 
         var response = await client.GetAsync($"/api/items/{zlozenie1}/bom/csv");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -126,10 +128,11 @@ public class BomEndpointsTests
 
         var text = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
         var lines = text.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2", lines[0]);
+        Assert.Equal("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka", lines[0]);
 
         // zlozenie2 to L.p. "1" (pierwsze dziecko zlozenie1), czesc2 pod nim to "1.1".
-        Assert.Contains(lines, l => l.StartsWith("1;", StringComparison.Ordinal));
+        // Obróbki stoją w ostatniej kolumnie, po przecinku.
+        Assert.Contains(lines, l => l.StartsWith("1;", StringComparison.Ordinal) && l.EndsWith(";Spawanie, Malowanie", StringComparison.Ordinal));
         Assert.Contains(lines, l => l.StartsWith("1.1;", StringComparison.Ordinal) && l.Contains("Stal nierdzewna") && l.Contains("ACME"));
     }
 

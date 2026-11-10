@@ -57,9 +57,8 @@ function ProcessesView() {
             trigger={<Button>{t("process.addButton")}</Button>}
             title={t("process.addTitle")}
             processes={processes}
-            onSubmit={async (body, existing) => {
-              if (existing) await api.updateProcess(existing.id, body)
-              else await api.addProcess(body)
+            onSubmit={async (body) => {
+              await api.addProcess(body)
               await refetch()
             }}
           />
@@ -131,11 +130,11 @@ function ProcessesView() {
   )
 }
 
-// Okno dodawania i edycji. Nazwa jest polem dynamicznym: podpowiada obróbki z katalogu, a
-// wpisanie nazwy już istniejącej (bez względu na wielkość liter) przełącza okno na edycję
-// tamtej obróbki — wczytuje jej opis i zastosowanie, a "Dodaj" zmienia się w "Zapisz zmiany".
-// Tak samo jak okno klienta: zamiast duplikatu, który serwer i tak by odrzucił, dostaje się
-// to, co już jest.
+// Okno dodawania i edycji. Nazwa jest polem dynamicznym: w trakcie pisania podpowiada
+// obróbki z katalogu, żeby było widać, co już jest. Okno zawsze zapisuje TĘ obróbkę, którą
+// się w nim wpisuje — nie przełącza się samo na istniejącą o pasującej nazwie, bo wtedy nie
+// dało się dodać np. "Malowanie mokre" obok "Malowanie proszkowe" (zgłoszone). Nazwa już
+// zajęta (bez względu na wielkość liter) dostaje ostrzeżenie, a serwer i tak ją odrzuci.
 function ProcessDialog({
   trigger,
   title,
@@ -147,7 +146,7 @@ function ProcessDialog({
   title: string
   initial?: Process
   processes: Process[]
-  onSubmit: (body: ProcessBody, existing: Process | null) => Promise<void>
+  onSubmit: (body: ProcessBody) => Promise<void>
 }) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
@@ -157,19 +156,11 @@ function ProcessDialog({
   const [forAssemblies, setForAssemblies] = useState(initial?.forAssemblies ?? false)
   const [error, setError] = useState("")
 
-  // Przy dodawaniu: obróbka z katalogu o wpisanej nazwie, jeśli taka jest.
-  const existing = useMemo(() => {
-    if (initial) return null
+  // Inna obróbka z katalogu o tej samej nazwie (bez względu na wielkość liter).
+  const taken = useMemo(() => {
     const key = name.trim().toLocaleLowerCase()
-    return key ? (processes.find((p) => p.name.toLocaleLowerCase() === key) ?? null) : null
+    return key ? (processes.find((p) => p.id !== initial?.id && p.name.toLocaleLowerCase() === key) ?? null) : null
   }, [initial, name, processes])
-
-  useEffect(() => {
-    if (!existing) return
-    setDescription(existing.description ?? "")
-    setForParts(existing.forParts)
-    setForAssemblies(existing.forAssemblies)
-  }, [existing])
 
   function reset() {
     setName(initial?.name ?? "")
@@ -193,10 +184,7 @@ function ProcessDialog({
     }
     setError("")
     try {
-      await onSubmit(
-        { name: existing?.name ?? trimmed, description: description.trim() || null, forParts, forAssemblies },
-        existing
-      )
+      await onSubmit({ name: trimmed, description: description.trim() || null, forParts, forAssemblies })
       setOpen(false)
       reset()
     } catch (err) {
@@ -215,7 +203,7 @@ function ProcessDialog({
       <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{existing ? t("process.editTitle") : title}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
@@ -227,8 +215,9 @@ function ProcessDialog({
             suggestions={processes.filter((p) => p.id !== initial?.id).map((p) => p.name)}
             placeholder={t("process.namePlaceholder")}
             newValueHint={initial ? undefined : t("process.newHint")}
+            nearDuplicateHint={false}
           />
-          {existing && <Hint>{t("process.existsHint")}</Hint>}
+          {taken && <Hint>{t("process.takenHint", { name: taken.name })}</Hint>}
 
           <Label htmlFor="process-description">{t("process.descriptionLabel")}</Label>
           <Textarea
@@ -268,7 +257,7 @@ function ProcessDialog({
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={submit}>{existing || initial ? t("common.save") : t("common.add")}</Button>
+          <Button onClick={submit}>{initial ? t("common.save") : t("common.add")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

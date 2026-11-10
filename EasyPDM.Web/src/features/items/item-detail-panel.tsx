@@ -53,6 +53,13 @@ import { previewKindOf } from "@/lib/file-preview"
 
 // W BOM-ie nie każda Część ma Materiał/Producenta/Numery zamówieniowe (zależy od "rodzaju") —
 // brakującą wartość pokazujemy jako "-", zamiast pustej komórki.
+// Obróbki (properties.processes) to lista nazw — w kolumnie BOM-u po przecinku.
+function bomProcessesOrDash(properties: Record<string, unknown>): string {
+  const value = properties.processes
+  const names = Array.isArray(value) ? value.filter((x): x is string => typeof x === "string") : []
+  return names.length > 0 ? names.join(", ") : "-"
+}
+
 function bomPropertyOrDash(properties: Record<string, unknown>, key: string): string {
   const value = properties[key]
   return typeof value === "string" && value.trim() ? value : "-"
@@ -524,6 +531,7 @@ function ItemDetailPanel({
                     <TableHead>{t("item.colRevision")}</TableHead>
                     <TableHead className="text-right">{t("common.quantity")}</TableHead>
                     <TableHead>{t("common.material")}</TableHead>
+                    <TableHead>{t("part.processes")}</TableHead>
                     <TableHead>{t("part.norm")}</TableHead>
                     <TableHead>{t("common.manufacturer")}</TableHead>
                     <TableHead>{t("item.colOrderNumber1")}</TableHead>
@@ -744,6 +752,7 @@ function SortableBomRow({
           />
         </TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "material")}</TableCell>
+        <TableCell>{bomProcessesOrDash(child.properties)}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "norm")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "manufacturer")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "orderNumber")}</TableCell>
@@ -783,6 +792,7 @@ function SortableBomRow({
           <TableCell>{entry.revisionLabel ?? "—"}</TableCell>
           <TableCell className="text-right">{entry.quantity}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "material")}</TableCell>
+          <TableCell>{bomProcessesOrDash(entry.properties)}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "norm")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "manufacturer")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "orderNumber")}</TableCell>

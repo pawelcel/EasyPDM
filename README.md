@@ -373,8 +373,10 @@ instead of typing them in by hand.
 The **Processes** menu holds the company's processes — laser cutting, bending, welding,
 powder coating — each with a description and a choice of whether it applies to parts,
 assemblies or both. A manufactured Part or Assembly then picks any number of them, or none,
-from that list. Typing the name of a process that already exists into "Add process"
-switches the window to editing it, so the catalog does not end up with "Welding" twice.
+from that list — typing narrows it down — and each one shows its description. The name field suggests the processes
+already in the catalog as you type, and warns when a name is taken, so a second kind of
+painting gets its own name, e.g. "Painting, wet" next to "Painting, powder". The chosen
+processes also appear as a column in the bill of materials and in both CSV exports.
 
 A **Client** has a name (plus an optional location), a list of second names/trade variants
 (add as many as you need — typing an existing client's name into "Add client" switches to

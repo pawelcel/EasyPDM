@@ -274,7 +274,7 @@ ikona kłódki: zielona (zablokowane przez Ciebie), żółta (przez kogoś inneg
 (zwolnione).
 
 BOM złożenia pokazuje: L.p. (edytowalne wpisaniem liczby całkowitej — musi być unikalna
-w tym BOM-ie — albo przeciągnięciem wiersza), Nazwa, Ilość, Materiał, Norma, Producent,
+w tym BOM-ie — albo przeciągnięciem wiersza), Nazwa, Ilość, Materiał, Obróbka, Norma, Producent,
 Numer zamówieniowy 1/2 (brakujące pola jako „-”), razem z zagłębionymi elementami (części
 zagnieżdżonych złożeń, L.p. w formie `2.1`). Eksport do CSV w dwóch wariantach: pełny
 (każde wystąpienie osobno) i zsumowany (ten sam komponent użyty kilka razy w różnych
@@ -380,7 +380,7 @@ nazwę, której katalog nie miał aż do zakończenia wysyłki. Makra czytają m
 a nie z listy wyboru, więc bez tego element miałby materiał, którego nie da się ani wybrać
 ponownie, ani użyć jako filtr. Zakładana jest sama nazwa; grupa i podgrupa zostają puste.
 
-**Obróbki** (`processes`, migracja 061, menu „Obróbka”) to katalog na wzór materiałów: nazwa, opcjonalny opis oraz `for_parts`/`for_assemblies`, z czego co najmniej jedno prawdziwe. Nazwa jest unikalna bez względu na wielkość liter (indeks `lower(name)`), więc lista wyboru nie rozjedzie się na „Spawanie” i „spawanie”. Część „Wykonywana” albo Złożenie „Wykonywane” zapisuje wybór jako listę nazw w `properties.processes`, powiązaną nazwą tak jak materiał: zmiana nazwy albo usunięcie obróbki nie przepisuje żadnego elementu, także wydanego, a nazwy spoza katalogu zostają widoczne w elemencie, żeby dało się je odznaczyć. Zmiana rodzaju z wykonywanego czyści listę razem z innymi polami tego rodzaju. Pole nazwy w oknie dodawania dopasowuje istniejącą obróbkę w trakcie pisania i przełącza się na jej edycję, zamiast proponować duplikat, który serwer i tak by odrzucił.
+**Obróbki** (`processes`, migracja 061, menu „Obróbka”) to katalog na wzór materiałów: nazwa, opcjonalny opis oraz `for_parts`/`for_assemblies`, z czego co najmniej jedno prawdziwe. Nazwa jest unikalna bez względu na wielkość liter (indeks `lower(name)`), więc lista wyboru nie rozjedzie się na „Spawanie” i „spawanie”. Część „Wykonywana” albo Złożenie „Wykonywane” zapisuje wybór jako listę nazw w `properties.processes`, powiązaną nazwą tak jak materiał: zmiana nazwy albo usunięcie obróbki nie przepisuje żadnego elementu, także wydanego, a nazwy spoza katalogu zostają widoczne w elemencie, żeby dało się je odznaczyć. Zmiana rodzaju z wykonywanego czyści listę razem z innymi polami tego rodzaju. Pole nazwy w oknie dodawania podpowiada istniejące obróbki w trakcie pisania i ostrzega przed zajętą nazwą, ale zawsze zapisuje obróbkę w nim wpisaną: wcześniejsza wersja przełączała się na edycję pasującej obróbki, przez co nie dało się dodać „Malowanie mokre” obok „Malowanie”. BOM pokazuje obróbki w kolumnie po Materiale, a oba eksporty CSV mają je w ostatniej kolumnie, po przecinku, żeby istniejące kolumny nie zmieniły pozycji. Czyszczenie bazy w Ustawieniach ma katalog obróbek jako osobną kategorię.
 
 ### Zaznaczanie wielu elementów w drzewie
 

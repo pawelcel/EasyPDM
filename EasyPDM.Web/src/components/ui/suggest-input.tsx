@@ -18,6 +18,7 @@ function SuggestInput({
   suggestions,
   placeholder,
   newValueHint,
+  nearDuplicateHint = true,
 }: {
   id?: string
   value: string
@@ -27,6 +28,10 @@ function SuggestInput({
   // Tekst pokazywany w liście, gdy wpisana wartość nie pasuje do żadnej istniejącej
   // ("zostanie dodana nowa grupa") — żeby było jasne, że to nie błąd, tylko nowa pozycja.
   newValueHint?: string
+  // Podpowiedź "użyj istniejącej pisowni" ma sens tam, gdzie wartość ma trafić w istniejącą
+  // pozycję (grupa materiału). Tam, gdzie tworzy się NOWĄ pozycję (nazwa obróbki), zachęta do
+  // wybrania istniejącej prowadzi prosto w duplikat — takie miejsce ma własny komunikat.
+  nearDuplicateHint?: boolean
 }) {
   const { t } = useLanguage()
   const trimmed = value.trim()
@@ -56,7 +61,7 @@ function SuggestInput({
           </ComboboxList>
         </ComboboxContent>
       </Autocomplete.Root>
-      {nearDuplicate && (
+      {nearDuplicateHint && nearDuplicate && (
         <Hint>
           {t("suggestInput.nearDuplicate", { name: nearDuplicate })}{" "}
           <button type="button" className="underline" onClick={() => onChange(nearDuplicate)}>
