@@ -119,7 +119,12 @@ function App() {
   // "Użytkownicy"/"Magazyn plików" są dostępne tylko dla admina, ale każdy może wejść w
   // Ustawienia (Wygląd/Język) — gdyby zwykły użytkownik trafił tu z domyślnym
   // settingsSection="users", zamiast tego lądował na ekranie "Brak uprawnień".
+  //
+  // Dopiero gdy wiadomo, kto jest zalogowany: zaraz po wczytaniu strony user jest jeszcze
+  // null, więc isAdmin wychodził false także dla administratora i link prosto do
+  // ?view=settings&section=users przerzucał go na "Wygląd".
   useEffect(() => {
+    if (!user) return
     if (
       !isAdmin &&
       (settingsSection === "users" ||
@@ -129,7 +134,7 @@ function App() {
     ) {
       setSettingsSection("appearance")
     }
-  }, [isAdmin, settingsSection])
+  }, [user, isAdmin, settingsSection])
 
   useEffect(() => {
     const params = new URLSearchParams()
