@@ -81,13 +81,19 @@ function ProcessSelect({
           onChange((keys as string[]).flatMap((key) => (byKey.has(key) ? [byKey.get(key)!.ref] : [])))
         }}
       >
-        <ComboboxChips ref={anchor} className="w-full">
+        <ComboboxChips ref={anchor} className="w-full md:text-sm">
           <ComboboxValue>
             {(keys: string[]) => (
               <>
                 {keys.map((key) => {
                   const ref = byKey.get(key)?.ref
-                  return ref ? <ComboboxChip key={key}>{chipLabel(ref)}</ComboboxChip> : null
+                  // Czcionka jak w zwykłych polach (masa, cena) — domyślna, drobna etykieta była
+                  // tak mała, że na pierwszy rzut oka nie było widać, że coś jest wybrane.
+                  return ref ? (
+                    <ComboboxChip key={key} className="h-6 text-sm font-normal">
+                      {chipLabel(ref)}
+                    </ComboboxChip>
+                  ) : null
                 })}
                 <ComboboxChipsInput placeholder={keys.length === 0 ? t("part.processesSearch") : undefined} />
               </>
