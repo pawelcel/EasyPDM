@@ -171,7 +171,7 @@ static class PropertyEndpoints
 
     // Czy element ma plik w którymś z czterech wyróżnionych pól -- czyli taki, którego nazwę
     // makro zbudowało z numeru elementu.
-    private static async Task<bool> HasNamedFileAsync(NpgsqlConnection conn, Guid id)
+    internal static async Task<bool> HasNamedFileAsync(NpgsqlConnection conn, Guid id)
     {
         await using var cmd = new NpgsqlCommand(
             "SELECT EXISTS (SELECT 1 FROM item_attachments WHERE item_id = @id AND preview_role IS NOT NULL);",

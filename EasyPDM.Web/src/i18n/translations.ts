@@ -115,6 +115,7 @@ const pl = {
 
   "naming.hint": "Litera-prefiks jest doklejana przed numerem nowo tworzonych Części/Złożeń danego rodzaju. Zmiana nie wpływa na już istniejące elementy — ich prefiks został zamrożony w momencie utworzenia.",
   "part.kindLockedHint": "Rodzaju nie można już zmienić — element ma plik w jednym z wyróżnionych pól (CAD, rysunek, PDF, model 3D), a nazwy tych plików zawierają jego numer, który od rodzaju zależy. Zwykłe załączniki niczego nie blokują.",
+  "part.nameLockedHint": "Nazwy nie można już zmienić — element ma plik w jednym z wyróżnionych miejsc (CAD, rysunek, PDF, model 3D), a jego nazwa jest w nazwie tego pliku.",
   "naming.examplePrefix": "Przykład:",
   // Przykładowa nazwa elementu w podglądzie numeracji — konkretna część czyta się lepiej
   // niż abstrakcyjne "nazwa", bo przykład ma wyglądać jak prawdziwy wpis.
@@ -893,6 +894,7 @@ const en: Record<TranslationKey, string> = {
 
   "naming.hint": "The letter prefix is prepended to the number of newly created Parts/Assemblies of that kind. Changing it does not affect existing items — their prefix was frozen when they were created.",
   "part.kindLockedHint": "The kind can no longer be changed — this item has a file in one of the dedicated slots (CAD, drawing, PDF, 3D model), and those file names carry its number, which depends on the kind. Ordinary attachments block nothing.",
+  "part.nameLockedHint": "The name can no longer be changed — this item has a file in one of the dedicated slots (CAD, drawing, PDF, 3D model), and its name is part of that file's name.",
   "naming.examplePrefix": "Example:",
   "naming.exampleName": "plate",
   "naming.digitsTitle": "Zero padding",
@@ -1666,6 +1668,7 @@ const de: Record<TranslationKey, string> = {
 
   "naming.hint": "Das Buchstabenpräfix wird der Nummer neu erstellter Teile/Baugruppen dieser Art vorangestellt. Eine Änderung wirkt sich nicht auf bestehende Elemente aus — deren Präfix wurde bei der Erstellung eingefroren.",
   "part.kindLockedHint": "Die Art lässt sich nicht mehr ändern — zu diesem Element gibt es eine Datei in einem der hervorgehobenen Felder (CAD, Zeichnung, PDF, 3D-Modell), und deren Dateinamen enthalten seine Nummer, die von der Art abhängt. Gewöhnliche Anhänge blockieren nichts.",
+  "part.nameLockedHint": "Der Name lässt sich nicht mehr ändern — zu diesem Element gibt es eine Datei in einem der festen Plätze (CAD, Zeichnung, PDF, 3D-Modell), und sein Name ist Teil ihres Dateinamens.",
   "naming.examplePrefix": "Beispiel:",
   "naming.exampleName": "Platte",
   "naming.digitsTitle": "Auffüllen mit Nullen",

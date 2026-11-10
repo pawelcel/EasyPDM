@@ -7,6 +7,9 @@ All notable changes to EasyPDM are documented in this file.
 ### Added
 - **An option to let only administrators release items.** Settings → Users has a new switch, off by default: when it is on, the "Released" status can be set only by an administrator, so an author sends an item for review and someone with the rights releases it. For other users the button is greyed out with an explanation, and the server refuses the change too, also when it comes from a CAD macro or with an assembly's components. Items already released stay released. Suggested by a fork of EasyPDM.
 
+### Changed
+- **An item's name can no longer be changed once it has a file in a dedicated slot**, just like its kind. The name is part of the CAD file's name, e.g. `C0005(plate).A.sldprt`, so a new name would no longer match the file on disk or what the CAD macros look for. The field is greyed out with an explanation, and the server refuses the change. Items created without the name in their record name, e.g. `C0005.A.sldprt`, can still be renamed.
+
 ### Fixed
 - **A link straight to an administrator's settings page opens that page.** Opening or refreshing an address such as `?view=settings&section=users` sent an administrator to Appearance, because the page checked the rights before it knew who was logged in. Ordinary users are still sent to Appearance.
 

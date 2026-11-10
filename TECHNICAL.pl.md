@@ -320,6 +320,8 @@ obiekt elementu niesie `kindLocked`, żeby interfejs mógł wyszarzyć przyciski
 wyłącznie rzeczywista zmiana — ponowne przysłanie tego samego rodzaju przechodzi. Sam numer
 nie zmienia się nigdy.
 
+Nazwa elementu podlega tej samej zasadzie, bo jest częścią nazwy rekordu, a więc i nazwy pliku: `C0005(płyta).A.sldprt`. `PATCH /name` odrzuca rzeczywistą zmianę, gdy któreś wyróżnione pole jest zajęte, a obiekt elementu niesie `nameLocked`. Wyjątkiem jest element zamrożony bez nazwy w nazwie rekordu (`item_number_with_name = false`, `C0005.A.sldprt`): tam nazwa nie trafia do pliku, więc zostaje edytowalna.
+
 Pełna nazwa elementu — jego **nazwa rekordu**, składana raz przez `ItemNumbering.RecordName`
 i podawana jako `recordName` — to `prefiks + dopełniony numer` i zaraz za nim nazwa w
 nawiasie: `C0001(płyta)`, albo samo `C0001` przy wyłączonej nazwie. Dla pliku na dysku

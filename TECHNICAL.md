@@ -347,6 +347,12 @@ outright rather than applying it with a stale prefix, and the item payload carri
 `kindLocked` so the UI can grey the buttons out. Only a real change is refused — resending
 the same kind passes. The number itself never changes.
 
+The item's name follows the same rule, since it is part of the record name and so of the file
+name, `C0005(plate).A.sldprt`. `PATCH /name` refuses a real change once a dedicated slot is
+filled, and the payload carries `nameLocked`. The exception is an item frozen without the
+name in its record name (`item_number_with_name = false`, `C0005.A.sldprt`): the name never
+reaches the file there, so it stays editable.
+
 The full name of an item — its **record name**, composed once by `ItemNumbering.RecordName`
 and shipped as `recordName` — reads `prefix + padded number` immediately followed by the name
 in brackets: `C0001(plate)`, or just `C0001` with the name switched off. The revision letter

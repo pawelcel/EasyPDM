@@ -171,10 +171,11 @@ function PartSummaryFields({
       </div>
 
       <Label htmlFor="part-name">{t("common.name")}</Label>
+      {item.nameLocked && !locked && <Hint>{t("part.nameLockedHint")}</Hint>}
       <Input
         id="part-name"
         value={name}
-        disabled={locked}
+        disabled={locked || item.nameLocked}
         onChange={(e) => setName(e.target.value)}
         onBlur={saveName}
         onKeyDown={(e) => {

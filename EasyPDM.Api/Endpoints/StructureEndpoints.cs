@@ -132,6 +132,8 @@ static class StructureEndpoints
                         // Czy rodzaju elementu nie da się już zmienić: ma plik w którymś z czterech
                         // wyróżnionych pól, a te noszą jego numer w nazwie (zob. PropertyEndpoints).
                         ["kindLocked"] = reader.GetBoolean(20),
+                        // Nazwy też nie, chyba że element powstał bez nazwy w nazwie rekordu.
+                        ["nameLocked"] = reader.GetBoolean(20) && (reader.IsDBNull(21) || reader.GetBoolean(21)),
                         // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego
                         // na elemencie -- nazwa w nawiasie. Klienci jej nie składają (zob. ItemNumbering).
                         ["recordName"] = ItemNumbering.RecordName(

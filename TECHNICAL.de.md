@@ -359,6 +359,8 @@ und das Element-Objekt führt `kindLocked`, damit die Oberfläche die Schaltflä
 kann. Abgelehnt wird nur eine tatsächliche Änderung — dieselbe Art erneut zu senden geht
 durch. Die Nummer selbst ändert sich nie.
 
+Der Name des Elements folgt derselben Regel, denn er ist Teil des Datensatznamens und damit des Dateinamens: `C0005(Platte).A.sldprt`. `PATCH /name` lehnt eine tatsächliche Änderung ab, sobald ein fester Platz belegt ist, und das Element-Objekt führt `nameLocked`. Ausnahme ist ein Element, das ohne Namen im Datensatznamen eingefroren wurde (`item_number_with_name = false`, `C0005.A.sldprt`): Dort gelangt der Name nie in die Datei und bleibt daher bearbeitbar.
+
 Der vollständige Name eines Elements — sein **Datensatzname**, einmal von
 `ItemNumbering.RecordName` zusammengesetzt und als `recordName` ausgeliefert — lautet
 `Präfix + aufgefüllte Nummer`, unmittelbar gefolgt vom Namen in Klammern: `C0001(Platte)`,

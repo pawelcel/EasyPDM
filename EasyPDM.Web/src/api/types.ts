@@ -183,6 +183,9 @@ export interface Item {
   // Rodzaju nie da się już zmienić: element ma plik w którymś z czterech wyróżnionych pól,
   // a ich nazwy zawierają jego numer, który od rodzaju zależy (zob. PropertyEndpoints).
   kindLocked: boolean
+  // Nazwy też nie -- wchodzi do nazwy tych plików, chyba że element powstał bez nazwy w
+  // nazwie rekordu ("C0005.A.sldprt").
+  nameLocked?: boolean
   showInTree: boolean
   // Czy element jest czyimś dzieckiem w strukturze (folder, złożenie) -- zob. GET /api/items.
   hasParent?: boolean

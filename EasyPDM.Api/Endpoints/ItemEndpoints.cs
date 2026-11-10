@@ -633,6 +633,9 @@ static class ItemEndpoints
                         // Czy rodzaju elementu nie da się już zmienić: ma plik w którymś z czterech
                         // wyróżnionych pól, a te noszą jego numer w nazwie (zob. PropertyEndpoints).
                         ["kindLocked"] = reader.GetBoolean(18),
+                    // Nazwy też nie: wchodzi do nazwy tych plików, chyba że element powstał bez
+                    // nazwy w nazwie rekordu (zob. PATCH /name).
+                    ["nameLocked"] = reader.GetBoolean(18) && (reader.IsDBNull(19) || reader.GetBoolean(19)),
                         // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego
                         // na elemencie -- nazwa w nawiasie. Klienci jej nie składają (zob. ItemNumbering).
                         ["recordName"] = ItemNumbering.RecordName(
@@ -731,6 +734,9 @@ static class ItemEndpoints
                     // Czy rodzaju elementu nie da się już zmienić: ma plik w którymś z czterech
                     // wyróżnionych pól, a te noszą jego numer w nazwie (zob. PropertyEndpoints).
                     ["kindLocked"] = reader.GetBoolean(18),
+                    // Nazwy też nie: wchodzi do nazwy tych plików, chyba że element powstał bez
+                    // nazwy w nazwie rekordu (zob. PATCH /name).
+                    ["nameLocked"] = reader.GetBoolean(18) && (reader.IsDBNull(19) || reader.GetBoolean(19)),
                     // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego
                     // na elemencie -- nazwa w nawiasie. Klienci jej nie składają (zob. ItemNumbering).
                     ["recordName"] = ItemNumbering.RecordName(
@@ -806,6 +812,9 @@ static class ItemEndpoints
                     // Czy rodzaju elementu nie da się już zmienić: ma plik w którymś z czterech
                     // wyróżnionych pól, a te noszą jego numer w nazwie (zob. PropertyEndpoints).
                     ["kindLocked"] = reader.GetBoolean(18),
+                    // Nazwy też nie: wchodzi do nazwy tych plików, chyba że element powstał bez
+                    // nazwy w nazwie rekordu (zob. PATCH /name).
+                    ["nameLocked"] = reader.GetBoolean(18) && (reader.IsDBNull(19) || reader.GetBoolean(19)),
                     // Pełna nazwa rekordu z serwera: numer i -- zależnie od ustawienia zamrożonego
                     // na elemencie -- nazwa w nawiasie. Klienci jej nie składają (zob. ItemNumbering).
                     ["recordName"] = ItemNumbering.RecordName(
@@ -855,6 +864,32 @@ static class ItemEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return OwnerLockedForbidden();
+
+            // Ta sama zasada co przy rodzaju (zob. PropertyEndpoints): makro CAD buduje nazwę
+            // pliku z nazwy rekordu, "C0005(płyta).A.sldprt", więc gdy element ma już plik w
+            // którymś z wyróżnionych pól, nowa nazwa rozjechałaby się z plikiem na dysku i z
+            // tym, czego szukają makra. Wyjątek: element utworzony bez nazwy w nazwie rekordu
+            // ("C0005.A.sldprt") -- tam nazwa nie wchodzi do pliku i zmiana niczego nie psuje.
+            // Tylko RZECZYWISTA zmiana jest odrzucana, jak przy rodzaju.
+            if (info.Value.ItemType is "part" or "assembly")
+            {
+                await using var nameCmd = new NpgsqlCommand(
+                    "SELECT file_name, COALESCE(item_number_with_name, true) FROM items WHERE id = @id;", conn);
+                nameCmd.Parameters.AddWithValue("id", id);
+                await using var nameReader = await nameCmd.ExecuteReaderAsync();
+                var nameInFile = false;
+                var currentName = "";
+                if (await nameReader.ReadAsync())
+                {
+                    currentName = nameReader.GetString(0);
+                    nameInFile = nameReader.GetBoolean(1);
+                }
+                await nameReader.CloseAsync();
+                if (nameInFile && currentName != body.Name.Trim() && await PropertyEndpoints.HasNamedFileAsync(conn, id))
+                    return Results.BadRequest(
+                        "Nie można zmienić nazwy — element ma już plik w jednym z wyróżnionych pól " +
+                        "(CAD, rysunek, PDF, model 3D), a nazwy tych plików zawierają jego nazwę.");
+            }
 
             const string sql = "UPDATE items SET file_name = @name WHERE id = @id;";
             await using var cmd = new NpgsqlCommand(sql, conn);
