@@ -371,13 +371,14 @@ Osobne, wspólne dla całej firmy katalogi (zakładki **Lista materiałów**, **
 osoby kontaktowe i listę Seria/Typ + Podtyp tego, co dostarcza. Wybiera się je z listy przy
 uzupełnianiu właściwości Części/Złożenia, zamiast wpisywać ręcznie.
 
-Menu **Obróbka** to firmowy katalog obróbek — cięcie laserem, gięcie, spawanie, malowanie
-proszkowe — każda z opisem i wyborem, czy dotyczy części, złożeń, czy obu. Część albo
-Złożenie wykonywane wybiera z tej listy dowolną liczbę obróbek albo żadną (wpisywanie zawęża
-listę), a przy każdej widać jej opis. Pole nazwy podpowiada w trakcie pisania obróbki, które już są w katalogu, i
-ostrzega, gdy nazwa jest zajęta — drugie malowanie dostaje więc własną nazwę, np. „Malowanie
-mokre” obok „Malowanie proszkowe”. Wybrane obróbki widać też jako kolumnę w zestawieniu
-części (BOM) i w obu eksportach CSV.
+Menu **Obróbka** to firmowy katalog obróbek — cięcie laserem, gięcie, spawanie, hartowanie —
+każda z opisem i wyborem, czy dotyczy części, złożeń, czy obu. Ta sama nazwa może wystąpić
+kilka razy z różnym opisem: „Hartowanie” do 50 HRC i „Hartowanie” indukcyjne to jeden proces
+z dwiema specyfikacjami. Część albo Złożenie wykonywane wybiera z tej listy dowolną liczbę
+obróbek albo żadną — wpisywanie zawęża listę po nazwie i opisie — a przy każdej widać jej
+opis. Element zapamiętuje nazwę i opis z chwili wyboru, więc wydana część zachowuje
+specyfikację, z którą ją wydano, nawet gdy katalog później się zmieni. Wybrane obróbki widać
+też jako kolumnę w zestawieniu części (BOM) i w obu eksportach CSV.
 
 **Klient** ma nazwę (opcjonalnie lokalizację), listę drugich nazw/wariantów handlowych
 (dowolną liczbę — wpisanie w oknie "Dodaj klienta" nazwy już istniejącego klienta dodaje mu

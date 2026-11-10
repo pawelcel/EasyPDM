@@ -1,7 +1,8 @@
 using Npgsql;
 
-// Katalog obróbek (menu "Obróbka"). Element wykonywany wybiera z niego obróbki i zapisuje
-// ich nazwy w properties.processes -- zob. migracja 061.
+// Katalog obróbek (menu "Obróbka"). Element wykonywany wybiera z niego obróbki i zapisuje je
+// w properties.processes jako {id, name, description} -- zob. migracje 061 i 062. Nazwa nie
+// jest unikalna: "Hartowanie" może mieć kilka wariantów różniących się opisem.
 static class ProcessEndpoints
 {
     public static void MapProcessEndpoints(this WebApplication app, string connectionString)
@@ -47,20 +48,13 @@ static class ProcessEndpoints
                 RETURNING id;
                 """, conn);
             AddParameters(cmd, body);
-            try
-            {
-                var id = (int)(await cmd.ExecuteScalarAsync())!;
-                return Results.Created($"/api/processes/{id}", new { id });
-            }
-            catch (PostgresException ex) when (ex.SqlState == "23505")
-            {
-                return Results.Conflict("Obróbka o tej nazwie już istnieje.");
-            }
+            var id = (int)(await cmd.ExecuteScalarAsync())!;
+            return Results.Created($"/api/processes/{id}", new { id });
         });
 
         // PATCH /api/processes/{id}   body jak przy POST.
-        // Zmiana nazwy NIE przepisuje elementów, które mają starą nazwę -- tak samo jak przy
-        // materiałach; element wydany ma zostać dokładnie taki, jaki był.
+        // Nie przepisuje elementów: każdy trzyma kopię nazwy i opisu z chwili wyboru, więc
+        // element wydany zostaje dokładnie z tą specyfikacją, z którą go wydano.
         app.MapPatch("/api/processes/{id:int}", async (int id, ProcessRequest body) =>
         {
             var invalid = Validate(body);
@@ -77,18 +71,11 @@ static class ProcessEndpoints
                 """, conn);
             cmd.Parameters.AddWithValue("id", id);
             AddParameters(cmd, body);
-            try
-            {
-                var affected = await cmd.ExecuteNonQueryAsync();
-                return affected == 0 ? Results.NotFound() : Results.Ok();
-            }
-            catch (PostgresException ex) when (ex.SqlState == "23505")
-            {
-                return Results.Conflict("Obróbka o tej nazwie już istnieje.");
-            }
+            var affected = await cmd.ExecuteNonQueryAsync();
+            return affected == 0 ? Results.NotFound() : Results.Ok();
         });
 
-        // DELETE /api/processes/{id} — elementy zachowują nazwę, jak przy materiałach.
+        // DELETE /api/processes/{id} — elementy zachowują swoją kopię nazwy i opisu.
         app.MapDelete("/api/processes/{id:int}", async (int id) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { api } from "@/api/client"
-import { canEditOwnerLocked, isLocked, type Item } from "@/api/types"
+import { canEditOwnerLocked, isLocked, readProcessRefs, type Item, type ProcessRef } from "@/api/types"
 import { useAuth } from "@/features/auth/use-auth"
 import { Button } from "@/components/ui/button"
 import { FormError } from "@/components/ui/form-error"
@@ -214,7 +214,7 @@ function PartPropertyForm({
   const locked = statusLocked || ownerBlocked
   const [error, setError] = useState<string | null>(null)
 
-  async function saveProcesses(next: string[]) {
+  async function saveProcesses(next: ProcessRef[]) {
     try {
       setError(null)
       await api.updateProperties(item.id, { processes: next })
@@ -429,7 +429,7 @@ function PriceRow({
 }
 
 
-// Obróbki elementu wykonywanego (properties.processes, lista nazw) — zob. ProcessSelect.
+// Obróbki elementu wykonywanego (properties.processes) — zob. ProcessSelect i ProcessRef.
 function ProcessesField({
   item,
   target,
@@ -439,11 +439,10 @@ function ProcessesField({
   item: Item
   target: "part" | "assembly"
   disabled: boolean
-  onSave: (next: string[]) => void | Promise<void>
+  onSave: (next: ProcessRef[]) => void | Promise<void>
 }) {
   const { t } = useLanguage()
-  const stored = item.properties.processes
-  const selected = Array.isArray(stored) ? stored.filter((x): x is string => typeof x === "string") : []
+  const selected = readProcessRefs(item.properties.processes)
 
   return (
     <>

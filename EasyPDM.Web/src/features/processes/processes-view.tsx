@@ -131,10 +131,9 @@ function ProcessesView() {
 }
 
 // Okno dodawania i edycji. Nazwa jest polem dynamicznym: w trakcie pisania podpowiada
-// obróbki z katalogu, żeby było widać, co już jest. Okno zawsze zapisuje TĘ obróbkę, którą
-// się w nim wpisuje — nie przełącza się samo na istniejącą o pasującej nazwie, bo wtedy nie
-// dało się dodać np. "Malowanie mokre" obok "Malowanie proszkowe" (zgłoszone). Nazwa już
-// zajęta (bez względu na wielkość liter) dostaje ostrzeżenie, a serwer i tak ją odrzuci.
+// obróbki z katalogu, żeby było widać, co już jest. Okno zawsze zapisuje TĘ obróbkę, którą się
+// w nim wpisuje, i ta sama nazwa może wystąpić kilka razy — "Hartowanie" do 50 HRC i
+// "Hartowanie" indukcyjne to ten sam proces z inną specyfikacją, a odróżnia je opis.
 function ProcessDialog({
   trigger,
   title,
@@ -156,8 +155,9 @@ function ProcessDialog({
   const [forAssemblies, setForAssemblies] = useState(initial?.forAssemblies ?? false)
   const [error, setError] = useState("")
 
-  // Inna obróbka z katalogu o tej samej nazwie (bez względu na wielkość liter).
-  const taken = useMemo(() => {
+  // Inna obróbka z katalogu o tej samej nazwie (bez względu na wielkość liter) — nie błąd, tylko
+  // przypomnienie, że opis będzie jedynym, co je odróżni.
+  const sameName = useMemo(() => {
     const key = name.trim().toLocaleLowerCase()
     return key ? (processes.find((p) => p.id !== initial?.id && p.name.toLocaleLowerCase() === key) ?? null) : null
   }, [initial, name, processes])
@@ -188,7 +188,7 @@ function ProcessDialog({
       setOpen(false)
       reset()
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 409 ? t("process.nameConflict") : t("process.saveFailed"))
+      setError(err instanceof ApiError ? err.message : t("process.saveFailed"))
     }
   }
 
@@ -217,7 +217,7 @@ function ProcessDialog({
             newValueHint={initial ? undefined : t("process.newHint")}
             nearDuplicateHint={false}
           />
-          {taken && <Hint>{t("process.takenHint", { name: taken.name })}</Hint>}
+          {sameName && <Hint>{t("process.sameNameHint", { name: sameName.name })}</Hint>}
 
           <Label htmlFor="process-description">{t("process.descriptionLabel")}</Label>
           <Textarea

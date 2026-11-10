@@ -240,15 +240,29 @@ static class BomEndpoints
         return ItemNumbering.RecordName(number, prefix, digits, withName, fileName);
     }
 
-    // Obróbki elementu wykonywanego (properties.processes, lista nazw) w jednej komórce,
-    // po przecinku. Kolumna stoi na końcu, żeby nie przesuwać kolumn, na których ktoś mógł
-    // już oprzeć swój arkusz.
-    private static string ProcessesOrEmpty(JsonElement properties) =>
-        properties.TryGetProperty("processes", out var value) && value.ValueKind == JsonValueKind.Array
-            ? string.Join(", ", value.EnumerateArray()
-                .Where(x => x.ValueKind == JsonValueKind.String)
-                .Select(x => x.GetString()))
-            : "";
+    // Obróbki elementu wykonywanego (properties.processes) w jednej komórce, po przecinku:
+    // "Hartowanie (50 HRC), Malowanie". Opis idzie w nawiasie, bo ta sama nazwa bywa kilka
+    // razy z różną specyfikacją. Wpis to {id, name, description}; zwykły napis (zapis sprzed
+    // wprowadzenia wariantów) też jest przyjmowany. Kolumna stoi na końcu, żeby nie przesuwać
+    // kolumn, na których ktoś mógł już oprzeć swój arkusz.
+    private static string ProcessesOrEmpty(JsonElement properties)
+    {
+        if (!properties.TryGetProperty("processes", out var value) || value.ValueKind != JsonValueKind.Array)
+            return "";
+        var labels = new List<string>();
+        foreach (var entry in value.EnumerateArray())
+        {
+            if (entry.ValueKind == JsonValueKind.String)
+                labels.Add(entry.GetString() ?? "");
+            else if (entry.ValueKind == JsonValueKind.Object)
+            {
+                var name = PropertyOrEmpty(entry, "name");
+                var description = PropertyOrEmpty(entry, "description");
+                labels.Add(string.IsNullOrWhiteSpace(description) ? name : $"{name} ({description.ReplaceLineEndings(" ")})");
+            }
+        }
+        return string.Join(", ", labels.Where(l => l.Length > 0));
+    }
 
     private static string PropertyOrEmpty(JsonElement properties, string key) =>
         properties.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String

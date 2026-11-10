@@ -2,7 +2,7 @@ import { type ReactElement, useEffect, useRef, useState } from "react"
 import { Upload } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
-import { itemDisplayLabel, type Item, type ItemType, type Project } from "@/api/types"
+import { itemDisplayLabel, type Item, type ItemType, type ProcessRef, type Project } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -255,7 +255,7 @@ function AddNodeDialog({
   // wspólny Record dla wszystkich rodzajów na raz — zob. PART_KIND_FIELDS/ASSEMBLY_KIND_FIELDS).
   // Obróbki — lista, więc trzymana osobno od tekstowych extraProps. Mają je tylko elementy
   // wykonywane; zmiana rodzaju na inny czyści wybór, tak jak w panelu elementu.
-  const [processes, setProcesses] = useState<string[]>([])
+  const [processes, setProcesses] = useState<ProcessRef[]>([])
   function changeRodzaj(next: string) {
     if (next !== "Wykonywana" && next !== "Wykonywane") setProcesses([])
     const staleFields = (mode === "assembly" ? ASSEMBLY_KIND_FIELDS : PART_KIND_FIELDS)[rodzaj] ?? []

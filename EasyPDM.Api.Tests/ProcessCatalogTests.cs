@@ -22,10 +22,10 @@ public class ProcessCatalogTests
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
 
-        // Ta sama nazwa inną wielkością liter to wciąż ta sama obróbka.
-        var duplicate = await client.PostAsJsonAsync("/api/processes",
-            new { name = name.ToUpperInvariant(), forParts = true, forAssemblies = false });
-        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+        // Ta sama nazwa może wystąpić drugi raz -- inny wariant tego samego procesu.
+        var variant = await client.PostAsJsonAsync("/api/processes",
+            new { name, description = "TIG", forParts = true, forAssemblies = false });
+        Assert.Equal(HttpStatusCode.Created, variant.StatusCode);
 
         // Obróbka musi czegoś dotyczyć.
         var nothing = await client.PostAsJsonAsync("/api/processes",
@@ -54,11 +54,19 @@ public class ProcessCatalogTests
         var projectId = await client.CreateProjectAsync($"Obrobki {Guid.NewGuid()}");
         var itemId = await client.CreateNodeAsync(projectId, "Wspornik", "part");
 
-        (await client.PatchAsJsonAsync($"/api/items/{itemId}/properties",
-            new { processes = new[] { "Ciecie laserem", "Giecie" } })).EnsureSuccessStatusCode();
+        // Dwa warianty tej samej nazwy rozróżnia identyfikator; opis jest kopią z chwili wyboru.
+        (await client.PatchAsJsonAsync($"/api/items/{itemId}/properties", new
+        {
+            processes = new object[]
+            {
+                new { id = 10, name = "Hartowanie", description = "50 HRC" },
+                new { id = 11, name = "Hartowanie", description = "indukcyjne" },
+            },
+        })).EnsureSuccessStatusCode();
         var item = await client.GetFromJsonAsync<JsonElement>($"/api/items/{itemId}");
-        Assert.Equal(new[] { "Ciecie laserem", "Giecie" },
-            item.GetProperty("properties").GetProperty("processes").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal(new[] { "50 HRC", "indukcyjne" },
+            item.GetProperty("properties").GetProperty("processes").EnumerateArray()
+                .Select(x => x.GetProperty("description").GetString()));
 
         (await client.PatchAsJsonAsync($"/api/items/{itemId}/properties",
             new { processes = Array.Empty<string>() })).EnsureSuccessStatusCode();
@@ -67,7 +75,7 @@ public class ProcessCatalogTests
 
         // Wyszukiwanie w "Całej bazie" przeszukuje właściwości, więc trafia też po obróbce.
         (await client.PatchAsJsonAsync($"/api/items/{itemId}/properties",
-            new { processes = new[] { "Malowanie proszkowe" } })).EnsureSuccessStatusCode();
+            new { processes = new object[] { new { id = 12, name = "Malowanie proszkowe", description = (string?)null } } })).EnsureSuccessStatusCode();
         var found = await client.GetFromJsonAsync<JsonElement>("/api/items?search=proszkowe");
         Assert.Contains(found.EnumerateArray(), i => i.GetProperty("id").GetGuid() == itemId);
     }

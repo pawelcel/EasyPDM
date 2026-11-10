@@ -20,6 +20,8 @@ import {
   isLocked,
   itemDisplayLabel,
   itemTypeLabelKey,
+  processLabel,
+  readProcessRefs,
   revisionLabel,
   type BomEntry,
   type ClientVerificationSummary,
@@ -53,11 +55,11 @@ import { previewKindOf } from "@/lib/file-preview"
 
 // W BOM-ie nie każda Część ma Materiał/Producenta/Numery zamówieniowe (zależy od "rodzaju") —
 // brakującą wartość pokazujemy jako "-", zamiast pustej komórki.
-// Obróbki (properties.processes) to lista nazw — w kolumnie BOM-u po przecinku.
+// Obróbki (properties.processes) w kolumnie BOM-u po przecinku, z opisem w nawiasie — ta sama
+// nazwa bywa kilka razy z różną specyfikacją.
 function bomProcessesOrDash(properties: Record<string, unknown>): string {
-  const value = properties.processes
-  const names = Array.isArray(value) ? value.filter((x): x is string => typeof x === "string") : []
-  return names.length > 0 ? names.join(", ") : "-"
+  const refs = readProcessRefs(properties.processes)
+  return refs.length > 0 ? refs.map(processLabel).join(", ") : "-"
 }
 
 function bomPropertyOrDash(properties: Record<string, unknown>, key: string): string {

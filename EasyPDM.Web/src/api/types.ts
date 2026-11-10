@@ -349,14 +349,47 @@ export interface Material {
   subgroup: string | null
 }
 
-// Obróbka z katalogu (menu "Obróbka"). Element wykonywany zapisuje wybrane obróbki jako
-// listę nazw w properties.processes.
+// Obróbka z katalogu (menu "Obróbka"). Nazwa nie jest unikalna: "Hartowanie" może mieć kilka
+// wariantów różniących się opisem.
 export interface Process {
   id: number
   name: string
   description: string | null
   forParts: boolean
   forAssemblies: boolean
+}
+
+// Obróbka wybrana w elemencie (properties.processes): identyfikator z katalogu i KOPIA nazwy
+// oraz opisu z chwili wyboru. Identyfikator odróżnia warianty o tej samej nazwie, a kopia
+// sprawia, że element wydany zostaje z tą specyfikacją, z którą go wydano, nawet gdy opis w
+// katalogu się zmieni albo obróbka zniknie. id null = zapis sprzed wariantów (sama nazwa).
+export interface ProcessRef {
+  id: number | null
+  name: string
+  description: string | null
+}
+
+export function readProcessRefs(value: unknown): ProcessRef[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((entry): ProcessRef[] => {
+    if (typeof entry === "string") return [{ id: null, name: entry, description: null }]
+    if (entry && typeof entry === "object" && typeof (entry as { name?: unknown }).name === "string") {
+      const e = entry as { id?: unknown; name: string; description?: unknown }
+      return [
+        {
+          id: typeof e.id === "number" ? e.id : null,
+          name: e.name,
+          description: typeof e.description === "string" && e.description ? e.description : null,
+        },
+      ]
+    }
+    return []
+  })
+}
+
+// "Hartowanie (50 HRC)" — opis w nawiasie, bo sama nazwa nie odróżnia wariantów.
+export function processLabel(ref: ProcessRef): string {
+  return ref.description ? `${ref.name} (${ref.description.replace(/\s*\n\s*/g, " ")})` : ref.name
 }
 
 // Lekki wpis do listy/wyszukiwarki producentów — bez osób kontaktowych (te dociągane są

@@ -1,5 +1,6 @@
 import { useRef } from "react"
 
+import type { ProcessRef } from "@/api/types"
 import {
   Combobox,
   ComboboxChip,
@@ -15,14 +16,21 @@ import { Hint } from "@/components/ui/hint"
 import { useProcesses } from "@/features/processes/use-processes"
 import { useLanguage } from "@/i18n/use-language"
 
+interface Entry {
+  key: string
+  ref: ProcessRef
+  outside: boolean
+}
+
 // Wybór obróbek z katalogu (menu "Obróbka") — kilka albo żadna. Pole jest dynamiczne: wpisany
-// tekst zawęża listę, wybrane obróbki stoją w polu jako etykiety z krzyżykiem. Opis obróbki
-// stoi przy niej na liście i pod polem przy każdej wybranej — sama nazwa ("Malowanie") często
-// nie mówi, o które malowanie chodzi.
+// tekst zawęża listę (po nazwie i opisie), wybrane obróbki stoją w polu jako etykiety z
+// krzyżykiem. Opis stoi przy obróbce na liście i pod polem przy każdej wybranej, bo ta sama
+// nazwa ("Hartowanie") bywa w katalogu kilka razy z różnym opisem.
 //
-// Lista pokazuje tylko obróbki dla danego typu elementu, a obok nich te już wybrane, których
-// w katalogu nie ma (usunięte albo przemianowane): zostają widoczne i da się je odznaczyć,
-// zamiast znikać po cichu. Wspólne dla panelu elementu i okna tworzenia.
+// Pozycje rozróżnia identyfikator, nie nazwa. Obróbka już wybrana zachowuje swoją kopię nazwy
+// i opisu; nowo wybrana bierze je z katalogu. Wybrane, których w katalogu nie ma (usunięte),
+// zostają widoczne z dopiskiem i da się je odznaczyć. Wspólne dla panelu elementu i okna
+// tworzenia.
 function ProcessSelect({
   target,
   value,
@@ -30,41 +38,58 @@ function ProcessSelect({
   disabled = false,
 }: {
   target: "part" | "assembly"
-  value: string[]
-  onChange: (next: string[]) => void
+  value: ProcessRef[]
+  onChange: (next: ProcessRef[]) => void
   disabled?: boolean
 }) {
   const { t } = useLanguage()
   const { processes } = useProcesses()
   const anchor = useRef<HTMLDivElement>(null)
-  const catalog = processes.filter((p) => (target === "part" ? p.forParts : p.forAssemblies)).map((p) => p.name)
-  const outside = value.filter((name) => !catalog.includes(name))
-  const items = [...catalog, ...outside]
-  const descriptionOf = (name: string) => processes.find((p) => p.name === name)?.description ?? null
 
-  if (items.length === 0) return <Hint>{t("part.processesEmptyCatalog")}</Hint>
+  const available = processes.filter((p) => (target === "part" ? p.forParts : p.forAssemblies))
+  const inCatalog = (ref: ProcessRef) => ref.id !== null && available.some((p) => p.id === ref.id)
+  const selectedKeys = value.map((ref, i) => (inCatalog(ref) ? `c${ref.id}` : `s${i}`))
+  const entries: Entry[] = [
+    ...available.map((p) => {
+      const chosen = value.find((ref) => ref.id === p.id)
+      return { key: `c${p.id}`, ref: chosen ?? { id: p.id, name: p.name, description: p.description }, outside: false }
+    }),
+    ...value.flatMap((ref, i) => (inCatalog(ref) ? [] : [{ key: `s${i}`, ref, outside: true }])),
+  ]
+  const byKey = new Map(entries.map((e) => [e.key, e]))
+  const sameName = (name: string) => entries.filter((e) => e.ref.name === name).length > 1
+  const chipLabel = (ref: ProcessRef) =>
+    ref.description && sameName(ref.name) ? `${ref.name} · ${ref.description}` : ref.name
+
+  if (entries.length === 0) return <Hint>{t("part.processesEmptyCatalog")}</Hint>
 
   return (
     <div className="flex flex-col gap-1">
       <Combobox
         multiple
-        items={items}
-        value={value}
+        items={entries.map((e) => e.key)}
+        value={selectedKeys}
         disabled={disabled}
+        itemToStringLabel={(key: string) => {
+          const ref = byKey.get(key)?.ref
+          return ref ? [ref.name, ref.description].filter(Boolean).join(" ") : key
+        }}
         // Escape ma tylko zamknąć listę. Combobox z wieloma wartościami czyści nim domyślnie cały
         // wybór, co przy zamykaniu listy kasowało świeżo wybrane obróbki.
-        onValueChange={(v, details) => {
-          if (details.reason !== "escape-key") onChange(v as string[])
+        onValueChange={(keys, details) => {
+          if (details.reason === "escape-key") return
+          onChange((keys as string[]).flatMap((key) => (byKey.has(key) ? [byKey.get(key)!.ref] : [])))
         }}
       >
         <ComboboxChips ref={anchor} className="w-full">
           <ComboboxValue>
-            {(values: string[]) => (
+            {(keys: string[]) => (
               <>
-                {values.map((name) => (
-                  <ComboboxChip key={name}>{name}</ComboboxChip>
-                ))}
-                <ComboboxChipsInput placeholder={values.length === 0 ? t("part.processesSearch") : undefined} />
+                {keys.map((key) => {
+                  const ref = byKey.get(key)?.ref
+                  return ref ? <ComboboxChip key={key}>{chipLabel(ref)}</ComboboxChip> : null
+                })}
+                <ComboboxChipsInput placeholder={keys.length === 0 ? t("part.processesSearch") : undefined} />
               </>
             )}
           </ComboboxValue>
@@ -72,31 +97,35 @@ function ProcessSelect({
         <ComboboxContent anchor={anchor}>
           <ComboboxEmpty>{t("part.processesNoMatch")}</ComboboxEmpty>
           <ComboboxList>
-            {(name: string) => (
-              <ComboboxItem key={name} value={name}>
-                <span className="flex min-w-0 flex-col">
-                  <span>
-                    {name}
-                    {outside.includes(name) && (
-                      <span className="text-muted-foreground"> ({t("part.processesOutside")})</span>
+            {(key: string) => {
+              const entry = byKey.get(key)
+              if (!entry) return null
+              return (
+                <ComboboxItem key={key} value={key}>
+                  <span className="flex min-w-0 flex-col">
+                    <span>
+                      {entry.ref.name}
+                      {entry.outside && (
+                        <span className="text-muted-foreground"> ({t("part.processesOutside")})</span>
+                      )}
+                    </span>
+                    {entry.ref.description && (
+                      <span className="truncate text-[12px] text-muted-foreground">{entry.ref.description}</span>
                     )}
                   </span>
-                  {descriptionOf(name) && (
-                    <span className="truncate text-[12px] text-muted-foreground">{descriptionOf(name)}</span>
-                  )}
-                </span>
-              </ComboboxItem>
-            )}
+                </ComboboxItem>
+              )
+            }}
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
       {value.length > 0 && (
         <ul className="flex flex-col gap-0.5 text-[12.5px]">
-          {value.map((name) => (
-            <li key={name}>
-              <span className="font-medium">{name}</span>
-              {descriptionOf(name) && (
-                <span className="whitespace-pre-line text-muted-foreground"> — {descriptionOf(name)}</span>
+          {value.map((ref, i) => (
+            <li key={selectedKeys[i]}>
+              <span className="font-medium">{ref.name}</span>
+              {ref.description && (
+                <span className="whitespace-pre-line text-muted-foreground"> — {ref.description}</span>
               )}
             </li>
           ))}

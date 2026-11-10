@@ -115,7 +115,11 @@ public class BomEndpointsTests
 
         var (_, zlozenie1, zlozenie2, _) = await BuildNestedAssemblyAsync(client);
         (await client.PatchAsJsonAsync($"/api/items/{zlozenie2}/properties",
-            new { processes = new[] { "Spawanie", "Malowanie" } })).EnsureSuccessStatusCode();
+            new { processes = new object[]
+            {
+                new { id = 1, name = "Spawanie", description = "MIG" },
+                new { id = 2, name = "Malowanie", description = (string?)null },
+            } })).EnsureSuccessStatusCode();
 
         var response = await client.GetAsync($"/api/items/{zlozenie1}/bom/csv");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -132,7 +136,7 @@ public class BomEndpointsTests
 
         // zlozenie2 to L.p. "1" (pierwsze dziecko zlozenie1), czesc2 pod nim to "1.1".
         // Obróbki stoją w ostatniej kolumnie, po przecinku.
-        Assert.Contains(lines, l => l.StartsWith("1;", StringComparison.Ordinal) && l.EndsWith(";Spawanie, Malowanie", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("1;", StringComparison.Ordinal) && l.EndsWith(";Spawanie (MIG), Malowanie", StringComparison.Ordinal));
         Assert.Contains(lines, l => l.StartsWith("1.1;", StringComparison.Ordinal) && l.Contains("Stal nierdzewna") && l.Contains("ACME"));
     }
 

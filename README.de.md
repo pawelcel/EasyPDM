@@ -403,14 +403,15 @@ was er liefert. Sie werden beim Ausfüllen der Eigenschaften eines Teils/einer B
 aus einer Liste ausgewählt, statt von Hand eingetippt zu werden.
 
 Das Menü **Bearbeitung** enthält die Bearbeitungsarten der Firma — Laserschneiden, Biegen,
-Schweißen, Pulverbeschichten —, jede mit einer Beschreibung und der Wahl, ob sie für Teile,
-Baugruppen oder beide gilt. Ein gefertigtes Teil oder eine gefertigte Baugruppe wählt
-daraus beliebig viele oder keine — Tippen grenzt die Liste ein —, jeweils mit ihrer
-Beschreibung. Das Namensfeld schlägt beim
-Tippen vorhandene Bearbeitungen vor und warnt, wenn ein Name vergeben ist — eine zweite
-Lackierung bekommt also einen eigenen Namen, z. B. „Nasslackieren“ neben
-„Pulverbeschichten“. Die gewählten Bearbeitungen erscheinen auch als Spalte in der Stückliste
-und in beiden CSV-Exporten.
+Schweißen, Härten —, jede mit einer Beschreibung und der Wahl, ob sie für Teile, Baugruppen
+oder beide gilt. Derselbe Name darf mehrfach mit unterschiedlicher Beschreibung vorkommen:
+„Härten“ bis 50 HRC und „Härten“ induktiv sind ein Verfahren mit zwei Spezifikationen. Ein
+gefertigtes Teil oder eine gefertigte Baugruppe wählt daraus beliebig viele oder keine —
+Tippen grenzt die Liste nach Name und Beschreibung ein —, jeweils mit ihrer Beschreibung. Ein
+Element behält Name und Beschreibung aus dem Moment der Auswahl, ein freigegebenes Teil also
+die Spezifikation, mit der es freigegeben wurde, auch wenn sich der Katalog später ändert.
+Die gewählten Bearbeitungen erscheinen auch als Spalte in der Stückliste und in beiden
+CSV-Exporten.
 
 Ein **Kunde** hat einen Namen (optional einen Standort), eine Liste zweiter Namen/
 Handelsvarianten (beliebig viele — die Eingabe des Namens eines bereits vorhandenen Kunden

@@ -423,20 +423,23 @@ document rather than from a list, so without this the item would carry a materia
 neither be picked again nor used as a filter. Only the name is created; group and subgroup
 stay empty.
 
-**Processes** (`processes`, migration 061, the "Processes" menu) are a catalog like
+**Processes** (`processes`, migrations 061 and 062, the "Processes" menu) are a catalog like
 materials: name, optional description, and `for_parts`/`for_assemblies`, at least one of them
-true. The name is unique case-insensitively (`lower(name)` index), so the pick list cannot
-split into "Welding" and "welding". A manufactured Part ("Wykonywana") or Assembly
-("Wykonywane") stores its choice as a list of names in `properties.processes`, linked by
-name the way material is: renaming or deleting a process rewrites no item, released ones
-included, and names no longer in the catalog stay listed on the item so they can still be
-unticked. Switching the kind away from manufactured clears the list with the other fields of
-that kind. The add dialog's name field suggests existing processes as you type and warns
-when the name is taken, but always saves the process typed into it: an earlier version
-switched to editing the matching process, which made "Painting, wet" impossible to add next
-to "Painting". The BOM shows the processes as a column after Material, and both CSV exports
-carry them as the last column, comma-separated, so existing columns keep their positions.
-Clearing the database in Settings has the catalog as a category of its own.
+true. Names are not unique (062 dropped 061's `lower(name)` index): "Hardening" to 50 HRC and
+"Hardening" by induction are one process with two specifications, told apart by the
+description. A manufactured Part ("Wykonywana") or Assembly ("Wykonywane") therefore stores
+its choice in `properties.processes` as `{id, name, description}` objects: the id tells the
+variants apart, and the copied name and description keep a released item at the
+specification it was released with when the catalog entry is edited or deleted. A process
+already chosen keeps its copy; a newly chosen one takes the catalog's current text. Entries
+whose id is no longer in the catalog stay listed so they can be unticked, and a plain string
+(the format before variants) still reads as a name. Switching the kind away from
+manufactured clears the list with the other fields of that kind. The picker is a chips
+combobox that filters by name and description; the add dialog's name field suggests
+existing processes and notes when a name is already used, without stopping a new variant.
+The BOM shows the processes as a column after Material, and both CSV exports carry them as
+the last column, `Name (description)` comma-separated, so existing columns keep their
+positions. Clearing the database in Settings has the catalog as a category of its own.
 
 ### Selecting several items in the tree
 
