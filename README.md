@@ -397,6 +397,11 @@ tags, kind. Several tags can be ticked at once; the list then shows the items th
 of them. Found filters can be saved for reuse, and a "Clear filters" button resets
 everything at once.
 
+Tags are typed freely, so typos and labels nobody uses any more pile up. An administrator
+sees every tag in **Settings → Tags**, with how many items carry it, and can filter for the
+unused ones. Deleting a tag there removes it from all items at once, released ones
+included, and from the suggestions and the filter.
+
 ### Downloadable documentation
 
 From a Project, Assembly or Part you can download the complete set of attached files as

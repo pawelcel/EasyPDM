@@ -568,6 +568,8 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET | `/api/projects/{projectId}/documentation/extensions`, `/documentation` | to samo, dla całego projektu |
 | GET | `/api/tags` | lista tagów |
 | POST/DELETE | `/api/items/{id}/tags[/{tagName}]` | zarządzanie tagami |
+| GET | `/api/settings/tags` | wszystkie tagi z liczbą elementów (tylko administrator) |
+| DELETE | `/api/settings/tags/{tagName}` | usunięcie tagu z całej bazy, także z elementów wydanych (tylko administrator) |
 | PATCH/DELETE | `/api/items/{id}/properties[/{key}]` | zarządzanie właściwościami (zablokowane poza statusem `w_pracy` i poza blokadą właściciela — wyjątek: pola ceny) |
 | GET | `/api/items/{id}/revisions` | historia komentarzy rewizji (tylko rewizje z komentarzem) |
 | GET | `/api/items/{id}/history` | pełna historia: utworzenie, zmiany statusu, rewizje, dodanie/usunięcie załącznika, blokada/zwolnienie właściciela (kiedy/kto/opis), chronologicznie |

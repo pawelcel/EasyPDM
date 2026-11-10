@@ -33,6 +33,7 @@ import { NotificationSettingsView } from "@/features/settings/notification-setti
 import { NotificationBell } from "@/features/notifications/notification-bell"
 import { StorageSettingsView } from "@/features/settings/storage-settings-view"
 import { SupportSettingsView } from "@/features/settings/support-settings-view"
+import { TagsSettingsView } from "@/features/settings/tags-settings-view"
 import { TagFilterSelect } from "@/features/tags/tag-filter-select"
 import { useTags } from "@/features/tags/use-tags"
 import { ProjectTreeView } from "@/features/tree/project-tree-view"
@@ -131,7 +132,8 @@ function App() {
       (settingsSection === "users" ||
         settingsSection === "storage" ||
         settingsSection === "logs" ||
-        settingsSection === "naming")
+        settingsSection === "naming" ||
+        settingsSection === "tags")
     ) {
       setSettingsSection("appearance")
     }
@@ -338,6 +340,20 @@ function App() {
           {view === "settings" &&
             settingsSection === "naming" &&
             (isAdmin ? <NamingSettingsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
+
+          {view === "settings" &&
+            settingsSection === "tags" &&
+            (isAdmin ? (
+              <TagsSettingsView
+                onTagDeleted={async (name) => {
+                  setSelectedTags((current) => current.filter((tag) => tag !== name))
+                  await refetchTags()
+                  await refetchItems()
+                }}
+              />
+            ) : (
+              <Hint>{t("settings.noPermission")}</Hint>
+            ))}
 
           {view === "settings" && settingsSection === "notifications" && (
             <NotificationSettingsView isAdmin={isAdmin} />

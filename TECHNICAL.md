@@ -802,6 +802,8 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET | `/api/projects/{projectId}/documentation/extensions`, `/documentation` | the same, for a whole project |
 | GET | `/api/tags` | tag list |
 | POST/DELETE | `/api/items/{id}/tags[/{tagName}]` | tag management |
+| GET | `/api/settings/tags` | every tag with its item count (admin only) |
+| DELETE | `/api/settings/tags/{tagName}` | delete a tag from the whole database, released items included (admin only) |
 | PATCH/DELETE | `/api/items/{id}/properties[/{key}]` | property management (locked outside the `w_pracy`/in-progress status and while owner-locked — exception: price fields) |
 | GET | `/api/items/{id}/revisions` | revision comment history (only revisions with a comment) |
 | GET | `/api/items/{id}/history` | full history: creation, status changes, revisions, attachment added/removed, owner lock/release (when/who/description), chronologically |

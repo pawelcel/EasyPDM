@@ -621,6 +621,8 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET | `/api/projects/{projectId}/documentation/extensions`, `/documentation` | dasselbe, für ein gesamtes Projekt |
 | GET | `/api/tags` | Tag-Liste |
 | POST/DELETE | `/api/items/{id}/tags[/{tagName}]` | Tag-Verwaltung |
+| GET | `/api/settings/tags` | alle Tags mit Anzahl der Elemente (nur Administrator) |
+| DELETE | `/api/settings/tags/{tagName}` | Tag aus der gesamten Datenbank löschen, auch bei freigegebenen Elementen (nur Administrator) |
 | PATCH/DELETE | `/api/items/{id}/properties[/{key}]` | Eigenschaftenverwaltung (gesperrt außerhalb des Status `w_pracy`/in Bearbeitung und bei Eigentümersperre — Ausnahme: Preisfelder) |
 | GET | `/api/items/{id}/revisions` | Historie der Revisionskommentare (nur Revisionen mit Kommentar) |
 | GET | `/api/items/{id}/history` | vollständige Historie: Erstellung, Statusänderungen, Revisionen, hinzugefügter/entfernter Anhang, Eigentümersperre/-freigabe (wann/wer/Beschreibung), chronologisch |

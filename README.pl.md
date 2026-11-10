@@ -396,6 +396,11 @@ numerze, tagach, rodzaju. Można zaznaczyć kilka tagów naraz — lista pokazuj
 które mają je wszystkie. Znalezione filtry można zapisać do ponownego użycia, a przycisk
 "Wyczyść filtry" resetuje wszystko naraz.
 
+Tagi wpisuje się dowolnie, więc z czasem zbierają się literówki i etykiety, których nikt już
+nie używa. Administrator widzi wszystkie tagi w **Ustawienia → Tagi**, z liczbą elementów,
+które je noszą, i może pokazać tylko nieużywane. Usunięcie tagu w tym miejscu zdejmuje go ze
+wszystkich elementów naraz, także wydanych, oraz z podpowiedzi i filtra.
+
 ### Dokumentacja do pobrania
 
 Z poziomu Projektu, Złożenia albo Części da się pobrać komplet załączonych plików jako ZIP

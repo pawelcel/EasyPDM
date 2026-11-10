@@ -34,6 +34,7 @@ import type {
   StorageInfo,
   CadRequest,
   Tag,
+  TagUsage,
   TransferProgress,
   UsedInEntry,
   UserRole,
@@ -318,6 +319,13 @@ export const api = {
   fileDownloadUrl: (itemId: string) => `${BASE}/items/${itemId}/file`,
 
   getTags: () => fetch(`${BASE}/tags`).then((r) => handleResponse<Tag[]>(r)),
+
+  getTagUsage: () => fetch(`${BASE}/settings/tags`).then((r) => handleResponse<TagUsage[]>(r)),
+
+  deleteTagEverywhere: (name: string) =>
+    fetch(`${BASE}/settings/tags/${encodeURIComponent(name)}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
+    ),
 
   addTag: (itemId: string, name: string) =>
     fetch(`${BASE}/items/${itemId}/tags`, json({ name })).then((r) => handleResponse<void>(r)),

@@ -22,6 +22,56 @@ static class TagEndpoints
         });
 
         // ============================================================
+        // GET /api/settings/tags — tagi z liczbą elementów, które je noszą (Ustawienia -> Tagi,
+        // tylko administrator). Liczy wszystkie elementy, także z projektów, do których
+        // administrator formalnie nie jest przypisany — usuwanie tagu i tak działa globalnie.
+        // ============================================================
+        app.MapGet("/api/settings/tags", async (HttpContext ctx) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            const string sql = """
+                SELECT t.name, COUNT(it.item_id)::int
+                FROM tags t
+                LEFT JOIN item_tags it ON it.tag_id = t.id
+                GROUP BY t.id, t.name
+                ORDER BY lower(t.name), t.name;
+                """;
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            var tags = new List<object>();
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                tags.Add(new { name = reader.GetString(0), itemCount = reader.GetInt32(1) });
+
+            return Results.Ok(tags);
+        });
+
+        // ============================================================
+        // DELETE /api/settings/tags/{tagName} — usuwa tag z całej bazy (tylko administrator).
+        // Wiązania w item_tags znikają kaskadą, także na elementach wydanych: tag to etykieta
+        // porządkowa, nie część specyfikacji, więc blokada statusu, która chroni zmianę tagów
+        // pojedynczego elementu, nie ma tu zastosowania. Bez tego raz wpisany tag (literówka,
+        // zakończona akcja) zostawał w podpowiedziach i filtrze na zawsze, nawet gdy nikt go
+        // już nie nosił.
+        // ============================================================
+        app.MapDelete("/api/settings/tags/{tagName}", async (string tagName, HttpContext ctx) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand("DELETE FROM tags WHERE name = @name;", conn);
+            cmd.Parameters.AddWithValue("name", tagName);
+            return await cmd.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.Ok();
+        });
+
+        // ============================================================
         // POST /api/items/{id}/tags   body: { "name": "do-przegladu" }
         // ============================================================
         app.MapPost("/api/items/{id:guid}/tags", async (Guid id, TagRequest body, HttpContext ctx) =>
@@ -102,6 +152,8 @@ static class TagEndpoints
             return Results.Ok();
         });
     }
+
+    private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }
 
 record TagRequest(string Name);

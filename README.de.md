@@ -433,6 +433,12 @@ Name, Nummer, Tags, Art. Mehrere Tags lassen sich gleichzeitig ankreuzen; die Li
 die Elemente, die alle davon tragen. Gefundene Filter können zur Wiederverwendung gespeichert
 werden, und eine Schaltfläche "Filter zurücksetzen" setzt alles auf einmal zurück.
 
+Tags werden frei eingegeben, daher sammeln sich mit der Zeit Tippfehler und Bezeichnungen,
+die niemand mehr nutzt. Ein Administrator sieht alle Tags unter **Einstellungen → Tags**,
+jeweils mit der Zahl der Elemente, die ihn tragen, und kann nur die unbenutzten anzeigen.
+Das Löschen eines Tags dort entfernt ihn auf einmal von allen Elementen, auch freigegebenen,
+sowie aus Vorschlägen und Filter.
+
 ### Herunterladbare Dokumentation
 
 Von einem Projekt, einer Baugruppe oder einem Teil aus lässt sich der komplette Satz

@@ -215,6 +215,12 @@ export function canEditOwnerLocked(
 
 export type Tag = string
 
+// Ustawienia -> Tagi (administrator): tag z liczbą elementów, które go noszą.
+export interface TagUsage {
+  name: string
+  itemCount: number
+}
+
 // Opcjonalny komentarz do rewizji (tylko rewizje, którym faktycznie nadano komentarz —
 // nie każda rewizja go ma).
 export interface RevisionComment {
