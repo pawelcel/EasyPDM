@@ -561,14 +561,16 @@ static class ItemEndpoints
         });
 
         // ============================================================
-        // GET /api/items?search=&tag=&projectId=
-        // Lista elementów z opcjonalnym filtrem po nazwie/właściwościach, tagu i projekcie.
+        // GET /api/items?search=&tag=&tag=&projectId=
+        // Lista elementów z opcjonalnym filtrem po nazwie/właściwościach, tagach i projekcie.
+        // "tag" może wystąpić kilka razy: element musi mieć WSZYSTKIE podane tagi -- tak samo
+        // jak pozostałe filtry, kolejny tag zawęża wynik, a nie go poszerza.
         // Świadomie otwarta dla KAŻDEGO zalogowanego użytkownika, niezależnie od przypisania
         // do projektu (project_users) — ograniczenia project_users dotyczą pracy w konkretnym
         // projekcie (jego drzewa/struktury) i zapisów, nie samego globalnego odczytu/
         // wyszukiwania elementów ("Cała baza" ma być czytelna dla wszystkich).
         // ============================================================
-        app.MapGet("/api/items", async (string? search, string? tag, Guid? projectId, HttpContext ctx) =>
+        app.MapGet("/api/items", async (string? search, string[]? tag, Guid? projectId, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -591,17 +593,19 @@ static class ItemEndpoints
                 WHERE (@search::text IS NULL OR i.file_name ILIKE '%' || @search || '%'
                                                OR i.properties::text ILIKE '%' || @search || '%'
                                                OR (COALESCE(i.item_number_prefix, '') || i.item_number::text) ILIKE '%' || @search || '%')
-                  AND (@tag::text IS NULL OR EXISTS (
-                        SELECT 1 FROM item_tags it
+                  AND (cardinality(@tags) = 0 OR (
+                        SELECT count(DISTINCT t.name) FROM item_tags it
                         JOIN tags t ON t.id = it.tag_id
-                        WHERE it.item_id = i.id AND t.name = @tag))
+                        WHERE it.item_id = i.id AND t.name = ANY(@tags)) = cardinality(@tags))
                   AND (@projectId::uuid IS NULL OR i.project_id = @projectId)
                 ORDER BY i.file_name;
                 """;
 
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("search", (object?)search ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("tag", (object?)tag ?? DBNull.Value);
+            // Bez duplikatów: "count(DISTINCT ...) = cardinality" wymaga, żeby każdy tag był raz.
+            var tags = (tag ?? Array.Empty<string>()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
+            cmd.Parameters.AddWithValue("tags", tags);
             cmd.Parameters.AddWithValue("projectId", (object?)projectId ?? DBNull.Value);
 
             var items = new List<Dictionary<string, object?>>();

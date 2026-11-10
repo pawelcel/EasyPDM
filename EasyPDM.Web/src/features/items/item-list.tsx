@@ -37,9 +37,9 @@ function ItemList({
   error,
   projects,
   search,
-  tag,
+  tags,
   onSearchChange,
-  onTagChange,
+  onTagsChange,
   isAdmin,
   onItemsRefetch,
   onTagsRefetch,
@@ -53,9 +53,9 @@ function ItemList({
   error: boolean
   projects: Project[]
   search: string
-  tag: string
+  tags: string[]
   onSearchChange: (value: string) => void
-  onTagChange: (value: string) => void
+  onTagsChange: (value: string[]) => void
   isAdmin: boolean
   onItemsRefetch: () => void | Promise<void>
   onTagsRefetch: () => void | Promise<void>
@@ -177,7 +177,7 @@ function ItemList({
   // i manufacturer, które ten sam zapis chce ustawić na coś innego niż "wszystkie").
   function applyFilters(f: DatabaseFilters) {
     onSearchChange(f.search)
-    onTagChange(f.tag)
+    onTagsChange(f.tags)
     setRecordType(f.recordType)
     setPartKind(f.partKind)
     setManufacturer(f.manufacturer)
@@ -189,7 +189,7 @@ function ItemList({
 
   const hasActiveFilters =
     !!search ||
-    !!tag ||
+    tags.length > 0 ||
     recordType !== "all" ||
     partKind !== "all" ||
     !!manufacturer ||
@@ -361,7 +361,7 @@ function ItemList({
         )}
         <ClientFilterSelect projects={projects} value={client} onChange={setClient} />
         <SavedFiltersBar
-          currentFilters={{ search, tag, recordType, partKind, manufacturer, productType, productSubtype, client }}
+          currentFilters={{ search, tags, recordType, partKind, manufacturer, productType, productSubtype, client }}
           onApply={applyFilters}
         />
         <Button

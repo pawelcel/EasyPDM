@@ -543,7 +543,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | zarządzanie kontami — **tylko administrator** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | lista/tworzenie/edycja/usunięcie projektu (zapis — tylko administrator; lista filtrowana wg dostępu) |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | zarządzanie przypisaniami użytkowników do projektów — **tylko administrator** |
-| GET | `/api/items?search=&tag=&projectId=` | lista elementów z filtrami (filtrowana wg dostępu do projektu) |
+| GET | `/api/items?search=&tag=&tag=&projectId=` | lista elementów z filtrami (filtrowana wg dostępu do projektu); `tag` może się powtarzać, a element musi mieć wszystkie |
 | GET | `/api/items/{id}` | szczegóły elementu |
 | GET | `/api/items/by-number/{itemNumber}` | szczegóły elementu po numerze zamiast guidzie — używane przez makro SolidWorks do rozwiązania, do której Części/Złożenia należy rysunek (.SLDDRW) |
 | POST | `/api/projects/{projectId}/nodes` | tworzy Folder/Część/Złożenie/Plik bez uploadu (opcjonalnie z ticketem dla makra CAD) |

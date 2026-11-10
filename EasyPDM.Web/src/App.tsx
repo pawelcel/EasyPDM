@@ -71,7 +71,7 @@ function App() {
   const [view, setView] = useState<View>(initialUrlState.view)
   const [settingsSection, setSettingsSection] = useState(initialUrlState.settingsSection)
   const [projectId, setProjectId] = useState(initialUrlState.projectId)
-  const [tag, setTag] = useState("")
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [search, setSearch] = useState("")
   const [treeRefreshKey, setTreeRefreshKey] = useState(0)
   const debouncedSearch = useDebouncedValue(search, 300)
@@ -81,13 +81,13 @@ function App() {
   const [pendingItemSelection, setPendingItemSelection] = useState<string | null>(null)
 
   const { projects, refetch: refetchProjects } = useProjects()
-  const { tags, refetch: refetchTags } = useTags()
+  const { tags: allTags, refetch: refetchTags } = useTags()
   const {
     items,
     loading,
     error,
     refetch: refetchItems,
-  } = useItems({ search: debouncedSearch, tag })
+  } = useItems({ search: debouncedSearch, tags: selectedTags })
 
   const selectedProject = projects.find((p) => p.id === projectId) ?? null
   const isAdmin = user?.role === "admin"
@@ -253,7 +253,7 @@ function App() {
                 placeholder={t("app.searchPlaceholder")}
                 className="min-w-52 flex-1"
               />
-              <TagFilterSelect tags={tags} value={tag} onChange={setTag} />
+              <TagFilterSelect tags={allTags} value={selectedTags} onChange={setSelectedTags} />
               <Button
                 variant="outline"
                 onClick={() => {
@@ -302,9 +302,9 @@ function App() {
               error={error}
               projects={projects}
               search={debouncedSearch}
-              tag={tag}
+              tags={selectedTags}
               onSearchChange={setSearch}
-              onTagChange={setTag}
+              onTagsChange={setSelectedTags}
               isAdmin={isAdmin}
               onItemsRefetch={refetchItems}
               onTagsRefetch={refetchTags}

@@ -8,7 +8,7 @@ export type KindFilter = "all" | "manufactured" | "purchased" | "standard" | "cl
 
 export interface DatabaseFilters {
   search: string
-  tag: string
+  tags: string[]
   recordType: RecordType
   partKind: KindFilter
   manufacturer: string
@@ -56,7 +56,13 @@ export function matchesKindFilter(item: Item, kind: KindFilter): boolean {
 export function coerceDatabaseFilters(raw: Record<string, unknown>): DatabaseFilters {
   return {
     search: typeof raw.search === "string" ? raw.search : "",
-    tag: typeof raw.tag === "string" ? raw.tag : "",
+    // Do 0.8 filtr trzymał jeden tag ("tag": "..."); taki zapis wczytuje się jako lista
+    // z jednym tagiem, zamiast zgubić wybór.
+    tags: Array.isArray(raw.tags)
+      ? raw.tags.filter((x): x is string => typeof x === "string")
+      : typeof raw.tag === "string" && raw.tag
+        ? [raw.tag]
+        : [],
     recordType: RECORD_TYPES.includes(raw.recordType as RecordType)
       ? (raw.recordType as RecordType)
       : "all",

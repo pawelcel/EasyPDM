@@ -415,7 +415,8 @@ Schaltfläche zum direkten Wechsel dorthin.
 ### Suche und gesamte Datenbank
 
 Der Reiter **Gesamte Datenbank** durchsucht alle Elemente unabhängig vom Projekt — nach
-Name, Nummer, Tags, Art. Gefundene Filter können zur Wiederverwendung gespeichert
+Name, Nummer, Tags, Art. Mehrere Tags lassen sich gleichzeitig ankreuzen; die Liste zeigt dann
+die Elemente, die alle davon tragen. Gefundene Filter können zur Wiederverwendung gespeichert
 werden, und eine Schaltfläche "Filter zurücksetzen" setzt alles auf einmal zurück.
 
 ### Herunterladbare Dokumentation

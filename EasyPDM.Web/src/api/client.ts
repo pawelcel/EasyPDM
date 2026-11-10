@@ -147,10 +147,11 @@ export const api = {
       handleResponse<void>(r)
     ),
 
-  getItems: (params: { search?: string; tag?: string; projectId?: string }) => {
+  // Kilka tagów = element musi mieć wszystkie (zob. GET /api/items).
+  getItems: (params: { search?: string; tags?: string[]; projectId?: string }) => {
     const query = new URLSearchParams()
     if (params.search) query.set("search", params.search)
-    if (params.tag) query.set("tag", params.tag)
+    for (const tag of params.tags ?? []) query.append("tag", tag)
     if (params.projectId) query.set("projectId", params.projectId)
     const qs = query.toString()
     return fetch(`${BASE}/items${qs ? `?${qs}` : ""}`).then((r) => handleResponse<Item[]>(r))

@@ -381,7 +381,8 @@ panel lists every Project assigned to it, with a button to jump straight there.
 ### Search and the whole database
 
 The **Whole database** tab searches all items regardless of project — by name, number,
-tags, kind. Found filters can be saved for reuse, and a "Clear filters" button resets
+tags, kind. Several tags can be ticked at once; the list then shows the items that carry all
+of them. Found filters can be saved for reuse, and a "Clear filters" button resets
 everything at once.
 
 ### Downloadable documentation

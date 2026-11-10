@@ -382,7 +382,8 @@ przypisany do niego Projekt, z przyciskiem do bezpośredniego przejścia.
 ### Wyszukiwanie i cała baza
 
 Zakładka **Cała baza** przeszukuje wszystkie elementy niezależnie od projektu — po nazwie,
-numerze, tagach, rodzaju. Znalezione filtry można zapisać do ponownego użycia, a przycisk
+numerze, tagach, rodzaju. Można zaznaczyć kilka tagów naraz — lista pokazuje wtedy elementy,
+które mają je wszystkie. Znalezione filtry można zapisać do ponownego użycia, a przycisk
 "Wyczyść filtry" resetuje wszystko naraz.
 
 ### Dokumentacja do pobrania

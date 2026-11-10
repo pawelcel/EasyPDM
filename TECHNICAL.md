@@ -758,7 +758,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | account management — **administrator only** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | list/create/edit/delete a project (writes — administrator only; list filtered by access) |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | managing user-to-project assignments — **administrator only** |
-| GET | `/api/items?search=&tag=&projectId=` | filtered item list (filtered by project access) |
+| GET | `/api/items?search=&tag=&tag=&projectId=` | filtered item list (filtered by project access); `tag` may repeat, and an item must carry all of them |
 | GET | `/api/items/{id}` | item details |
 | GET | `/api/items/by-number/{itemNumber}` | item details by item number instead of guid — used by the SolidWorks macro to resolve a Drawing (.SLDDRW) to the Part/Assembly it documents |
 | POST | `/api/projects/{projectId}/nodes` | creates a Folder/Part/Assembly/File without an upload (optionally with a ticket for a CAD macro) |

@@ -596,7 +596,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | Kontenverwaltung — **nur Administrator** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | Liste/Erstellung/Bearbeitung/Löschung eines Projekts (Schreiben — nur Administrator; Liste nach Zugriff gefiltert) |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | Verwaltung von Benutzer-Projekt-Zuweisungen — **nur Administrator** |
-| GET | `/api/items?search=&tag=&projectId=` | gefilterte Elementliste (nach Projektzugriff gefiltert) |
+| GET | `/api/items?search=&tag=&tag=&projectId=` | gefilterte Elementliste (nach Projektzugriff gefiltert); `tag` darf sich wiederholen, ein Element muss alle tragen |
 | GET | `/api/items/{id}` | Elementdetails |
 | GET | `/api/items/by-number/{itemNumber}` | Elementdetails nach Elementnummer statt Guid — verwendet vom SolidWorks-Makro, um eine Zeichnung (.SLDDRW) dem Teil/der Baugruppe zuzuordnen, die sie dokumentiert |
 | POST | `/api/projects/{projectId}/nodes` | erstellt Ordner/Teil/Baugruppe/Datei ohne Upload (optional mit Ticket für ein CAD-Makro) |
