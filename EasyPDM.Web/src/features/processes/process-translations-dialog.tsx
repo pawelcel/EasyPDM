@@ -12,7 +12,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { FormError } from "@/components/ui/form-error"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -21,7 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { SuggestInput } from "@/components/ui/suggest-input"
 import { Textarea } from "@/components/ui/textarea"
+import { processNamesIn } from "@/features/processes/process-names"
 import { useLanguage } from "@/i18n/use-language"
 
 type Draft = Record<number, { name: string; description: string }>
@@ -40,11 +41,14 @@ function draftFrom(process: Process): Draft {
 function ProcessTranslationsDialog({
   trigger,
   process,
+  processes,
   languages,
   onSaved,
 }: {
   trigger: ReactElement
   process: Process
+  // Cały katalog — do podpowiedzi nazw w każdym języku z nazw innych obróbek w tym języku.
+  processes: Process[]
   languages: ProjectLanguage[]
   onSaved: () => Promise<void>
 }) {
@@ -95,10 +99,12 @@ function ProcessTranslationsDialog({
     return (
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${prefix}-name`}>{t("process.nameLabel")}</Label>
-        <Input
+        <SuggestInput
           id={`${prefix}-name`}
           value={draft[lang.id]?.name ?? ""}
-          onChange={(e) => set(lang.id, "name", e.target.value)}
+          onChange={(value) => set(lang.id, "name", value)}
+          suggestions={processNamesIn(processes, lang.id, process.id)}
+          nearDuplicateHint={false}
         />
         <Label htmlFor={`${prefix}-description`}>{t("process.descriptionLabel")}</Label>
         <Textarea

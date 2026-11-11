@@ -28,6 +28,7 @@ import {
 import { SuggestInput } from "@/components/ui/suggest-input"
 import { Textarea } from "@/components/ui/textarea"
 import { ProcessTranslationsDialog } from "@/features/processes/process-translations-dialog"
+import { processNamesIn } from "@/features/processes/process-names"
 import { useProcesses } from "@/features/processes/use-processes"
 import { useProjectLanguages } from "@/features/project-languages/use-project-languages"
 import { useLanguage } from "@/i18n/use-language"
@@ -81,6 +82,7 @@ function ProcessesView() {
             trigger={<Button>{t("process.addButton")}</Button>}
             title={t("process.addTitle")}
             processes={processes}
+            defaultLanguageId={defaultLanguageId}
             onSubmit={async (body) => {
               await api.addProcess(body)
               await refetch()
@@ -147,6 +149,7 @@ function ProcessesView() {
                       </Button>
                     }
                     process={p}
+                    processes={processes}
                     languages={languages}
                     onSaved={refetch}
                   />
@@ -159,6 +162,7 @@ function ProcessesView() {
                     title={t("process.editTitle")}
                     initial={p}
                     processes={processes}
+                    defaultLanguageId={defaultLanguageId}
                     onSubmit={async (body) => {
                       await api.updateProcess(p.id, body)
                       await refetch()
@@ -207,12 +211,15 @@ function ProcessDialog({
   title,
   initial,
   processes,
+  defaultLanguageId,
   onSubmit,
 }: {
   trigger: ReactElement
   title: string
   initial?: Process
   processes: Process[]
+  // Okno zapisuje tekst w domyślnym języku dokumentacji, więc i podpowiada nazwy z tego języka.
+  defaultLanguageId: number | undefined
   onSubmit: (body: ProcessBody) => Promise<void>
 }) {
   const { t } = useLanguage()
@@ -280,7 +287,7 @@ function ProcessDialog({
             id="process-name"
             value={name}
             onChange={setName}
-            suggestions={processes.filter((p) => p.id !== initial?.id).map((p) => p.name)}
+            suggestions={processNamesIn(processes, defaultLanguageId, initial?.id)}
             placeholder={t("process.namePlaceholder")}
             newValueHint={initial ? undefined : t("process.newHint")}
             nearDuplicateHint={false}
