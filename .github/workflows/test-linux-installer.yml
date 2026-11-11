@@ -40,6 +40,10 @@ jobs:
       # i oba warianty deinstalacji.
       - name: "Symulacja bazy deweloperskiej (pdm / pdm_user)"
         run: |
+          # Indeks paczek w obrazie runnera bywa starszy niż mirror: apt próbuje wtedy pobrać
+          # wersję, której już tam nie ma, i pada ("Failed to fetch ... maybe run apt-get
+          # update"). Świeży indeks przed instalacją usuwa ten problem.
+          sudo apt-get update > /dev/null
           sudo apt-get install -y postgresql > /dev/null
           sudo systemctl start postgresql
           sudo -u postgres psql -c "CREATE ROLE pdm_user LOGIN PASSWORD 'dev';"
