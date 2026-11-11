@@ -88,6 +88,8 @@ const ASSEMBLY_MANAGED_PROPERTY_KEYS = new Set([
   "mass",
   // Dodatkowe informacje — własne pole przy każdym rodzaju Złożenia, jak przy Części.
   "notes",
+  // Tłumaczenia nazwy — własne okno przy polu nazwy.
+  "nameTexts",
 ])
 
 function propertyEditorEntries(item: Item): Record<string, unknown> {
@@ -161,6 +163,7 @@ function ItemDetailPanel({
   hideActions = false,
   clientVerification = null,
   documentationLanguageId,
+  documentationLanguageIds,
 }: {
   item: Item
   projectName?: string
@@ -195,6 +198,8 @@ function ItemDetailPanel({
   // Główny język projektu, w którego kontekście element jest oglądany — w nim pokazują się
   // obróbki (zob. DocumentationLanguageProvider). Brak = domyślny język dokumentacji.
   documentationLanguageId?: number
+  // Języki projektu wielojęzycznego — na nie tłumaczy się nazwę; brak = wszystkie języki.
+  documentationLanguageIds?: number[]
 }) {
   const { t, language } = useLanguage()
   const { user } = useAuth()
@@ -328,7 +333,7 @@ function ItemDetailPanel({
   }
 
   return (
-    <DocumentationLanguageProvider languageId={documentationLanguageId}>
+    <DocumentationLanguageProvider languageId={documentationLanguageId} languageIds={documentationLanguageIds}>
     <div>
       {!hideActions &&
         (onRemoveFromStructure || canDuplicate || canDownloadDocumentation || onDeleteCompletely) && (

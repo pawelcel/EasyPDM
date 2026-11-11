@@ -500,6 +500,10 @@ function ItemList({
                 item={selectedItem}
                 projectName={projects.find((p) => p.id === selectedItem.projectId)?.name}
                 documentationLanguageId={projects.find((p) => p.id === selectedItem.projectId)?.mainLanguageId}
+                documentationLanguageIds={(() => {
+                  const project = projects.find((p) => p.id === selectedItem.projectId)
+                  return project?.multilingual ? project.languageIds : undefined
+                })()}
                 childEntries={selectedItemChildren}
                 onSelectChild={handleSelectChild}
                 onItemsRefetch={refetchItemsAndExternal}

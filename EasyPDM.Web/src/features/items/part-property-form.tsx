@@ -24,6 +24,7 @@ import {
 } from "@/features/items/property-fields"
 import { ProcessSelect } from "@/features/processes/process-select"
 import type { TranslationKey } from "@/i18n/translations"
+import { ItemNameTranslationsDialog } from "@/features/items/item-name-translations-dialog"
 import { useLanguage } from "@/i18n/use-language"
 
 const CURRENCIES = [
@@ -173,16 +174,19 @@ function PartSummaryFields({
 
       <Label htmlFor="part-name">{t("common.name")}</Label>
       {item.nameLocked && !locked && <Hint>{t("part.nameLockedHint")}</Hint>}
-      <Input
-        id="part-name"
-        value={name}
-        disabled={locked || item.nameLocked}
-        onChange={(e) => setName(e.target.value)}
-        onBlur={saveName}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur()
-        }}
-      />
+      <div className="flex items-center gap-1.5">
+        <ItemNameTranslationsDialog item={item} disabled={locked} onChanged={onChanged} />
+        <Input
+          id="part-name"
+          value={name}
+          disabled={locked || item.nameLocked}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={saveName}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+          }}
+        />
+      </div>
 
       {!isAssembly && (rodzaj === "Wykonywana" || rodzaj === "Normalia") && (
         <MaterialField

@@ -41,6 +41,7 @@ import {
 import { ASSEMBLY_KIND_FIELDS, PART_KIND_FIELDS } from "@/features/items/part-property-form"
 import { ProcessSelect } from "@/features/processes/process-select"
 import { DocumentationLanguageProvider } from "@/features/project-languages/documentation-language"
+import { useProjectLanguages } from "@/features/project-languages/use-project-languages"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -192,6 +193,9 @@ function AddNodeDialog({
   // Główny język projektu, do którego trafi element — w nim pokazują się obróbki do wyboru.
   // Bez projektu (albo zanim się wczyta) obowiązuje domyślny język dokumentacji.
   const [mainLanguageId, setMainLanguageId] = useState<number | undefined>(undefined)
+  const { languages: documentationLanguages } = useProjectLanguages()
+  const titleLanguage =
+    documentationLanguages.find((l) => l.id === mainLanguageId) ?? documentationLanguages.find((l) => l.isDefault)
   useEffect(() => {
     if (!open || !projectId) {
       setMainLanguageId(undefined)
@@ -551,7 +555,19 @@ function AddNodeDialog({
       <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{lockMode === "file" ? t("item.uploadFile") : t("addNode.title")}</DialogTitle>
+          <DialogTitle>
+            {lockMode === "file" ? (
+              t("item.uploadFile")
+            ) : (
+              <>
+                {t("addNode.title")}
+                {/* Język, w którym wpisuje się dane nowego elementu — główny język projektu. */}
+                {titleLanguage && (
+                  <span className="font-normal text-muted-foreground"> ({titleLanguage.name})</span>
+                )}
+              </>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         {/* Widoczne tylko gdy ten dialog obsługuje bilet z makra CAD (ticket podany) --
