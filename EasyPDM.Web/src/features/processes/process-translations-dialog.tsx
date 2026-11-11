@@ -14,6 +14,13 @@ import {
 import { FormError } from "@/components/ui/form-error"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -26,8 +33,10 @@ function draftFrom(process: Process): Draft {
 }
 
 // Okno tłumaczeń obróbki: na górze wersja w domyślnym języku dokumentacji, pod nią nazwa i
-// opis w każdym innym języku. Zapis wysyła wszystkie języki naraz (PUT
-// /api/processes/{id}/texts); język z pustą nazwą to brak tłumaczenia.
+// opis w JEDNYM wybranym z listy innym języku — przy kilkunastu językach osobne pola dla
+// każdego robiłyby z okna długą ścianę formularzy. Zmiany we wszystkich przeglądanych
+// językach zostają w szkicu i zapis wysyła je naraz (PUT /api/processes/{id}/texts); język
+// z pustą nazwą to brak tłumaczenia.
 function ProcessTranslationsDialog({
   trigger,
   process,
@@ -47,6 +56,11 @@ function ProcessTranslationsDialog({
 
   const defaultLanguage = languages.find((l) => l.isDefault)
   const others = languages.filter((l) => !l.isDefault)
+  // Na start pierwszy język bez tłumaczenia — to zwykle ten, który przyszło się uzupełnić.
+  const firstToEdit = () => (others.find((l) => !draftFrom(process)[l.id]?.name) ?? others[0])?.id ?? null
+  const [selectedId, setSelectedId] = useState<number | null>(firstToEdit)
+  const selected = others.find((l) => l.id === selectedId) ?? others[0]
+  const hasText = (id: number) => !!draft[id]?.name.trim()
 
   function set(languageId: number, field: "name" | "description", value: string) {
     setDraft((d) => ({
@@ -104,6 +118,7 @@ function ProcessTranslationsDialog({
         setOpen(next)
         if (next) {
           setDraft(draftFrom(process))
+          setSelectedId(firstToEdit())
           setError("")
         }
       }}
@@ -127,18 +142,28 @@ function ProcessTranslationsDialog({
           </section>
         )}
 
-        {others.length > 0 ? (
-          <div className="flex flex-col gap-4">
-            {others.map((lang) => (
-              <section key={lang.id}>
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                  <span className="font-mono">{lang.code}</span>
-                  <span>{lang.name}</span>
-                </div>
-                {fields(lang)}
-              </section>
-            ))}
-          </div>
+        {others.length > 0 && selected ? (
+          <section className="flex flex-col gap-2">
+            <Label htmlFor={`process-${process.id}-translation-language`}>{t("process.translationsLanguage")}</Label>
+            <Select value={String(selected.id)} onValueChange={(v) => v && setSelectedId(Number(v))}>
+              <SelectTrigger id={`process-${process.id}-translation-language`} className="w-full">
+                <SelectValue>
+                  {(v: string) => {
+                    const lang = others.find((l) => String(l.id) === v)
+                    return lang ? <LanguageOption lang={lang} translated={hasText(lang.id)} /> : ""
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {others.map((lang) => (
+                  <SelectItem key={lang.id} value={String(lang.id)}>
+                    <LanguageOption lang={lang} translated={hasText(lang.id)} />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div key={selected.id}>{fields(selected)}</div>
+          </section>
         ) : (
           <p className="text-sm text-muted-foreground">{t("process.translationsNoOtherLanguages")}</p>
         )}
@@ -155,6 +180,21 @@ function ProcessTranslationsDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Pozycja listy języków: skrót, nazwa i znacznik, czy tłumaczenie już jest (liczy się szkic,
+// więc znacznik pojawia się od razu po wpisaniu nazwy, przed zapisem).
+function LanguageOption({ lang, translated }: { lang: ProjectLanguage; translated: boolean }) {
+  const { t } = useLanguage()
+  return (
+    <span className="flex items-center gap-2">
+      <span className="w-9 font-mono text-[13px] font-semibold">{lang.code}</span>
+      <span>{lang.name}</span>
+      <span className={`text-[12px] ${translated ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+        {translated ? t("process.translationsDone") : t("process.translationsMissing")}
+      </span>
+    </span>
   )
 }
 
