@@ -231,6 +231,13 @@ export interface ProjectLanguage {
   isDefault: boolean
 }
 
+// Podpowiedź nazwy przy tworzeniu elementu: nazwa istniejącego elementu w danym języku i jej
+// tłumaczenia na inne języki (GET /api/item-names).
+export interface ItemNameSuggestion {
+  name: string
+  texts: { languageId: number; name: string }[]
+}
+
 // Ustawienia -> Tagi (administrator): tag z liczbą elementów, które go noszą.
 export interface TagUsage {
   name: string

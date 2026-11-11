@@ -202,6 +202,7 @@ const pl = {
   "database.empty": "Brak rekordów pasujących do wybranych filtrów.",
 
   "addNode.title": "Dodaj element",
+  "addNode.inheritsTranslations": "Wybrana nazwa doda tłumaczenia: {list}",
   "item.nameTranslations": "Tłumaczenia nazwy",
   "item.nameTranslationsTitle": "Tłumaczenia nazwy — {name}",
   "item.translationsMainNote": "(główny język projektu)",
@@ -1061,6 +1062,7 @@ const en: Record<TranslationKey, string> = {
   "database.empty": "No records match the selected filters.",
 
   "addNode.title": "Add item",
+  "addNode.inheritsTranslations": "The chosen name adds translations: {list}",
   "item.nameTranslations": "Name translations",
   "item.nameTranslationsTitle": "Name translations — {name}",
   "item.translationsMainNote": "(main project language)",
@@ -1917,6 +1919,7 @@ const de: Record<TranslationKey, string> = {
   "database.empty": "Keine Datensätze entsprechen den ausgewählten Filtern.",
 
   "addNode.title": "Element hinzufügen",
+  "addNode.inheritsTranslations": "Der gewählte Name übernimmt die Übersetzungen: {list}",
   "item.nameTranslations": "Namensübersetzungen",
   "item.nameTranslationsTitle": "Namensübersetzungen — {name}",
   "item.translationsMainNote": "(Hauptsprache des Projekts)",

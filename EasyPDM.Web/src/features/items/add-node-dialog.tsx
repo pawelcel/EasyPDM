@@ -2,7 +2,14 @@ import { type ReactElement, useEffect, useRef, useState } from "react"
 import { Upload } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
-import { itemDisplayLabel, type Item, type ItemType, type ProcessRef, type Project } from "@/api/types"
+import {
+  itemDisplayLabel,
+  type Item,
+  type ItemNameSuggestion,
+  type ItemType,
+  type ProcessRef,
+  type Project,
+} from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -43,6 +50,7 @@ import { ProcessSelect } from "@/features/processes/process-select"
 import { DocumentationLanguageProvider } from "@/features/project-languages/documentation-language"
 import { useProjectLanguages } from "@/features/project-languages/use-project-languages"
 import type { TranslationKey } from "@/i18n/translations"
+import { SuggestInput } from "@/components/ui/suggest-input"
 import { useLanguage } from "@/i18n/use-language"
 
 type Mode = ItemType | "existing"
@@ -196,6 +204,7 @@ function AddNodeDialog({
   const { languages: documentationLanguages } = useProjectLanguages()
   const titleLanguage =
     documentationLanguages.find((l) => l.id === mainLanguageId) ?? documentationLanguages.find((l) => l.isDefault)
+
   useEffect(() => {
     if (!open || !projectId) {
       setMainLanguageId(undefined)
@@ -262,6 +271,31 @@ function AddNodeDialog({
 
   // Folder / Część
   const [name, setName] = useState(initialName ?? "")
+
+  // Podpowiedzi nazw Części/Złożeń w języku projektu. Wybór podpowiedzi (nazwa dokładnie równa
+  // jednej z nich) dołącza do nowego elementu jej tłumaczenia — properties.nameTexts.
+  const [nameSuggestions, setNameSuggestions] = useState<ItemNameSuggestion[]>([])
+  const suggestionType = mode === "part" || mode === "assembly" ? mode : null
+  useEffect(() => {
+    if (!open || !suggestionType || !titleLanguage) {
+      setNameSuggestions([])
+      return
+    }
+    let cancelled = false
+    api.getItemNames(titleLanguage.id, suggestionType).then((list) => {
+      if (!cancelled) setNameSuggestions(list)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, suggestionType, titleLanguage])
+  const matchedName = nameSuggestions.find((s) => s.name === name.trim() && s.texts.length > 0) ?? null
+  const inheritedTranslations = matchedName
+    ? matchedName.texts.flatMap((x) => {
+        const lang = documentationLanguages.find((l) => l.id === x.languageId)
+        return lang ? [`${lang.code} ${x.name}`] : []
+      })
+    : []
   const [mass, setMass] = useState(seedMass)
   const [rodzaj, setRodzaj] = useState(seedRodzaj)
   // Materiał/Producent/Numery zamówieniowe/Norma — pola zależne od rodzaju, te same co w
@@ -408,6 +442,9 @@ function AddNodeDialog({
         if (value.trim()) properties[key] = value.trim()
       }
       if (rodzaj === "Wykonywana" && processes.length > 0) properties.processes = processes
+    }
+    if ((itemType === "part" || itemType === "assembly") && matchedName) {
+      properties.nameTexts = matchedName.texts
     }
     if (itemType === "assembly") {
       properties.rodzaj = rodzaj
@@ -720,7 +757,16 @@ function AddNodeDialog({
               </Button>
             </div>
             <Label htmlFor="node-name">{t("common.name")}</Label>
-            <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} />
+            <SuggestInput
+              id="node-name"
+              value={name}
+              onChange={setName}
+              suggestions={nameSuggestions.map((s) => s.name)}
+              nearDuplicateHint={false}
+            />
+            {inheritedTranslations.length > 0 && (
+              <Hint>{t("addNode.inheritsTranslations", { list: inheritedTranslations.join(", ") })}</Hint>
+            )}
 
             {(rodzaj === "Wykonywana" || rodzaj === "Normalia") && (
               <MaterialField
@@ -866,7 +912,16 @@ function AddNodeDialog({
             )}
 
             <Label htmlFor="node-name">{t("common.name")}</Label>
-            <Input id="node-name" value={name} onChange={(e) => setName(e.target.value)} />
+            <SuggestInput
+              id="node-name"
+              value={name}
+              onChange={setName}
+              suggestions={nameSuggestions.map((s) => s.name)}
+              nearDuplicateHint={false}
+            />
+            {inheritedTranslations.length > 0 && (
+              <Hint>{t("addNode.inheritsTranslations", { list: inheritedTranslations.join(", ") })}</Hint>
+            )}
 
             {mode === "assembly" && rodzaj === "Wykonywane" && (
               <>

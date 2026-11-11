@@ -35,6 +35,7 @@ import type {
   CadRequest,
   Tag,
   TagUsage,
+  ItemNameSuggestion,
   ProjectLanguage,
   TransferProgress,
   UsedInEntry,
@@ -354,6 +355,11 @@ export const api = {
 
   removeProjectLanguage: (id: number) =>
     fetch(`${BASE}/project-languages/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  getItemNames: (languageId: number, itemType: "part" | "assembly") =>
+    fetch(`${BASE}/item-names?languageId=${languageId}&itemType=${itemType}`).then((r) =>
+      handleResponse<ItemNameSuggestion[]>(r)
+    ),
 
   getTagUsage: () => fetch(`${BASE}/settings/tags`).then((r) => handleResponse<TagUsage[]>(r)),
 
