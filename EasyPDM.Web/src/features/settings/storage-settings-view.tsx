@@ -475,9 +475,11 @@ function DangerZoneSection() {
   const [scopeProcesses, setScopeProcesses] = useState(true)
   const [scopeManufacturers, setScopeManufacturers] = useState(true)
   const [scopeClients, setScopeClients] = useState(true)
+  const [scopeCompany, setScopeCompany] = useState(true)
 
   const phrase = t("storage.clearDatabasePhrase")
-  const noneSelected = !scopeProjects && !scopeMaterials && !scopeProcesses && !scopeManufacturers && !scopeClients
+  const noneSelected =
+    !scopeProjects && !scopeMaterials && !scopeProcesses && !scopeManufacturers && !scopeClients && !scopeCompany
 
   function openConfirm() {
     setTypedPhrase("")
@@ -501,6 +503,7 @@ function DangerZoneSection() {
         processes: scopeProcesses,
         manufacturers: scopeManufacturers,
         clients: scopeClients,
+        company: scopeCompany,
       })
       setDone(true)
     } catch (err) {
@@ -604,6 +607,15 @@ function DangerZoneSection() {
                       className="size-3.5 shrink-0 accent-primary"
                     />
                     {t("storage.clearScopeClients")}
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={scopeCompany}
+                      onChange={(e) => setScopeCompany(e.target.checked)}
+                      className="size-3.5 shrink-0 accent-primary"
+                    />
+                    {t("storage.clearScopeCompany")}
                   </label>
                   {noneSelected && <Hint>{t("storage.clearScopeNoneSelected")}</Hint>}
                 </div>

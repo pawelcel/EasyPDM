@@ -100,7 +100,7 @@ static class SettingsEndpoints
 
         // POST /api/settings/storage/clear-database — kasuje wybrane kategorie danych
         // (projekty/elementy, katalog Materiałów, katalog Obróbek, katalog Producentów,
-        // katalog Klientów),
+        // katalog Klientów, dane Firmy — nazwa i logo),
         // niezależnie od siebie — do wyboru w body. Zawsze zostają nietknięte: konta
         // użytkowników i ustawienia serwera (backup, prefiksy numeracji).
         app.MapPost("/api/settings/storage/clear-database", async (HttpContext ctx, ClearDatabaseRequest body) =>
@@ -108,7 +108,7 @@ static class SettingsEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
-            if (!body.Projects && !body.Materials && !body.Processes && !body.Manufacturers && !body.Clients)
+            if (!body.Projects && !body.Materials && !body.Processes && !body.Manufacturers && !body.Clients && !body.Company)
                 return Results.BadRequest("Wybierz przynajmniej jedną kategorię do wyczyszczenia.");
 
             await using var conn = new NpgsqlConnection(connectionString);
@@ -166,6 +166,13 @@ static class SettingsEndpoints
                 // Jak materiały: samodzielny katalog bez plików na dysku; elementy trzymają
                 // tylko nazwy obróbek w properties.processes, bez FK, więc zostają nietknięte.
                 await using var cmd = new NpgsqlCommand("DELETE FROM processes;", conn);
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            if (body.Company)
+            {
+                // Nazwa i logo firmy (Ustawienia -> Firma, migracja 067) — jeden wiersz w bazie.
+                await using var cmd = new NpgsqlCommand("DELETE FROM company_profile;", conn);
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -830,9 +837,9 @@ class BackupFailedException(string message) : Exception(message);
 
 record MoveStorageRequest(string NewPath, bool MigrateExisting);
 
-// Processes jest ostatnie i ma wartość domyślną: starszy klient, który pola nie wysyła,
-// nie czyści katalogu obróbek.
-record ClearDatabaseRequest(bool Projects, bool Materials, bool Manufacturers, bool Clients, bool Processes = false);
+// Processes i Company są na końcu i mają wartość domyślną: starszy klient, który tych pól nie
+// wysyła, nie czyści katalogu obróbek ani danych firmy.
+record ClearDatabaseRequest(bool Projects, bool Materials, bool Manufacturers, bool Clients, bool Processes = false, bool Company = false);
 
 record BackupSchedule(
     bool Enabled, string Frequency, int? DayOfWeek, int? DayOfMonth, int Hour, int Minute, DateTime? LastRunAt,

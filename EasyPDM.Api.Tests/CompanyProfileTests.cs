@@ -74,4 +74,25 @@ public class CompanyProfileTests
             (await user.PutAsync("/api/settings/company/logo", FileForm(Png, "logo.png", "image/png"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await user.DeleteAsync("/api/settings/company/logo")).StatusCode);
     }
+
+    [Fact]
+    public async Task Czyszczenie_bazy_usuwa_dane_firmy_tylko_na_zyczenie()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var admin = factory.CreateClient();
+        await admin.LoginAsync("admin", "admin");
+        (await admin.PatchAsJsonAsync("/api/settings/company", new { name = "Do skasowania" })).EnsureSuccessStatusCode();
+        (await admin.PutAsync("/api/settings/company/logo", FileForm(Png, "logo.png", "image/png"))).EnsureSuccessStatusCode();
+
+        // Starszy klient bez pola "company" nie rusza danych firmy.
+        (await admin.PostAsJsonAsync("/api/settings/storage/clear-database",
+            new { projects = false, materials = true, manufacturers = false, clients = false })).EnsureSuccessStatusCode();
+        Assert.Equal("Do skasowania", (await admin.GetFromJsonAsync<JsonElement>("/api/settings/company")).GetProperty("name").GetString());
+
+        (await admin.PostAsJsonAsync("/api/settings/storage/clear-database",
+            new { projects = false, materials = false, manufacturers = false, clients = false, company = true })).EnsureSuccessStatusCode();
+        var company = await admin.GetFromJsonAsync<JsonElement>("/api/settings/company");
+        Assert.Equal(JsonValueKind.Null, company.GetProperty("name").ValueKind);
+        Assert.False(company.GetProperty("hasLogo").GetBoolean());
+    }
 }

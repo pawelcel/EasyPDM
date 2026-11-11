@@ -766,6 +766,7 @@ export const api = {
     processes: boolean
     manufacturers: boolean
     clients: boolean
+    company: boolean
   }) =>
     fetch(`${BASE}/settings/storage/clear-database`, json(scope)).then((r) =>
       handleResponse<{ deletedProjects: number; deletedFiles: number }>(r)
