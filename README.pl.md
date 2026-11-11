@@ -389,6 +389,30 @@ powiązać z Klientem, a gdy ten ma ich kilka — z konkretną drugą nazwą. Li
 pokazuje wtedy "Projekt (Klient, Druga nazwa)", a panel szczegółów klienta wypisuje każdy
 przypisany do niego Projekt, z przyciskiem do bezpośredniego przejścia.
 
+### Języki dokumentacji
+
+Języki dokumentacji są niezależne od języka interfejsu, który każdy wybiera dla siebie. W
+**Ustawienia → Język** administrator prowadzi listę języków, w których firma tworzy
+dokumentację — pełna nazwa i skrót z maksymalnie trzech wielkich liter; na start są
+English (EN) i Polish (PL) — i wybiera domyślny język dokumentacji.
+
+Każdy projekt ma **główny język** — przy tworzeniu projektu domyślny — i może być
+oznaczony jako **wielojęzyczny**, z listą języków, w których powstaje jego dokumentacja;
+jedno i drugie ustawia się we właściwościach projektu. Okno dodawania elementu podaje w
+tytule język projektu, żeby było jasne, w jakim języku opisuje się nowy element.
+
+**Obróbki** wpisuje się w domyślnym języku dokumentacji, a przycisk przy każdej otwiera
+jej tłumaczenia: na górze wersja domyślna, pod nią jeden inny język naraz, wybierany z
+listy, która pokazuje, co jest już przetłumaczone. Katalog podąża za językiem domyślnym i
+oznacza obróbki bez tłumaczenia. Część albo złożenie trzyma swoje obróbki we wszystkich
+językach i pokazuje je w głównym języku projektu — w panelu elementu, zestawieniu części
+(BOM) i obu eksportach CSV.
+
+**Nazwę części albo złożenia** tłumaczy się przyciskiem na lewo od pola nazwy. Przy
+dodawaniu nowego elementu pole nazwy podpowiada nazwy, które istniejące części lub
+złożenia mają już w języku projektu, a wybór podpowiedzi przenosi jej tłumaczenia — druga
+„Kostka” przychodzi od razu ze swoim „Cube”.
+
 ### Wyszukiwanie i cała baza
 
 Zakładka **Cała baza** przeszukuje wszystkie elementy niezależnie od projektu — po nazwie,
@@ -425,6 +449,10 @@ Dwie role: **administrator** (pełny dostęp, widzi wszystkie projekty, zarządz
 ustawieniami serwera) i **użytkownik** (widzi i pracuje tylko w projektach, do których go
 przypisano). Każdy sam zarządza swoim językiem interfejsu (polski/angielski/niemiecki) i
 motywem jasny/ciemny w Ustawieniach.
+
+Każde konto ma **imię i nazwisko**, osobno od wyświetlanej nazwy, z myślą o tabelce
+rysunkowej. Oba są wymagane przy zakładaniu konta; Ustawienia → Użytkownicy oznaczają
+konta, którym ich brakuje, a przycisk edycji przy koncie pozwala je uzupełnić.
 
 ## Dla administratorów i programistów
 

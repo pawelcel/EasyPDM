@@ -425,7 +425,48 @@ Hochladens nicht kannte. Die Makros lesen das Material aus dem Dokument statt au
 Liste; ohne dies trüge das Element ein Material, das sich weder erneut auswählen noch als
 Filter nutzen ließe. Angelegt wird nur der Name; Gruppe und Untergruppe bleiben leer.
 
-**Bearbeitungen** (`processes`, Migrationen 061 und 062, Menü „Bearbeitung“) sind ein Katalog nach dem Vorbild der Materialien: Name, optionale Beschreibung sowie `for_parts`/`for_assemblies`, von denen mindestens eines wahr ist. Namen sind nicht eindeutig (062 hat den Index auf `lower(name)` aus 061 entfernt): „Härten“ bis 50 HRC und „Härten“ induktiv sind ein Verfahren mit zwei Spezifikationen, unterschieden durch die Beschreibung. Ein gefertigtes Teil („Wykonywana“) oder eine gefertigte Baugruppe („Wykonywane“) speichert die Auswahl daher in `properties.processes` als Objekte `{id, name, description}`: Die ID unterscheidet die Varianten, und die kopierten Name und Beschreibung halten ein freigegebenes Element bei der Spezifikation, mit der es freigegeben wurde, wenn der Katalogeintrag geändert oder gelöscht wird. Eine bereits gewählte Bearbeitung behält ihre Kopie; eine neu gewählte übernimmt den aktuellen Text des Katalogs. Einträge, deren ID nicht mehr im Katalog steht, bleiben sichtbar, damit man sie abwählen kann, und eine bloße Zeichenkette (das Format vor den Varianten) wird als Name gelesen. Ein Wechsel weg von „gefertigt“ leert die Liste mit den übrigen Feldern dieser Art. Die Auswahl ist eine Mehrfach-Combobox, die sich per Klick öffnet und nach Name und Beschreibung filtert; die gewählten Einträge stehen nicht als Chips im Feld, sondern in normaler Schriftgröße darunter, jeweils mit einem × (Escape, das im Mehrfachmodus von Base UI die Auswahl leert, wird ignoriert). Die Katalogansicht filtert nach Text und Geltungsbereich. Das Namensfeld im Hinzufügen-Dialog schlägt vorhandene Bearbeitungen vor und weist darauf hin, dass ein Name schon vorkommt, ohne eine neue Variante zu verhindern. Die Stückliste zeigt die Bearbeitungen als Spalte nach dem Material, und beide CSV-Exporte führen sie als letzte Spalte als `Name (Beschreibung)`, kommagetrennt, damit die vorhandenen Spalten ihre Position behalten. Das Leeren der Datenbank in den Einstellungen führt den Katalog als eigene Kategorie.
+**Bearbeitungen** (`processes`, Migrationen 061 und 062, Menü „Bearbeitung“) sind ein Katalog nach dem Vorbild der Materialien: Name und optionale Beschreibung in jeder Dokumentationssprache (siehe unten) sowie `for_parts`/`for_assemblies`, von denen mindestens eines wahr ist. Namen sind nicht eindeutig (062 hat den Index auf `lower(name)` aus 061 entfernt): „Härten“ bis 50 HRC und „Härten“ induktiv sind ein Verfahren mit zwei Spezifikationen, unterschieden durch die Beschreibung. Ein gefertigtes Teil („Wykonywana“) oder eine gefertigte Baugruppe („Wykonywane“) speichert die Auswahl daher in `properties.processes` als Objekte `{id, name, description}`: Die ID unterscheidet die Varianten, und die kopierten Name und Beschreibung halten ein freigegebenes Element bei der Spezifikation, mit der es freigegeben wurde, wenn der Katalogeintrag geändert oder gelöscht wird. Eine bereits gewählte Bearbeitung behält ihre Kopie; eine neu gewählte übernimmt den aktuellen Text des Katalogs. Einträge, deren ID nicht mehr im Katalog steht, bleiben sichtbar, damit man sie abwählen kann, und eine bloße Zeichenkette (das Format vor den Varianten) wird als Name gelesen. Ein Wechsel weg von „gefertigt“ leert die Liste mit den übrigen Feldern dieser Art. Die Auswahl ist eine Mehrfach-Combobox, die sich per Klick öffnet und nach Name und Beschreibung filtert; die gewählten Einträge stehen nicht als Chips im Feld, sondern in normaler Schriftgröße darunter, jeweils mit einem × (Escape, das im Mehrfachmodus von Base UI die Auswahl leert, wird ignoriert). Die Katalogansicht filtert nach Text und Geltungsbereich. Das Namensfeld im Hinzufügen-Dialog schlägt vorhandene Bearbeitungen vor und weist darauf hin, dass ein Name schon vorkommt, ohne eine neue Variante zu verhindern. Die Stückliste zeigt die Bearbeitungen als Spalte nach dem Material, und beide CSV-Exporte führen sie als letzte Spalte als `Name (Beschreibung)`, kommagetrennt, damit die vorhandenen Spalten ihre Position behalten. Das Leeren der Datenbank in den Einstellungen führt den Katalog als eigene Kategorie.
+
+**Dokumentationssprachen** (`project_languages`, Migration 063, Einstellungen → Sprache)
+sind unabhängig von der im Browser gespeicherten Oberflächensprache. Ein Kürzel besteht
+aus 1–3 Buchstaben A–Z — ein CHECK sichert es ab, und die API wandelt Eingaben in
+Großbuchstaben um —, weil es in Feld- und Spaltennamen landen wird; Namen sind unabhängig
+von der Groß-/Kleinschreibung eindeutig. Genau eine Zeile ist `is_default`: Ein partieller
+eindeutiger Index verhindert zwei, der Wechsel läuft in einer Transaktion, und die
+Standardsprache lässt sich nicht löschen. Die Liste startet mit English (Standard) und
+Polish.
+
+Ein Projekt (Migration 064) hat `main_language_id` mit einem Standardwert über
+`default_project_language_id()`, sodass jedes INSERT ihn erhält, auch das Beispielprojekt.
+Es ist ein Schnappschuss: Eine spätere Änderung der Standardsprache verschiebt bestehende
+Projekte nicht. `multilingual` mit `project_language_links` führt die Sprachen eines
+mehrsprachigen Projekts, immer einschließlich der Hauptsprache (die API ergänzt sie); ein
+einsprachiges Projekt hat eine leere Liste. Gespeichert werden sie über ein eigenes `PATCH
+/api/projects/{id}/languages`, aus demselben Grund wie `/closed`. Eine in einem Projekt
+verwendete Sprache lässt sich nicht löschen (`ON DELETE RESTRICT`, von PostgreSQL als
+23001 gemeldet und auf 409 abgebildet).
+
+Namen und Beschreibungen von Bearbeitungen liegen in `process_texts`, eine Zeile pro
+Sprache. Migration 065 hat die alten `processes.name`/`description` in die damalige
+Standardsprache verschoben und die Spalten entfernt; da 061 und 062 `processes.name`
+voraussetzen, markiert `db/schema.sql` sie zusammen mit 065 als angewendet, damit eine
+Neuinstallation sie nicht gegen ein Schema ohne diese Spalte ausführt. Der Katalog zeigt
+den Text in der Standardsprache oder den einer anderen Sprache, wobei `languageId` angibt,
+welcher; der Hinzufügen-/Bearbeiten-Dialog schreibt die Standardsprache, und `PUT
+/api/processes/{id}/texts` ersetzt alle Sprachen auf einmal. Eine Sprache, in der eine
+Bearbeitung ihren einzigen Namen hat, lässt sich nicht löschen. Eine gewählte Bearbeitung
+kopiert auch `texts` in ihren Eintrag in `properties.processes`, sodass Elementbereich,
+Stückliste und CSV-Exporte sie in der Hauptsprache des Projekts zeigen, in dem das Element
+betrachtet wird (für CSV das Projekt des Elements, von dem die Stückliste ausgeht), unter
+Wahrung der Schnappschuss-Regel; das Frontend reicht diese Sprache über einen kleinen
+Kontext weiter, den Elementbereich und Hinzufügen-Dialog setzen.
+
+Der Name eines Elements steht in der Hauptsprache seines Projekts; Übersetzungen kommen in
+`properties.nameTexts` (`{languageId, name}`) und folgen damit den üblichen Regeln für
+Eigenschaften. `GET /api/item-names?languageId=&itemType=` sammelt die Namen aller Teile
+oder Baugruppen in allen Sprachen und liefert die in der angefragten Sprache, mit den
+übrigen als Übersetzungen; der Hinzufügen-Dialog schlägt sie vor und übernimmt die
+Übersetzungen, wenn der eingegebene Name einem Vorschlag genau entspricht.
 
 ### Mehrere Elemente im Baum auswählen
 
@@ -567,6 +608,11 @@ dem Administrator.
 
 `system_state.release_admin_only` (Einstellungen → Benutzer, standardmäßig aus) beschränkt den Übergang zu „freigegeben“ auf Administratoren. Durchgesetzt wird das von `PATCH /status`, nicht nur von der Oberfläche, denn auch die CAD-Makros ändern den Status; das Mitziehen der Komponenten einer Baugruppe läuft über dieselbe Anfrage, eine Ablehnung für die Baugruppe hält sie also ebenfalls auf. `GET /api/settings/release-policy` darf jeder Angemeldete lesen, damit die Statusschaltflächen „Freigegeben“ mit einer Erklärung ausgrauen können, statt beim Klick zu scheitern; nur `PATCH` ist dem Administrator vorbehalten. Bereits freigegebene Elemente bleiben unberührt.
 
+`users.first_name`/`last_name` (Migration 066) sind für das Zeichnungsschriftfeld vom
+`display_name` getrennt. `POST /api/users` verlangt sie; Konten von vor 066 und der
+Standard-`admin` haben NULL, bis sie ergänzt werden, und ein leerer Wert wird abgelehnt,
+statt einen Namen zu löschen.
+
 Wenn die Tabelle `users` beim Start der API leer ist, legt sie selbst ein Standardkonto
 **`admin` / `admin`** an (siehe Konsole beim ersten Start) — ändern Sie dieses Passwort
 sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwendung).
@@ -628,6 +674,11 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET | `/api/items/{id}/history` | vollständige Historie: Erstellung, Statusänderungen, Revisionen, hinzugefügter/entfernter Anhang, Eigentümersperre/-freigabe (wann/wer/Beschreibung), chronologisch |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | Materialkatalog (Name + Gruppe/Untergruppe) |
 | GET/POST/PATCH/DELETE | `/api/processes[/{id}]` | Bearbeitungskatalog (Name, Beschreibung, `forParts`/`forAssemblies`) |
+| PUT | `/api/processes/{id}/texts` | Name und Beschreibung einer Bearbeitung in allen Sprachen auf einmal |
+| GET/POST/PATCH/DELETE | `/api/project-languages[/{id}]` | Dokumentationssprachen — Lesen für alle, Schreiben für den Administrator |
+| PUT | `/api/project-languages/{id}/default` | setzt die Standardsprache der Dokumentation — nur Administrator |
+| PATCH | `/api/projects/{id}/languages` | Hauptsprache, Mehrsprachigkeit und Sprachen eines Projekts — nur Administrator |
+| GET | `/api/item-names?languageId=&itemType=` | vorhandene Teil-/Baugruppennamen in einer Sprache mit ihren Übersetzungen |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | Herstellerkatalog + Kontaktpersonen + Serien/Typen und deren Untertypen |
 | GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | Kundenkatalog + Kontaktpersonen + deren Namen-2-Liste |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | eigener Dokumentenbaum eines Kunden (Ordner/Dateien — Upload/Download/Umbenennen/Löschen/Suche) |

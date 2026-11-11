@@ -380,7 +380,42 @@ nazwę, której katalog nie miał aż do zakończenia wysyłki. Makra czytają m
 a nie z listy wyboru, więc bez tego element miałby materiał, którego nie da się ani wybrać
 ponownie, ani użyć jako filtr. Zakładana jest sama nazwa; grupa i podgrupa zostają puste.
 
-**Obróbki** (`processes`, migracje 061 i 062, menu „Obróbka”) to katalog na wzór materiałów: nazwa, opcjonalny opis oraz `for_parts`/`for_assemblies`, z czego co najmniej jedno prawdziwe. Nazwy nie są unikalne (062 usunęła indeks `lower(name)` z 061): „Hartowanie” do 50 HRC i „Hartowanie” indukcyjne to jeden proces z dwiema specyfikacjami, a odróżnia je opis. Dlatego Część „Wykonywana” albo Złożenie „Wykonywane” zapisuje wybór w `properties.processes` jako obiekty `{id, name, description}`: identyfikator rozróżnia warianty, a skopiowana nazwa i opis zatrzymują element wydany przy specyfikacji, z którą go wydano, gdy wpis w katalogu się zmieni albo zniknie. Obróbka już wybrana zachowuje swoją kopię; nowo wybrana bierze aktualny tekst z katalogu. Wpisy, których identyfikatora nie ma już w katalogu, zostają widoczne, żeby dało się je odznaczyć, a zwykły napis (format sprzed wariantów) czyta się jako nazwę. Zmiana rodzaju z wykonywanego czyści listę razem z innymi polami tego rodzaju. Wybór to combobox wielokrotnego wyboru, który otwiera się po kliknięciu i filtruje po nazwie i opisie; wybrane pozycje nie są pokazywane w polu jako etykiety, tylko wypisane pod nim zwykłą czcionką, każda z × (Escape, który w trybie wielokrotnym Base UI czyści wybór, jest ignorowany). Widok katalogu filtruje tekstem i tym, czego obróbka dotyczy. Pole nazwy w oknie dodawania podpowiada istniejące obróbki i informuje, że nazwa już jest, nie blokując nowego wariantu. BOM pokazuje obróbki w kolumnie po Materiale, a oba eksporty CSV mają je w ostatniej kolumnie jako `Nazwa (opis)` po przecinku, żeby istniejące kolumny nie zmieniły pozycji. Czyszczenie bazy w Ustawieniach ma katalog obróbek jako osobną kategorię.
+**Obróbki** (`processes`, migracje 061 i 062, menu „Obróbka”) to katalog na wzór materiałów: nazwa i opcjonalny opis w każdym języku dokumentacji (zob. niżej) oraz `for_parts`/`for_assemblies`, z czego co najmniej jedno prawdziwe. Nazwy nie są unikalne (062 usunęła indeks `lower(name)` z 061): „Hartowanie” do 50 HRC i „Hartowanie” indukcyjne to jeden proces z dwiema specyfikacjami, a odróżnia je opis. Dlatego Część „Wykonywana” albo Złożenie „Wykonywane” zapisuje wybór w `properties.processes` jako obiekty `{id, name, description}`: identyfikator rozróżnia warianty, a skopiowana nazwa i opis zatrzymują element wydany przy specyfikacji, z którą go wydano, gdy wpis w katalogu się zmieni albo zniknie. Obróbka już wybrana zachowuje swoją kopię; nowo wybrana bierze aktualny tekst z katalogu. Wpisy, których identyfikatora nie ma już w katalogu, zostają widoczne, żeby dało się je odznaczyć, a zwykły napis (format sprzed wariantów) czyta się jako nazwę. Zmiana rodzaju z wykonywanego czyści listę razem z innymi polami tego rodzaju. Wybór to combobox wielokrotnego wyboru, który otwiera się po kliknięciu i filtruje po nazwie i opisie; wybrane pozycje nie są pokazywane w polu jako etykiety, tylko wypisane pod nim zwykłą czcionką, każda z × (Escape, który w trybie wielokrotnym Base UI czyści wybór, jest ignorowany). Widok katalogu filtruje tekstem i tym, czego obróbka dotyczy. Pole nazwy w oknie dodawania podpowiada istniejące obróbki i informuje, że nazwa już jest, nie blokując nowego wariantu. BOM pokazuje obróbki w kolumnie po Materiale, a oba eksporty CSV mają je w ostatniej kolumnie jako `Nazwa (opis)` po przecinku, żeby istniejące kolumny nie zmieniły pozycji. Czyszczenie bazy w Ustawieniach ma katalog obróbek jako osobną kategorię.
+
+**Języki dokumentacji** (`project_languages`, migracja 063, Ustawienia → Język) są
+niezależne od języka interfejsu zapisanego w przeglądarce. Skrót to 1–3 litery A–Z —
+pilnuje tego CHECK, a API podnosi wpisane litery — bo trafi do nazw pól i kolumn; nazwy są
+unikalne bez względu na wielkość liter. Dokładnie jeden wiersz ma `is_default`: częściowy
+indeks unikalny nie dopuszcza dwóch, zmiana idzie w jednej transakcji, a domyślnego nie da
+się usunąć. Lista startuje z English (domyślny) i Polish.
+
+Projekt (migracja 064) ma `main_language_id` z wartością domyślną przez
+`default_project_language_id()`, więc dostaje go każdy INSERT, także projekt startowy. To
+migawka: późniejsza zmiana domyślnego języka nie przestawia istniejących projektów.
+`multilingual` z `project_language_links` to języki projektu wielojęzycznego, zawsze z
+głównym (dokłada go API); jednojęzyczny ma listę pustą. Zapisuje je osobny `PATCH
+/api/projects/{id}/languages`, z tego samego powodu co `/closed`. Języka użytego w
+projekcie nie da się usunąć (`ON DELETE RESTRICT`, który PostgreSQL zgłasza jako 23001,
+zamieniany na 409).
+
+Nazwy i opisy obróbek są w `process_texts`, po wierszu na język. Migracja 065 przeniosła
+dawne `processes.name`/`description` do języka domyślnego w chwili migracji i usunęła te
+kolumny; ponieważ 061 i 062 zakładają `processes.name`, `db/schema.sql` oznacza je razem z
+065 jako zastosowane, żeby świeża instalacja nie wykonywała ich na schemacie bez tej
+kolumny. Katalog pokazuje tekst w domyślnym języku albo z innego języka, a `languageId`
+mówi z którego; okno dodawania i edycji zapisuje język domyślny, a `PUT
+/api/processes/{id}/texts` zastępuje wszystkie języki naraz. Języka, w którym jakaś
+obróbka ma jedyną nazwę, nie da się usunąć. Wybrana obróbka kopiuje też `texts` do swojego
+wpisu w `properties.processes`, więc panel elementu, BOM i eksporty CSV pokazują ją w
+głównym języku projektu, w którym element jest oglądany (dla CSV — projektu elementu, od
+którego liczony jest BOM), z zachowaniem zasady migawki; front przekazuje ten język przez
+mały kontekst ustawiany przez panel elementu i okno dodawania.
+
+Nazwa elementu jest w głównym języku jego projektu; tłumaczenia trafiają do
+`properties.nameTexts` (`{languageId, name}`), więc podlegają zwykłym zasadom właściwości.
+`GET /api/item-names?languageId=&itemType=` zbiera nazwy wszystkich części lub złożeń we
+wszystkich językach i zwraca te w żądanym języku, z pozostałymi jako tłumaczeniami; okno
+dodawania je podpowiada i kopiuje tłumaczenia, gdy wpisana nazwa jest równa podpowiedzi.
 
 ### Zaznaczanie wielu elementów w drzewie
 
@@ -516,6 +551,11 @@ Wyglądu są dostępne dla każdego; Użytkownicy, Magazyn plików i Logi tylko 
 
 `system_state.release_admin_only` (Ustawienia → Użytkownicy, domyślnie wyłączone) ogranicza przejście na „wydany” do administratorów. Pilnuje tego `PATCH /status`, a nie tylko interfejs, bo status zmieniają też makra CAD; pociągnięcie komponentów złożenia idzie tym samym żądaniem, więc odmowa dla złożenia zatrzymuje i je. `GET /api/settings/release-policy` czyta każdy zalogowany, żeby przyciski statusu mogły wyszarzyć „Wydany” z wyjaśnieniem zamiast kończyć się błędem po kliknięciu; tylko `PATCH` jest dla administratora. Elementy już wydane zostają nietknięte.
 
+`users.first_name`/`last_name` (migracja 066) są oddzielone od `display_name` z myślą o
+tabelce rysunkowej. `POST /api/users` ich wymaga; konta sprzed 066 i domyślny `admin` mają
+NULL, dopóki ich nie uzupełnić, a pusta wartość jest odrzucana zamiast czyścić imię lub
+nazwisko.
+
 Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
 **`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
 po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
@@ -575,6 +615,11 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET | `/api/items/{id}/history` | pełna historia: utworzenie, zmiany statusu, rewizje, dodanie/usunięcie załącznika, blokada/zwolnienie właściciela (kiedy/kto/opis), chronologicznie |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | katalog materiałów (nazwa + grupa/podgrupa) |
 | GET/POST/PATCH/DELETE | `/api/processes[/{id}]` | katalog obróbek (nazwa, opis, `forParts`/`forAssemblies`) |
+| PUT | `/api/processes/{id}/texts` | nazwa i opis obróbki we wszystkich językach naraz |
+| GET/POST/PATCH/DELETE | `/api/project-languages[/{id}]` | języki dokumentacji — odczyt dla każdego, zapis dla administratora |
+| PUT | `/api/project-languages/{id}/default` | ustawia domyślny język dokumentacji — tylko administrator |
+| PATCH | `/api/projects/{id}/languages` | główny język projektu, flaga wielojęzyczności i języki — tylko administrator |
+| GET | `/api/item-names?languageId=&itemType=` | istniejące nazwy części/złożeń w danym języku z ich tłumaczeniami |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | katalog producentów + osoby kontaktowe + serie/typy i ich podtypy |
 | GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | katalog klientów + osoby kontaktowe + ich lista Nazw 2 |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | własne drzewko dokumentów klienta (foldery/pliki — upload/pobranie/zmiana nazwy/usunięcie/wyszukiwanie) |

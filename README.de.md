@@ -426,6 +426,34 @@ bestimmten zweiten Namen. Die Projektauswahl zeigt dann "Projekt (Kunde, Zweiter
 und der Detailbereich des Kunden listet jedes ihm zugewiesene Projekt auf, mit einer
 Schaltfläche zum direkten Wechsel dorthin.
 
+### Dokumentationssprachen
+
+Dokumentationssprachen sind unabhängig von der Oberflächensprache, die jeder für sich
+wählt. Unter **Einstellungen → Sprache** pflegt ein Administrator die Liste der Sprachen,
+in denen die Firma dokumentiert — vollständiger Name und ein Kürzel aus bis zu drei
+Großbuchstaben; zu Beginn stehen English (EN) und Polish (PL) darauf — und wählt die
+Standardsprache der Dokumentation.
+
+Jedes Projekt hat eine **Hauptsprache**, beim Anlegen die Standardsprache, und kann als
+**mehrsprachig** markiert werden, mit den Sprachen, in denen seine Dokumentation entsteht;
+beides wird in den Projekteigenschaften eingestellt. Der Dialog zum Hinzufügen eines
+Elements nennt die Projektsprache im Titel, damit klar ist, in welcher Sprache das neue
+Element beschrieben wird.
+
+**Bearbeitungen** werden in der Standardsprache der Dokumentation eingegeben, und eine
+Schaltfläche bei jeder öffnet ihre Übersetzungen: oben die Standardfassung, darunter
+jeweils eine andere Sprache, gewählt aus einer Liste, die zeigt, was schon übersetzt ist.
+Der Katalog folgt der Standardsprache und markiert Bearbeitungen ohne Übersetzung. Ein
+Teil oder eine Baugruppe behält seine Bearbeitungen in allen Sprachen und zeigt sie in der
+Hauptsprache des Projekts — im Elementbereich, in der Stückliste und in beiden
+CSV-Exporten.
+
+Der **Name eines Teils oder einer Baugruppe** wird über die Schaltfläche links vom
+Namensfeld übersetzt. Beim Hinzufügen eines neuen Elements schlägt das Namensfeld Namen
+vor, die vorhandene Teile oder Baugruppen in der Projektsprache schon haben, und die Wahl
+eines Vorschlags übernimmt dessen Übersetzungen — eine zweite „Kostka“ kommt gleich mit
+ihrem „Cube“.
+
 ### Suche und gesamte Datenbank
 
 Der Reiter **Gesamte Datenbank** durchsucht alle Elemente unabhängig vom Projekt — nach
@@ -466,6 +494,11 @@ Zwei Rollen: **Administrator** (voller Zugriff, sieht alle Projekte, verwaltet K
 und Servereinstellungen) und **Benutzer** (sieht und arbeitet nur in den Projekten, denen
 er zugewiesen wurde). Jeder verwaltet seine eigene Oberflächensprache
 (Polnisch/Englisch/Deutsch) und den hellen/dunklen Modus selbst in den Einstellungen.
+
+Jedes Konto hat einen **Vor- und Nachnamen**, getrennt vom Anzeigenamen und für das
+Zeichnungsschriftfeld gedacht. Beide sind beim Anlegen eines Kontos Pflicht; Einstellungen
+→ Benutzer markiert Konten, denen sie fehlen, und die Bearbeiten-Schaltfläche beim Konto
+ergänzt sie.
 
 ## Für Administratoren und Entwickler
 

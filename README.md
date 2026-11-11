@@ -390,6 +390,30 @@ can optionally be linked to a Client — and, when that client has several, to o
 Name 2. The project selector then shows "Project (Client, Name 2)", and the client's detail
 panel lists every Project assigned to it, with a button to jump straight there.
 
+### Documentation languages
+
+Documentation languages are separate from the interface language each person picks for
+themselves. Under **Settings → Language** an administrator keeps the list of languages the
+company documents in — a full name and a code of up to three capital letters; the list
+starts with English (EN) and Polish (PL) — and chooses the default documentation language.
+
+Every project has a **main language**, the default one when the project is created, and
+can be marked **multilingual** with the languages its documentation is written in; both
+are set in the project properties. The add-item dialog names the project's language in its
+title, so it is clear which language the new item is described in.
+
+**Processes** are entered in the default documentation language, and a button next to each
+opens its translations: the default version on top and one other language at a time below,
+picked from a list that shows which are already translated. The catalog follows the
+default language and marks processes still without a translation. A part or assembly keeps
+its processes in every language and shows them in its project's main language — in the
+item panel, the bill of materials and both CSV exports.
+
+A **part or assembly name** is translated through the button to the left of the name
+field. When adding a new item, the name field suggests names existing parts or assemblies
+already have in the project's language, and picking one brings its translations along — a
+second "Kostka" arrives with its "Cube".
+
 ### Search and the whole database
 
 The **Whole database** tab searches all items regardless of project — by name, number,
@@ -426,6 +450,10 @@ Two roles: **administrator** (full access, sees all projects, manages accounts a
 server settings) and **user** (sees and works only in the projects they've been assigned
 to). Everyone manages their own interface language (Polish/English/German) and
 light/dark theme in Settings.
+
+Every account has a **first and last name**, separate from the display name and meant for
+drawing title blocks. Both are required when an account is created; Settings → Users marks
+accounts that still lack them, and the edit button next to an account fills them in.
 
 ## For administrators and developers
 

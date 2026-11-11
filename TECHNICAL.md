@@ -424,8 +424,8 @@ neither be picked again nor used as a filter. Only the name is created; group an
 stay empty.
 
 **Processes** (`processes`, migrations 061 and 062, the "Processes" menu) are a catalog like
-materials: name, optional description, and `for_parts`/`for_assemblies`, at least one of them
-true. Names are not unique (062 dropped 061's `lower(name)` index): "Hardening" to 50 HRC and
+materials: a name and optional description in each documentation language (see below), and
+`for_parts`/`for_assemblies`, at least one of them true. Names are not unique (062 dropped 061's `lower(name)` index): "Hardening" to 50 HRC and
 "Hardening" by induction are one process with two specifications, told apart by the
 description. A manufactured Part ("Wykonywana") or Assembly ("Wykonywane") therefore stores
 its choice in `properties.processes` as `{id, name, description}` objects: the id tells the
@@ -443,6 +443,42 @@ existing processes and notes when a name is already used, without stopping a new
 The BOM shows the processes as a column after Material, and both CSV exports carry them as
 the last column, `Name (description)` comma-separated, so existing columns keep their
 positions. Clearing the database in Settings has the catalog as a category of its own.
+
+**Documentation languages** (`project_languages`, migration 063, Settings → Language) are
+independent of the per-browser interface language. A code is 1–3 letters A–Z — a CHECK
+backs it and the API upper-cases what was typed — because it will end up in field and
+column names; names are unique regardless of case. Exactly one row is `is_default`: a
+partial unique index forbids two, the switch runs in one transaction, and the default
+cannot be deleted. The list is seeded with English (default) and Polish.
+
+A project (migration 064) has `main_language_id`, defaulted through
+`default_project_language_id()` so that every INSERT gets it, the sample project included.
+It is a snapshot: changing the default later does not move existing projects.
+`multilingual` with `project_language_links` lists a multilingual project's languages,
+always including the main one (the API adds it); a monolingual project has an empty list.
+They are saved through their own `PATCH /api/projects/{id}/languages`, for the same reason
+as `/closed`. A language used by a project cannot be deleted (`ON DELETE RESTRICT`, which
+PostgreSQL reports as 23001, mapped to 409).
+
+Process names and descriptions live in `process_texts`, one row per language. Migration
+065 moved the old `processes.name`/`description` to the language that was the default at
+the time and dropped the columns; since 061 and 062 assume `processes.name`,
+`db/schema.sql` marks them and 065 as applied so a fresh install does not run them against
+a schema without it. The catalog shows the default-language text, or another language's
+with `languageId` saying which; the add/edit dialog writes the default language and `PUT
+/api/processes/{id}/texts` replaces all languages at once. A language holding some
+process's only name cannot be deleted. A picked process also copies `texts` into its
+`properties.processes` entry, so the item panel, the BOM and the CSV exports show it in
+the main language of the project it is viewed in (the BOM root's project for CSV) while
+keeping the snapshot rule; the frontend passes that language through a small context set
+by the item panel and the add dialog.
+
+An item's name is in its project's main language; translations go to
+`properties.nameTexts` (`{languageId, name}`), so they follow the normal properties rules.
+`GET /api/item-names?languageId=&itemType=` gathers every part's or assembly's names in
+all languages and returns those in the requested language with the others as translations;
+the add dialog suggests them and copies the translations when the typed name equals a
+suggestion.
 
 ### Selecting several items in the tree
 
@@ -750,6 +786,11 @@ every logged-in user, so the status buttons can grey "Released" out with an expl
 instead of failing on click; only `PATCH` is admin-only. Items already released are left
 alone.
 
+`users.first_name`/`last_name` (migration 066) are kept apart from `display_name` for the
+drawing title block. `POST /api/users` requires them; accounts from before 066 and the
+default `admin` have NULL until edited, and a blank value is refused rather than clearing
+a name.
+
 If the `users` table is empty when the API starts, it sets up a default
 **`admin` / `admin`** account on its own (see the console on first run) — change this
 password right after logging in (`PATCH /api/auth/password`, or from within the web
@@ -809,6 +850,11 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET | `/api/items/{id}/history` | full history: creation, status changes, revisions, attachment added/removed, owner lock/release (when/who/description), chronologically |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | material catalog (name + group/subgroup) |
 | GET/POST/PATCH/DELETE | `/api/processes[/{id}]` | process catalog (name, description, `forParts`/`forAssemblies`) |
+| PUT | `/api/processes/{id}/texts` | a process's name and description in every language at once |
+| GET/POST/PATCH/DELETE | `/api/project-languages[/{id}]` | documentation languages — read by everyone, written by the administrator |
+| PUT | `/api/project-languages/{id}/default` | sets the default documentation language — administrator only |
+| PATCH | `/api/projects/{id}/languages` | a project's main language, multilingual flag and languages — administrator only |
+| GET | `/api/item-names?languageId=&itemType=` | existing part/assembly names in a language, with their translations |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | manufacturer catalog + contact people + series/types and their subtypes |
 | GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | client catalog + contact people + their Name 2 list |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | a client's own document tree (folders/files — upload/download/rename/delete/search) |
