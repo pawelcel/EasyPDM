@@ -20,6 +20,9 @@ export interface ManagedUser {
   id: string
   username: string
   displayName: string
+  // Imię i nazwisko — do tabelki rysunkowej. null tylko na kontach sprzed ich wprowadzenia.
+  firstName: string | null
+  lastName: string | null
   email: string | null
   role: UserRole
 }

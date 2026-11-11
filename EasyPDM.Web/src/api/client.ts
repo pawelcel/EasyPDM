@@ -903,13 +903,22 @@ export const api = {
     username: string
     password: string
     displayName: string
+    firstName: string
+    lastName: string
     email: string | null
     role: UserRole
   }) => fetch(`${BASE}/users`, json(body)).then((r) => handleResponse<{ id: string }>(r)),
 
   updateUser: (
     id: string,
-    body: { displayName?: string; email?: string; role?: UserRole; password?: string }
+    body: {
+      displayName?: string
+      firstName?: string
+      lastName?: string
+      email?: string
+      role?: UserRole
+      password?: string
+    }
   ) =>
     fetch(`${BASE}/users/${id}`, {
       method: "PATCH",

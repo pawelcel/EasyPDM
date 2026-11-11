@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { KeyRound, Trash2 } from "lucide-react"
+import { KeyRound, Pencil, Trash2 } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
 import { ROLE_LABEL_KEYS, type ManagedUser, type UserRole } from "@/api/types"
@@ -94,9 +94,14 @@ function UsersView() {
                       <span className="ml-1.5 text-[12.5px] text-muted-foreground">({t("users.you")})</span>
                     )}
                   </div>
-                  {u.email && (
-                    <div className="truncate text-[12.5px] text-muted-foreground">{u.email}</div>
-                  )}
+                  <div className="truncate text-[12.5px] text-muted-foreground">
+                    {u.firstName && u.lastName ? (
+                      `${u.firstName} ${u.lastName}`
+                    ) : (
+                      <span className="text-amber-600 dark:text-amber-400">{t("users.missingName")}</span>
+                    )}
+                    {u.email && ` · ${u.email}`}
+                  </div>
                 </div>
 
                 <Select value={u.role} onValueChange={(v) => changeRole(u, v as UserRole)}>
@@ -109,6 +114,7 @@ function UsersView() {
                   </SelectContent>
                 </Select>
 
+                <EditUserDialog user={u} onSaved={refetch} />
                 <Button
                   size="icon-xs"
                   variant="ghost"
@@ -168,6 +174,8 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [displayName, setDisplayName] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<UserRole>("user")
   const [error, setError] = useState("")
@@ -176,13 +184,15 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
     setUsername("")
     setPassword("")
     setDisplayName("")
+    setFirstName("")
+    setLastName("")
     setEmail("")
     setRole("user")
     setError("")
   }
 
   async function add() {
-    if (!username.trim() || !password || !displayName.trim()) {
+    if (!username.trim() || !password || !firstName.trim() || !lastName.trim()) {
       setError(t("users.addValidation"))
       return
     }
@@ -190,7 +200,10 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
       await api.createUser({
         username: username.trim(),
         password,
-        displayName: displayName.trim(),
+        // Wyświetlana nazwa jest opcjonalna w formularzu — domyślnie "Imię Nazwisko".
+        displayName: displayName.trim() || `${firstName.trim()} ${lastName.trim()}`,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email: email.trim() || null,
         role,
       })
@@ -220,10 +233,22 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
           <Label htmlFor="user-username">{t("users.usernameLabel")}</Label>
           <Input id="user-username" value={username} onChange={(e) => setUsername(e.target.value)} />
 
-          <Label htmlFor="user-display-name">{t("users.displayNameLabel")}</Label>
+          <div className="flex gap-2">
+            <div className="flex flex-1 flex-col gap-2">
+              <Label htmlFor="user-first-name">{t("users.firstNameLabel")}</Label>
+              <Input id="user-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </div>
+            <div className="flex flex-1 flex-col gap-2">
+              <Label htmlFor="user-last-name">{t("users.lastNameLabel")}</Label>
+              <Input id="user-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </div>
+          </div>
+
+          <Label htmlFor="user-display-name">{t("users.displayNameOptionalLabel")}</Label>
           <Input
             id="user-display-name"
             value={displayName}
+            placeholder={[firstName.trim(), lastName.trim()].filter(Boolean).join(" ")}
             onChange={(e) => setDisplayName(e.target.value)}
           />
 
@@ -257,6 +282,98 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
             {t("common.cancel")}
           </Button>
           <Button onClick={add}>{t("common.add")}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Edycja danych konta: imię i nazwisko (do tabelki rysunkowej), wyświetlana nazwa i e-mail.
+// Rola i hasło mają własne kontrolki w wierszu listy.
+function EditUserDialog({ user, onSaved }: { user: ManagedUser; onSaved: () => void | Promise<void> }) {
+  const { t } = useLanguage()
+  const [open, setOpen] = useState(false)
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [displayName, setDisplayName] = useState("")
+  const [email, setEmail] = useState("")
+  const [error, setError] = useState("")
+  const [pending, setPending] = useState(false)
+
+  async function save() {
+    if (!firstName.trim() || !lastName.trim() || !displayName.trim()) {
+      setError(t("users.editValidation"))
+      return
+    }
+    setPending(true)
+    setError("")
+    try {
+      await api.updateUser(user.id, {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        displayName: displayName.trim(),
+        email: email.trim(),
+      })
+      await onSaved()
+      setOpen(false)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("users.editFailed"))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (next) {
+          setFirstName(user.firstName ?? "")
+          setLastName(user.lastName ?? "")
+          setDisplayName(user.displayName)
+          setEmail(user.email ?? "")
+          setError("")
+        }
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button size="icon-xs" variant="ghost" aria-label={t("common.editNamed", { name: user.username })}>
+            <Pencil className="size-3.5 text-muted-foreground" />
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("users.editTitle", { username: user.username })}</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <div className="flex flex-1 flex-col gap-2">
+              <Label htmlFor={`edit-first-name-${user.id}`}>{t("users.firstNameLabel")}</Label>
+              <Input id={`edit-first-name-${user.id}`} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </div>
+            <div className="flex flex-1 flex-col gap-2">
+              <Label htmlFor={`edit-last-name-${user.id}`}>{t("users.lastNameLabel")}</Label>
+              <Input id={`edit-last-name-${user.id}`} value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </div>
+          </div>
+          <Label htmlFor={`edit-display-name-${user.id}`}>{t("users.displayNameLabel")}</Label>
+          <Input id={`edit-display-name-${user.id}`} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          <Label htmlFor={`edit-email-${user.id}`}>{t("users.emailOptionalLabel")}</Label>
+          <Input id={`edit-email-${user.id}`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <FormError>{error}</FormError>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button onClick={save} disabled={pending}>
+            {t("common.save")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

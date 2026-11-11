@@ -16,7 +16,7 @@ static class UserEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            const string sql = "SELECT id, username, display_name, email, role FROM users ORDER BY username;";
+            const string sql = "SELECT id, username, display_name, email, role, first_name, last_name FROM users ORDER BY username;";
             await using var cmd = new NpgsqlCommand(sql, conn);
 
             var result = new List<object>();
@@ -30,13 +30,15 @@ static class UserEndpoints
                     displayName = reader.GetString(2),
                     email = reader.IsDBNull(3) ? null : reader.GetString(3),
                     role = reader.GetString(4),
+                    firstName = reader.IsDBNull(5) ? null : reader.GetString(5),
+                    lastName = reader.IsDBNull(6) ? null : reader.GetString(6),
                 });
             }
 
             return Results.Ok(result);
         });
 
-        // POST /api/users   body: { username, password, displayName, email?, role }
+        // POST /api/users   body: { username, password, displayName, firstName, lastName, email?, role }
         app.MapPost("/api/users", async (HttpContext ctx, CreateUserRequest body) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
@@ -48,6 +50,8 @@ static class UserEndpoints
                 return Results.BadRequest("Hasło jest wymagane.");
             if (string.IsNullOrWhiteSpace(body.DisplayName))
                 return Results.BadRequest("Wyświetlana nazwa jest wymagana.");
+            if (string.IsNullOrWhiteSpace(body.FirstName) || string.IsNullOrWhiteSpace(body.LastName))
+                return Results.BadRequest("Imię i nazwisko są wymagane.");
             if (body.Role != "admin" && body.Role != "user")
                 return Results.BadRequest("Nieprawidłowa rola — dozwolone: 'admin', 'user'.");
 
@@ -56,13 +60,15 @@ static class UserEndpoints
 
             var userId = Guid.NewGuid();
             const string sql = """
-                INSERT INTO users (id, username, display_name, email, password_hash, role)
-                VALUES (@id, @username, @displayName, @email, @hash, @role);
+                INSERT INTO users (id, username, display_name, first_name, last_name, email, password_hash, role)
+                VALUES (@id, @username, @displayName, @firstName, @lastName, @email, @hash, @role);
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", userId);
             cmd.Parameters.AddWithValue("username", body.Username.Trim());
             cmd.Parameters.AddWithValue("displayName", body.DisplayName.Trim());
+            cmd.Parameters.AddWithValue("firstName", body.FirstName!.Trim());
+            cmd.Parameters.AddWithValue("lastName", body.LastName!.Trim());
             cmd.Parameters.AddWithValue("email", (object?)body.Email?.Trim() ?? DBNull.Value);
             cmd.Parameters.AddWithValue("hash", PasswordHasher.Hash(body.Password));
             cmd.Parameters.AddWithValue("role", body.Role);
@@ -79,13 +85,19 @@ static class UserEndpoints
             return Results.Created($"/api/users/{userId}", new { id = userId });
         });
 
-        // PATCH /api/users/{id}   body: { displayName?, email?, role?, password? }
+        // PATCH /api/users/{id}   body: { displayName?, firstName?, lastName?, email?, role?, password? }
         app.MapPatch("/api/users/{id:guid}", async (Guid id, HttpContext ctx, UpdateUserRequest body) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (body.Role is not null && body.Role != "admin" && body.Role != "user")
                 return Results.BadRequest("Nieprawidłowa rola — dozwolone: 'admin', 'user'.");
+            // Imienia, nazwiska ani wyświetlanej nazwy nie da się wyczyścić — przysłane puste to błąd,
+            // pominięte (null) to "bez zmian".
+            if (body.FirstName is { } f && string.IsNullOrWhiteSpace(f) || body.LastName is { } l && string.IsNullOrWhiteSpace(l))
+                return Results.BadRequest("Imię i nazwisko nie mogą być puste.");
+            if (body.DisplayName is { } d && string.IsNullOrWhiteSpace(d))
+                return Results.BadRequest("Wyświetlana nazwa nie może być pusta.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -102,6 +114,8 @@ static class UserEndpoints
             const string sql = """
                 UPDATE users SET
                     display_name = COALESCE(@displayName, display_name),
+                    first_name = COALESCE(@firstName, first_name),
+                    last_name = COALESCE(@lastName, last_name),
                     email = CASE WHEN @emailProvided THEN @email ELSE email END,
                     role = COALESCE(@role, role),
                     password_hash = COALESCE(@hash, password_hash)
@@ -112,6 +126,8 @@ static class UserEndpoints
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("displayName", (object?)body.DisplayName?.Trim() ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("firstName", (object?)body.FirstName?.Trim() ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("lastName", (object?)body.LastName?.Trim() ?? DBNull.Value);
             cmd.Parameters.AddWithValue("emailProvided", body.Email is not null);
             cmd.Parameters.AddWithValue("email", (object?)body.Email?.Trim() ?? DBNull.Value);
             cmd.Parameters.AddWithValue("role", (object?)body.Role ?? DBNull.Value);
@@ -174,5 +190,7 @@ static class UserEndpoints
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }
 
-record CreateUserRequest(string Username, string Password, string DisplayName, string? Email, string Role);
-record UpdateUserRequest(string? DisplayName, string? Email, string? Role, string? Password);
+record CreateUserRequest(string Username, string Password, string DisplayName, string? Email, string Role,
+    string? FirstName = null, string? LastName = null);
+record UpdateUserRequest(string? DisplayName, string? Email, string? Role, string? Password,
+    string? FirstName = null, string? LastName = null);

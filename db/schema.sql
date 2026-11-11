@@ -16,6 +16,10 @@ CREATE TABLE users (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username      TEXT NOT NULL UNIQUE,
     display_name  TEXT NOT NULL,
+    -- Imię i nazwisko (do tabelki rysunkowej) — wymagane przy zakładaniu konta przez API;
+    -- NULL tylko na kontach sprzed migracji 066 i na domyślnym "admin", dopóki ich nie uzupełnić.
+    first_name    TEXT,
+    last_name     TEXT,
     email         TEXT,
     password_hash TEXT NOT NULL,
     role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user'))

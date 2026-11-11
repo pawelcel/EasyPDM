@@ -43,6 +43,8 @@ internal static class TestClientHelpers
             username,
             password,
             displayName = username,
+            firstName = "Jan",
+            lastName = "Testowy " + username,
             email = (string?)null,
             role,
         });
