@@ -121,8 +121,8 @@ static partial class ProjectLanguageEndpoints
             return Results.Ok();
         });
 
-        // DELETE /api/project-languages/{id} — poza domyślnym (najpierw trzeba wybrać inny) i poza
-        // językiem używanym w którymś projekcie.
+        // DELETE /api/project-languages/{id} — poza domyślnym (najpierw trzeba wybrać inny),
+        // językiem używanym w którymś projekcie i językiem, w którym jakaś obróbka ma jedyną nazwę.
         app.MapDelete("/api/project-languages/{id:int}", async (int id, HttpContext ctx) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
@@ -139,6 +139,20 @@ static partial class ProjectLanguageEndpoints
                     return Results.NotFound();
                 if ((bool)isDefault)
                     return Results.BadRequest("Nie można usunąć domyślnego języka dokumentacji — najpierw wybierz inny.");
+            }
+
+            // Teksty obróbek w tym języku znikają razem z nim (CASCADE), ale obróbka, która ma
+            // nazwę tylko w nim, zostałaby bez żadnej -- wtedy najpierw trzeba ją przetłumaczyć.
+            await using (var onlyText = new NpgsqlCommand("""
+                SELECT 1 FROM process_texts t
+                WHERE t.language_id = @id
+                  AND NOT EXISTS (SELECT 1 FROM process_texts o WHERE o.process_id = t.process_id AND o.language_id <> @id)
+                LIMIT 1;
+                """, conn))
+            {
+                onlyText.Parameters.AddWithValue("id", id);
+                if (await onlyText.ExecuteScalarAsync() is not null)
+                    return Results.Conflict("W tym języku jest jedyna nazwa którejś obróbki — najpierw dodaj jej tłumaczenie.");
             }
 
             await using var cmd = new NpgsqlCommand("DELETE FROM project_languages WHERE id = @id AND NOT is_default;", conn);

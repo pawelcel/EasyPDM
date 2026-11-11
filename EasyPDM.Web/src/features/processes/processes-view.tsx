@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react"
-import { Pencil, Trash2 } from "lucide-react"
+import { Languages, Pencil, Trash2 } from "lucide-react"
 
 import { api, ApiError } from "@/api/client"
 import type { Process } from "@/api/types"
@@ -27,7 +27,9 @@ import {
 } from "@/components/ui/select"
 import { SuggestInput } from "@/components/ui/suggest-input"
 import { Textarea } from "@/components/ui/textarea"
+import { ProcessTranslationsDialog } from "@/features/processes/process-translations-dialog"
 import { useProcesses } from "@/features/processes/use-processes"
+import { useProjectLanguages } from "@/features/project-languages/use-project-languages"
 import { useLanguage } from "@/i18n/use-language"
 
 type ProcessBody = { name: string; description: string | null; forParts: boolean; forAssemblies: boolean }
@@ -35,6 +37,8 @@ type ProcessBody = { name: string; description: string | null; forParts: boolean
 function ProcessesView() {
   const { t } = useLanguage()
   const { processes, refetch } = useProcesses()
+  const { languages } = useProjectLanguages()
+  const defaultLanguageId = languages.find((l) => l.isDefault)?.id
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null)
   const [deletingPending, setDeletingPending] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -114,6 +118,15 @@ function ProcessesView() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate font-medium">{p.name}</span>
+                    {/* Brak tłumaczenia na domyślny język: tekst pochodzi z innego języka. */}
+                    {defaultLanguageId !== undefined && p.languageId !== null && p.languageId !== defaultLanguageId && (
+                      <span
+                        className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[11px] text-amber-600 dark:text-amber-400"
+                        title={t("process.fallbackLanguageHint")}
+                      >
+                        {languages.find((l) => l.id === p.languageId)?.code}
+                      </span>
+                    )}
                     {p.forParts && <Badge variant="secondary">{t("process.forParts")}</Badge>}
                     {p.forAssemblies && <Badge variant="secondary">{t("process.forAssemblies")}</Badge>}
                   </div>
@@ -122,6 +135,21 @@ function ProcessesView() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5">
+                  <ProcessTranslationsDialog
+                    trigger={
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label={t("process.translationsNamed", { name: p.name })}
+                        title={t("process.translations")}
+                      >
+                        <Languages className="size-3.5 text-muted-foreground" />
+                      </Button>
+                    }
+                    process={p}
+                    languages={languages}
+                    onSaved={refetch}
+                  />
                   <ProcessDialog
                     trigger={
                       <Button size="icon-xs" variant="ghost" aria-label={t("common.editNamed", { name: p.name })}>

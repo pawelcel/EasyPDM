@@ -475,6 +475,13 @@ export const api = {
       body: JSON.stringify(body),
     }).then((r) => handleResponse<void>(r)),
 
+  setProcessTexts: (id: number, texts: { languageId: number; name: string; description: string | null }[]) =>
+    fetch(`${BASE}/processes/${id}/texts`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texts }),
+    }).then((r) => handleResponse<void>(r)),
+
   removeProcess: (id: number) =>
     fetch(`${BASE}/processes/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 

@@ -375,10 +375,21 @@ export interface Material {
 // wariantów różniących się opisem.
 export interface Process {
   id: number
+  // Nazwa i opis w domyślnym języku dokumentacji; gdy obróbka nie ma tłumaczenia na ten
+  // język — tekst z innego, a languageId mówi z którego.
   name: string
   description: string | null
+  languageId: number | null
   forParts: boolean
   forAssemblies: boolean
+  // Teksty we wszystkich językach, w których obróbka je ma.
+  texts: ProcessText[]
+}
+
+export interface ProcessText {
+  languageId: number
+  name: string
+  description: string | null
 }
 
 // Obróbka wybrana w elemencie (properties.processes): identyfikator z katalogu i KOPIA nazwy

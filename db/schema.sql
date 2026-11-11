@@ -114,13 +114,12 @@ CREATE TABLE materials (
 
 -- ============================================================
 -- Obróbki (katalog z menu "Obróbka"; elementy wykonywane zapisują wybrane obróbki w
--- properties.processes jako {id, name, description}). Nazwa NIE jest unikalna: ten sam proces
--- ("Hartowanie") może mieć kilka wariantów z różnym opisem.
+-- properties.processes jako {id, name, description}). Nazwa i opis są w process_texts, osobno
+-- dla każdego języka dokumentacji (tabela niżej, po project_languages). Nazwa NIE jest
+-- unikalna: ten sam proces ("Hartowanie") może mieć kilka wariantów z różnym opisem.
 -- ============================================================
 CREATE TABLE processes (
     id              SERIAL PRIMARY KEY,
-    name            TEXT NOT NULL,
-    description     TEXT,
     for_parts       BOOLEAN NOT NULL DEFAULT true,   -- czy obróbkę można wybrać w Części
     for_assemblies  BOOLEAN NOT NULL DEFAULT false,  -- czy obróbkę można wybrać w Złożeniu
     CHECK (for_parts OR for_assemblies)
@@ -158,6 +157,16 @@ CREATE TABLE project_language_links (
     project_id   UUID    NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     language_id  INTEGER NOT NULL REFERENCES project_languages(id) ON DELETE RESTRICT,
     PRIMARY KEY (project_id, language_id)
+);
+
+-- Nazwa i opis obróbki w każdym języku dokumentacji (zob. migracja 065). Katalog pokazuje
+-- wersję w domyślnym języku, a gdy jej brak -- tekst z innego języka.
+CREATE TABLE process_texts (
+    process_id   INTEGER NOT NULL REFERENCES processes(id) ON DELETE CASCADE,
+    language_id  INTEGER NOT NULL REFERENCES project_languages(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL CHECK (btrim(name) <> ''),
+    description  TEXT,
+    PRIMARY KEY (process_id, language_id)
 );
 
 -- ============================================================
@@ -633,4 +642,7 @@ INSERT INTO schema_migrations (filename) VALUES
     ('040_manufacturer_product_types.sql'), ('041_manufacturer_product_subtypes.sql'),
     ('042_status_anulowana.sql'), ('043_client_name2.sql'),
     ('044_client_name2_own_properties.sql'), ('045_client_name2_files.sql'),
-    ('046_attachment_drawing_role.sql');
+    ('046_attachment_drawing_role.sql'),
+    -- Zakładały kolumnę processes.name, której ten schemat już nie ma (065 przeniosła nazwy
+    -- do process_texts) -- ich efekt jest tu w całości, więc nie wykonują się na świeżej bazie.
+    ('061_processes.sql'), ('062_process_names_not_unique.sql'), ('065_process_texts.sql');
