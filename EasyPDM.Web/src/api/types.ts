@@ -241,6 +241,13 @@ export interface ItemNameSuggestion {
   texts: { languageId: number; name: string }[]
 }
 
+// Ustawienia -> Firma: nazwa i logo do tabelki rysunkowej.
+export interface CompanyProfile {
+  name: string | null
+  hasLogo: boolean
+  logoUpdatedAt: string | null
+}
+
 // Ustawienia -> Tagi (administrator): tag z liczbą elementów, które go noszą.
 export interface TagUsage {
   name: string

@@ -35,6 +35,7 @@ import type {
   CadRequest,
   Tag,
   TagUsage,
+  CompanyProfile,
   ItemNameSuggestion,
   ProjectLanguage,
   TransferProgress,
@@ -360,6 +361,27 @@ export const api = {
     fetch(`${BASE}/item-names?languageId=${languageId}&itemType=${itemType}`).then((r) =>
       handleResponse<ItemNameSuggestion[]>(r)
     ),
+
+  getCompany: () => fetch(`${BASE}/settings/company`).then((r) => handleResponse<CompanyProfile>(r)),
+
+  setCompanyName: (name: string) =>
+    fetch(`${BASE}/settings/company`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }).then((r) => handleResponse<void>(r)),
+
+  uploadCompanyLogo: (file: File) => {
+    const form = new FormData()
+    form.append("file", file)
+    return fetch(`${BASE}/settings/company/logo`, { method: "PUT", body: form }).then((r) => handleResponse<void>(r))
+  },
+
+  removeCompanyLogo: () =>
+    fetch(`${BASE}/settings/company/logo`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  // Znacznik czasu w adresie omija pamięć podręczną przeglądarki po wgraniu nowego logo.
+  companyLogoUrl: (version: string | null) => `${BASE}/settings/company/logo?v=${encodeURIComponent(version ?? "")}`,
 
   getTagUsage: () => fetch(`${BASE}/settings/tags`).then((r) => handleResponse<TagUsage[]>(r)),
 

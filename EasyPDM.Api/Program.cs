@@ -120,6 +120,7 @@ app.MapMaterialEndpoints(connectionString);
 app.MapProcessEndpoints(connectionString);
 app.MapProjectLanguageEndpoints(connectionString);
 app.MapItemNameEndpoints(connectionString);
+app.MapCompanyEndpoints(connectionString);
 app.MapManufacturerEndpoints(connectionString);
 app.MapClientEndpoints(connectionString, storage);
 app.MapSavedFilterEndpoints(connectionString);

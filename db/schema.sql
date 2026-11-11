@@ -580,6 +580,16 @@ GRANT SELECT, INSERT, UPDATE ON backup_schedule TO CURRENT_USER;
 -- projects/materials/manufacturers/clients) -- bez tego, po ręcznym wyczyszczeniu Projektów
 -- na już zasiedlonej instancji, kolejny restart procesu widziałby pustą tabelę projects i
 -- ponownie zasiewał przykładowy projekt startowy (EnsureSampleProjectAsync w Program.cs).
+-- Dane firmy (Ustawienia -> Firma): nazwa i logo do tabelki rysunkowej — jeden wiersz, logo
+-- w bazie (wchodzi do backupu), tylko PNG/JPEG (zob. migracja 067).
+CREATE TABLE company_profile (
+    id                 BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+    name               TEXT,
+    logo               BYTEA,
+    logo_content_type  TEXT,
+    logo_updated_at    TIMESTAMPTZ
+);
+
 CREATE TABLE system_state (
     id                     BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
     sample_project_seeded  BOOLEAN NOT NULL DEFAULT false,

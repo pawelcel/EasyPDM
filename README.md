@@ -455,6 +455,9 @@ Every account has a **first and last name**, separate from the display name and 
 drawing title blocks. Both are required when an account is created; Settings → Users marks
 accounts that still lack them, and the edit button next to an account fills them in.
 
+**Settings → Company** (administrators) holds the company name and logo — PNG or JPEG,
+ideally square — for the drawing title block.
+
 ## For administrators and developers
 
 Server installation (Docker / Linux / Windows), architecture, the full list of API

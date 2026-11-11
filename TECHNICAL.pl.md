@@ -620,6 +620,8 @@ usunąć (`DELETE /api/notifications/{id}`).
 | PUT | `/api/project-languages/{id}/default` | ustawia domyślny język dokumentacji — tylko administrator |
 | PATCH | `/api/projects/{id}/languages` | główny język projektu, flaga wielojęzyczności i języki — tylko administrator |
 | GET | `/api/item-names?languageId=&itemType=` | istniejące nazwy części/złożeń w danym języku z ich tłumaczeniami |
+| GET/PATCH | `/api/settings/company` | nazwa firmy i czy jest logo — odczyt dla każdego, zmiana dla administratora |
+| GET/PUT/DELETE | `/api/settings/company/logo` | samo logo (PNG/JPEG do 2 MB, rodzaj sprawdzany po zawartości; zapisane w bazie) — zapis tylko administrator |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | katalog producentów + osoby kontaktowe + serie/typy i ich podtypy |
 | GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | katalog klientów + osoby kontaktowe + ich lista Nazw 2 |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | własne drzewko dokumentów klienta (foldery/pliki — upload/pobranie/zmiana nazwy/usunięcie/wyszukiwanie) |

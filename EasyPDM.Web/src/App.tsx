@@ -24,6 +24,7 @@ import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
 import { ClientsView } from "@/features/clients/clients-view"
 import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
 import { AuthorSettingsView } from "@/features/settings/author-settings-view"
+import { CompanySettingsView } from "@/features/settings/company-settings-view"
 import { LanguageSettingsView } from "@/features/settings/language-settings-view"
 import { LogsView } from "@/features/settings/logs-view"
 import { MyProjectsView } from "@/features/settings/my-projects-view"
@@ -133,7 +134,8 @@ function App() {
         settingsSection === "storage" ||
         settingsSection === "logs" ||
         settingsSection === "naming" ||
-        settingsSection === "tags")
+        settingsSection === "tags" ||
+        settingsSection === "company")
     ) {
       setSettingsSection("appearance")
     }
@@ -340,6 +342,10 @@ function App() {
           {view === "settings" &&
             settingsSection === "naming" &&
             (isAdmin ? <NamingSettingsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
+
+          {view === "settings" &&
+            settingsSection === "company" &&
+            (isAdmin ? <CompanySettingsView /> : <Hint>{t("settings.noPermission")}</Hint>)}
 
           {view === "settings" &&
             settingsSection === "tags" &&

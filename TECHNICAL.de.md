@@ -679,6 +679,8 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | PUT | `/api/project-languages/{id}/default` | setzt die Standardsprache der Dokumentation — nur Administrator |
 | PATCH | `/api/projects/{id}/languages` | Hauptsprache, Mehrsprachigkeit und Sprachen eines Projekts — nur Administrator |
 | GET | `/api/item-names?languageId=&itemType=` | vorhandene Teil-/Baugruppennamen in einer Sprache mit ihren Übersetzungen |
+| GET/PATCH | `/api/settings/company` | Firmenname und ob ein Logo vorhanden ist — Lesen für alle, Ändern für den Administrator |
+| GET/PUT/DELETE | `/api/settings/company/logo` | das Logo selbst (PNG/JPEG bis 2 MB, Typ nach Inhalt geprüft; in der Datenbank gespeichert) — Schreiben nur Administrator |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | Herstellerkatalog + Kontaktpersonen + Serien/Typen und deren Untertypen |
 | GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | Kundenkatalog + Kontaktpersonen + deren Namen-2-Liste |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | eigener Dokumentenbaum eines Kunden (Ordner/Dateien — Upload/Download/Umbenennen/Löschen/Suche) |

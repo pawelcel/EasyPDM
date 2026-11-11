@@ -500,6 +500,9 @@ Zeichnungsschriftfeld gedacht. Beide sind beim Anlegen eines Kontos Pflicht; Ein
 → Benutzer markiert Konten, denen sie fehlen, und die Bearbeiten-Schaltfläche beim Konto
 ergänzt sie.
 
+**Einstellungen → Firma** (Administratoren) enthält Firmenname und Logo — PNG oder JPEG,
+am besten quadratisch — für das Zeichnungsschriftfeld.
+
 ## Für Administratoren und Entwickler
 
 Serverinstallation (Docker / Linux / Windows), Architektur, die vollständige Liste der

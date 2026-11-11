@@ -855,6 +855,8 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | PUT | `/api/project-languages/{id}/default` | sets the default documentation language — administrator only |
 | PATCH | `/api/projects/{id}/languages` | a project's main language, multilingual flag and languages — administrator only |
 | GET | `/api/item-names?languageId=&itemType=` | existing part/assembly names in a language, with their translations |
+| GET/PATCH | `/api/settings/company` | company name and whether a logo exists — read by everyone, changed by the administrator |
+| GET/PUT/DELETE | `/api/settings/company/logo` | the logo itself (PNG/JPEG, up to 2 MB, type checked by content; stored in the database) — writes administrator only |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | manufacturer catalog + contact people + series/types and their subtypes |
 | GET/POST/PATCH/DELETE | `/api/clients[/{id}]`, `/api/clients/{id}/contacts[/{contactId}]`, `/api/clients/{id}/name2[/{name2Id}]` | client catalog + contact people + their Name 2 list |
 | GET/POST/PATCH/DELETE | `/api/clients/{id}/nodes[/{nodeId}]`, `/nodes/folder`, `/nodes/file`, `/nodes/{nodeId}/file`, `/nodes/search` | a client's own document tree (folders/files — upload/download/rename/delete/search) |

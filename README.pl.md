@@ -454,6 +454,9 @@ Każde konto ma **imię i nazwisko**, osobno od wyświetlanej nazwy, z myślą o
 rysunkowej. Oba są wymagane przy zakładaniu konta; Ustawienia → Użytkownicy oznaczają
 konta, którym ich brakuje, a przycisk edycji przy koncie pozwala je uzupełnić.
 
+**Ustawienia → Firma** (administrator) przechowują nazwę i logo firmy — PNG albo JPEG,
+najlepiej kwadratowe — do tabelki rysunkowej.
+
 ## Dla administratorów i programistów
 
 Instalacja serwera (Docker / Linux / Windows), architektura, pełna lista endpointów API i
