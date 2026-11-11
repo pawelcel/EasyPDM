@@ -40,6 +40,7 @@ import {
 } from "@/features/items/property-fields"
 import { ASSEMBLY_KIND_FIELDS, PART_KIND_FIELDS } from "@/features/items/part-property-form"
 import { ProcessSelect } from "@/features/processes/process-select"
+import { DocumentationLanguageProvider } from "@/features/project-languages/documentation-language"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -187,6 +188,23 @@ function AddNodeDialog({
       api.getProjects().then((list) => setProjects(list.filter((p) => !p.closed)))
     }
   }, [needsProjectPicker, open])
+
+  // Główny język projektu, do którego trafi element — w nim pokazują się obróbki do wyboru.
+  // Bez projektu (albo zanim się wczyta) obowiązuje domyślny język dokumentacji.
+  const [mainLanguageId, setMainLanguageId] = useState<number | undefined>(undefined)
+  useEffect(() => {
+    if (!open || !projectId) {
+      setMainLanguageId(undefined)
+      return
+    }
+    let cancelled = false
+    api.getProjects().then((list) => {
+      if (!cancelled) setMainLanguageId(list.find((p) => p.id === projectId)?.mainLanguageId)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, projectId])
 
   useEffect(() => {
     if (!needsProjectPicker || !projectId) {
@@ -699,7 +717,9 @@ function AddNodeDialog({
             {rodzaj === "Wykonywana" && (
               <>
                 <Label>{t("part.processes")}</Label>
-                <ProcessSelect target="part" value={processes} onChange={setProcesses} />
+                <DocumentationLanguageProvider languageId={mainLanguageId}>
+                  <ProcessSelect target="part" value={processes} onChange={setProcesses} />
+                </DocumentationLanguageProvider>
               </>
             )}
             {rodzaj === "Zakupowa" && (
@@ -835,7 +855,9 @@ function AddNodeDialog({
             {mode === "assembly" && rodzaj === "Wykonywane" && (
               <>
                 <Label>{t("part.processes")}</Label>
-                <ProcessSelect target="assembly" value={processes} onChange={setProcesses} />
+                <DocumentationLanguageProvider languageId={mainLanguageId}>
+                  <ProcessSelect target="assembly" value={processes} onChange={setProcesses} />
+                </DocumentationLanguageProvider>
               </>
             )}
             {mode === "assembly" && rodzaj === "Zakupowe" && (

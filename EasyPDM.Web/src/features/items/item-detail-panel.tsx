@@ -49,6 +49,8 @@ import { PropertyEditor } from "@/features/items/property-editor"
 import { StatusControl } from "@/features/items/status-control"
 import { ItemPreviewBox } from "@/features/preview/item-preview-box"
 import { PreviewDialog } from "@/features/preview/preview-dialog"
+import { DocumentationLanguageProvider } from "@/features/project-languages/documentation-language"
+import { useDocumentationLanguageId } from "@/features/project-languages/use-documentation-language-id"
 import { useLanguage } from "@/i18n/use-language"
 import { useOptimisticOrder } from "@/lib/optimistic-order"
 import { previewKindOf } from "@/lib/file-preview"
@@ -57,9 +59,10 @@ import { previewKindOf } from "@/lib/file-preview"
 // brakującą wartość pokazujemy jako "-", zamiast pustej komórki.
 // Obróbki (properties.processes) w kolumnie BOM-u po przecinku, z opisem w nawiasie — ta sama
 // nazwa bywa kilka razy z różną specyfikacją.
-function bomProcessesOrDash(properties: Record<string, unknown>): string {
+// W głównym języku projektu (zob. DocumentationLanguageProvider), z kopii tłumaczeń w elemencie.
+function bomProcessesOrDash(properties: Record<string, unknown>, languageId: number | undefined): string {
   const refs = readProcessRefs(properties.processes)
-  return refs.length > 0 ? refs.map(processLabel).join(", ") : "-"
+  return refs.length > 0 ? refs.map((ref) => processLabel(ref, languageId)).join(", ") : "-"
 }
 
 function bomPropertyOrDash(properties: Record<string, unknown>, key: string): string {
@@ -157,6 +160,7 @@ function ItemDetailPanel({
   duplicateParentId,
   hideActions = false,
   clientVerification = null,
+  documentationLanguageId,
 }: {
   item: Item
   projectName?: string
@@ -188,6 +192,9 @@ function ItemDetailPanel({
   // wyłącznie z widoku projektu -- w "Całej bazie" nie ma kontekstu projektu, więc ta sekcja
   // się tam nie pokazuje (null), zgodnie z zasadą, że weryfikacja nie idzie za elementem.
   clientVerification?: ClientVerificationSummary | null
+  // Główny język projektu, w którego kontekście element jest oglądany — w nim pokazują się
+  // obróbki (zob. DocumentationLanguageProvider). Brak = domyślny język dokumentacji.
+  documentationLanguageId?: number
 }) {
   const { t, language } = useLanguage()
   const { user } = useAuth()
@@ -321,6 +328,7 @@ function ItemDetailPanel({
   }
 
   return (
+    <DocumentationLanguageProvider languageId={documentationLanguageId}>
     <div>
       {!hideActions &&
         (onRemoveFromStructure || canDuplicate || canDownloadDocumentation || onDeleteCompletely) && (
@@ -677,6 +685,7 @@ function ItemDetailPanel({
         <ItemHistoryPanel itemId={item.id} refreshSignal={historyRefreshSignal} />
       )}
     </div>
+    </DocumentationLanguageProvider>
   )
 }
 
@@ -704,6 +713,7 @@ function SortableBomRow({
   setBomError: (message: string | null) => void
   disabled?: boolean
 }) {
+  const languageId = useDocumentationLanguageId()
   const { t } = useLanguage()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: child.id,
@@ -754,7 +764,7 @@ function SortableBomRow({
           />
         </TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "material")}</TableCell>
-        <TableCell>{bomProcessesOrDash(child.properties)}</TableCell>
+        <TableCell>{bomProcessesOrDash(child.properties, languageId)}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "norm")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "manufacturer")}</TableCell>
         <TableCell>{bomPropertyOrDash(child.properties, "orderNumber")}</TableCell>
@@ -794,7 +804,7 @@ function SortableBomRow({
           <TableCell>{entry.revisionLabel ?? "—"}</TableCell>
           <TableCell className="text-right">{entry.quantity}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "material")}</TableCell>
-          <TableCell>{bomProcessesOrDash(entry.properties)}</TableCell>
+          <TableCell>{bomProcessesOrDash(entry.properties, languageId)}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "norm")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "manufacturer")}</TableCell>
           <TableCell>{bomPropertyOrDash(entry.properties, "orderNumber")}</TableCell>

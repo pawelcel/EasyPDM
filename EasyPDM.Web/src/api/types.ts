@@ -396,10 +396,14 @@ export interface ProcessText {
 // oraz opisu z chwili wyboru. Identyfikator odróżnia warianty o tej samej nazwie, a kopia
 // sprawia, że element wydany zostaje z tą specyfikacją, z którą go wydano, nawet gdy opis w
 // katalogu się zmieni albo obróbka zniknie. id null = zapis sprzed wariantów (sama nazwa).
+// texts to kopia nazwy i opisu we WSZYSTKICH językach z chwili wyboru — element pokazuje
+// obróbkę w głównym języku projektu (zob. localizeProcess); name/description to wersja w
+// domyślnym języku, a zarazem całość starszych wpisów, zapisanych jeszcze bez texts.
 export interface ProcessRef {
   id: number | null
   name: string
   description: string | null
+  texts?: ProcessText[]
 }
 
 export function readProcessRefs(value: unknown): ProcessRef[] {
@@ -407,12 +411,20 @@ export function readProcessRefs(value: unknown): ProcessRef[] {
   return value.flatMap((entry): ProcessRef[] => {
     if (typeof entry === "string") return [{ id: null, name: entry, description: null }]
     if (entry && typeof entry === "object" && typeof (entry as { name?: unknown }).name === "string") {
-      const e = entry as { id?: unknown; name: string; description?: unknown }
+      const e = entry as { id?: unknown; name: string; description?: unknown; texts?: unknown }
+      const texts = Array.isArray(e.texts)
+        ? e.texts.flatMap((t): ProcessText[] =>
+            t && typeof t === "object" && typeof t.languageId === "number" && typeof t.name === "string"
+              ? [{ languageId: t.languageId, name: t.name, description: typeof t.description === "string" && t.description ? t.description : null }]
+              : []
+          )
+        : undefined
       return [
         {
           id: typeof e.id === "number" ? e.id : null,
           name: e.name,
           description: typeof e.description === "string" && e.description ? e.description : null,
+          ...(texts && texts.length > 0 ? { texts } : {}),
         },
       ]
     }
@@ -420,9 +432,17 @@ export function readProcessRefs(value: unknown): ProcessRef[] {
   })
 }
 
+// Nazwa i opis obróbki w danym języku dokumentacji, z kopii zapisanej w elemencie; bez
+// tłumaczenia na ten język (albo przy starszym wpisie bez kopii) — wersja domyślna.
+export function localizeProcess(ref: ProcessRef, languageId: number | undefined): { name: string; description: string | null } {
+  const text = languageId === undefined ? undefined : ref.texts?.find((t) => t.languageId === languageId)
+  return text ? { name: text.name, description: text.description } : { name: ref.name, description: ref.description }
+}
+
 // "Hartowanie (50 HRC)" — opis w nawiasie, bo sama nazwa nie odróżnia wariantów.
-export function processLabel(ref: ProcessRef): string {
-  return ref.description ? `${ref.name} (${ref.description.replace(/\s*\n\s*/g, " ")})` : ref.name
+export function processLabel(ref: ProcessRef, languageId?: number): string {
+  const { name, description } = localizeProcess(ref, languageId)
+  return description ? `${name} (${description.replace(/\s*\n\s*/g, " ")})` : name
 }
 
 // Lekki wpis do listy/wyszukiwarki producentów — bez osób kontaktowych (te dociągane są

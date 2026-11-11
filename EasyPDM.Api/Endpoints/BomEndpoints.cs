@@ -57,6 +57,7 @@ static class BomEndpoints
 
             var rows = await FetchBomRowsAsync(conn, id);
 
+            var languageId = await DocumentationLanguageIdAsync(conn, id);
             var csv = new StringBuilder();
             csv.Append("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka\r\n");
             foreach (var row in rows)
@@ -76,7 +77,7 @@ static class BomEndpoints
                     CsvField(PropertyOrEmpty(props, "manufacturer")),
                     CsvField(PropertyOrEmpty(props, "orderNumber")),
                     CsvField(PropertyOrEmpty(props, "orderNumber2")),
-                    CsvField(ProcessesOrEmpty(props)),
+                    CsvField(ProcessesOrEmpty(props, languageId)),
                 }));
                 csv.Append("\r\n");
             }
@@ -183,6 +184,7 @@ static class BomEndpoints
                 })
                 .OrderBy(a => a.ItemNumber ?? int.MaxValue);
 
+            var languageId = await DocumentationLanguageIdAsync(conn, id);
             var csv = new StringBuilder();
             csv.Append("Nazwa;Ilość łącznie;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka\r\n");
             foreach (var row in aggregated)
@@ -201,7 +203,7 @@ static class BomEndpoints
                     CsvField(PropertyOrEmpty(props, "manufacturer")),
                     CsvField(PropertyOrEmpty(props, "orderNumber")),
                     CsvField(PropertyOrEmpty(props, "orderNumber2")),
-                    CsvField(ProcessesOrEmpty(props)),
+                    CsvField(ProcessesOrEmpty(props, languageId)),
                 }));
                 csv.Append("\r\n");
             }
@@ -245,7 +247,22 @@ static class BomEndpoints
     // razy z różną specyfikacją. Wpis to {id, name, description}; zwykły napis (zapis sprzed
     // wprowadzenia wariantów) też jest przyjmowany. Kolumna stoi na końcu, żeby nie przesuwać
     // kolumn, na których ktoś mógł już oprzeć swój arkusz.
-    private static string ProcessesOrEmpty(JsonElement properties)
+    // Język, w którym CSV podaje obróbki: główny język projektu elementu, od którego liczony jest
+    // BOM; element bez projektu -- domyślny język dokumentacji.
+    private static async Task<int?> DocumentationLanguageIdAsync(NpgsqlConnection conn, Guid id)
+    {
+        await using var cmd = new NpgsqlCommand("""
+            SELECT COALESCE(p.main_language_id, default_project_language_id())
+            FROM items i LEFT JOIN projects p ON p.id = i.project_id
+            WHERE i.id = @id;
+            """, conn);
+        cmd.Parameters.AddWithValue("id", id);
+        return await cmd.ExecuteScalarAsync() is int languageId ? languageId : null;
+    }
+
+    // Nazwa i opis obróbki: z kopii tłumaczeń zapisanej w elemencie (texts), w podanym języku;
+    // bez tłumaczenia na ten język albo przy starszym wpisie bez kopii -- name/description.
+    private static string ProcessesOrEmpty(JsonElement properties, int? languageId)
     {
         if (!properties.TryGetProperty("processes", out var value) || value.ValueKind != JsonValueKind.Array)
             return "";
@@ -256,8 +273,22 @@ static class BomEndpoints
                 labels.Add(entry.GetString() ?? "");
             else if (entry.ValueKind == JsonValueKind.Object)
             {
-                var name = PropertyOrEmpty(entry, "name");
-                var description = PropertyOrEmpty(entry, "description");
+                var source = entry;
+                if (languageId is not null && entry.TryGetProperty("texts", out var texts) && texts.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var text in texts.EnumerateArray())
+                    {
+                        if (text.ValueKind == JsonValueKind.Object
+                            && text.TryGetProperty("languageId", out var lang) && lang.ValueKind == JsonValueKind.Number
+                            && lang.GetInt32() == languageId)
+                        {
+                            source = text;
+                            break;
+                        }
+                    }
+                }
+                var name = PropertyOrEmpty(source, "name");
+                var description = PropertyOrEmpty(source, "description");
                 labels.Add(string.IsNullOrWhiteSpace(description) ? name : $"{name} ({description.ReplaceLineEndings(" ")})");
             }
         }

@@ -564,6 +564,7 @@ function ProjectTreeView({
               key={selectedItem.id}
               item={selectedItem}
               projectName={project.name}
+              documentationLanguageId={project.mainLanguageId}
               childEntries={tree.childrenOf(selectedItem.id)}
               onSelectChild={(childId, parentId) => setSelection({ kind: "item", id: childId, parentId })}
               onItemsRefetch={tree.refetch}

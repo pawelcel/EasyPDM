@@ -499,6 +499,7 @@ function ItemList({
                 key={selectedItem.id}
                 item={selectedItem}
                 projectName={projects.find((p) => p.id === selectedItem.projectId)?.name}
+                documentationLanguageId={projects.find((p) => p.id === selectedItem.projectId)?.mainLanguageId}
                 childEntries={selectedItemChildren}
                 onSelectChild={handleSelectChild}
                 onItemsRefetch={refetchItemsAndExternal}

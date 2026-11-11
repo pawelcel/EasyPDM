@@ -140,6 +140,49 @@ public class BomEndpointsTests
         Assert.Contains(lines, l => l.StartsWith("1.1;", StringComparison.Ordinal) && l.Contains("Stal nierdzewna") && l.Contains("ACME"));
     }
 
+    // Obróbka zapisana z kopią tłumaczeń pokazuje się w CSV w głównym języku projektu; bez
+    // tłumaczenia na ten język (albo starszy wpis bez kopii) -- w wersji domyślnej.
+    [Fact]
+    public async Task Bom_csv_podaje_obrobki_w_glownym_jezyku_projektu()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync(AdminUsername, AdminPassword);
+
+        var languages = await client.GetFromJsonAsync<JsonElement>("/api/project-languages");
+        int Lang(string code) => languages.EnumerateArray().Single(l => l.GetProperty("code").GetString() == code).GetProperty("id").GetInt32();
+        var en = Lang("EN");
+        var pl = Lang("PL");
+
+        var (projectId, zlozenie1, zlozenie2, _) = await BuildNestedAssemblyAsync(client);
+        (await client.PatchAsJsonAsync($"/api/items/{zlozenie2}/properties",
+            new { processes = new object[]
+            {
+                new { id = 1, name = "Welding", description = "MIG", texts = new object[]
+                {
+                    new { languageId = en, name = "Welding", description = "MIG" },
+                    new { languageId = pl, name = "Spawanie", description = "MIG" },
+                } },
+                new { id = 2, name = "Painting", description = (string?)null, texts = new object[]
+                {
+                    new { languageId = en, name = "Painting", description = (string?)null },
+                } },
+            } })).EnsureSuccessStatusCode();
+
+        async Task<string> ProcessesCellAsync()
+        {
+            var bytes = await client.GetByteArrayAsync($"/api/items/{zlozenie1}/bom/csv");
+            var lines = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+            return lines.Single(l => l.StartsWith("1;", StringComparison.Ordinal)).Split(';').Last();
+        }
+
+        Assert.Equal("Welding (MIG), Painting", await ProcessesCellAsync());
+
+        (await client.PatchAsJsonAsync($"/api/projects/{projectId}/languages",
+            new { mainLanguageId = pl, multilingual = false })).EnsureSuccessStatusCode();
+        Assert.Equal("Spawanie (MIG), Painting", await ProcessesCellAsync());
+    }
+
     [Fact]
     public async Task Bom_aggregated_csv_sumuje_rozwinieta_ilosc_przez_cały_lancuch()
     {
