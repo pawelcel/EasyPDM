@@ -4,6 +4,8 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [0.8]
 
+_0.8 will get point releases (0.8.x) as drawing sheets — title block templates filled in from EasyPDM — are created for the CAD programs._
+
 ### Added
 - **CAD macros log in with their own revocable token.** Each macro login (FreeCAD, SolidWorks, Inventor) now gets a separate token instead of a browser session; Settings → Users lists the logged-in macros with when each was last used and can sign out any of them, and changing a user's password signs out all their macros. Opening the browser from a macro starts its own browser session. The updated macros fall back to the old login on a server older than 0.8, and older macros keep working with this server.
 - **Items in progress get translations for processes picked before 0.8.** An update migration adds the catalog's translations to their processes; released items are left as they were.
