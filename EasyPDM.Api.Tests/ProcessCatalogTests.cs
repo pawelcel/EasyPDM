@@ -217,4 +217,31 @@ public class ProcessTranslationTests
         Assert.Equal("Only here", process.GetProperty("name").GetString());
         Assert.Single(process.GetProperty("texts").EnumerateArray());
     }
+
+    [Fact]
+    public async Task Edycja_w_jezyku_zastepczym_nie_kopiuje_tekstu_do_domyslnego()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var admin = factory.CreateClient();
+        await admin.LoginAsync("admin", "admin");
+        var pl = await LanguageIdAsync(admin, "PL");
+        var tag = Guid.NewGuid().ToString("N")[..6];
+
+        // Obróbka tylko po polsku: katalog (domyślny angielski) pokazuje ją w języku zastępczym.
+        var created = await admin.PostAsJsonAsync("/api/processes",
+            new { name = "Gięcie " + tag, forParts = true, forAssemblies = false, languageId = pl });
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        Assert.Equal(pl, (await ProcessAsync(admin, id)).GetProperty("languageId").GetInt32());
+
+        (await admin.PatchAsJsonAsync($"/api/processes/{id}",
+            new { name = "Gięcie " + tag, description = "R2", forParts = true, forAssemblies = true, languageId = pl })).EnsureSuccessStatusCode();
+        var process = await ProcessAsync(admin, id);
+        var text = Assert.Single(process.GetProperty("texts").EnumerateArray());
+        Assert.Equal(pl, text.GetProperty("languageId").GetInt32());
+        Assert.Equal("R2", text.GetProperty("description").GetString());
+        Assert.True(process.GetProperty("forAssemblies").GetBoolean());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PatchAsJsonAsync($"/api/processes/{id}",
+            new { name = "X", forParts = true, forAssemblies = false, languageId = int.MaxValue })).StatusCode);
+    }
 }

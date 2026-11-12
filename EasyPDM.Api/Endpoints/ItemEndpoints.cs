@@ -895,7 +895,15 @@ static class ItemEndpoints
                         "(CAD, rysunek, PDF, model 3D), a nazwy tych plików zawierają jego nazwę.");
             }
 
-            const string sql = "UPDATE items SET file_name = @name WHERE id = @id;";
+            // Tłumaczenia nazwy (properties.nameTexts) tłumaczą DOTYCHCZASOWĄ nazwę -- po jej zmianie
+            // "Wspornik" nosiłby dalej angielskie "Cube" po "Kostce". Znikają razem ze starą nazwą;
+            // ta sama nazwa przysłana ponownie niczego nie rusza.
+            const string sql = """
+                UPDATE items SET
+                    properties = CASE WHEN file_name IS DISTINCT FROM @name THEN properties - 'nameTexts' ELSE properties END,
+                    file_name = @name
+                WHERE id = @id;
+                """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("name", body.Name.Trim());

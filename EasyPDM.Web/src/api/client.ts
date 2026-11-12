@@ -66,6 +66,8 @@ type ProcessWriteBody = {
   description: string | null
   forParts: boolean
   forAssemblies: boolean
+  // Język, w którym zapisuje się nazwa i opis; bez niego domyślny język dokumentacji.
+  languageId?: number
 }
 
 type MaterialWriteBody = {

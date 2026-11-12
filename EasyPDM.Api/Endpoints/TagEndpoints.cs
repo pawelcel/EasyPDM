@@ -67,7 +67,7 @@ static class TagEndpoints
             await conn.OpenAsync();
 
             await using var cmd = new NpgsqlCommand("DELETE FROM tags WHERE name = @name;", conn);
-            cmd.Parameters.AddWithValue("name", tagName);
+            cmd.Parameters.AddWithValue("name", DecodeTagName(tagName));
             return await cmd.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.Ok();
         });
 
@@ -146,12 +146,19 @@ static class TagEndpoints
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("itemId", id);
-            cmd.Parameters.AddWithValue("tagName", tagName);
+            cmd.Parameters.AddWithValue("tagName", DecodeTagName(tagName));
             await cmd.ExecuteNonQueryAsync();
 
             return Results.Ok();
         });
     }
+
+    // Routing zostawia ukośnik w wartości ścieżki zakodowany ("a%2Fb"), więc tag z "/" w nazwie
+    // nie trafiał w żaden wiersz: usunięcie z całej bazy kończyło się 404, a zdjęcie z elementu
+    // po cichu nic nie robiło. Pozostałe znaki są już zdekodowane; nazwa tagu z dosłownym "%2F"
+    // jest na tyle nieprawdopodobna, że nie warto dla niej zmieniać kształtu adresu.
+    private static string DecodeTagName(string tagName) =>
+        tagName.Replace("%2F", "/", StringComparison.OrdinalIgnoreCase);
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }

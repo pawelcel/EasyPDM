@@ -90,6 +90,9 @@ const ASSEMBLY_MANAGED_PROPERTY_KEYS = new Set([
   "notes",
   // Tłumaczenia nazwy — własne okno przy polu nazwy.
   "nameTexts",
+  // Obróbki — własne pole przy Złożeniu "Wykonywanym"; bez tego wpisu samo wybranie obróbki
+  // wywoływało edytor surowych właściwości z listą obiektów jako wartością.
+  "processes",
 ])
 
 function propertyEditorEntries(item: Item): Record<string, unknown> {

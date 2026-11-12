@@ -69,7 +69,8 @@ static class UserEndpoints
             cmd.Parameters.AddWithValue("displayName", body.DisplayName.Trim());
             cmd.Parameters.AddWithValue("firstName", body.FirstName!.Trim());
             cmd.Parameters.AddWithValue("lastName", body.LastName!.Trim());
-            cmd.Parameters.AddWithValue("email", (object?)body.Email?.Trim() ?? DBNull.Value);
+            // Pusty e-mail to brak e-maila (NULL), nie pusty napis -- okno edycji wysyła "" po wyczyszczeniu pola.
+            cmd.Parameters.AddWithValue("email", string.IsNullOrWhiteSpace(body.Email) ? DBNull.Value : body.Email.Trim());
             cmd.Parameters.AddWithValue("hash", PasswordHasher.Hash(body.Password));
             cmd.Parameters.AddWithValue("role", body.Role);
 
@@ -129,7 +130,8 @@ static class UserEndpoints
             cmd.Parameters.AddWithValue("firstName", (object?)body.FirstName?.Trim() ?? DBNull.Value);
             cmd.Parameters.AddWithValue("lastName", (object?)body.LastName?.Trim() ?? DBNull.Value);
             cmd.Parameters.AddWithValue("emailProvided", body.Email is not null);
-            cmd.Parameters.AddWithValue("email", (object?)body.Email?.Trim() ?? DBNull.Value);
+            // Pusty e-mail to brak e-maila (NULL), nie pusty napis -- okno edycji wysyła "" po wyczyszczeniu pola.
+            cmd.Parameters.AddWithValue("email", string.IsNullOrWhiteSpace(body.Email) ? DBNull.Value : body.Email.Trim());
             cmd.Parameters.AddWithValue("role", (object?)body.Role ?? DBNull.Value);
             cmd.Parameters.AddWithValue(
                 "hash", string.IsNullOrEmpty(body.Password) ? DBNull.Value : PasswordHasher.Hash(body.Password));

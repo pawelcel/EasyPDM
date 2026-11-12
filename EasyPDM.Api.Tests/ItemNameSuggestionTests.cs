@@ -52,4 +52,27 @@ public class ItemNameSuggestionTests
         Assert.Null(await FindAsync(en, "Kostka " + tag));
         Assert.Null(await FindAsync(pl, "Kostka " + tag, "assembly"));
     }
+
+    // Tłumaczenia tłumaczą dotychczasową nazwę, więc znikają razem z nią.
+    [Fact]
+    public async Task Zmiana_nazwy_usuwa_tlumaczenia_starej_nazwy()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync("admin", "admin");
+        var projectId = await client.CreateProjectAsync($"Zmiana nazwy {Guid.NewGuid()}");
+        var item = await client.CreateNodeAsync(projectId, "Kostka", "part");
+        (await client.PatchAsJsonAsync($"/api/items/{item}/properties",
+            new { nameTexts = new[] { new { languageId = 1, name = "Cube" } }, notes = "zostaje" })).EnsureSuccessStatusCode();
+
+        // Ta sama nazwa przysłana ponownie niczego nie rusza.
+        (await client.PatchAsJsonAsync($"/api/items/{item}/name", new { name = "Kostka" })).EnsureSuccessStatusCode();
+        var same = (await client.GetFromJsonAsync<JsonElement>($"/api/items/{item}")).GetProperty("properties");
+        Assert.True(same.TryGetProperty("nameTexts", out _));
+
+        (await client.PatchAsJsonAsync($"/api/items/{item}/name", new { name = "Wspornik" })).EnsureSuccessStatusCode();
+        var renamed = (await client.GetFromJsonAsync<JsonElement>($"/api/items/{item}")).GetProperty("properties");
+        Assert.False(renamed.TryGetProperty("nameTexts", out _));
+        Assert.Equal("zostaje", renamed.GetProperty("notes").GetString());
+    }
 }

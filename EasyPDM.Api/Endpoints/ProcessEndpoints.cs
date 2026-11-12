@@ -74,13 +74,14 @@ static class ProcessEndpoints
                 cmd.Parameters.AddWithValue("forAssemblies", body.ForAssemblies);
                 id = (int)(await cmd.ExecuteScalarAsync())!;
             }
-            await UpsertDefaultTextAsync(conn, tx, id, body);
+            if (await UpsertTextAsync(conn, tx, id, body) is { } badLanguage)
+                return badLanguage;
             await tx.CommitAsync();
             return Results.Created($"/api/processes/{id}", new { id });
         });
 
-        // PATCH /api/processes/{id}   body jak przy POST — zmienia tekst w domyślnym języku
-        // i zakres (części/złożenia); tłumaczenia na inne języki zostają.
+        // PATCH /api/processes/{id}   body jak przy POST — zmienia tekst w języku z languageId
+        // (bez niego: w domyślnym) i zakres (części/złożenia); pozostałe języki zostają.
         // Nie przepisuje elementów: każdy trzyma kopię nazwy i opisu z chwili wyboru, więc
         // element wydany zostaje dokładnie z tą specyfikacją, z którą go wydano.
         app.MapPatch("/api/processes/{id:int}", async (int id, ProcessRequest body) =>
@@ -102,7 +103,8 @@ static class ProcessEndpoints
                 if (await cmd.ExecuteNonQueryAsync() == 0)
                     return Results.NotFound();
             }
-            await UpsertDefaultTextAsync(conn, tx, id, body);
+            if (await UpsertTextAsync(conn, tx, id, body) is { } badLanguage)
+                return badLanguage;
             await tx.CommitAsync();
             return Results.Ok();
         });
@@ -172,18 +174,26 @@ static class ProcessEndpoints
         });
     }
 
-    private static async Task UpsertDefaultTextAsync(NpgsqlConnection conn, NpgsqlTransaction tx, int id, ProcessRequest body)
+    // Tekst trafia do języka wskazanego w żądaniu (ten, w którym katalog pokazał obróbkę do
+    // edycji), a bez wskazania -- do domyślnego. Bez tego edycja obróbki pokazanej w języku
+    // zastępczym (brak tłumaczenia na domyślny) kopiowałaby np. polski tekst jako angielski.
+    private static async Task<IResult?> UpsertTextAsync(NpgsqlConnection conn, NpgsqlTransaction tx, int id, ProcessRequest body)
     {
         await using var cmd = new NpgsqlCommand("""
             INSERT INTO process_texts (process_id, language_id, name, description)
-            VALUES (@id, default_project_language_id(), @name, @description)
+            SELECT @id, l.id, @name, @description
+            FROM project_languages l
+            WHERE l.id = COALESCE(@languageId, default_project_language_id())
             ON CONFLICT (process_id, language_id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
             """, conn, tx);
         cmd.Parameters.AddWithValue("id", id);
+        cmd.Parameters.Add(new NpgsqlParameter("languageId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = (object?)body.LanguageId ?? DBNull.Value });
         cmd.Parameters.AddWithValue("name", body.Name.Trim());
         cmd.Parameters.AddWithValue("description",
             string.IsNullOrWhiteSpace(body.Description) ? DBNull.Value : body.Description.Trim());
-        await cmd.ExecuteNonQueryAsync();
+        return await cmd.ExecuteNonQueryAsync() == 0
+            ? Results.BadRequest("Wybrano język, którego nie ma na liście języków dokumentacji.")
+            : null;
     }
 
     private static IResult? Validate(ProcessRequest body)
@@ -201,7 +211,7 @@ static class ProcessEndpoints
         bool ForParts, bool ForAssemblies, List<ProcessText> Texts);
 }
 
-record ProcessRequest(string Name, string? Description, bool ForParts, bool ForAssemblies);
+record ProcessRequest(string Name, string? Description, bool ForParts, bool ForAssemblies, int? LanguageId = null);
 
 record ProcessTextRequest(int LanguageId, string? Name, string? Description);
 

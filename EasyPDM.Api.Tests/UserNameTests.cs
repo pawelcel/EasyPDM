@@ -57,4 +57,18 @@ public class UserNameTests
         Assert.Equal(HttpStatusCode.BadRequest,
             (await admin.PatchAsJsonAsync($"/api/users/{id}", new { lastName = " " })).StatusCode);
     }
+
+    [Fact]
+    public async Task Wyczyszczony_email_zapisuje_sie_jako_brak()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var admin = factory.CreateClient();
+        await admin.LoginAsync("admin", "admin");
+        var id = await admin.CreateUserAsync("mail" + Guid.NewGuid().ToString("N")[..8], "haslo123");
+
+        (await admin.PatchAsJsonAsync($"/api/users/{id}", new { email = "a@b.pl" })).EnsureSuccessStatusCode();
+        Assert.Equal("a@b.pl", (await UserAsync(admin, id)).GetProperty("email").GetString());
+        (await admin.PatchAsJsonAsync($"/api/users/{id}", new { email = "" })).EnsureSuccessStatusCode();
+        Assert.Equal(JsonValueKind.Null, (await UserAsync(admin, id)).GetProperty("email").ValueKind);
+    }
 }

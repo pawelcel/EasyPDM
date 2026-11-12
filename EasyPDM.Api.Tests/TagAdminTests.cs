@@ -75,4 +75,25 @@ public class TagAdminTests
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync("/api/settings/tags")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await user.DeleteAsync("/api/settings/tags/cokolwiek")).StatusCode);
     }
+
+    // Ukośnik w nazwie tagu dociera w adresie jako %2F, którego routing nie dekoduje.
+    [Fact]
+    public async Task Tag_z_ukosnikiem_da_sie_zdjac_i_usunac()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var admin = factory.CreateClient();
+        await admin.LoginAsync("admin", "admin");
+        var projectId = await admin.CreateProjectAsync($"Tagi ukosnik {Guid.NewGuid()}");
+        var tag = "a/b " + Guid.NewGuid().ToString("N")[..6];
+        var encoded = Uri.EscapeDataString(tag);
+        var item = await admin.CreateNodeAsync(projectId, "Czesc", "part");
+
+        (await admin.PostAsJsonAsync($"/api/items/{item}/tags", new { name = tag })).EnsureSuccessStatusCode();
+        Assert.Equal(1, await ItemCountAsync(admin, tag));
+        (await admin.DeleteAsync($"/api/items/{item}/tags/{encoded}")).EnsureSuccessStatusCode();
+        Assert.Equal(0, await ItemCountAsync(admin, tag));
+
+        (await admin.DeleteAsync($"/api/settings/tags/{encoded}")).EnsureSuccessStatusCode();
+        Assert.Null(await ItemCountAsync(admin, tag));
+    }
 }

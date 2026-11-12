@@ -33,7 +33,13 @@ import { useProcesses } from "@/features/processes/use-processes"
 import { useProjectLanguages } from "@/features/project-languages/use-project-languages"
 import { useLanguage } from "@/i18n/use-language"
 
-type ProcessBody = { name: string; description: string | null; forParts: boolean; forAssemblies: boolean }
+type ProcessBody = {
+  name: string
+  description: string | null
+  forParts: boolean
+  forAssemblies: boolean
+  languageId?: number
+}
 
 function ProcessesView() {
   const { t } = useLanguage()
@@ -229,13 +235,15 @@ function ProcessDialog({
   const [forParts, setForParts] = useState(initial?.forParts ?? true)
   const [forAssemblies, setForAssemblies] = useState(initial?.forAssemblies ?? false)
   const [error, setError] = useState("")
+  const editLanguageId = initial?.languageId ?? defaultLanguageId
 
   // Inna obróbka z katalogu o tej samej nazwie (bez względu na wielkość liter) — nie błąd, tylko
   // przypomnienie, że opis będzie jedynym, co je odróżni.
   const sameName = useMemo(() => {
     const key = name.trim().toLocaleLowerCase()
-    return key ? (processes.find((p) => p.id !== initial?.id && p.name.toLocaleLowerCase() === key) ?? null) : null
-  }, [initial, name, processes])
+    if (!key) return null
+    return processNamesIn(processes, editLanguageId, initial?.id).find((n) => n.toLocaleLowerCase() === key) ?? null
+  }, [editLanguageId, initial, name, processes])
 
   function reset() {
     setName(initial?.name ?? "")
@@ -259,7 +267,15 @@ function ProcessDialog({
     }
     setError("")
     try {
-      await onSubmit({ name: trimmed, description: description.trim() || null, forParts, forAssemblies })
+      await onSubmit({
+        name: trimmed,
+        description: description.trim() || null,
+        forParts,
+        forAssemblies,
+        // Edycja zapisuje tekst w języku, w którym katalog go pokazał — przy braku tłumaczenia na
+        // domyślny jest to język zastępczy, i to jego tekst się poprawia, a nie kopiuje jako domyślny.
+        languageId: editLanguageId,
+      })
       setOpen(false)
       reset()
     } catch (err) {
@@ -287,12 +303,12 @@ function ProcessDialog({
             id="process-name"
             value={name}
             onChange={setName}
-            suggestions={processNamesIn(processes, defaultLanguageId, initial?.id)}
+            suggestions={processNamesIn(processes, editLanguageId, initial?.id)}
             placeholder={t("process.namePlaceholder")}
             newValueHint={initial ? undefined : t("process.newHint")}
             nearDuplicateHint={false}
           />
-          {sameName && <Hint>{t("process.sameNameHint", { name: sameName.name })}</Hint>}
+          {sameName && <Hint>{t("process.sameNameHint", { name: sameName })}</Hint>}
 
           <Label htmlFor="process-description">{t("process.descriptionLabel")}</Label>
           <Textarea
