@@ -24,11 +24,13 @@ static class AttachmentEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            const string sql = """
-                SELECT id, file_name, file_size, uploaded_at, preview_role, revision_number
-                FROM item_attachments
-                WHERE item_id = @itemId
-                ORDER BY uploaded_at;
+            var sql = $"""
+                SELECT a.id, a.file_name, a.file_size, a.uploaded_at, a.preview_role, a.revision_number,
+                       {UserNames.FullNameSql("u")}
+                FROM item_attachments a
+                LEFT JOIN users u ON u.id = a.uploaded_by
+                WHERE a.item_id = @itemId
+                ORDER BY a.uploaded_at;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("itemId", itemId);
@@ -44,7 +46,8 @@ static class AttachmentEndpoints
                     fileSize = reader.IsDBNull(2) ? (long?)null : reader.GetInt64(2),
                     uploadedAt = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3),
                     role = reader.IsDBNull(4) ? null : reader.GetString(4),
-                    revisionNumber = reader.IsDBNull(5) ? (int?)null : reader.GetInt32(5)
+                    revisionNumber = reader.IsDBNull(5) ? (int?)null : reader.GetInt32(5),
+                    uploadedBy = reader.IsDBNull(6) ? null : reader.GetString(6)
                 });
             }
 
@@ -104,8 +107,8 @@ static class AttachmentEndpoints
             }
 
             const string insertSql = """
-                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, preview_role, revision_number)
-                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @role, @revisionNumber);
+                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, uploaded_by, preview_role, revision_number)
+                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @uploadedBy, @role, @revisionNumber);
                 """;
             try
             {
@@ -117,6 +120,7 @@ static class AttachmentEndpoints
                 insertCmd.Parameters.AddWithValue("fileName", file.FileName);
                 insertCmd.Parameters.AddWithValue("filePath", storedPath);
                 insertCmd.Parameters.AddWithValue("hash", hash);
+                insertCmd.Parameters.AddWithValue("uploadedBy", user.Id);
                 insertCmd.Parameters.AddWithValue("size", file.Length);
                 insertCmd.Parameters.AddWithValue("role", (object?)role ?? DBNull.Value);
                 insertCmd.Parameters.AddWithValue("revisionNumber", (object?)info.Value.RevisionNumber ?? DBNull.Value);
@@ -195,8 +199,8 @@ static class AttachmentEndpoints
             await ReplaceExistingRoleAttachmentAsync(conn, itemId, body.Role, fileName, fullPath, user.Id);
 
             const string insertSql = """
-                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, preview_role, revision_number)
-                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @role, @revisionNumber);
+                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, uploaded_by, preview_role, revision_number)
+                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @uploadedBy, @role, @revisionNumber);
                 """;
             await using var insertCmd = new NpgsqlCommand(insertSql, conn);
             insertCmd.Parameters.AddWithValue("id", attachmentId);
@@ -204,6 +208,7 @@ static class AttachmentEndpoints
             insertCmd.Parameters.AddWithValue("fileName", fileName);
             insertCmd.Parameters.AddWithValue("filePath", fullPath);
             insertCmd.Parameters.AddWithValue("hash", hash);
+            insertCmd.Parameters.AddWithValue("uploadedBy", user.Id);
             insertCmd.Parameters.AddWithValue("size", fileSize);
             insertCmd.Parameters.AddWithValue("role", (object?)body.Role ?? DBNull.Value);
             insertCmd.Parameters.AddWithValue("revisionNumber", (object?)info.Value.RevisionNumber ?? DBNull.Value);

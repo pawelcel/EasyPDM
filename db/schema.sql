@@ -429,6 +429,7 @@ CREATE TABLE item_attachments (
     file_hash    TEXT,
     file_size    BIGINT,
     uploaded_at  TIMESTAMPTZ DEFAULT now(),
+    uploaded_by  UUID REFERENCES users(id) ON DELETE SET NULL,  -- who uploaded it (migration 072)
     -- Opcjonalna "rola" załącznika:
     --   pdf/step — wskazuje, KTÓRY załącznik zasila stały podgląd (2D/3D) w panelu
     --     właściwości elementu (jeden na rolę, nowy zastępuje poprzedni).

@@ -21,6 +21,14 @@ function formatUploadedAt(uploadedAt: string | null, language: string): string {
   return new Date(uploadedAt).toLocaleString(language)
 }
 
+// "date · size · who" -- the who was only in the item's History before, so a CAD file showed
+// when it arrived but not who sent it.
+function uploadMeta(attachment: Attachment, language: string): string {
+  return [formatUploadedAt(attachment.uploadedAt, language), formatSize(attachment.fileSize), attachment.uploadedBy ?? ""]
+    .filter(Boolean)
+    .join(" · ")
+}
+
 // Miejsce "PDF"/"STEP" — jeden załącznik na rolę, widoczny osobno OD załączników
 // ogólnych, żeby było od razu jasne, KTÓRY plik zasila stały podgląd 2D/3D w nagłówku
 // panelu (ItemPreviewBox), zamiast szukać go wśród zwykłych załączników.
@@ -86,9 +94,7 @@ function RoleSlot({
             {/* Data i rozmiar jak przy plikach CAD: nowy STEP/PDF zastępuje poprzedni pod
                 tą samą nazwą, więc bez daty nie widać, czy wysyłka go faktycznie nadpisała. */}
             <span className="text-muted-foreground">
-              {formatUploadedAt(attachment.uploadedAt, language)}
-              {attachment.uploadedAt && attachment.fileSize !== null && " · "}
-              {formatSize(attachment.fileSize)}
+              {uploadMeta(attachment, language)}
             </span>
             <Button size="icon-xs" variant="ghost" onClick={onPreview} aria-label={t("common.preview")}>
               <Eye className="size-3 text-muted-foreground" />
@@ -280,9 +286,7 @@ function AttachmentsPanel({
                   </a>
                   <div className="flex shrink-0 items-center gap-1">
                     <span className="text-muted-foreground">
-                      {formatUploadedAt(attachment.uploadedAt, language)}
-                      {attachment.uploadedAt && attachment.fileSize !== null && " · "}
-                      {formatSize(attachment.fileSize)}
+                      {uploadMeta(attachment, language)}
                     </span>
                     {previewKindOf(attachment.fileName) && (
                       <Button
@@ -350,9 +354,7 @@ function AttachmentsPanel({
                   </a>
                   <div className="flex shrink-0 items-center gap-1">
                     <span className="text-muted-foreground">
-                      {formatUploadedAt(attachment.uploadedAt, language)}
-                      {attachment.uploadedAt && attachment.fileSize !== null && " · "}
-                      {formatSize(attachment.fileSize)}
+                      {uploadMeta(attachment, language)}
                     </span>
                     {previewKindOf(attachment.fileName) && (
                       <Button
@@ -421,9 +423,7 @@ function AttachmentsPanel({
               </a>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="text-muted-foreground">
-                  {formatUploadedAt(attachment.uploadedAt, language)}
-                  {attachment.uploadedAt && attachment.fileSize !== null && " · "}
-                  {formatSize(attachment.fileSize)}
+                  {uploadMeta(attachment, language)}
                 </span>
                 {previewKindOf(attachment.fileName) && (
                   <Button

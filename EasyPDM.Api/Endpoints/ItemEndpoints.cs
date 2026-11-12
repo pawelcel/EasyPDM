@@ -1408,11 +1408,12 @@ static class ItemEndpoints
 
             // Odczyt historii rewizji — świadomie otwarty dla KAŻDEGO zalogowanego
             // użytkownika, zob. GET /api/items.
-            const string sql = """
-                SELECT revision_number, comment, created_at
-                FROM item_revision_comments
-                WHERE item_id = @id
-                ORDER BY revision_number;
+            var sql = $"""
+                SELECT rc.revision_number, rc.comment, rc.created_at, {UserNames.FullNameSql("u")}
+                FROM item_revision_comments rc
+                LEFT JOIN users u ON u.id = rc.created_by
+                WHERE rc.item_id = @id
+                ORDER BY rc.revision_number;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
@@ -1426,7 +1427,8 @@ static class ItemEndpoints
                     revisionNumber = reader.GetInt32(0),
                     revisionLabel = RevisionLabeling.Label(reader.GetInt32(0)),
                     comment = reader.GetString(1),
-                    createdAt = reader.GetDateTime(2)
+                    createdAt = reader.GetDateTime(2),
+                    createdBy = reader.IsDBNull(3) ? null : reader.GetString(3)
                 });
             }
 

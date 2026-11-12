@@ -284,6 +284,8 @@ export interface RevisionComment {
   revisionLabel: string
   comment: string
   createdAt: string
+  // Who opened the revision (moved the item back to In progress), first and last name.
+  createdBy: string | null
 }
 
 // Historia Części/Złożenia (do panelu "Historia") — kilka rodzajów wpisów połączonych
@@ -716,6 +718,9 @@ export interface Attachment {
   fileName: string
   fileSize: number | null
   uploadedAt: string | null
+  // First and last name of whoever uploaded it (display name for accounts without them);
+  // null for files from before this was recorded, or when the account was deleted.
+  uploadedBy: string | null
   // "image" — zrzut modelu zrobiony przez makro CAD przy wysyłce, to on jest podglądem 3D
   // w panelu elementu (wcześniej renderowaliśmy w tym celu plik STEP w przeglądarce).
   // Wgrywany RAZEM ze STEP-em i razem z nim kasowany, zob. AttachmentEndpoints.cs.

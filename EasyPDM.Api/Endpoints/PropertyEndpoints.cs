@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Npgsql;
 
 static class PropertyEndpoints
@@ -9,6 +10,12 @@ static class PropertyEndpoints
     {
         "price", "currency", "priceType", "priceDate"
     };
+
+    // Changing any of these counts as entering the price: the panel shows "Price entered on
+    // <date> by <name>", and the name is stamped here from the session -- never taken from the
+    // request, or anyone could sign a price with someone else's name.
+    private static readonly string[] PriceKeys = { "price", "currency", "priceType" };
+    private const string PriceByKey = "priceBy";
 
     public static void MapPropertyEndpoints(this WebApplication app, string connectionString)
     {
@@ -36,11 +43,14 @@ static class PropertyEndpoints
             if (ItemPropertyShapes.Validate(body) is { } shapeError)
                 return Results.BadRequest(shapeError);
 
+            var props = JsonNode.Parse(body.GetRawText())!.AsObject();
+            props.Remove(PriceByKey);
+
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
             {
-                foreach (var prop in body.EnumerateObject())
+                foreach (var prop in props)
                 {
-                    if (!AlwaysEditableKeys.Contains(prop.Name))
+                    if (!AlwaysEditableKeys.Contains(prop.Key))
                         return Results.BadRequest(
                             "Properties can only be changed while the item is In progress (except price, currency, gross/net).");
                 }
@@ -82,6 +92,9 @@ static class PropertyEndpoints
                     "which depends on the kind.");
             }
 
+            if (PriceKeys.Any(props.ContainsKey))
+                props[PriceByKey] = await FullNameAsync(conn, user.Id);
+
             await using var tx = await conn.BeginTransactionAsync();
 
             const string sql = """
@@ -91,7 +104,7 @@ static class PropertyEndpoints
             await using (var cmd = new NpgsqlCommand(sql, conn, tx))
             {
                 cmd.Parameters.AddWithValue("id", id);
-                cmd.Parameters.AddWithValue("props", body.GetRawText());
+                cmd.Parameters.AddWithValue("props", props.ToJsonString());
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -181,5 +194,13 @@ static class PropertyEndpoints
             conn);
         cmd.Parameters.AddWithValue("id", id);
         return (bool)(await cmd.ExecuteScalarAsync())!;
+    }
+
+    private static async Task<string?> FullNameAsync(NpgsqlConnection conn, Guid userId)
+    {
+        await using var cmd = new NpgsqlCommand(
+            $"SELECT {UserNames.FullNameSql("u")} FROM users u WHERE u.id = @id;", conn);
+        cmd.Parameters.AddWithValue("id", userId);
+        return await cmd.ExecuteScalarAsync() as string;
     }
 }

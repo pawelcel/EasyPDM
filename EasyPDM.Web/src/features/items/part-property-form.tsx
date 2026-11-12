@@ -358,6 +358,8 @@ function PriceRow({
   const currency = typeof item.properties.currency === "string" ? item.properties.currency : "PLN"
   const priceType = typeof item.properties.priceType === "string" ? item.properties.priceType : ""
   const priceDate = typeof item.properties.priceDate === "string" ? item.properties.priceDate : ""
+  // Stamped by the server from the session whenever price, currency or gross/net changes.
+  const priceBy = typeof item.properties.priceBy === "string" ? item.properties.priceBy : ""
 
   const [price, setPrice] = useState(initial)
   useEffect(() => setPrice(initial), [initial])
@@ -426,7 +428,10 @@ function PriceRow({
       </div>
 
       <div className="-mt-1 text-[12.5px] text-muted-foreground">
-        {priceDate && t("part.priceEnteredOn", { date: priceDate })}
+        {priceDate &&
+          (priceBy
+            ? t("part.priceEnteredOnBy", { date: priceDate, name: priceBy })
+            : t("part.priceEnteredOn", { date: priceDate }))}
       </div>
     </>
   )

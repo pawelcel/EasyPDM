@@ -536,6 +536,7 @@ const pl = {
   "part.notes": "Dodatkowe informacje",
   "part.price": "Cena",
   "part.priceEnteredOn": "Cena wprowadzona: {date}",
+  "part.priceEnteredOnBy": "Cena wprowadzona: {date}, {name}",
   "part.priceNetto": "Netto",
   "part.priceBrutto": "Brutto",
 
@@ -1447,6 +1448,7 @@ const en: Record<TranslationKey, string> = {
   "part.notes": "Additional information",
   "part.price": "Price",
   "part.priceEnteredOn": "Price entered on: {date}",
+  "part.priceEnteredOnBy": "Price entered on: {date} by {name}",
   "part.priceNetto": "Net",
   "part.priceBrutto": "Gross",
 
@@ -2355,6 +2357,7 @@ const de: Record<TranslationKey, string> = {
   "part.notes": "Zusätzliche Informationen",
   "part.price": "Preis",
   "part.priceEnteredOn": "Preis eingegeben am: {date}",
+  "part.priceEnteredOnBy": "Preis eingegeben am: {date} von {name}",
   "part.priceNetto": "Netto",
   "part.priceBrutto": "Brutto",
 

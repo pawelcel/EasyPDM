@@ -52,7 +52,7 @@ function StatusControl({
   disabled?: boolean
   onChanged: () => void | Promise<void>
 }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const status = item.status ?? "w_pracy"
   const [pending, setPending] = useState<ItemStatus | null>(null)
   const [comment, setComment] = useState("")
@@ -181,6 +181,10 @@ function StatusControl({
           {revisions.map((r) => (
             <div key={r.revisionNumber}>
               <span className="font-medium">rev. {r.revisionLabel}:</span> {r.comment}
+              <span className="opacity-75">
+                {" · "}
+                {[r.createdBy, new Date(r.createdAt).toLocaleDateString(language)].filter(Boolean).join(", ")}
+              </span>
             </div>
           ))}
         </div>
