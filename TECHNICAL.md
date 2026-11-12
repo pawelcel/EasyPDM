@@ -791,6 +791,15 @@ drawing title block. `POST /api/users` requires them; accounts from before 066 a
 default `admin` have NULL until edited, and a blank value is refused rather than clearing
 a name.
 
+`system_state.catalogs_admin_only` (Settings → Users, off by default) limits changes to
+the catalogs to administrators. A middleware in `Program.cs` refuses every non-GET request
+under `/api/materials`, `/api/processes`, `/api/manufacturers` and `/api/clients` from an
+ordinary user (`CatalogPolicy`), so a new endpoint under those paths is covered without
+anyone remembering a check; `StartsWithSegments` compares whole segments, which keeps
+`/api/client-verifications` out. Describing items is untouched — an item stores its
+material and processes itself. `GET /api/settings/catalog-policy` is readable by everyone
+so the catalog views can hide their edit controls.
+
 If the `users` table is empty when the API starts, it sets up a default
 **`admin` / `admin`** account on its own (see the console on first run) — change this
 password right after logging in (`PATCH /api/auth/password`, or from within the web
@@ -854,7 +863,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET/POST/PATCH/DELETE | `/api/project-languages[/{id}]` | documentation languages — read by everyone, written by the administrator |
 | PUT | `/api/project-languages/{id}/default` | sets the default documentation language — administrator only |
 | PATCH | `/api/projects/{id}/languages` | a project's main language, multilingual flag and languages — administrator only |
-| GET | `/api/item-names?languageId=&itemType=` | existing part/assembly names in a language, with their translations |
+| GET | `/api/item-names?languageId=&itemType=&search=` | existing part/assembly names in a language, with their translations |
 | GET/PATCH | `/api/settings/company` | company name and whether a logo exists — read by everyone, changed by the administrator |
 | GET/PUT/DELETE | `/api/settings/company/logo` | the logo itself (PNG/JPEG, up to 2 MB, type checked by content; stored in the database) — writes administrator only |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | manufacturer catalog + contact people + series/types and their subtypes |
@@ -872,6 +881,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | item number letter prefixes per kind (the 4 Part kinds plus `Zlozenie` = manufactured assembly; purchased/client assemblies reuse the Part kind's prefix) — **administrator only** |
 | GET/PATCH | `/api/settings/item-number-format` | number format for items created from now on: `digits` (minimum width to zero-pad to, 0 = no padding) and `withName` (whether the item's name is appended in brackets). Both optional on PATCH and saved independently, since they are two separate sections in the UI; frozen onto each item as it is created — **administrator only** |
 | GET/PATCH | `/api/settings/release-policy` | whether only administrators can set "released" (`adminOnly`); read by everyone, changed by the administrator |
+| GET/PATCH | `/api/settings/catalog-policy` | whether only administrators can change the catalogs (`adminOnly`); read by everyone, changed by the administrator |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | preview/rewind the item number sequence — **administrator only** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | list of days with a saved log, the last N lines of a given day, download of the full file — **administrator only** |
 

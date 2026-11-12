@@ -276,19 +276,29 @@ function AddNodeDialog({
   // jednej z nich) dołącza do nowego elementu jej tłumaczenia — properties.nameTexts.
   const [nameSuggestions, setNameSuggestions] = useState<ItemNameSuggestion[]>([])
   const suggestionType = mode === "part" || mode === "assembly" ? mode : null
+  // Serwer szuka po wpisanym tekście (od dwóch znaków), z krótkim opóźnieniem, żeby nie pytać
+  // po każdej literze; odpowiedź na starsze zapytanie jest pomijana.
+  const nameQuery = name.trim()
+  const titleLanguageId = titleLanguage?.id
   useEffect(() => {
-    if (!open || !suggestionType || !titleLanguage) {
+    if (!open || !suggestionType || titleLanguageId === undefined || nameQuery.length < 2) {
       setNameSuggestions([])
       return
     }
     let cancelled = false
-    api.getItemNames(titleLanguage.id, suggestionType).then((list) => {
-      if (!cancelled) setNameSuggestions(list)
-    })
+    const timer = window.setTimeout(() => {
+      api
+        .getItemNames(titleLanguageId, suggestionType, nameQuery)
+        .then((list) => {
+          if (!cancelled) setNameSuggestions(list)
+        })
+        .catch(() => {})
+    }, 200)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
-  }, [open, suggestionType, titleLanguage])
+  }, [open, suggestionType, titleLanguageId, nameQuery])
   const matchedName = nameSuggestions.find((s) => s.name === name.trim() && s.texts.length > 0) ?? null
   const inheritedTranslations = matchedName
     ? matchedName.texts.flatMap((x) => {

@@ -146,6 +146,7 @@ function UsersView() {
       </div>
 
       <ReleasePolicySection />
+      <CatalogPolicySection />
 
       {deletingUser && (
         <ConfirmDialog
@@ -472,6 +473,51 @@ function ReleasePolicySection() {
           className="size-3.5 shrink-0 accent-primary"
         />
         {t("users.releaseLabel")}
+      </label>
+      <FormError>{error}</FormError>
+    </div>
+  )
+}
+
+// Czy katalogi firmy (Materiały, Obróbki, Producenci, Klienci) zmienia tylko administrator.
+function CatalogPolicySection() {
+  const { t } = useLanguage()
+  const [adminOnly, setAdminOnly] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    api.getCatalogPolicy().then((p) => setAdminOnly(p.adminOnly)).catch(() => {})
+  }, [])
+
+  async function save(next: boolean) {
+    const previous = adminOnly
+    setAdminOnly(next)
+    setSaving(true)
+    setError("")
+    try {
+      setAdminOnly((await api.setCatalogPolicy(next)).adminOnly)
+    } catch (err) {
+      setAdminOnly(previous)
+      setError(err instanceof ApiError ? err.message : t("users.releaseSaveFailed"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+      <SectionLabel>{t("users.catalogTitle")}</SectionLabel>
+      <Hint>{t("users.catalogHint")}</Hint>
+      <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={adminOnly}
+          disabled={saving}
+          onChange={(e) => void save(e.target.checked)}
+          className="size-3.5 shrink-0 accent-primary"
+        />
+        {t("users.catalogLabel")}
       </label>
       <FormError>{error}</FormError>
     </div>

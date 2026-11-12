@@ -94,6 +94,20 @@ app.Use(async (context, next) =>
         }
 
         context.Items["CurrentUser"] = user;
+
+        // Katalogi tylko dla administratora (zob. CatalogPolicy) -- zapytanie o ustawienie idzie
+        // wyłącznie przy zapisie do katalogu przez zwykłego użytkownika, nie przy każdym żądaniu.
+        if (user.Role != "admin" && CatalogPolicy.IsCatalogWrite(context.Request))
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            if (await CatalogPolicy.GetAdminOnlyAsync(conn))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsync("Katalogi może zmieniać tylko administrator.");
+                return;
+            }
+        }
     }
 
     await next();

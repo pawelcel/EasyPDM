@@ -613,6 +613,17 @@ dem Administrator.
 Standard-`admin` haben NULL, bis sie ergänzt werden, und ein leerer Wert wird abgelehnt,
 statt einen Namen zu löschen.
 
+`system_state.catalogs_admin_only` (Einstellungen → Benutzer, standardmäßig aus)
+beschränkt Änderungen an den Katalogen auf Administratoren. Eine Middleware in
+`Program.cs` weist jede Nicht-GET-Anfrage unter `/api/materials`, `/api/processes`,
+`/api/manufacturers` und `/api/clients` von gewöhnlichen Benutzern ab (`CatalogPolicy`),
+sodass ein neuer Endpunkt unter diesen Pfaden geschützt ist, ohne dass jemand an eine
+Prüfung denken muss; `StartsWithSegments` vergleicht ganze Segmente, wodurch
+`/api/client-verifications` nicht darunter fällt. Das Beschreiben von Elementen bleibt
+unberührt — ein Element speichert Material und Bearbeitungen selbst. `GET
+/api/settings/catalog-policy` darf jeder lesen, damit die Katalogansichten ihre
+Bearbeitungselemente ausblenden können.
+
 Wenn die Tabelle `users` beim Start der API leer ist, legt sie selbst ein Standardkonto
 **`admin` / `admin`** an (siehe Konsole beim ersten Start) — ändern Sie dieses Passwort
 sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwendung).
@@ -678,7 +689,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET/POST/PATCH/DELETE | `/api/project-languages[/{id}]` | Dokumentationssprachen — Lesen für alle, Schreiben für den Administrator |
 | PUT | `/api/project-languages/{id}/default` | setzt die Standardsprache der Dokumentation — nur Administrator |
 | PATCH | `/api/projects/{id}/languages` | Hauptsprache, Mehrsprachigkeit und Sprachen eines Projekts — nur Administrator |
-| GET | `/api/item-names?languageId=&itemType=` | vorhandene Teil-/Baugruppennamen in einer Sprache mit ihren Übersetzungen |
+| GET | `/api/item-names?languageId=&itemType=&search=` | vorhandene Teil-/Baugruppennamen in einer Sprache mit ihren Übersetzungen |
 | GET/PATCH | `/api/settings/company` | Firmenname und ob ein Logo vorhanden ist — Lesen für alle, Ändern für den Administrator |
 | GET/PUT/DELETE | `/api/settings/company/logo` | das Logo selbst (PNG/JPEG bis 2 MB, Typ nach Inhalt geprüft; in der Datenbank gespeichert) — Schreiben nur Administrator |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | Herstellerkatalog + Kontaktpersonen + Serien/Typen und deren Untertypen |
@@ -696,6 +707,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | Buchstaben-Präfixe der Elementnummer pro Art (die 4 Teile-Arten plus `Zlozenie` = gefertigte Baugruppe; zugekaufte/Kunden-Baugruppen nutzen das Präfix der Teile-Art) — **nur Administrator** |
 | GET/PATCH | `/api/settings/item-number-format` | Nummernformat für ab jetzt erstellte Elemente: `digits` (Mindestbreite zum Auffüllen mit Nullen, 0 = kein Auffüllen) und `withName` (ob der Elementname in Klammern angehängt wird). Beide bei PATCH optional und unabhängig gespeichert, da es in der Oberfläche zwei getrennte Abschnitte sind; beim Erstellen am Element eingefroren — **nur Administrator** |
 | GET/PATCH | `/api/settings/release-policy` | ob nur Administratoren „freigegeben“ setzen dürfen (`adminOnly`); lesen darf jeder, ändern nur der Administrator |
+| GET/PATCH | `/api/settings/catalog-policy` | ob nur Administratoren die Kataloge ändern dürfen (`adminOnly`); Lesen für alle, Ändern für den Administrator |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | Vorschau/Zurückdrehen der Elementnummern-Sequenz — **nur Administrator** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | Liste der Tage mit gespeichertem Protokoll, die letzten N Zeilen eines bestimmten Tages, Download der vollständigen Datei — **nur Administrator** |
 

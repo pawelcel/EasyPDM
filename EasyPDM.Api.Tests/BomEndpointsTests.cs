@@ -132,7 +132,8 @@ public class BomEndpointsTests
 
         var text = Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
         var lines = text.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka", lines[0]);
+        // Projekt testowy ma domyślny język dokumentacji (English), więc nagłówki są angielskie.
+        Assert.Equal("No.;Name;Quantity;Material;Standard;Manufacturer;Order number 1;Order number 2;Processes", lines[0]);
 
         // zlozenie2 to L.p. "1" (pierwsze dziecko zlozenie1), czesc2 pod nim to "1.1".
         // Obróbki stoją w ostatniej kolumnie, po przecinku.
@@ -181,6 +182,15 @@ public class BomEndpointsTests
         (await client.PatchAsJsonAsync($"/api/projects/{projectId}/languages",
             new { mainLanguageId = pl, multilingual = false })).EnsureSuccessStatusCode();
         Assert.Equal("Spawanie (MIG), Painting", await ProcessesCellAsync());
+
+        // Nagłówki idą za językiem projektu: po polsku w obu eksportach.
+        async Task<string> HeaderAsync(string path)
+        {
+            var bytes = await client.GetByteArrayAsync($"/api/items/{zlozenie1}/{path}");
+            return Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3).Split("\r\n")[0];
+        }
+        Assert.Equal("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka", await HeaderAsync("bom/csv"));
+        Assert.Equal("Nazwa;Ilość łącznie;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka", await HeaderAsync("bom/aggregated-csv"));
     }
 
     [Fact]

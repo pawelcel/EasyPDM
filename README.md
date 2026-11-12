@@ -458,6 +458,11 @@ accounts that still lack them, and the edit button next to an account fills them
 **Settings → Company** (administrators) holds the company name and logo — PNG or JPEG,
 ideally square — for the drawing title block.
 
+Two switches under **Settings → Users**, both off by default, tighten what ordinary users
+may do: only administrators set the Released status, and only administrators change the
+company catalogs (Materials, Processes, Manufacturers, Clients) — everyone else still
+browses them and picks from them.
+
 ## For administrators and developers
 
 Server installation (Docker / Linux / Windows), architecture, the full list of API

@@ -503,6 +503,11 @@ ergänzt sie.
 **Einstellungen → Firma** (Administratoren) enthält Firmenname und Logo — PNG oder JPEG,
 am besten quadratisch — für das Zeichnungsschriftfeld.
 
+Zwei Schalter unter **Einstellungen → Benutzer**, beide standardmäßig aus, schränken ein,
+was gewöhnliche Benutzer dürfen: Nur Administratoren setzen den Status „Freigegeben“, und
+nur Administratoren ändern die Firmenkataloge (Materialien, Bearbeitungen, Hersteller,
+Kunden) — alle anderen sehen sie weiterhin und wählen daraus.
+
 ## Für Administratoren und Entwickler
 
 Serverinstallation (Docker / Linux / Windows), Architektur, die vollständige Liste der

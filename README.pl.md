@@ -457,6 +457,11 @@ konta, którym ich brakuje, a przycisk edycji przy koncie pozwala je uzupełnić
 **Ustawienia → Firma** (administrator) przechowują nazwę i logo firmy — PNG albo JPEG,
 najlepiej kwadratowe — do tabelki rysunkowej.
 
+Dwa przełączniki w **Ustawienia → Użytkownicy**, oba domyślnie wyłączone, zawężają to, co
+wolno zwykłemu użytkownikowi: status „Wydany” nadaje tylko administrator oraz katalogi
+firmy (Materiały, Obróbki, Producenci, Klienci) zmienia tylko administrator — pozostali
+dalej je przeglądają i z nich wybierają.
+
 ## Dla administratorów i programistów
 
 Instalacja serwera (Docker / Linux / Windows), architektura, pełna lista endpointów API i

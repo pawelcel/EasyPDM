@@ -57,9 +57,9 @@ static class BomEndpoints
 
             var rows = await FetchBomRowsAsync(conn, id);
 
-            var languageId = await DocumentationLanguageIdAsync(conn, id);
+            var (languageId, languageCode) = await DocumentationLanguageAsync(conn, id);
             var csv = new StringBuilder();
-            csv.Append("L.p.;Nazwa;Ilość;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka\r\n");
+            csv.Append(CsvHeaderLine(languageCode, aggregated: false));
             foreach (var row in rows)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
@@ -184,9 +184,9 @@ static class BomEndpoints
                 })
                 .OrderBy(a => a.ItemNumber ?? int.MaxValue);
 
-            var languageId = await DocumentationLanguageIdAsync(conn, id);
+            var (languageId, languageCode) = await DocumentationLanguageAsync(conn, id);
             var csv = new StringBuilder();
-            csv.Append("Nazwa;Ilość łącznie;Materiał;Norma;Producent;Numer zamówieniowy 1;Numer zamówieniowy 2;Obróbka\r\n");
+            csv.Append(CsvHeaderLine(languageCode, aggregated: true));
             foreach (var row in aggregated)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
@@ -247,17 +247,39 @@ static class BomEndpoints
     // razy z różną specyfikacją. Wpis to {id, name, description}; zwykły napis (zapis sprzed
     // wprowadzenia wariantów) też jest przyjmowany. Kolumna stoi na końcu, żeby nie przesuwać
     // kolumn, na których ktoś mógł już oprzeć swój arkusz.
-    // Język, w którym CSV podaje obróbki: główny język projektu elementu, od którego liczony jest
-    // BOM; element bez projektu -- domyślny język dokumentacji.
-    private static async Task<int?> DocumentationLanguageIdAsync(NpgsqlConnection conn, Guid id)
+    // Język eksportu CSV: główny język projektu elementu, od którego liczony jest BOM; element
+    // bez projektu -- domyślny język dokumentacji. Id wybiera wersję językową obróbek, a skrót
+    // -- nagłówki kolumn.
+    private static async Task<(int? Id, string? Code)> DocumentationLanguageAsync(NpgsqlConnection conn, Guid id)
     {
         await using var cmd = new NpgsqlCommand("""
-            SELECT COALESCE(p.main_language_id, default_project_language_id())
-            FROM items i LEFT JOIN projects p ON p.id = i.project_id
+            SELECT l.id, l.code
+            FROM items i
+            LEFT JOIN projects p ON p.id = i.project_id
+            JOIN project_languages l ON l.id = COALESCE(p.main_language_id, default_project_language_id())
             WHERE i.id = @id;
             """, conn);
         cmd.Parameters.AddWithValue("id", id);
-        return await cmd.ExecuteScalarAsync() is int languageId ? languageId : null;
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? (reader.GetInt32(0), reader.GetString(1)) : (null, null);
+    }
+
+    // Nagłówki kolumn CSV w języku projektu. Języki dokumentacji wpisuje administrator pod
+    // dowolnym skrótem, więc gotowe tłumaczenia są tylko dla tych, które zna interfejs (PL, EN,
+    // DE); każdy inny dostaje angielskie. Kolejność i liczba kolumn są te same w każdym języku.
+    private static readonly Dictionary<string, string[]> CsvHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["PL"] = ["L.p.", "Nazwa", "Ilość", "Ilość łącznie", "Materiał", "Norma", "Producent", "Numer zamówieniowy 1", "Numer zamówieniowy 2", "Obróbka"],
+        ["EN"] = ["No.", "Name", "Quantity", "Total quantity", "Material", "Standard", "Manufacturer", "Order number 1", "Order number 2", "Processes"],
+        ["DE"] = ["Pos.", "Name", "Menge", "Gesamtmenge", "Material", "Norm", "Hersteller", "Bestellnummer 1", "Bestellnummer 2", "Bearbeitung"],
+    };
+
+    private static string CsvHeaderLine(string? languageCode, bool aggregated)
+    {
+        var h = CsvHeaders.GetValueOrDefault(languageCode ?? "EN") ?? CsvHeaders["EN"];
+        // Pełny BOM: L.p., Nazwa, Ilość, ...; zsumowany: Nazwa, Ilość łącznie, ... (bez L.p.).
+        var first = aggregated ? new[] { h[1], h[3] } : [h[0], h[1], h[2]];
+        return string.Join(";", first.Concat(h[4..])) + "\r\n";
     }
 
     // Nazwa i opis obróbki: z kopii tłumaczeń zapisanej w elemencie (texts), w podanym języku;

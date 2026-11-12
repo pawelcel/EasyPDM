@@ -359,10 +359,10 @@ export const api = {
   removeProjectLanguage: (id: number) =>
     fetch(`${BASE}/project-languages/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
-  getItemNames: (languageId: number, itemType: "part" | "assembly") =>
-    fetch(`${BASE}/item-names?languageId=${languageId}&itemType=${itemType}`).then((r) =>
-      handleResponse<ItemNameSuggestion[]>(r)
-    ),
+  getItemNames: (languageId: number, itemType: "part" | "assembly", search: string) =>
+    fetch(
+      `${BASE}/item-names?languageId=${languageId}&itemType=${itemType}&search=${encodeURIComponent(search)}`
+    ).then((r) => handleResponse<ItemNameSuggestion[]>(r)),
 
   getCompany: () => fetch(`${BASE}/settings/company`).then((r) => handleResponse<CompanyProfile>(r)),
 
@@ -797,6 +797,16 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prefix }),
     }).then((r) => handleResponse<{ rodzaj: string; prefix: string | null }>(r)),
+
+  getCatalogPolicy: () =>
+    fetch(`${BASE}/settings/catalog-policy`).then((r) => handleResponse<{ adminOnly: boolean }>(r)),
+
+  setCatalogPolicy: (adminOnly: boolean) =>
+    fetch(`${BASE}/settings/catalog-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adminOnly }),
+    }).then((r) => handleResponse<{ adminOnly: boolean }>(r)),
 
   getReleasePolicy: () =>
     fetch(`${BASE}/settings/release-policy`).then((r) => handleResponse<{ adminOnly: boolean }>(r)),

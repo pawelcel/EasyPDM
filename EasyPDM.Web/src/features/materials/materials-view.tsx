@@ -28,7 +28,9 @@ import {
 import { useMaterials } from "@/features/materials/use-materials"
 import { useLanguage } from "@/i18n/use-language"
 
-function MaterialsView() {
+// readOnly — katalogi zmienia tylko administrator (Ustawienia -> Użytkownicy), a to zwykły
+// użytkownik: lista i filtry zostają, przyciski dodawania/edycji/usuwania znikają.
+function MaterialsView({ readOnly = false }: { readOnly?: boolean }) {
   const { t } = useLanguage()
   const { materials, refetch } = useMaterials()
   const [groupFilter, setGroupFilter] = useState("")
@@ -83,16 +85,18 @@ function MaterialsView() {
 
       <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <MaterialDialog
-            trigger={<Button>{t("material.addButton")}</Button>}
-            title={t("material.addTitle")}
-            confirmLabel={t("common.add")}
-            materials={materials}
-            onSubmit={async (body) => {
-              await api.addMaterial(body)
-              await refetch()
-            }}
-          />
+          {!readOnly && (
+            <MaterialDialog
+              trigger={<Button>{t("material.addButton")}</Button>}
+              title={t("material.addTitle")}
+              confirmLabel={t("common.add")}
+              materials={materials}
+              onSubmit={async (body) => {
+                await api.addMaterial(body)
+                await refetch()
+              }}
+            />
+          )}
 
           <div className="flex flex-wrap items-center gap-2">
             {existingGroups.length > 0 && (
@@ -163,31 +167,33 @@ function MaterialsView() {
                     </span>
                   )}
                 </span>
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <MaterialDialog
-                    trigger={
-                      <Button size="icon-xs" variant="ghost" aria-label={t("common.editNamed", { name: m.name })}>
-                        <Pencil className="size-3.5 text-muted-foreground" />
-                      </Button>
-                    }
-                    title={t("material.editTitle")}
-                    confirmLabel={t("common.save")}
-                    initial={m}
-                    materials={materials}
-                    onSubmit={async (body) => {
-                      await api.updateMaterial(m.id, body)
-                      await refetch()
-                    }}
-                  />
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    aria-label={t("common.deleteNamed", { name: m.name })}
-                    onClick={() => setConfirmingDeleteId(m.id)}
-                  >
-                    <Trash2 className="size-3.5 text-muted-foreground" />
-                  </Button>
-                </div>
+                {!readOnly && (
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <MaterialDialog
+                      trigger={
+                        <Button size="icon-xs" variant="ghost" aria-label={t("common.editNamed", { name: m.name })}>
+                          <Pencil className="size-3.5 text-muted-foreground" />
+                        </Button>
+                      }
+                      title={t("material.editTitle")}
+                      confirmLabel={t("common.save")}
+                      initial={m}
+                      materials={materials}
+                      onSubmit={async (body) => {
+                        await api.updateMaterial(m.id, body)
+                        await refetch()
+                      }}
+                    />
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label={t("common.deleteNamed", { name: m.name })}
+                      onClick={() => setConfirmingDeleteId(m.id)}
+                    >
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

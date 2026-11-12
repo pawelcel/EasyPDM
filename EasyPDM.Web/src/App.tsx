@@ -25,6 +25,7 @@ import { ClientsView } from "@/features/clients/clients-view"
 import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
 import { AuthorSettingsView } from "@/features/settings/author-settings-view"
 import { CompanySettingsView } from "@/features/settings/company-settings-view"
+import { useCatalogReadOnly } from "@/features/settings/use-catalog-read-only"
 import { LanguageSettingsView } from "@/features/settings/language-settings-view"
 import { LogsView } from "@/features/settings/logs-view"
 import { MyProjectsView } from "@/features/settings/my-projects-view"
@@ -94,6 +95,7 @@ function App() {
 
   const selectedProject = projects.find((p) => p.id === projectId) ?? null
   const isAdmin = user?.role === "admin"
+  const catalogsReadOnly = useCatalogReadOnly(isAdmin)
 
   // useProjects/useTags/useItems montują się (i odpalają swój jedyny fetch) razem z App,
   // czyli JESZCZE PRZED zalogowaniem — ten pierwszy fetch dostaje 401 i nigdy się sam nie
@@ -320,8 +322,14 @@ function App() {
             />
           )}
 
-          {view === "materials" && <MaterialsView />}
-          {view === "processes" && <ProcessesView />}
+          {catalogsReadOnly &&
+            (view === "materials" || view === "processes" || view === "manufacturers" || view === "clients") && (
+              <div className="mx-auto mb-3 max-w-3xl">
+                <Hint>{t("catalog.readOnlyHint")}</Hint>
+              </div>
+            )}
+          {view === "materials" && <MaterialsView readOnly={catalogsReadOnly} />}
+          {view === "processes" && <ProcessesView readOnly={catalogsReadOnly} />}
 
           {view === "manufacturers" && <ManufacturersView />}
 

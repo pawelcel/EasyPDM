@@ -48,6 +48,19 @@ public class ItemNameSuggestionTests
         Assert.NotNull(english);
         Assert.Equal("Kostka " + tag, Assert.Single(english.Value.GetProperty("texts").EnumerateArray()).GetProperty("name").GetString());
 
+        // Szukanie zawęża po nazwie w żądanym języku, bez względu na wielkość liter.
+        async Task<List<string>> SearchAsync(int languageId, string search)
+        {
+            var list = await client.GetFromJsonAsync<JsonElement>(
+                $"/api/item-names?languageId={languageId}&itemType=part&search={Uri.EscapeDataString(search)}");
+            return list.EnumerateArray().Select(e => e.GetProperty("name").GetString()!).ToList();
+        }
+        Assert.Contains("Kostka " + tag, await SearchAsync(pl, "kostka " + tag));
+        Assert.Contains("Cube " + tag, await SearchAsync(en, "CUBE " + tag));
+        // Angielska nazwa pasuje do elementu, ale po polsku nie ma czego podpowiedzieć.
+        Assert.Empty(await SearchAsync(pl, "Cube " + tag));
+        Assert.Empty(await SearchAsync(pl, "nie ma takiej " + tag));
+
         // Polska nazwa nie trafia do angielskich podpowiedzi, a część do złożeń.
         Assert.Null(await FindAsync(en, "Kostka " + tag));
         Assert.Null(await FindAsync(pl, "Kostka " + tag, "assembly"));

@@ -11,12 +11,18 @@ using Npgsql;
 // zalogowanego, tak jak "Cała baza" (GET /api/items).
 static class ItemNameEndpoints
 {
+    private const int MaxSuggestions = 50;
+
     public static void MapItemNameEndpoints(this WebApplication app, string connectionString)
     {
-        // GET /api/item-names?languageId=2&itemType=part
-        // -> [{ name, texts: [{ languageId, name }] }], alfabetycznie, bez powtórzeń nazwy.
-        app.MapGet("/api/item-names", async (int languageId, string itemType) =>
+        // GET /api/item-names?languageId=2&itemType=part&search=kost
+        // -> [{ name, texts: [{ languageId, name }] }], alfabetycznie, bez powtórzeń nazwy,
+        // najwyżej MaxSuggestions pozycji. search zawęża już w bazie do elementów, które mają
+        // ten tekst w nazwie albo w tłumaczeniach -- okno pyta w trakcie pisania, więc nie ma
+        // powodu wozić nazw wszystkich elementów przy każdym jego otwarciu.
+        app.MapGet("/api/item-names", async (int languageId, string itemType, string? search) =>
         {
+            var needle = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
             if (itemType is not ("part" or "assembly"))
                 return Results.BadRequest("itemType to part albo assembly.");
 
@@ -26,9 +32,13 @@ static class ItemNameEndpoints
                 SELECT i.file_name, i.properties -> 'nameTexts',
                        COALESCE(p.main_language_id, default_project_language_id())
                 FROM items i LEFT JOIN projects p ON p.id = i.project_id
-                WHERE i.item_type = @itemType;
+                WHERE i.item_type = @itemType
+                  AND (@search::text IS NULL
+                       OR position(lower(@search) in lower(i.file_name)) > 0
+                       OR position(lower(@search) in lower(COALESCE(i.properties ->> 'nameTexts', ''))) > 0);
                 """, conn);
             cmd.Parameters.AddWithValue("itemType", itemType);
+            cmd.Parameters.Add(new NpgsqlParameter("search", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object?)needle ?? DBNull.Value });
 
             // Ta sama nazwa bywa w wielu elementach — zostaje wpis z największą liczbą tłumaczeń.
             var byName = new Dictionary<string, (string Name, Dictionary<int, string> Texts)>(StringComparer.CurrentCultureIgnoreCase);
@@ -56,6 +66,10 @@ static class ItemNameEndpoints
 
                 if (!all.TryGetValue(languageId, out var name) || string.IsNullOrWhiteSpace(name))
                     continue;
+                // Baza dopasowała element po którejkolwiek z jego nazw; podpowiada się tylko ta
+                // w żądanym języku, więc i ona musi zawierać szukany tekst.
+                if (needle is not null && !name.Contains(needle, StringComparison.CurrentCultureIgnoreCase))
+                    continue;
                 var texts = all.Where(kv => kv.Key != languageId).ToDictionary(kv => kv.Key, kv => kv.Value);
                 if (!byName.TryGetValue(name, out var existing) || texts.Count > existing.Texts.Count)
                     byName[name] = (name, texts);
@@ -63,6 +77,7 @@ static class ItemNameEndpoints
 
             var result = byName.Values
                 .OrderBy(v => v.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Take(MaxSuggestions)
                 .Select(v => new
                 {
                     name = v.Name,

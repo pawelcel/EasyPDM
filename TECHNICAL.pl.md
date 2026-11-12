@@ -556,6 +556,16 @@ tabelce rysunkowej. `POST /api/users` ich wymaga; konta sprzed 066 i domyślny `
 NULL, dopóki ich nie uzupełnić, a pusta wartość jest odrzucana zamiast czyścić imię lub
 nazwisko.
 
+`system_state.catalogs_admin_only` (Ustawienia → Użytkownicy, domyślnie wyłączone)
+ogranicza zmiany w katalogach do administratorów. Middleware w `Program.cs` odrzuca każde
+żądanie inne niż GET pod `/api/materials`, `/api/processes`, `/api/manufacturers` i
+`/api/clients` od zwykłego użytkownika (`CatalogPolicy`), więc nowy endpoint pod tymi
+ścieżkami jest chroniony bez pamiętania o warunku; `StartsWithSegments` porównuje całe
+segmenty, dzięki czemu `/api/client-verifications` tu nie wpada. Opisywanie elementów
+zostaje bez zmian — element sam zapisuje swój materiał i obróbki. `GET
+/api/settings/catalog-policy` czyta każdy, żeby widoki katalogów mogły schować przyciski
+edycji.
+
 Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
 **`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
 po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
@@ -619,7 +629,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET/POST/PATCH/DELETE | `/api/project-languages[/{id}]` | języki dokumentacji — odczyt dla każdego, zapis dla administratora |
 | PUT | `/api/project-languages/{id}/default` | ustawia domyślny język dokumentacji — tylko administrator |
 | PATCH | `/api/projects/{id}/languages` | główny język projektu, flaga wielojęzyczności i języki — tylko administrator |
-| GET | `/api/item-names?languageId=&itemType=` | istniejące nazwy części/złożeń w danym języku z ich tłumaczeniami |
+| GET | `/api/item-names?languageId=&itemType=&search=` | istniejące nazwy części/złożeń w danym języku z ich tłumaczeniami |
 | GET/PATCH | `/api/settings/company` | nazwa firmy i czy jest logo — odczyt dla każdego, zmiana dla administratora |
 | GET/PUT/DELETE | `/api/settings/company/logo` | samo logo (PNG/JPEG do 2 MB, rodzaj sprawdzany po zawartości; zapisane w bazie) — zapis tylko administrator |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | katalog producentów + osoby kontaktowe + serie/typy i ich podtypy |
@@ -637,6 +647,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | prefiksy-litery numeru elementu per rodzaj (4 rodzaje Części + `Zlozenie` = złożenie wykonywane; złożenie zakupowe/klienta używa prefiksu rodzaju Części) — **tylko administrator** |
 | GET/PATCH | `/api/settings/item-number-format` | format numeru dla elementów tworzonych od teraz: `digits` (minimalna szerokość dopełnienia zerami, 0 = bez dopełniania) i `withName` (czy dochodzi nazwa elementu w nawiasie). Oba opcjonalne przy PATCH i zapisywane niezależnie, bo w interfejsie to dwie osobne sekcje; zamrażane na elemencie przy jego tworzeniu — **tylko administrator** |
 | GET/PATCH | `/api/settings/release-policy` | czy status „wydany” nadaje tylko administrator (`adminOnly`); odczyt dla każdego, zmiana tylko dla administratora |
+| GET/PATCH | `/api/settings/catalog-policy` | czy katalogi zmienia tylko administrator (`adminOnly`); odczyt dla każdego, zmiana dla administratora |
 | GET/POST | `/api/settings/item-number-sequence`, `/reset` | podgląd/cofnięcie sekwencji numerów elementów — **tylko administrator** |
 | GET | `/api/settings/logs`, `/logs/{date}`, `/logs/{date}/download` | lista dni z zapisanym logiem, ostatnie N wierszy z danego dnia, pobranie pełnego pliku — **tylko administrator** |
 

@@ -41,7 +41,8 @@ type ProcessBody = {
   languageId?: number
 }
 
-function ProcessesView() {
+// readOnly — jak w MaterialsView: katalogi tylko dla administratora, a to zwykły użytkownik.
+function ProcessesView({ readOnly = false }: { readOnly?: boolean }) {
   const { t } = useLanguage()
   const { processes, refetch } = useProcesses()
   const { languages } = useProjectLanguages()
@@ -84,16 +85,18 @@ function ProcessesView() {
 
       <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <ProcessDialog
-            trigger={<Button>{t("process.addButton")}</Button>}
-            title={t("process.addTitle")}
-            processes={processes}
-            defaultLanguageId={defaultLanguageId}
-            onSubmit={async (body) => {
-              await api.addProcess(body)
-              await refetch()
-            }}
-          />
+          {!readOnly && (
+            <ProcessDialog
+              trigger={<Button>{t("process.addButton")}</Button>}
+              title={t("process.addTitle")}
+              processes={processes}
+              defaultLanguageId={defaultLanguageId}
+              onSubmit={async (body) => {
+                await api.addProcess(body)
+                await refetch()
+              }}
+            />
+          )}
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -142,47 +145,49 @@ function ProcessesView() {
                     <div className="text-[12.5px] whitespace-pre-line text-muted-foreground">{p.description}</div>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <ProcessTranslationsDialog
-                    trigger={
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        aria-label={t("process.translationsNamed", { name: p.name })}
-                        title={t("process.translations")}
-                      >
-                        <Languages className="size-3.5 text-muted-foreground" />
-                      </Button>
-                    }
-                    process={p}
-                    processes={processes}
-                    languages={languages}
-                    onSaved={refetch}
-                  />
-                  <ProcessDialog
-                    trigger={
-                      <Button size="icon-xs" variant="ghost" aria-label={t("common.editNamed", { name: p.name })}>
-                        <Pencil className="size-3.5 text-muted-foreground" />
-                      </Button>
-                    }
-                    title={t("process.editTitle")}
-                    initial={p}
-                    processes={processes}
-                    defaultLanguageId={defaultLanguageId}
-                    onSubmit={async (body) => {
-                      await api.updateProcess(p.id, body)
-                      await refetch()
-                    }}
-                  />
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    aria-label={t("common.deleteNamed", { name: p.name })}
-                    onClick={() => setConfirmingDeleteId(p.id)}
-                  >
-                    <Trash2 className="size-3.5 text-muted-foreground" />
-                  </Button>
-                </div>
+                {!readOnly && (
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <ProcessTranslationsDialog
+                      trigger={
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={t("process.translationsNamed", { name: p.name })}
+                          title={t("process.translations")}
+                        >
+                          <Languages className="size-3.5 text-muted-foreground" />
+                        </Button>
+                      }
+                      process={p}
+                      processes={processes}
+                      languages={languages}
+                      onSaved={refetch}
+                    />
+                    <ProcessDialog
+                      trigger={
+                        <Button size="icon-xs" variant="ghost" aria-label={t("common.editNamed", { name: p.name })}>
+                          <Pencil className="size-3.5 text-muted-foreground" />
+                        </Button>
+                      }
+                      title={t("process.editTitle")}
+                      initial={p}
+                      processes={processes}
+                      defaultLanguageId={defaultLanguageId}
+                      onSubmit={async (body) => {
+                        await api.updateProcess(p.id, body)
+                        await refetch()
+                      }}
+                    />
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label={t("common.deleteNamed", { name: p.name })}
+                      onClick={() => setConfirmingDeleteId(p.id)}
+                    >
+                      <Trash2 className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

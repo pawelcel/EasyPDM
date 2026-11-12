@@ -601,7 +601,9 @@ CREATE TABLE system_state (
     -- Czy nazwa elementu wchodzi w nazwę rekordu: true = "C0005(płyta)", false = "C0005".
     item_number_with_name  BOOLEAN NOT NULL DEFAULT true,
     -- Czy status "Wydany" może nadać tylko administrator (domyślnie każdy z dostępem).
-    release_admin_only     BOOLEAN NOT NULL DEFAULT false
+    release_admin_only     BOOLEAN NOT NULL DEFAULT false,
+    -- Czy katalogi (Materiały, Obróbki, Producenci, Klienci) zmienia tylko administrator.
+    catalogs_admin_only    BOOLEAN NOT NULL DEFAULT false
 );
 GRANT SELECT, INSERT, UPDATE ON system_state TO CURRENT_USER;
 

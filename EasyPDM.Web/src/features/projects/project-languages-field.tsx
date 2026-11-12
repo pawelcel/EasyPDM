@@ -37,21 +37,28 @@ function ProjectLanguagesField({
   const [pending, setPending] = useState(false)
   const [error, setError] = useState("")
 
+  // Kliknięcie widać od razu: do czasu odpowiedzi serwera i odświeżenia projektu pola pokazują
+  // wysłany stan, a nie poprzedni. Przy błędzie wracają do tego, co jest w projekcie.
+  const [sent, setSent] = useState<{ mainLanguageId: number; multilingual: boolean; languageIds: number[] } | null>(null)
+
   async function save(mainLanguageId: number, multilingual: boolean, languageIds: number[]) {
     setPending(true)
     setError("")
+    setSent({ mainLanguageId, multilingual, languageIds })
     try {
       await api.setProjectLanguages(project.id, { mainLanguageId, multilingual, languageIds })
       await onUpdated()
     } catch (err) {
       setError(err instanceof Error ? err.message : t("project.saveFailed"))
     } finally {
+      setSent(null)
       setPending(false)
     }
   }
 
-  const main = project.mainLanguageId
-  const selected = new Set(project.languageIds)
+  const shown = sent ?? project
+  const main = shown.mainLanguageId
+  const selected = new Set(shown.languageIds)
   const disabled = !isAdmin || pending
 
   return (
@@ -60,7 +67,7 @@ function ProjectLanguagesField({
       <Select
         value={String(main)}
         disabled={disabled}
-        onValueChange={(v) => v && save(Number(v), project.multilingual, project.languageIds)}
+        onValueChange={(v) => v && save(Number(v), shown.multilingual, shown.languageIds)}
       >
         <SelectTrigger id="project-main-language" className="w-full">
           <SelectValue>{(v: string) => languageLabel(languages.find((l) => String(l.id) === v))}</SelectValue>
@@ -77,15 +84,15 @@ function ProjectLanguagesField({
       <label className="flex cursor-pointer items-center gap-2 text-sm">
         <input
           type="checkbox"
-          checked={project.multilingual}
+          checked={shown.multilingual}
           disabled={disabled}
-          onChange={(e) => save(main, e.target.checked, project.languageIds)}
+          onChange={(e) => save(main, e.target.checked, shown.languageIds)}
           className="size-3.5 shrink-0 accent-primary"
         />
         {t("project.multilingual")}
       </label>
 
-      {project.multilingual && (
+      {shown.multilingual && (
         <div className="flex flex-col gap-1 pl-5">
           {languages.map((lang) => {
             const isMain = lang.id === main
@@ -103,8 +110,8 @@ function ProjectLanguagesField({
                       main,
                       true,
                       e.target.checked
-                        ? [...project.languageIds, lang.id]
-                        : project.languageIds.filter((id) => id !== lang.id)
+                        ? [...shown.languageIds, lang.id]
+                        : shown.languageIds.filter((id) => id !== lang.id)
                     )
                   }
                   className="size-3.5 shrink-0 accent-primary"

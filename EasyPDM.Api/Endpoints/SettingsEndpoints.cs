@@ -595,6 +595,34 @@ static class SettingsEndpoints
             return Results.Ok(new { adminOnly = await ReleasePolicy.GetAdminOnlyAsync(conn) });
         });
 
+        // GET /api/settings/catalog-policy
+        // Czy katalogi (Materiały, Obróbki, Producenci, Klienci) zmienia tylko administrator.
+        // Czyta każdy zalogowany, żeby widoki katalogów mogły u zwykłego użytkownika schować
+        // przyciski edycji i wyjaśnić dlaczego. Samej reguły pilnuje middleware w Program.cs.
+        app.MapGet("/api/settings/catalog-policy", async () =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            return Results.Ok(new { adminOnly = await CatalogPolicy.GetAdminOnlyAsync(conn) });
+        });
+
+        // PATCH /api/settings/catalog-policy   body: { "adminOnly": true } — tylko administrator.
+        app.MapPatch("/api/settings/catalog-policy", async (HttpContext ctx, ReleasePolicyRequest body) =>
+        {
+            if (!AuthEndpoints.IsAdmin(ctx))
+                return Forbidden();
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand("""
+                INSERT INTO system_state (id, catalogs_admin_only) VALUES (true, @adminOnly)
+                ON CONFLICT (id) DO UPDATE SET catalogs_admin_only = @adminOnly;
+                """, conn);
+            cmd.Parameters.AddWithValue("adminOnly", body.AdminOnly);
+            await cmd.ExecuteNonQueryAsync();
+            return Results.Ok(new { adminOnly = await CatalogPolicy.GetAdminOnlyAsync(conn) });
+        });
+
         // GET /api/settings/item-number-sequence
         // Podgląd stanu sekwencji numerów elementów -- jaki numer dostałby KOLEJNY nowo
         // utworzony element teraz (bez konsumowania go -- last_value/is_called to
