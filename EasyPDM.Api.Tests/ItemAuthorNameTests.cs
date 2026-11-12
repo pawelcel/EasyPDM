@@ -53,5 +53,9 @@ public class ItemAuthorNameTests
         var revision = revisions.EnumerateArray().Single();
         Assert.Equal("Thicker wall", revision.GetProperty("comment").GetString());
         Assert.Equal("Anna Nowak", revision.GetProperty("createdBy").GetString());
+
+        // The History list names people the same way.
+        var history = await client.GetFromJsonAsync<JsonElement>($"/api/items/{itemId}/history");
+        Assert.All(history.EnumerateArray(), e => Assert.Equal("Anna Nowak", e.GetProperty("userDisplayName").GetString()));
     }
 }

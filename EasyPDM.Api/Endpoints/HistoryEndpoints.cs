@@ -21,8 +21,9 @@ static class HistoryEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            const string sql = """
-                SELECT 'created' AS type, i.created_at AS at, u.display_name AS user_display_name,
+            // First and last name like everywhere else on the item, see UserNames.
+            var sql = $"""
+                SELECT 'created' AS type, i.created_at AS at, {UserNames.FullNameSql("u")} AS user_display_name,
                        NULL::text AS from_status, NULL::text AS to_status,
                        NULL::int AS revision_number, NULL::text AS comment, NULL::text AS file_name
                 FROM items i
@@ -31,7 +32,7 @@ static class HistoryEndpoints
 
                 UNION ALL
 
-                SELECT 'status', sh.changed_at, u.display_name,
+                SELECT 'status', sh.changed_at, {UserNames.FullNameSql("u")},
                        sh.from_status, sh.to_status, NULL, NULL, NULL
                 FROM item_status_history sh
                 LEFT JOIN users u ON u.id = sh.changed_by
@@ -39,7 +40,7 @@ static class HistoryEndpoints
 
                 UNION ALL
 
-                SELECT 'revision', rc.created_at, u.display_name,
+                SELECT 'revision', rc.created_at, {UserNames.FullNameSql("u")},
                        NULL, NULL, rc.revision_number, rc.comment, NULL
                 FROM item_revision_comments rc
                 LEFT JOIN users u ON u.id = rc.created_by
@@ -48,7 +49,7 @@ static class HistoryEndpoints
                 UNION ALL
 
                 SELECT CASE WHEN ah.action = 'added' THEN 'attachment_added' ELSE 'attachment_removed' END,
-                       ah.at, u.display_name, NULL, NULL, NULL, NULL, ah.file_name
+                       ah.at, {UserNames.FullNameSql("u")}, NULL, NULL, NULL, NULL, ah.file_name
                 FROM item_attachment_history ah
                 LEFT JOIN users u ON u.id = ah.user_id
                 WHERE ah.item_id = @id
@@ -56,7 +57,7 @@ static class HistoryEndpoints
                 UNION ALL
 
                 SELECT CASE WHEN oh.action = 'locked' THEN 'owner_locked' ELSE 'owner_released' END,
-                       oh.at, u.display_name, NULL, NULL, NULL, NULL, NULL
+                       oh.at, {UserNames.FullNameSql("u")}, NULL, NULL, NULL, NULL, NULL
                 FROM item_owner_history oh
                 LEFT JOIN users u ON u.id = oh.user_id
                 WHERE oh.item_id = @id

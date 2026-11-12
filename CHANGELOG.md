@@ -5,7 +5,7 @@ All notable changes to EasyPDM are documented in this file.
 ## [0.8.1]
 
 ### Added
-- **The item panel shows who did what, not only when.** A CAD file, drawing, PDF, STEP or other attachment shows who uploaded it next to its date and size, each revision comment shows who opened the revision and when, and the price shows who entered it ("Price entered on: 2026-11-12 by Anna Nowak"). Names are first and last name, or the display name on accounts that do not have them yet. Files sent before this update get their uploader from the item's history; the price gets a name the next time it is changed.
+- **The item panel shows who did what, not only when.** A CAD file, drawing, PDF, STEP or other attachment shows who uploaded it next to its date and size, each revision comment shows who opened the revision and when, and the price shows who entered it ("Price entered on: 2026-11-12 by Anna Nowak"). Names are first and last name, or the display name on accounts that do not have them yet. Files sent before this update get their uploader from the item's history; the price gets a name the next time it is changed. The item's History list uses first and last name too, instead of the display name.
 
 ## [0.8]
 
