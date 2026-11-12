@@ -44,7 +44,7 @@ static class DocumentationEndpoints
             if (zip is null)
                 return Results.BadRequest("Brak załączników pasujących do wybranych rozszerzeń.");
 
-            return Results.File(zip, "application/zip", "dokumentacja.zip");
+            return Results.File(TempFiles.OpenDeleteOnClose(zip), "application/zip", "dokumentacja.zip");
         });
 
         // GET /api/projects/{projectId}/documentation/extensions
@@ -79,7 +79,7 @@ static class DocumentationEndpoints
             if (zip is null)
                 return Results.BadRequest("Brak załączników pasujących do wybranych rozszerzeń.");
 
-            return Results.File(zip, "application/zip", "dokumentacja.zip");
+            return Results.File(TempFiles.OpenDeleteOnClose(zip), "application/zip", "dokumentacja.zip");
         });
     }
 
@@ -175,7 +175,9 @@ static class DocumentationEndpoints
     // (pusty "ext" = wszystkie rozszerzenia). Wewnątrz ZIP-a każdy załącznik trafia do
     // folderu nazwanego numerem/nazwą elementu, do którego jest podpięty — dzięki temu
     // pliki o tej samej nazwie z różnych elementów się nie nadpisują.
-    private static async Task<byte[]?> BuildZipAsync(NpgsqlConnection conn, List<Guid> itemIds, string[]? extensionFilter)
+    // Zwraca ścieżkę gotowego archiwum w katalogu tymczasowym (zob. TempFiles) albo null, gdy nic
+    // nie pasowało do filtra. Wywołujący wysyła je strumieniem, który usuwa plik po wysłaniu.
+    private static async Task<string?> BuildZipAsync(NpgsqlConnection conn, List<Guid> itemIds, string[]? extensionFilter)
     {
         if (itemIds.Count == 0)
             return null;
@@ -195,45 +197,56 @@ static class DocumentationEndpoints
             ? extensionFilter.Select(e => e.TrimStart('.').ToLowerInvariant()).ToHashSet()
             : null;
 
-        using var memoryStream = new MemoryStream();
+        var zipPath = TempFiles.NewPath("pdm_docs", ".zip");
         var wroteAny = false;
-        using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+        try
         {
-            var usedEntryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            await using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            await using (var zipFile = new FileStream(zipPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 81920, FileOptions.Asynchronous))
+            using (var archive = new ZipArchive(zipFile, ZipArchiveMode.Create))
             {
-                var attachmentFileName = reader.GetString(0);
-                var attachmentPath = reader.GetString(1);
-                var itemNumber = reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2);
-                var itemNumberPrefix = reader.IsDBNull(3) ? "" : reader.GetString(3);
-                var itemName = reader.GetString(4);
-                var itemNumberDigits = reader.IsDBNull(5) ? (int?)null : reader.GetInt32(5);
-                var itemNumberWithName = reader.IsDBNull(6) ? (bool?)null : reader.GetBoolean(6);
+                var usedEntryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                var extension = Path.GetExtension(attachmentFileName).TrimStart('.').ToLowerInvariant();
-                if (wantedExtensions is not null && !wantedExtensions.Contains(extension))
-                    continue;
-                if (!File.Exists(attachmentPath))
-                    continue;
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var attachmentFileName = reader.GetString(0);
+                    var attachmentPath = reader.GetString(1);
+                    var itemNumber = reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2);
+                    var itemNumberPrefix = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                    var itemName = reader.GetString(4);
+                    var itemNumberDigits = reader.IsDBNull(5) ? (int?)null : reader.GetInt32(5);
+                    var itemNumberWithName = reader.IsDBNull(6) ? (bool?)null : reader.GetBoolean(6);
 
-                var folderName = SanitizeSegment(ItemNumbering.RecordName(
-                    itemNumber, itemNumberPrefix, itemNumberDigits, itemNumberWithName, itemName));
-                var entryName = MakeUniqueEntryName($"{folderName}/{SanitizeSegment(attachmentFileName)}", usedEntryNames);
+                    var extension = Path.GetExtension(attachmentFileName).TrimStart('.').ToLowerInvariant();
+                    if (wantedExtensions is not null && !wantedExtensions.Contains(extension))
+                        continue;
+                    if (!File.Exists(attachmentPath))
+                        continue;
 
-                var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
-                await using var entryStream = entry.Open();
-                await using var fileStream = File.OpenRead(attachmentPath);
-                await fileStream.CopyToAsync(entryStream);
-                wroteAny = true;
+                    var folderName = SanitizeSegment(ItemNumbering.RecordName(
+                        itemNumber, itemNumberPrefix, itemNumberDigits, itemNumberWithName, itemName));
+                    var entryName = MakeUniqueEntryName($"{folderName}/{SanitizeSegment(attachmentFileName)}", usedEntryNames);
+
+                    var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
+                    await using var entryStream = entry.Open();
+                    await using var fileStream = File.OpenRead(attachmentPath);
+                    await fileStream.CopyToAsync(entryStream);
+                    wroteAny = true;
+                }
             }
+        }
+        catch
+        {
+            TempFiles.TryDelete(zipPath);
+            throw;
         }
 
         if (!wroteAny)
+        {
+            TempFiles.TryDelete(zipPath);
             return null;
-
-        return memoryStream.ToArray();
+        }
+        return zipPath;
     }
 
     private static string SanitizeSegment(string segment) => segment.Replace('/', '-').Replace('\\', '-').Trim();

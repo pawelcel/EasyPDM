@@ -263,6 +263,8 @@ static class ItemEndpoints
                 return Results.BadRequest("Nazwa jest wymagana.");
             if (body.ItemType != "folder" && body.ItemType != "part" && body.ItemType != "file" && body.ItemType != "assembly")
                 return Results.BadRequest("Nieprawidłowy typ elementu — dozwolone: 'folder', 'part', 'file', 'assembly'.");
+            if (body.Properties.HasValue && ItemPropertyShapes.Validate(body.Properties.Value) is { } shapeError)
+                return Results.BadRequest(shapeError);
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -287,6 +289,13 @@ static class ItemEndpoints
                     return Results.NotFound("Element nadrzędny nie istnieje.");
                 if (!IsChildTypeAllowed(parentInfo.Value.ItemType, body.ItemType))
                     return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
+                // Dostęp do projektu RODZICA, nie tylko docelowego. Wcześniej sprawdzany był tylko
+                // projekt nowego elementu, więc POST /api/nodes (element bez projektu, który
+                // przechodzi to sprawdzenie zawsze) z parentId dopisywał pozycję do BOM-u złożenia w
+                // projekcie, do którego użytkownik nie ma dostępu. Ta sama reguła co przy dopięciu
+                // istniejącego elementu (POST .../children sprawdza oba projekty).
+                if (!await HasProjectAccessAsync(conn, ctx, parentInfo.Value.ProjectId))
+                    return ProjectAccessForbidden();
                 // Rodzic zablokowany przez innego właściciela nie może dostać nowego dziecka —
                 // ta sama reguła co dla dopięcia JUŻ ISTNIEJĄCEGO elementu (POST .../children,
                 // StructureEndpoints.cs). Bez tego dowolny użytkownik z dostępem do projektu
@@ -607,7 +616,12 @@ static class ItemEndpoints
                 FROM items i
                 LEFT JOIN users u ON u.id = i.owner_id
                 WHERE (@search::text IS NULL OR i.file_name ILIKE '%' || @search || '%'
-                                               OR i.properties::text ILIKE '%' || @search || '%'
+                                               -- Po WARTOŚCIACH tekstowych właściwości, także zagnieżdżonych
+                                               -- (obróbki, tłumaczenia). Dawniej szukało w całym JSON-ie jako
+                                               -- tekście, więc "name", "text" czy "rodzaj" trafiały w nazwy
+                                               -- kluczy i zwracały prawie każdy element.
+                                               OR EXISTS (SELECT 1 FROM jsonb_path_query(COALESCE(i.properties, '{}'::jsonb), 'strict $.**') v
+                                                          WHERE jsonb_typeof(v) = 'string' AND v #>> '{}' ILIKE '%' || @search || '%')
                                                OR (COALESCE(i.item_number_prefix, '') || i.item_number::text) ILIKE '%' || @search || '%')
                   AND (cardinality(@tags) = 0 OR (
                         SELECT count(DISTINCT t.name) FROM item_tags it

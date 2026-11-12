@@ -88,11 +88,23 @@ class ScheduledBackupService(
         logger.LogInformation("Automatyczna kopia zapasowa: uruchamiam ({Frequency}).", schedule.Frequency);
         try
         {
-            var bytes = await SettingsEndpoints.CreateBackupZipAsync(connectionString, storage);
-
             Directory.CreateDirectory(backupRoot);
             var fileName = $"pdm-auto-backup-{now:yyyy-MM-dd_HHmm}.zip";
-            await File.WriteAllBytesAsync(Path.Combine(backupRoot, fileName), bytes, stoppingToken);
+            // Najpierw pod nazwą roboczą, potem przemianowanie: przerwana kopia nie zostaje pod
+            // nazwą pasującą do pdm-auto-backup-*.zip, więc nie udaje gotowej i nie wypycha przy
+            // przycinaniu starszej, prawdziwej kopii.
+            var finalPath = Path.Combine(backupRoot, fileName);
+            var partialPath = finalPath + ".partial";
+            try
+            {
+                await SettingsEndpoints.CreateBackupZipAsync(connectionString, storage, partialPath);
+                File.Move(partialPath, finalPath, overwrite: true);
+            }
+            catch
+            {
+                TempFiles.TryDelete(partialPath);
+                throw;
+            }
 
             PruneOldBackups(schedule.RetentionCount);
 

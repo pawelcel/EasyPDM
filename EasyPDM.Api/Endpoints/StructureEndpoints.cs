@@ -4,6 +4,10 @@ using Npgsql;
 // RELACJE MIĘDZY ELEMENTAMI (BOM/złożenia — struktura projektu)
 static class StructureEndpoints
 {
+    // Klucz blokady (pg_advisory_xact_lock) na czas dopinania elementu w strukturze — dowolna
+    // stała, unikalna w obrębie aplikacji (MigrationRunner ma swoją).
+    private const long StructureLockKey = 875_142_002;
+
     public static void MapStructureEndpoints(this WebApplication app, string connectionString)
     {
         // GET /api/items/{id}/children — bezpośrednie dzieci (item_relations, depth=1) tego
@@ -273,7 +277,18 @@ static class StructureEndpoints
                 )
                 SELECT 1 FROM descendants WHERE child_id = @parentId;
                 """;
-            await using (var cycleCmd = new NpgsqlCommand(cycleCheckSql, conn))
+            // Sprawdzenie cyklu, dopięcie i przejęcie projektu w jednej transakcji, pod blokadą
+            // wspólną dla wszystkich dopięć. Bez niej dwa równoległe żądania (A pod B i B pod A)
+            // przechodziły sprawdzenie, zanim któreś zapisało krawędź, i razem tworzyły cykl,
+            // na którym zapętlały się zapytania rekurencyjne po strukturze.
+            await using var tx = await conn.BeginTransactionAsync();
+            await using (var lockCmd = new NpgsqlCommand("SELECT pg_advisory_xact_lock(@key);", conn, tx))
+            {
+                lockCmd.Parameters.AddWithValue("key", StructureLockKey);
+                await lockCmd.ExecuteNonQueryAsync();
+            }
+
+            await using (var cycleCmd = new NpgsqlCommand(cycleCheckSql, conn, tx))
             {
                 cycleCmd.Parameters.AddWithValue("childId", body.ChildId);
                 cycleCmd.Parameters.AddWithValue("parentId", parentId);
@@ -291,7 +306,7 @@ static class StructureEndpoints
                 )
                 ON CONFLICT (parent_id, child_id) DO UPDATE SET quantity = EXCLUDED.quantity;
                 """;
-            await using var cmd = new NpgsqlCommand(sql, conn);
+            await using var cmd = new NpgsqlCommand(sql, conn, tx);
             cmd.Parameters.AddWithValue("parentId", parentId);
             cmd.Parameters.AddWithValue("childId", body.ChildId);
             cmd.Parameters.AddWithValue("quantity", body.Quantity ?? 1);
@@ -317,12 +332,13 @@ static class StructureEndpoints
                     UPDATE items SET project_id = @projectId, show_in_tree = false
                     WHERE id IN (SELECT id FROM subtree) AND project_id IS NULL;
                     """;
-                await using var adoptCmd = new NpgsqlCommand(adoptSql, conn);
+                await using var adoptCmd = new NpgsqlCommand(adoptSql, conn, tx);
                 adoptCmd.Parameters.AddWithValue("childId", body.ChildId);
                 adoptCmd.Parameters.AddWithValue("projectId", parentProjectId);
                 await adoptCmd.ExecuteNonQueryAsync();
             }
 
+            await tx.CommitAsync();
             return Results.Ok();
         });
 

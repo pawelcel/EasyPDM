@@ -137,6 +137,13 @@ static class SettingsEndpoints
                 // (POST .../item-number-sequence/reset), który musi się przed tym bronić.
                 await using (var cmd = new NpgsqlCommand("ALTER SEQUENCE item_number_seq RESTART WITH 1;", conn))
                     await cmd.ExecuteNonQueryAsync();
+
+                // Tagi istnieją niezależnie od elementów (item_tags kasuje się kaskadą, same tagi
+                // nie), więc po wyczyszczeniu projektów zostawały wszystkie — w podpowiedziach i
+                // filtrze "Całej bazy", przy pustej bazie. Usuwane są te, których nic już nie nosi.
+                await using (var cmd = new NpgsqlCommand(
+                    "DELETE FROM tags t WHERE NOT EXISTS (SELECT 1 FROM item_tags it WHERE it.tag_id = t.id);", conn))
+                    await cmd.ExecuteNonQueryAsync();
             }
 
             if (body.Clients)
@@ -229,18 +236,26 @@ static class SettingsEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
 
-            byte[] bytes;
+            // Archiwum powstaje w pliku tymczasowym i jest wysyłane strumieniem, który usuwa plik
+            // po wysłaniu — zob. TempFiles. Wcześniej całe ZIP-y trafiały do pamięci.
+            var zipPath = TempFiles.NewPath("pdm_backup_download", ".zip");
             try
             {
-                bytes = await CreateBackupZipAsync(connectionString, storage);
+                await CreateBackupZipAsync(connectionString, storage, zipPath);
             }
             catch (BackupFailedException ex)
             {
+                TempFiles.TryDelete(zipPath);
                 return Results.Problem(ex.Message);
+            }
+            catch
+            {
+                TempFiles.TryDelete(zipPath);
+                throw;
             }
 
             var fileName = $"pdm-backup-{DateTime.Now:yyyy-MM-dd_HHmm}.zip";
-            return Results.File(bytes, "application/zip", fileName);
+            return Results.File(TempFiles.OpenDeleteOnClose(zipPath), "application/zip", fileName);
         });
 
         // GET /api/settings/backup-schedule — bieżący harmonogram automatycznej kopii zapasowej.
@@ -751,7 +766,9 @@ static class SettingsEndpoints
     // Wspólna logika pg_dump + spakowanie magazynu plików w ZIP — używana zarówno przez
     // GET /api/settings/backup (pobranie ręczne, zwraca do przeglądarki), jak i przez
     // ScheduledBackupService (kopia automatyczna wg harmonogramu, zapisywana na dysku).
-    internal static async Task<byte[]> CreateBackupZipAsync(string connectionString, StorageSettings storage)
+    // Zapisuje kopię (pg_dump + magazyn plików) jako ZIP pod zipPath. Do pliku, nie do pamięci:
+    // magazyn plików potrafi ważyć gigabajty.
+    internal static async Task CreateBackupZipAsync(string connectionString, StorageSettings storage, string zipPath)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"pdm_backup_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
@@ -792,7 +809,6 @@ static class SettingsEndpoints
             if (process.ExitCode != 0)
                 throw new BackupFailedException($"pg_dump zakończył się błędem: {stderr}");
 
-            var zipPath = Path.Combine(tempDir, "backup.zip");
             using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
             {
                 zip.CreateEntryFromFile(dumpPath, "database.dump");
@@ -812,7 +828,6 @@ static class SettingsEndpoints
                 }
             }
 
-            return await File.ReadAllBytesAsync(zipPath);
         }
         finally
         {

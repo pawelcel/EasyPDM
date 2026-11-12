@@ -24,6 +24,12 @@ All notable changes to EasyPDM are documented in this file.
 - **An item's name can no longer be changed once it has a file in a dedicated slot**, just like its kind. The name is part of the CAD file's name, e.g. `C0005(plate).A.sldprt`, so a new name would no longer match the file on disk or what the CAD macros look for. The field is greyed out with an explanation, and the server refuses the change. Items created without the name in their record name, e.g. `C0005.A.sldprt`, can still be renamed.
 
 ### Fixed
+- **Backups of large file storage work.** The backup and the documentation download were built in memory, so storage over about 2 GB failed and smaller ones took as much RAM as they weighed; both are now written to a temporary file and streamed.
+- **Searching the whole database matches values, not property names.** Typing a word such as "name" or "rodzaj" returned almost every item, because the search looked through the raw property text including its keys.
+- **Changing a password signs out the account's other sessions.** A password changed by the user keeps only the session it was changed from, and one set by an administrator signs the user out everywhere, so a session taken over earlier stops working.
+- **Failed logins no longer add up over months.** Ten mistyped passwords spread over a long time locked the account like ten tries in a minute; the count now restarts after a quiet period.
+- **An item can no longer be added under an assembly in a project the user cannot access.** Creating an item without a project but with a parent skipped the check on the parent's project.
+- **Clearing the projects also removes tags no item uses.** They stayed in the suggestions and the search filter of an empty database.
 - **Restoring a backup works in Docker and native installs.** It logged in to the database as `postgres` without a password, a role those deployments do not have; it now uses the application's own database account, and a backup from another installation, owned by a different role, restores cleanly.
 - **A restored backup from an older version works without a restart.** The database is brought up to date right after restoring instead of at the next start, which left the program failing on missing columns until then.
 - **Files open after restoring a backup on a different server.** The backup now records where its file storage was, and restoring points every file at this server's storage, so files no longer return "not found" when the storage folder differs; older backups are matched file by file.

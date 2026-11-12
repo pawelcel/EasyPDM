@@ -33,6 +33,9 @@ static class PropertyEndpoints
             if (!await ItemEndpoints.HasProjectAccessAsync(conn, ctx, info.Value.ProjectId))
                 return ItemEndpoints.ProjectAccessForbidden();
 
+            if (ItemPropertyShapes.Validate(body) is { } shapeError)
+                return Results.BadRequest(shapeError);
+
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
             {
                 foreach (var prop in body.EnumerateObject())

@@ -151,6 +151,10 @@ static class UserEndpoints
             // Pomiń, gdy admin zmienia WŁASNE hasło tędy — nie ma sensu informować kogoś o
             // czymś, co sam właśnie zrobił.
             var actor = (CurrentUser)ctx.Items["CurrentUser"]!;
+            // Hasło ustawione przez administratora unieważnia sesje tego konta (poza bieżącą, jeśli
+            // administrator zmienia własne) — zob. AuthEndpoints.RevokeSessionsAsync.
+            if (!string.IsNullOrEmpty(body.Password))
+                await AuthEndpoints.RevokeSessionsAsync(conn, id, actor.Id == id ? AuthEndpoints.CurrentSessionToken(ctx) : null);
             if (!string.IsNullOrEmpty(body.Password) && actor.Id != id)
                 await Notifications.NotifyAsync(conn, app.Logger, id, "password_changed", new { });
 

@@ -70,6 +70,19 @@ await MigrationRunner.ApplyPendingMigrationsAsync(connectionString, app.Logger);
 await EnsureDefaultAdminAsync(connectionString);
 await EnsureSampleProjectAsync(connectionString, app.Logger);
 
+// Nagłówki bezpieczeństwa dla każdej odpowiedzi: przeglądarka nie zgaduje typu treści (plik
+// wgrany jako .pdf, a będący HTML-em, nie wykona się jako strona), strony nie da się osadzić w
+// cudzej ramce (clickjacking), a adres z parametrami nie wycieka w nagłówku Referer do
+// zewnętrznych linków. Własne ramki (podgląd PDF) dalej działają — SAMEORIGIN.
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "SAMEORIGIN";
+    headers["Referrer-Policy"] = "same-origin";
+    await next();
+});
+
 // Serwuje wwwroot/index.html pod adresem "/" oraz zbudowany frontend.
 app.UseDefaultFiles();
 app.UseStaticFiles();

@@ -26,18 +26,56 @@ static class AuthEndpoints
     {
         public int Count;
         public DateTime LockedUntil;
+        public DateTime LastFailure;
     }
+
+    // Powyżej tylu wpisów stare, już nieblokujące są wyrzucane — bez tego próby logowania na
+    // losowe nazwy użytkowników powiększały słownik w nieskończoność.
+    private const int MaxTrackedUsernames = 10_000;
 
     private static void RecordFailedLogin(string username)
     {
+        var now = DateTime.UtcNow;
         var state = FailedAttempts.GetOrAdd(username, _ => new LoginAttemptState());
         lock (state)
         {
+            // Licznik dotyczy prób "z rzędu": po przerwie dłuższej niż czas blokady zaczyna od
+            // zera. Wcześniej pomyłki sumowały się bez końca i dziesiąta literówka po miesiącach
+            // blokowała konto tak samo jak dziesięć prób w minutę.
+            if (now - state.LastFailure > LockoutDuration)
+                state.Count = 0;
             state.Count++;
+            state.LastFailure = now;
             if (state.Count >= MaxFailedAttempts)
-                state.LockedUntil = DateTime.UtcNow.Add(LockoutDuration);
+                state.LockedUntil = now.Add(LockoutDuration);
+        }
+
+        if (FailedAttempts.Count > MaxTrackedUsernames)
+        {
+            foreach (var (name, entry) in FailedAttempts)
+            {
+                bool stale;
+                lock (entry) { stale = entry.LockedUntil < now && now - entry.LastFailure > LockoutDuration; }
+                if (stale)
+                    FailedAttempts.TryRemove(name, out _);
+            }
         }
     }
+
+    // Unieważnia sesje użytkownika po zmianie hasła, poza sesją, z której zmieniono hasło
+    // (exceptToken; null = wszystkie). Bez tego przejęta sesja działała jeszcze do 30 dni mimo
+    // zmiany hasła — a zmiana hasła to zwykle właśnie reakcja na podejrzenie przejęcia konta.
+    public static async Task RevokeSessionsAsync(NpgsqlConnection conn, Guid userId, string? exceptToken)
+    {
+        await using var cmd = new NpgsqlCommand(
+            "DELETE FROM sessions WHERE user_id = @userId AND token IS DISTINCT FROM @except;", conn);
+        cmd.Parameters.AddWithValue("userId", userId);
+        cmd.Parameters.Add(new NpgsqlParameter("except", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object?)exceptToken ?? DBNull.Value });
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public static string? CurrentSessionToken(HttpContext ctx) =>
+        ctx.Request.Cookies.TryGetValue(CookieName, out var token) && !string.IsNullOrEmpty(token) ? token : null;
 
     public static void MapAuthEndpoints(this WebApplication app, string connectionString, BrowserBridgeTicketStore ticketStore)
     {
@@ -87,6 +125,11 @@ static class AuthEndpoints
 
             var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             var expiresAt = DateTime.UtcNow.Add(SessionLifetime);
+
+            // Wygasłe sesje nigdy nie były usuwane — tabela tylko rosła. Logowanie jest rzadkie,
+            // więc to dobry moment na sprzątanie, bez osobnej usługi w tle.
+            await using (var cleanup = new NpgsqlCommand("DELETE FROM sessions WHERE expires_at < now();", conn))
+                await cleanup.ExecuteNonQueryAsync();
 
             await using (var cmd = new NpgsqlCommand(
                 "INSERT INTO sessions (token, user_id, expires_at) VALUES (@token, @userId, @expiresAt);", conn))
@@ -224,6 +267,9 @@ static class AuthEndpoints
                 cmd.Parameters.AddWithValue("id", user.Id);
                 await cmd.ExecuteNonQueryAsync();
             }
+            // Bieżąca sesja zostaje (użytkownik właśnie z niej zmienił hasło), pozostałe —
+            // inne przeglądarki, makra CAD — muszą zalogować się nowym hasłem.
+            await RevokeSessionsAsync(conn, user.Id, CurrentSessionToken(ctx));
 
             return Results.Ok();
         });
