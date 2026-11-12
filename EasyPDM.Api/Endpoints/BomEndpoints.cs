@@ -57,9 +57,9 @@ static class BomEndpoints
 
             var rows = await FetchBomRowsAsync(conn, id);
 
-            var (languageId, languageCode) = await DocumentationLanguageAsync(conn, id);
+            var (languageId, _) = await DocumentationLanguageAsync(conn, id);
             var csv = new StringBuilder();
-            csv.Append(CsvHeaderLine(languageCode, aggregated: false));
+            csv.Append(await CsvHeaderLineAsync(conn, languageId, aggregated: false));
             foreach (var row in rows)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
@@ -184,9 +184,9 @@ static class BomEndpoints
                 })
                 .OrderBy(a => a.ItemNumber ?? int.MaxValue);
 
-            var (languageId, languageCode) = await DocumentationLanguageAsync(conn, id);
+            var (languageId, _) = await DocumentationLanguageAsync(conn, id);
             var csv = new StringBuilder();
-            csv.Append(CsvHeaderLine(languageCode, aggregated: true));
+            csv.Append(await CsvHeaderLineAsync(conn, languageId, aggregated: true));
             foreach (var row in aggregated)
             {
                 var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
@@ -264,22 +264,15 @@ static class BomEndpoints
         return await reader.ReadAsync() ? (reader.GetInt32(0), reader.GetString(1)) : (null, null);
     }
 
-    // Nagłówki kolumn CSV w języku projektu. Języki dokumentacji wpisuje administrator pod
-    // dowolnym skrótem, więc gotowe tłumaczenia są tylko dla tych, które zna interfejs (PL, EN,
-    // DE); każdy inny dostaje angielskie. Kolejność i liczba kolumn są te same w każdym języku.
-    private static readonly Dictionary<string, string[]> CsvHeaders = new(StringComparer.OrdinalIgnoreCase)
+    // Nagłówki kolumn CSV w języku projektu, z podpisów w dokumentach (Ustawienia -> Język,
+    // zob. DocumentLabels). Kolejność i liczba kolumn są te same w każdym języku.
+    private static async Task<string> CsvHeaderLineAsync(NpgsqlConnection conn, int? languageId, bool aggregated)
     {
-        ["PL"] = ["L.p.", "Nazwa", "Ilość", "Ilość łącznie", "Materiał", "Norma", "Producent", "Numer zamówieniowy 1", "Numer zamówieniowy 2", "Obróbka"],
-        ["EN"] = ["No.", "Name", "Quantity", "Total quantity", "Material", "Standard", "Manufacturer", "Order number 1", "Order number 2", "Processes"],
-        ["DE"] = ["Pos.", "Name", "Menge", "Gesamtmenge", "Material", "Norm", "Hersteller", "Bestellnummer 1", "Bestellnummer 2", "Bearbeitung"],
-    };
-
-    private static string CsvHeaderLine(string? languageCode, bool aggregated)
-    {
-        var h = CsvHeaders.GetValueOrDefault(languageCode ?? "EN") ?? CsvHeaders["EN"];
+        var l = await DocumentLabels.ResolveAsync(conn, languageId);
         // Pełny BOM: L.p., Nazwa, Ilość, ...; zsumowany: Nazwa, Ilość łącznie, ... (bez L.p.).
-        var first = aggregated ? new[] { h[1], h[3] } : [h[0], h[1], h[2]];
-        return string.Join(";", first.Concat(h[4..])) + "\r\n";
+        string[] first = aggregated ? [l["csv.name"], l["csv.totalQuantity"]] : [l["csv.no"], l["csv.name"], l["csv.quantity"]];
+        string[] rest = [l["csv.material"], l["csv.standard"], l["csv.manufacturer"], l["csv.orderNumber1"], l["csv.orderNumber2"], l["csv.processes"]];
+        return string.Join(";", first.Concat(rest).Select(CsvField)) + "\r\n";
     }
 
     // Nazwa i opis obróbki: z kopii tłumaczeń zapisanej w elemencie (texts), w podanym języku;

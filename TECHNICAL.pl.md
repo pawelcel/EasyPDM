@@ -417,6 +417,14 @@ Nazwa elementu jest w głównym języku jego projektu; tłumaczenia trafiają do
 wszystkich językach i zwraca te w żądanym języku, z pozostałymi jako tłumaczeniami; okno
 dodawania je podpowiada i kopiuje tłumaczenia, gdy wpisana nazwa jest równa podpowiedzi.
 
+**Podpisy w dokumentach** (`document_labels`, migracja 069, Ustawienia → Język) to tekst,
+który program wstawia do generowanych dokumentów — na razie nagłówki CSV z BOM-u, później
+pola tabelki rysunkowej. Wiersz istnieje tylko dla podpisu zmienionego przez
+administratora; w pozostałych `DocumentLabels` bierze tekst wbudowany dla skrótu języka
+(PL/EN/DE), a potem angielski, bo języki dokumentacji zakłada się pod dowolnym skrótem.
+Zapis pustego tekstu albo równego wbudowanemu usuwa wiersz, więc podpis dalej podąża za
+wbudowanym.
+
 ### Zaznaczanie wielu elementów w drzewie
 
 Wiersze zaznacza się Ctrl (Cmd) + klikiem, obok starszego przycisku „Zaznacz wiele" i jego checkboxów — przycisk zostaje, bo na tablecie nie ma klawisza Ctrl. Ctrl+klik sam włącza tryb zaznaczania: checkboxy i belka akcji istnieją tylko w nim, więc pierwszy taki klik zaznaczałby inaczej coś, czego nie widać.
@@ -630,6 +638,7 @@ usunąć (`DELETE /api/notifications/{id}`).
 | PUT | `/api/project-languages/{id}/default` | ustawia domyślny język dokumentacji — tylko administrator |
 | PATCH | `/api/projects/{id}/languages` | główny język projektu, flaga wielojęzyczności i języki — tylko administrator |
 | GET | `/api/item-names?languageId=&itemType=&search=` | istniejące nazwy części/złożeń w danym języku z ich tłumaczeniami |
+| GET/PUT | `/api/document-labels/{languageId}` | podpisy w dokumentach (nagłówki CSV) dla jednego języka — odczyt dla każdego, zapis dla administratora; pusty tekst przywraca wbudowany |
 | GET/PATCH | `/api/settings/company` | nazwa firmy i czy jest logo — odczyt dla każdego, zmiana dla administratora |
 | GET/PUT/DELETE | `/api/settings/company/logo` | samo logo (PNG/JPEG do 2 MB, rodzaj sprawdzany po zawartości; zapisane w bazie) — zapis tylko administrator |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | katalog producentów + osoby kontaktowe + serie/typy i ich podtypy |

@@ -248,6 +248,15 @@ export interface CompanyProfile {
   logoUpdatedAt: string | null
 }
 
+// Podpis w dokumentach (nagłówek CSV, pole tabelki rysunkowej) w jednym języku dokumentacji.
+// custom = zmieniony przez administratora; inaczej text === defaultText (wbudowany).
+export interface DocumentLabel {
+  key: string
+  text: string
+  defaultText: string
+  custom: boolean
+}
+
 // Ustawienia -> Tagi (administrator): tag z liczbą elementów, które go noszą.
 export interface TagUsage {
   name: string

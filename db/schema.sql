@@ -163,6 +163,15 @@ CREATE TABLE project_language_links (
     PRIMARY KEY (project_id, language_id)
 );
 
+-- Podpisy w dokumentach (nagłówki CSV, pola tabelki rysunkowej) zmienione przez administratora,
+-- per język dokumentacji; brak wiersza = podpis wbudowany (zob. migracja 069, DocumentLabels.cs).
+CREATE TABLE document_labels (
+    language_id  INTEGER NOT NULL REFERENCES project_languages(id) ON DELETE CASCADE,
+    key          TEXT NOT NULL,
+    text         TEXT NOT NULL CHECK (btrim(text) <> ''),
+    PRIMARY KEY (language_id, key)
+);
+
 -- Nazwa i opis obróbki w każdym języku dokumentacji (zob. migracja 065). Katalog pokazuje
 -- wersję w domyślnym języku, a gdy jej brak -- tekst z innego języka.
 CREATE TABLE process_texts (

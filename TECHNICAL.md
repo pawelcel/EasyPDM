@@ -480,6 +480,14 @@ all languages and returns those in the requested language with the others as tra
 the add dialog suggests them and copies the translations when the typed name equals a
 suggestion.
 
+**Labels in documents** (`document_labels`, migration 069, Settings → Language) hold the
+text the program puts into generated documents — for now the BOM CSV headers, later the
+drawing title block fields. A row exists only for a label an administrator changed;
+otherwise `DocumentLabels` falls back to the built-in text for the language code
+(PL/EN/DE) and then to English, since documentation languages are created under arbitrary
+codes. Saving an empty text, or one equal to the built-in, deletes the row so the label
+keeps following the built-in.
+
 ### Selecting several items in the tree
 
 Rows are selected with Ctrl (Cmd) + click, alongside the older "Select multiple" button and
@@ -864,6 +872,7 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 | PUT | `/api/project-languages/{id}/default` | sets the default documentation language — administrator only |
 | PATCH | `/api/projects/{id}/languages` | a project's main language, multilingual flag and languages — administrator only |
 | GET | `/api/item-names?languageId=&itemType=&search=` | existing part/assembly names in a language, with their translations |
+| GET/PUT | `/api/document-labels/{languageId}` | labels in documents (CSV headers) for one language — read by everyone, written by the administrator; an empty text restores the built-in |
 | GET/PATCH | `/api/settings/company` | company name and whether a logo exists — read by everyone, changed by the administrator |
 | GET/PUT/DELETE | `/api/settings/company/logo` | the logo itself (PNG/JPEG, up to 2 MB, type checked by content; stored in the database) — writes administrator only |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | manufacturer catalog + contact people + series/types and their subtypes |

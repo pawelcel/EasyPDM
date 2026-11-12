@@ -35,6 +35,7 @@ import type {
   CadRequest,
   Tag,
   TagUsage,
+  DocumentLabel,
   CompanyProfile,
   ItemNameSuggestion,
   ProjectLanguage,
@@ -384,6 +385,17 @@ export const api = {
 
   // Znacznik czasu w adresie omija pamięć podręczną przeglądarki po wgraniu nowego logo.
   companyLogoUrl: (version: string | null) => `${BASE}/settings/company/logo?v=${encodeURIComponent(version ?? "")}`,
+
+  getDocumentLabels: (languageId: number) =>
+    fetch(`${BASE}/document-labels/${languageId}`).then((r) => handleResponse<DocumentLabel[]>(r)),
+
+  // Pusty tekst przywraca podpis wbudowany.
+  setDocumentLabels: (languageId: number, labels: Record<string, string>) =>
+    fetch(`${BASE}/document-labels/${languageId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ labels }),
+    }).then((r) => handleResponse<void>(r)),
 
   getTagUsage: () => fetch(`${BASE}/settings/tags`).then((r) => handleResponse<TagUsage[]>(r)),
 

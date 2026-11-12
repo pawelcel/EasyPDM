@@ -468,6 +468,15 @@ oder Baugruppen in allen Sprachen und liefert die in der angefragten Sprache, mi
 übrigen als Übersetzungen; der Hinzufügen-Dialog schlägt sie vor und übernimmt die
 Übersetzungen, wenn der eingegebene Name einem Vorschlag genau entspricht.
 
+**Beschriftungen in Dokumenten** (`document_labels`, Migration 069, Einstellungen →
+Sprache) enthalten den Text, den das Programm in erzeugte Dokumente einsetzt — vorerst die
+CSV-Überschriften der Stückliste, später die Felder des Zeichnungsschriftfelds. Eine Zeile
+gibt es nur für eine vom Administrator geänderte Beschriftung; sonst greift
+`DocumentLabels` auf den eingebauten Text für das Sprachkürzel (PL/EN/DE) und dann auf
+Englisch zurück, da Dokumentationssprachen unter beliebigen Kürzeln angelegt werden. Ein
+leerer Text oder einer gleich dem eingebauten löscht die Zeile, sodass die Beschriftung
+weiter dem eingebauten folgt.
+
 ### Mehrere Elemente im Baum auswählen
 
 Zeilen werden mit Strg (Cmd) + Klick ausgewählt, neben der älteren Schaltfläche „Mehrere auswählen" und ihren Kontrollkästchen — die Schaltfläche bleibt, denn ein Tablet hat keine Strg-Taste. Ein Strg+Klick schaltet den Auswahlmodus selbst ein: Kontrollkästchen und Aktionsleiste gibt es nur dort, der erste solche Klick würde sonst etwas Unsichtbares auswählen.
@@ -690,6 +699,7 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 | PUT | `/api/project-languages/{id}/default` | setzt die Standardsprache der Dokumentation — nur Administrator |
 | PATCH | `/api/projects/{id}/languages` | Hauptsprache, Mehrsprachigkeit und Sprachen eines Projekts — nur Administrator |
 | GET | `/api/item-names?languageId=&itemType=&search=` | vorhandene Teil-/Baugruppennamen in einer Sprache mit ihren Übersetzungen |
+| GET/PUT | `/api/document-labels/{languageId}` | Beschriftungen in Dokumenten (CSV-Überschriften) für eine Sprache — Lesen für alle, Schreiben für den Administrator; leerer Text stellt die eingebaute wieder her |
 | GET/PATCH | `/api/settings/company` | Firmenname und ob ein Logo vorhanden ist — Lesen für alle, Ändern für den Administrator |
 | GET/PUT/DELETE | `/api/settings/company/logo` | das Logo selbst (PNG/JPEG bis 2 MB, Typ nach Inhalt geprüft; in der Datenbank gespeichert) — Schreiben nur Administrator |
 | GET/POST/PATCH/DELETE | `/api/manufacturers[/{id}]`, `/api/manufacturers/{id}/contacts[/{contactId}]`, `/api/manufacturers/{id}/product-types[/{typeId}][/subtypes[/{subtypeId}]]` | Herstellerkatalog + Kontaktpersonen + Serien/Typen und deren Untertypen |

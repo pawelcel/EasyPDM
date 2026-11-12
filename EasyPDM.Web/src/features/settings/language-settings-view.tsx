@@ -1,4 +1,5 @@
 import { Hint } from "@/components/ui/hint"
+import { DocumentLabelsSection } from "@/features/settings/document-labels-section"
 import { ProjectLanguagesSection } from "@/features/settings/project-languages-section"
 import { SectionLabel } from "@/components/ui/section-label"
 import { LanguageSelect } from "@/i18n/language-select"
@@ -20,6 +21,7 @@ function LanguageSettingsView({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       <ProjectLanguagesSection isAdmin={isAdmin} />
+      <DocumentLabelsSection isAdmin={isAdmin} />
     </div>
   )
 }
