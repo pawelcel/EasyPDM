@@ -39,6 +39,10 @@ function DocumentationDialog({
         setExtensions(exts)
         setSelected(new Set(exts))
       })
+      .catch(() => {
+        setExtensions([])
+        setSelected(new Set())
+      })
       .finally(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])

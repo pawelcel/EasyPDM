@@ -27,6 +27,7 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useCatalogEditable } from "@/features/settings/catalog-editable-context"
 import { useLanguage } from "@/i18n/use-language"
 
 type TreeNode = ClientNode & { children: TreeNode[] }
@@ -69,13 +70,17 @@ function countDescendants(node: TreeNode): number {
 function ClientFileTree({
   clientId,
   name2Id,
-  readOnly = false,
+  readOnly: readOnlyProp = false,
 }: {
   clientId: number
   name2Id?: number
   readOnly?: boolean
 }) {
   const { t } = useLanguage()
+  // Tylko do odczytu także wtedy, gdy katalogi zmienia wyłącznie administrator (zob.
+  // CatalogEditableContext) — pobieranie plików zostaje.
+  const editable = useCatalogEditable()
+  const readOnly = readOnlyProp || !editable
   const [nodes, setNodes] = useState<ClientNode[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())

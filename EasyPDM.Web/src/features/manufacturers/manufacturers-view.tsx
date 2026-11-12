@@ -29,10 +29,12 @@ import { SectionLabel } from "@/components/ui/section-label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useManufacturers } from "@/features/manufacturers/use-manufacturers"
+import { useCatalogEditable } from "@/features/settings/catalog-editable-context"
 import { useLanguage } from "@/i18n/use-language"
 
 function ManufacturersView() {
   const { t } = useLanguage()
+  const editable = useCatalogEditable()
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search, 300)
   const { manufacturers, refetch } = useManufacturers(debouncedSearch)
@@ -48,12 +50,14 @@ function ManufacturersView() {
             placeholder={t("manufacturer.searchPlaceholder")}
             className="flex-1"
           />
-          <NewManufacturerDialog
-            onCreated={async (id) => {
-              await refetch()
-              setSelectedId(id)
-            }}
-          />
+          {editable && (
+            <NewManufacturerDialog
+              onCreated={async (id) => {
+                await refetch()
+                setSelectedId(id)
+              }}
+            />
+          )}
         </div>
 
         {manufacturers.length > 0 ? (
@@ -173,6 +177,7 @@ function ManufacturerDetailPanel({
   onDeleted: () => void
 }) {
   const { t } = useLanguage()
+  const editable = useCatalogEditable()
   const [manufacturer, setManufacturer] = useState<ManufacturerDetail | null>(null)
   const [name, setName] = useState("")
   const [nameError, setNameError] = useState("")
@@ -407,38 +412,43 @@ function ManufacturerDetailPanel({
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={saveName}
+            disabled={!editable}
             className="text-[15px] font-semibold"
           />
           <FormError>{nameError}</FormError>
         </div>
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => {
-            setDeleteError(null)
-            setConfirmingDelete(true)
-          }}
-        >
-          {t("manufacturer.deleteButton")}
-        </Button>
+        {editable && (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              setDeleteError(null)
+              setConfirmingDelete(true)
+            }}
+          >
+            {t("manufacturer.deleteButton")}
+          </Button>
+        )}
       </div>
 
       <div className="mb-1 flex items-center justify-between">
         <SectionLabel>{t("manufacturer.contactsLabel")}</SectionLabel>
-        <ContactDialog
-          trigger={
-            <Button size="sm" variant="secondary">
-              {t("manufacturer.addContactButton")}
-            </Button>
-          }
-          title={t("manufacturer.addContactTitle")}
-          confirmLabel={t("common.add")}
-          onSubmit={async (body) => {
-            await api.addManufacturerContact(id, body)
-            await refetch()
-            await onManufacturersRefetch()
-          }}
-        />
+        {editable && (
+          <ContactDialog
+            trigger={
+              <Button size="sm" variant="secondary">
+                {t("manufacturer.addContactButton")}
+              </Button>
+            }
+            title={t("manufacturer.addContactTitle")}
+            confirmLabel={t("common.add")}
+            onSubmit={async (body) => {
+              await api.addManufacturerContact(id, body)
+              await refetch()
+              await onManufacturersRefetch()
+            }}
+          />
+        )}
       </div>
 
       {manufacturer.contacts.length > 0 ? (
@@ -462,30 +472,32 @@ function ManufacturerDetailPanel({
                 <TableCell>{c.phone || "-"}</TableCell>
                 <TableCell>{c.email || "-"}</TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-0.5">
-                    <ContactDialog
-                      trigger={
-                        <Button size="icon-xs" variant="ghost" aria-label={t("manufacturer.editContactAria")}>
-                          <Pencil className="size-3.5 text-muted-foreground" />
-                        </Button>
-                      }
-                      title={t("manufacturer.editContactTitle")}
-                      confirmLabel={t("common.save")}
-                      initial={c}
-                      onSubmit={async (body) => {
-                        await api.updateManufacturerContact(id, c.id, body)
-                        await refetch()
-                      }}
-                    />
-                    <Button
-                      size="icon-xs"
-                      variant="ghost"
-                      aria-label={t("manufacturer.deleteContactAria")}
-                      onClick={() => setConfirmingDeleteContactId(c.id)}
-                    >
-                      <Trash2 className="size-3.5 text-muted-foreground" />
-                    </Button>
-                  </div>
+                  {editable && (
+                    <div className="flex items-center gap-0.5">
+                      <ContactDialog
+                        trigger={
+                          <Button size="icon-xs" variant="ghost" aria-label={t("manufacturer.editContactAria")}>
+                            <Pencil className="size-3.5 text-muted-foreground" />
+                          </Button>
+                        }
+                        title={t("manufacturer.editContactTitle")}
+                        confirmLabel={t("common.save")}
+                        initial={c}
+                        onSubmit={async (body) => {
+                          await api.updateManufacturerContact(id, c.id, body)
+                          await refetch()
+                        }}
+                      />
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        aria-label={t("manufacturer.deleteContactAria")}
+                        onClick={() => setConfirmingDeleteContactId(c.id)}
+                      >
+                        <Trash2 className="size-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -507,49 +519,51 @@ function ManufacturerDetailPanel({
       <div className="mt-4">
         <SectionLabel>{t("manufacturer.productTypesLabel")}</SectionLabel>
 
-        <div className="mt-1 flex items-start gap-1.5">
-          <div className="min-w-0 flex-1">
-            <Combobox
-              items={typeNames}
-              value={typeInput || null}
-              inputValue={typeInput}
-              onInputValueChange={(v) => setTypeInput(v)}
-              onValueChange={(v) => setTypeInput((v as string | null) ?? "")}
-            >
-              <ComboboxInput
-                placeholder={t("manufacturer.productTypePlaceholder")}
-                showClear
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") addTypeOrSubtype()
-                }}
-              />
-              <ComboboxContent>
-                <ComboboxEmpty>{t("manufacturer.newProductTypeHint")}</ComboboxEmpty>
-                <ComboboxList>
-                  {(name: string) => (
-                    <ComboboxItem key={name} value={name}>
-                      {name}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
+        {editable && (
+          <div className="mt-1 flex items-start gap-1.5">
+            <div className="min-w-0 flex-1">
+              <Combobox
+                items={typeNames}
+                value={typeInput || null}
+                inputValue={typeInput}
+                onInputValueChange={(v) => setTypeInput(v)}
+                onValueChange={(v) => setTypeInput((v as string | null) ?? "")}
+              >
+                <ComboboxInput
+                  placeholder={t("manufacturer.productTypePlaceholder")}
+                  showClear
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addTypeOrSubtype()
+                  }}
+                />
+                <ComboboxContent>
+                  <ComboboxEmpty>{t("manufacturer.newProductTypeHint")}</ComboboxEmpty>
+                  <ComboboxList>
+                    {(name: string) => (
+                      <ComboboxItem key={name} value={name}>
+                        {name}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+            </div>
+
+            <Input
+              value={subtypeInput}
+              onChange={(e) => setSubtypeInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addTypeOrSubtype()
+              }}
+              placeholder={t("manufacturer.productSubtypePlaceholder")}
+              className="min-w-0 flex-1"
+            />
+
+            <Button variant="secondary" onClick={addTypeOrSubtype} disabled={addPending}>
+              {t("common.add")}
+            </Button>
           </div>
-
-          <Input
-            value={subtypeInput}
-            onChange={(e) => setSubtypeInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addTypeOrSubtype()
-            }}
-            placeholder={t("manufacturer.productSubtypePlaceholder")}
-            className="min-w-0 flex-1"
-          />
-
-          <Button variant="secondary" onClick={addTypeOrSubtype} disabled={addPending}>
-            {t("common.add")}
-          </Button>
-        </div>
+        )}
         <FormError>{addError}</FormError>
 
         {manufacturer.productTypes.length > 0 ? (
@@ -580,22 +594,24 @@ function ManufacturerDetailPanel({
                       </TableCell>
                       <TableCell>{row.subtypeName ?? "-"}</TableCell>
                       <TableCell>
-                        <Button
-                          size="icon-xs"
-                          variant="ghost"
-                          aria-label={
-                            row.subtypeId === null
-                              ? t("manufacturer.deleteProductTypeTitle")
-                              : t("manufacturer.deleteProductSubtypeTitle")
-                          }
-                          onClick={() =>
-                            row.subtypeId === null
-                              ? setConfirmingDeleteTypeId(row.typeId)
-                              : setConfirmingDeleteSubtype({ typeId: row.typeId, subtypeId: row.subtypeId })
-                          }
-                        >
-                          <Trash2 className="size-3.5 text-muted-foreground" />
-                        </Button>
+                        {editable && (
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            aria-label={
+                              row.subtypeId === null
+                                ? t("manufacturer.deleteProductTypeTitle")
+                                : t("manufacturer.deleteProductSubtypeTitle")
+                            }
+                            onClick={() =>
+                              row.subtypeId === null
+                                ? setConfirmingDeleteTypeId(row.typeId)
+                                : setConfirmingDeleteSubtype({ typeId: row.typeId, subtypeId: row.subtypeId })
+                            }
+                          >
+                            <Trash2 className="size-3.5 text-muted-foreground" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

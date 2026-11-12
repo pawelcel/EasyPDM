@@ -179,7 +179,11 @@ function AddNodeDialog({
 
   // Projekt/rodzic — albo z góry ustalone (zwykłe użycie), albo wybierane W TYM OKNIE
   // (zob. needsProjectPicker wyżej).
-  const [projects, setProjects] = useState<Project[]>([])
+  // Jedno pobranie listy projektów na otwarcie okna: z niej bierze się i lista do wyboru
+  // projektu (bez zamkniętych), i główny język projektu docelowego. Wcześniej okno pytało
+  // serwer o tę samą listę dwa razy.
+  const [allProjects, setAllProjects] = useState<Project[]>([])
+  const projects = allProjects.filter((p) => !p.closed)
   const [selectedProjectId, setSelectedProjectId] = useState("")
   const projectId = fixedProjectId ?? selectedProjectId
   const [parentCandidates, setParentCandidates] = useState<Item[]>([])
@@ -191,33 +195,27 @@ function AddNodeDialog({
       : (parentCandidates.find((i) => i.id === selectedParentId)?.itemType ?? null)
 
   useEffect(() => {
-    // Zamknięty projekt nie ma się tu pojawić -- nie ma sensu dorzucać nowych elementów do
-    // projektu, który jest odłożony na bok.
-    if (needsProjectPicker && open) {
-      api.getProjects().then((list) => setProjects(list.filter((p) => !p.closed)))
-    }
-  }, [needsProjectPicker, open])
-
-  // Główny język projektu, do którego trafi element — w nim pokazują się obróbki do wyboru.
-  // Bez projektu (albo zanim się wczyta) obowiązuje domyślny język dokumentacji.
-  const [mainLanguageId, setMainLanguageId] = useState<number | undefined>(undefined)
-  const { languages: documentationLanguages } = useProjectLanguages()
-  const titleLanguage =
-    documentationLanguages.find((l) => l.id === mainLanguageId) ?? documentationLanguages.find((l) => l.isDefault)
-
-  useEffect(() => {
-    if (!open || !projectId) {
-      setMainLanguageId(undefined)
-      return
-    }
+    // Zamknięty projekt nie trafia do listy wyboru (filtr wyżej) -- nie ma sensu dorzucać
+    // nowych elementów do projektu, który jest odłożony na bok.
+    if (!open) return
     let cancelled = false
-    api.getProjects().then((list) => {
-      if (!cancelled) setMainLanguageId(list.find((p) => p.id === projectId)?.mainLanguageId)
-    })
+    api
+      .getProjects()
+      .then((list) => {
+        if (!cancelled) setAllProjects(list)
+      })
+      .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [open, projectId])
+  }, [open])
+
+  // Główny język projektu, do którego trafi element — w nim pokazują się obróbki do wyboru.
+  // Bez projektu (albo zanim się wczyta) obowiązuje domyślny język dokumentacji.
+  const mainLanguageId = projectId ? allProjects.find((p) => p.id === projectId)?.mainLanguageId : undefined
+  const { languages: documentationLanguages } = useProjectLanguages()
+  const titleLanguage =
+    documentationLanguages.find((l) => l.id === mainLanguageId) ?? documentationLanguages.find((l) => l.isDefault)
 
   useEffect(() => {
     if (!needsProjectPicker || !projectId) {
@@ -225,10 +223,15 @@ function AddNodeDialog({
       return
     }
     let cancelled = false
-    api.getItems({ projectId }).then((items) => {
-      if (cancelled) return
-      setParentCandidates(items.filter((i) => i.itemType === "folder" || i.itemType === "assembly"))
-    })
+    api
+      .getItems({ projectId })
+      .then((items) => {
+        if (cancelled) return
+        setParentCandidates(items.filter((i) => i.itemType === "folder" || i.itemType === "assembly"))
+      })
+      .catch(() => {
+        if (!cancelled) setParentCandidates([])
+      })
     return () => {
       cancelled = true
     }
@@ -357,7 +360,10 @@ function AddNodeDialog({
   // projektu, bo Część/Złożenie mogą być współdzielone jako komponent w wielu projektach.
   useEffect(() => {
     if (!open) return
-    api.getItems({}).then(setAllItems)
+    api
+      .getItems({})
+      .then(setAllItems)
+      .catch(() => setAllItems([]))
   }, [open])
 
   const partsAndAssemblies = allItems.filter(

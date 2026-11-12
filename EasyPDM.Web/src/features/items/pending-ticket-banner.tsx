@@ -61,7 +61,10 @@ function PendingTicketBanner() {
 
   useEffect(() => {
     if (!pickingItem) return
-    api.getItems({}).then(setItems)
+    api
+      .getItems({})
+      .then(setItems)
+      .catch(() => setItems([]))
   }, [pickingItem])
 
   useEffect(() => {

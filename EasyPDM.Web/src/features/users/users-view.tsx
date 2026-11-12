@@ -33,7 +33,7 @@ import { useLanguage } from "@/i18n/use-language"
 function UsersView() {
   const { t } = useLanguage()
   const { users, refetch } = useUsers()
-  const { user: me } = useAuth()
+  const { user: me, refetch: refetchMe } = useAuth()
   const [error, setError] = useState("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingPending, setDeletingPending] = useState(false)
@@ -114,7 +114,15 @@ function UsersView() {
                   </SelectContent>
                 </Select>
 
-                <EditUserDialog user={u} onSaved={refetch} />
+                <EditUserDialog
+                  user={u}
+                  onSaved={async () => {
+                    await refetch()
+                    // Własna wyświetlana nazwa stoi też w nagłówku aplikacji (z sesji) — bez
+                    // odświeżenia sesji zostawała tam stara aż do przeładowania strony.
+                    if (u.id === me?.id) await refetchMe()
+                  }}
+                />
                 <Button
                   size="icon-xs"
                   variant="ghost"

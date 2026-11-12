@@ -19,9 +19,19 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Przypięta wersja zamiast ubuntu-latest: obraz "latest" przechodzi na Ubuntu 26 i zmienia
+    # wersję PostgreSQL z apt, a ten test sprawdza instalator na konkretnym systemie — zmiana
+    # systemu ma być świadomą zmianą tej linii, a nie niespodzianką w czerwonym przebiegu.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+
+      # Ponawianie pobrań apt w całym zadaniu, także w samym instalatorze. 2026-11-11 test padł
+      # kilka razy z rzędu na chwilowym błędzie DNS mirrora (azure.archive.ubuntu.com), zanim
+      # doszedł do EasyPDM.
+      - name: "apt: ponawianie pobrań"
+        run: |
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
 
       - uses: actions/setup-dotnet@v6
         with:

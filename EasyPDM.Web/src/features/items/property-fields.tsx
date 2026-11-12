@@ -463,7 +463,10 @@ function ManufacturerInfoButton({ manufacturerId }: { manufacturerId: number | n
 
   useEffect(() => {
     if (!open || manufacturerId === null) return
-    api.getManufacturer(manufacturerId).then(setDetail)
+    api
+      .getManufacturer(manufacturerId)
+      .then(setDetail)
+      .catch(() => setDetail(null))
   }, [open, manufacturerId])
 
   return (
@@ -530,7 +533,10 @@ function ClientInfoButton({ clientId }: { clientId: number | null }) {
 
   useEffect(() => {
     if (!open || clientId === null) return
-    api.getClient(clientId).then(setDetail)
+    api
+      .getClient(clientId)
+      .then(setDetail)
+      .catch(() => setDetail(null))
   }, [open, clientId])
 
   return (

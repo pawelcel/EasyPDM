@@ -27,9 +27,13 @@ function ClientFileSearch({ clientId, name2Id }: { clientId: number; name2Id?: n
       name2Id !== undefined
         ? api.searchClientName2Files(clientId, name2Id, debouncedQuery)
         : api.searchClientFiles(clientId, debouncedQuery)
-    search.then((data) => {
-      if (!cancelled) setResults(data)
-    })
+    search
+      .then((data) => {
+        if (!cancelled) setResults(data)
+      })
+      .catch(() => {
+        if (!cancelled) setResults([])
+      })
     return () => {
       cancelled = true
     }

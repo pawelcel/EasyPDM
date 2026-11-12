@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ContactDialog } from "@/features/clients/client-contact-dialog"
 import { ClientFileSearch } from "@/features/clients/client-file-search"
 import { ClientFileTree } from "@/features/clients/client-file-tree"
+import { useCatalogEditable } from "@/features/settings/catalog-editable-context"
 import { useLanguage } from "@/i18n/use-language"
 
 function ClientDetailPanel({
@@ -30,6 +31,7 @@ function ClientDetailPanel({
   onAddName2: (client: Pick<ClientDetail, "id" | "name">) => void
 }) {
   const { t } = useLanguage()
+  const editable = useCatalogEditable()
   const [client, setClient] = useState<ClientDetail | null>(null)
   const [name, setName] = useState("")
   const [location, setLocation] = useState("")
@@ -123,6 +125,7 @@ function ClientDetailPanel({
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={save}
+            disabled={!editable}
             className="text-[15px] font-semibold"
             placeholder={t("common.name")}
           />
@@ -133,26 +136,29 @@ function ClientDetailPanel({
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               onBlur={save}
+              disabled={!editable}
               placeholder={t("client.locationPlaceholder")}
             />
           </div>
           <FormError>{nameError}</FormError>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <Button size="sm" variant="secondary" onClick={() => onAddName2(client)}>
-            {t("client.addName2Button")}
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => {
-              setDeleteError(null)
-              setConfirmingDelete(true)
-            }}
-          >
-            {t("client.deleteButton")}
-          </Button>
-        </div>
+        {editable && (
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <Button size="sm" variant="secondary" onClick={() => onAddName2(client)}>
+              {t("client.addName2Button")}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                setDeleteError(null)
+                setConfirmingDelete(true)
+              }}
+            >
+              {t("client.deleteButton")}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div>
@@ -184,20 +190,22 @@ function ClientDetailPanel({
       <div>
         <div className="mb-1 flex items-center justify-between">
           <SectionLabel>{t("client.contactsLabel")}</SectionLabel>
-          <ContactDialog
-            trigger={
-              <Button size="sm" variant="secondary">
-                {t("client.addContactButton")}
-              </Button>
-            }
-            title={t("client.addContactTitle")}
-            confirmLabel={t("common.add")}
-            onSubmit={async (body) => {
-              await api.addClientContact(id, body)
-              await refetch()
-              await onClientsRefetch()
-            }}
-          />
+          {editable && (
+            <ContactDialog
+              trigger={
+                <Button size="sm" variant="secondary">
+                  {t("client.addContactButton")}
+                </Button>
+              }
+              title={t("client.addContactTitle")}
+              confirmLabel={t("common.add")}
+              onSubmit={async (body) => {
+                await api.addClientContact(id, body)
+                await refetch()
+                await onClientsRefetch()
+              }}
+            />
+          )}
         </div>
 
         {client.contacts.length > 0 ? (
@@ -219,30 +227,32 @@ function ClientDetailPanel({
                   <TableCell>{c.phone || "-"}</TableCell>
                   <TableCell>{c.email || "-"}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-0.5">
-                      <ContactDialog
-                        trigger={
-                          <Button size="icon-xs" variant="ghost" aria-label={t("client.editContactAria")}>
-                            <Pencil className="size-3.5 text-muted-foreground" />
-                          </Button>
-                        }
-                        title={t("client.editContactTitle")}
-                        confirmLabel={t("common.save")}
-                        initial={c}
-                        onSubmit={async (body) => {
-                          await api.updateClientContact(id, c.id, body)
-                          await refetch()
-                        }}
-                      />
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        aria-label={t("client.deleteContactAria")}
-                        onClick={() => setConfirmingDeleteContactId(c.id)}
-                      >
-                        <Trash2 className="size-3.5 text-muted-foreground" />
-                      </Button>
-                    </div>
+                    {editable && (
+                      <div className="flex items-center gap-0.5">
+                        <ContactDialog
+                          trigger={
+                            <Button size="icon-xs" variant="ghost" aria-label={t("client.editContactAria")}>
+                              <Pencil className="size-3.5 text-muted-foreground" />
+                            </Button>
+                          }
+                          title={t("client.editContactTitle")}
+                          confirmLabel={t("common.save")}
+                          initial={c}
+                          onSubmit={async (body) => {
+                            await api.updateClientContact(id, c.id, body)
+                            await refetch()
+                          }}
+                        />
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={t("client.deleteContactAria")}
+                          onClick={() => setConfirmingDeleteContactId(c.id)}
+                        >
+                          <Trash2 className="size-3.5 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

@@ -28,6 +28,13 @@ export function useCadRequests() {
   // każdym odpytaniu, dopóki użytkownik nie wypełni formularza.
   const handled = useRef<Set<string>>(new Set())
 
+  // Tłumaczenie przez ref: efekt ma wystartować odpytywanie raz, a zmiana języka (nowe t) nie
+  // powinna go restartować ani zostawiać starego tekstu w powiadomieniu.
+  const tRef = useRef(t)
+  useEffect(() => {
+    tRef.current = t
+  }, [t])
+
   useEffect(() => {
     let cancelled = false
 
@@ -70,9 +77,10 @@ export function useCadRequests() {
         // Formularz stoi, ale człowiek może patrzeć na CAD-a. Powiadomienie systemowe jest
         // jedyną drogą, która przełącza na kartę wszędzie — kliknięcie w nie robi to, czego
         // sama strona zrobić nie może.
+        const tr = tRef.current
         showCadFormNotice(
-          t("cadNotice.title"),
-          request.name ? t("cadNotice.bodyNamed", { name: request.name }) : t("cadNotice.body")
+          tr("cadNotice.title"),
+          request.name ? tr("cadNotice.bodyNamed", { name: request.name }) : tr("cadNotice.body")
         )
       } catch {
         // Cicho: to jest wygoda, nie część wysyłki. Gdy serwer nie odpowiada, makro po

@@ -23,7 +23,15 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useClients } from "@/features/clients/use-clients"
+import { useProjectLanguages } from "@/features/project-languages/use-project-languages"
 import { useLanguage } from "@/i18n/use-language"
 
 // Etykieta w wyszukiwarce klienta to zawsze sama nazwa główna -- Nazwa 2 (gdy klient ją ma
@@ -44,6 +52,12 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
   const [endDate, setEndDate] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  // Główny język projektu — od początku, a nie dopiero we właściwościach po utworzeniu, bo w nim
+  // wpisuje się nazwy pierwszych elementów. null = domyślny język dokumentacji z ustawień.
+  const { languages } = useProjectLanguages()
+  const [mainLanguageId, setMainLanguageId] = useState<number | null>(null)
+  const defaultLanguage = languages.find((l) => l.isDefault)
+  const chosenLanguageId = mainLanguageId ?? defaultLanguage?.id ?? null
 
   const name2s = clients.find((c) => c.id === clientId)?.name2s ?? []
 
@@ -54,6 +68,7 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
     setClientName2Id(null)
     setStartDate("")
     setEndDate("")
+    setMainLanguageId(null)
     setError("")
   }
 
@@ -77,9 +92,16 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
         startDate: startDate || null,
         endDate: endDate || null,
       })
+      // Projekt powstaje z domyślnym językiem (wartość domyślna kolumny); inny wybór ustawia się
+      // tym samym zapisem co we właściwościach projektu.
+      let created = project
+      if (chosenLanguageId !== null && chosenLanguageId !== project.mainLanguageId) {
+        await api.setProjectLanguages(project.id, { mainLanguageId: chosenLanguageId, multilingual: false, languageIds: [] })
+        created = { ...project, mainLanguageId: chosenLanguageId }
+      }
       setOpen(false)
       reset()
-      onCreated(project)
+      onCreated(created)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError(t("project.nameConflict"))
@@ -171,6 +193,31 @@ function NewProjectDialog({ onCreated }: { onCreated: (project: Project) => void
               </ComboboxList>
             </ComboboxContent>
           </Combobox>
+          {languages.length > 0 && (
+            <>
+              <Label htmlFor="new-project-language">{t("project.mainLanguage")}</Label>
+              <Select
+                value={chosenLanguageId !== null ? String(chosenLanguageId) : ""}
+                onValueChange={(v) => v && setMainLanguageId(Number(v))}
+              >
+                <SelectTrigger id="new-project-language" className="w-full">
+                  <SelectValue>
+                    {(v: string) => {
+                      const lang = languages.find((l) => String(l.id) === v)
+                      return lang ? `${lang.name} (${lang.code})` : ""
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {languages.map((lang) => (
+                    <SelectItem key={lang.id} value={String(lang.id)}>
+                      {lang.name} ({lang.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
           <div className="flex gap-2">
             <div className="flex flex-1 flex-col gap-2">
               <Label htmlFor="new-project-start">{t("project.startDate")}</Label>

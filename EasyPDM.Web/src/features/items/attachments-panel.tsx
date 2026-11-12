@@ -142,9 +142,14 @@ function AttachmentsPanel({
   // niż dla elementu, na który użytkownik już przeszedł.
   useEffect(() => {
     let cancelled = false
-    api.getAttachments(itemId).then((data) => {
-      if (!cancelled) setAttachments(data)
-    })
+    api
+      .getAttachments(itemId)
+      .then((data) => {
+        if (!cancelled) setAttachments(data)
+      })
+      .catch(() => {
+        if (!cancelled) setAttachments([])
+      })
     return () => {
       cancelled = true
     }

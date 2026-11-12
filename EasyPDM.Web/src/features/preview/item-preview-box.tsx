@@ -56,6 +56,8 @@ function usePreviewSources(item: Item, refreshSignal: number): { pdf: PreviewSou
           ? { fileName: imageAttachment.fileName, url: api.attachmentDownloadUrl(imageAttachment.id) }
           : null,
       })
+    }).catch(() => {
+      // Bez listy załączników podgląd zostaje przy obrazku z samego elementu (albo pustym polu).
     })
     return () => {
       cancelled = true

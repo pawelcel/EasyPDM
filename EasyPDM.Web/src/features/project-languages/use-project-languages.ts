@@ -8,7 +8,12 @@ export function useProjectLanguages() {
   const [languages, setLanguages] = useState<ProjectLanguage[]>([])
 
   const refetch = useCallback(async () => {
-    setLanguages(await api.getProjectLanguages())
+    try {
+      setLanguages(await api.getProjectLanguages())
+    } catch {
+      // Bez listy języków pola wyboru zostają puste, a teksty pokazują się w wersji domyślnej —
+      // nic nie przestaje działać, więc nie ma czym przerywać.
+    }
   }, [])
 
   useEffect(() => {

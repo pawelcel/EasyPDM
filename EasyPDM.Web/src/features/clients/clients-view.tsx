@@ -29,6 +29,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { ClientDetailPanel } from "@/features/clients/client-detail-panel"
 import { ClientName2DetailPanel } from "@/features/clients/client-name2-detail-panel"
 import { useClients } from "@/features/clients/use-clients"
+import { useCatalogEditable } from "@/features/settings/catalog-editable-context"
 import { useLanguage } from "@/i18n/use-language"
 
 // Zaznaczenie w liście po lewej -- klient sam (name2Id null) albo jedna konkretna jego
@@ -38,6 +39,7 @@ type Selection = { clientId: number; name2Id: number | null }
 
 function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: string) => void }) {
   const { t } = useLanguage()
+  const editable = useCatalogEditable()
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search, 300)
   const { clients, refetch } = useClients(debouncedSearch)
@@ -57,13 +59,15 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
             placeholder={t("client.searchPlaceholder")}
             className="flex-1"
           />
-          <NewClientDialog
-            clients={clients}
-            onCreated={async (id) => {
-              await refetch()
-              setSelection({ clientId: id, name2Id: null })
-            }}
-          />
+          {editable && (
+            <NewClientDialog
+              clients={clients}
+              onCreated={async (id) => {
+                await refetch()
+                setSelection({ clientId: id, name2Id: null })
+              }}
+            />
+          )}
         </div>
 
         {/* Grupowane: nazwa klienta jako nagłówek (pogrubiony, klikalny -> zaznacza samego
@@ -87,18 +91,20 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
                       {/* Widoczny tylko po najechaniu -- szybki skrót do dodania kolejnej
                           Nazwy 2 temu klientowi bez przechodzenia przez wyszukiwanie w
                           NewClientDialog (ten sam mechanizm co Trash2 przy Nazwie 2 niżej). */}
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        aria-label={t("client.quickAddName2Aria")}
-                        className="opacity-0 group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setQuickAddClient(c)
-                        }}
-                      >
-                        <Plus className="size-3.5 text-muted-foreground" />
-                      </Button>
+                      {editable && (
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          aria-label={t("client.quickAddName2Aria")}
+                          className="opacity-0 group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setQuickAddClient(c)
+                          }}
+                        >
+                          <Plus className="size-3.5 text-muted-foreground" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                   {c.name2s.map((n) => (

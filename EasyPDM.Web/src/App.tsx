@@ -25,6 +25,7 @@ import { ClientsView } from "@/features/clients/clients-view"
 import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
 import { AuthorSettingsView } from "@/features/settings/author-settings-view"
 import { CompanySettingsView } from "@/features/settings/company-settings-view"
+import { CatalogEditableContext } from "@/features/settings/catalog-editable-context"
 import { useCatalogReadOnly } from "@/features/settings/use-catalog-read-only"
 import { LanguageSettingsView } from "@/features/settings/language-settings-view"
 import { LogsView } from "@/features/settings/logs-view"
@@ -331,9 +332,17 @@ function App() {
           {view === "materials" && <MaterialsView readOnly={catalogsReadOnly} />}
           {view === "processes" && <ProcessesView readOnly={catalogsReadOnly} />}
 
-          {view === "manufacturers" && <ManufacturersView />}
+          {view === "manufacturers" && (
+            <CatalogEditableContext.Provider value={!catalogsReadOnly}>
+              <ManufacturersView />
+            </CatalogEditableContext.Provider>
+          )}
 
-          {view === "clients" && <ClientsView onNavigateToProject={navigateToProject} />}
+          {view === "clients" && (
+            <CatalogEditableContext.Provider value={!catalogsReadOnly}>
+              <ClientsView onNavigateToProject={navigateToProject} />
+            </CatalogEditableContext.Provider>
+          )}
 
           {view === "settings" &&
             settingsSection === "users" &&

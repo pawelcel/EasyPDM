@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, ChevronDown, ChevronRight, Loader2, X } from "lucide-react"
 
 import { api } from "@/api/client"
+import { useVisibleInterval } from "@/lib/use-visible-interval"
 import type { TransferProgress } from "@/api/types"
 import { clearPendingCreateTicket, usePendingCreateTicket } from "@/features/items/pending-create-ticket"
 import { announceTransferFinished } from "@/features/transfer/transfer-finished-event"
@@ -41,11 +42,7 @@ function useTransferProgress() {
     }
   }, [])
 
-  useEffect(() => {
-    refetch()
-    const id = setInterval(refetch, POLL_INTERVAL_MS)
-    return () => clearInterval(id)
-  }, [refetch])
+  useVisibleInterval(refetch, POLL_INTERVAL_MS)
 
   return { progress, refetch }
 }

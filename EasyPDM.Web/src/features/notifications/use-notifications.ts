@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 
 import { api } from "@/api/client"
+import { useVisibleInterval } from "@/lib/use-visible-interval"
 import type { NotificationEntry } from "@/api/types"
 import { TRANSFER_FINISHED_EVENT } from "@/features/transfer/transfer-finished-event"
 
@@ -23,11 +24,7 @@ export function useNotifications() {
     }
   }, [])
 
-  useEffect(() => {
-    refetch()
-    const id = setInterval(refetch, POLL_INTERVAL_MS)
-    return () => clearInterval(id)
-  }, [refetch])
+  useVisibleInterval(refetch, POLL_INTERVAL_MS)
 
   // Koniec biegu makra zostawia raport w powiadomieniach i jest jedynym momentem, w którym
   // 30 s to zdecydowanie za długo — użytkownik patrzy wtedy prosto na listę plików, która
