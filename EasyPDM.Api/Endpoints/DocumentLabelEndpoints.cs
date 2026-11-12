@@ -6,7 +6,8 @@ static class DocumentLabelEndpoints
 {
     public static void MapDocumentLabelEndpoints(this WebApplication app, string connectionString)
     {
-        // GET /api/document-labels/{languageId} -> [{ key, text, defaultText, custom }]
+        // GET /api/document-labels/{languageId} -> [{ key, text, defaultText, custom, baseText }]
+        // baseText to wbudowany podpis angielski — punkt odniesienia dla tłumaczenia.
         app.MapGet("/api/document-labels/{languageId:int}", async (int languageId) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
@@ -18,7 +19,7 @@ static class DocumentLabelEndpoints
                     return Results.NotFound();
             }
             var labels = await DocumentLabels.ForLanguageAsync(conn, languageId);
-            return Results.Ok(labels.Select(l => new { key = l.Key, text = l.Text, defaultText = l.DefaultText, custom = l.Custom }));
+            return Results.Ok(labels.Select(l => new { key = l.Key, text = l.Text, defaultText = l.DefaultText, custom = l.Custom, baseText = l.BaseText }));
         });
 
         // PUT /api/document-labels/{languageId}   body: { "labels": { "csv.name": "Benennung", ... } }

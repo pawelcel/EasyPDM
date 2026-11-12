@@ -35,8 +35,9 @@ static class DocumentLabels
         };
     }
 
-    // Wszystkie podpisy dla języka: (klucz, obowiązujący tekst, tekst wbudowany, czy zmieniony).
-    public static async Task<List<(string Key, string Text, string DefaultText, bool Custom)>> ForLanguageAsync(
+    // Wszystkie podpisy dla języka: (klucz, obowiązujący tekst, tekst wbudowany, czy zmieniony,
+    // wbudowany angielski — podpis bazowy, który ustawienia pokazują obok tłumaczenia).
+    public static async Task<List<(string Key, string Text, string DefaultText, bool Custom, string BaseText)>> ForLanguageAsync(
         NpgsqlConnection conn, int languageId)
     {
         string? code;
@@ -58,7 +59,7 @@ static class DocumentLabels
         return BuiltIn.Select(b =>
         {
             var def = Default(b.Key, code);
-            return custom.TryGetValue(b.Key, out var text) ? (b.Key, text, def, true) : (b.Key, def, def, false);
+            return custom.TryGetValue(b.Key, out var text) ? (b.Key, text, def, true, b.En) : (b.Key, def, def, false, b.En);
         }).ToList();
     }
 

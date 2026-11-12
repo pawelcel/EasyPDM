@@ -33,7 +33,14 @@ function DocumentLabelsSection({ isAdmin }: { isAdmin: boolean }) {
   const [saved, setSaved] = useState(false)
   const [pending, setPending] = useState(false)
 
-  const selected = languages.find((l) => l.id === languageId) ?? languages.find((l) => l.isDefault)
+  // Angielski jest punktem odniesienia (lewa kolumna), więc na start tłumaczy się na pierwszy
+  // inny język — domyślny, jeśli nie jest angielski. Angielskie podpisy też da się zmienić,
+  // wybierając English z listy.
+  const selected =
+    languages.find((l) => l.id === languageId) ??
+    languages.find((l) => l.isDefault && l.code !== "EN") ??
+    languages.find((l) => l.code !== "EN") ??
+    languages[0]
   const selectedId = selected?.id
 
   function applyLoaded(list: DocumentLabel[]) {
@@ -105,10 +112,17 @@ function DocumentLabelsSection({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="mt-3">
         <div className="mb-1 text-[12.5px] font-medium text-muted-foreground">{t("documentLabels.csvGroup")}</div>
+        <div className="mb-1 grid grid-cols-[minmax(0,16rem)_1fr] gap-2 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">
+          <span>English</span>
+          <span>{selected ? `${selected.name} (${selected.code})` : ""}</span>
+        </div>
         <div className="flex flex-col gap-1.5">
           {labels.map((l) => (
             <div key={l.key} className="grid grid-cols-[minmax(0,16rem)_1fr] items-center gap-2">
-              <span className="text-sm">{t(`documentLabels.key.${l.key}` as TranslationKey)}</span>
+              {/* Podpis angielski jako punkt odniesienia; opis, do czego służy, w podpowiedzi. */}
+              <span className="text-sm" title={t(`documentLabels.key.${l.key}` as TranslationKey)}>
+                {l.baseText}
+              </span>
               {isAdmin ? (
                 <Input
                   aria-label={t(`documentLabels.key.${l.key}` as TranslationKey)}

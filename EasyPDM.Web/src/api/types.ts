@@ -255,6 +255,8 @@ export interface DocumentLabel {
   text: string
   defaultText: string
   custom: boolean
+  // Wbudowany podpis angielski — pokazywany obok tłumaczenia jako punkt odniesienia.
+  baseText: string
 }
 
 // Ustawienia -> Tagi (administrator): tag z liczbą elementów, które go noszą.
