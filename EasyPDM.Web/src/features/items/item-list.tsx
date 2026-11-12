@@ -27,12 +27,14 @@ import { ProductTypeFilterSelect } from "@/features/manufacturers/product-type-f
 import { ProjectDetailPanel } from "@/features/projects/project-detail-panel"
 import { ProjectRow } from "@/features/projects/project-row"
 import { useResizableWidth } from "@/hooks/use-resizable-width"
+import { ITEMS_LIMIT } from "@/features/items/use-items"
 import { useLanguage } from "@/i18n/use-language"
 
 type Selection = { kind: "item"; id: string } | { kind: "project"; id: string }
 
 function ItemList({
   items,
+  truncated = false,
   loading,
   error,
   projects,
@@ -49,6 +51,8 @@ function ItemList({
   onPendingSelectedItemIdConsumed,
 }: {
   items: Item[]
+  // Serwer zwrócił tylko pierwsze ITEMS_LIMIT pasujących — pokazujemy prośbę o zawężenie.
+  truncated?: boolean
   loading: boolean
   error: boolean
   projects: Project[]
@@ -375,6 +379,8 @@ function ItemList({
           {t("filter.clearAll")}
         </Button>
       </div>
+
+      {truncated && <Hint>{t("database.truncatedHint", { limit: String(ITEMS_LIMIT) })}</Hint>}
 
       {/* Belka zawsze widoczna (nie tylko po zaznaczeniu czegoś) — zmieniają się jedynie
           przyciski w środku, żeby układ się nie "przeskakiwał" przy zaznaczaniu/odznaczaniu.

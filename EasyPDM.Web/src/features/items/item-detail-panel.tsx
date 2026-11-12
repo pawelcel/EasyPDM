@@ -570,7 +570,9 @@ function ItemDetailPanel({
                         onSelectChild={onSelectChild}
                         onItemsRefetch={onItemsRefetch}
                         setBomError={setBomError}
-                        disabled={!ownerEditable}
+                        // Struktura wydanego (albo sprawdzanego/anulowanego) złożenia jest zamrożona
+                        // razem z jego właściwościami — zmienia się po powrocie do "W pracy".
+                        disabled={!ownerEditable || isLocked(item)}
                       />
                     ))}
                   </SortableContext>

@@ -203,14 +203,21 @@ function RestoreSection() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [error, setError] = useState("")
-  const [result, setResult] = useState<{ success: boolean; warnings: string; filesRestored: number } | null>(null)
+  const [result, setResult] = useState<{
+    success: boolean
+    warnings: string
+    filesRestored: number
+    filesReplaced: boolean
+  } | null>(null)
+  // Przy błędach pg_restore serwer domyślnie NIE podmienia plików (baza i pliki z różnych chwil).
+  const [replaceDespiteErrors, setReplaceDespiteErrors] = useState(false)
 
   async function performRestore() {
     if (!file) return
     setRestoring(true)
     setError("")
     try {
-      const res = await api.restoreBackup(file)
+      const res = await api.restoreBackup(file, replaceDespiteErrors)
       setConfirmOpen(false)
       setResult(res)
     } catch (err) {
@@ -227,7 +234,11 @@ function RestoreSection() {
       {result ? (
         <div className="flex flex-col gap-2">
           <Hint>
-            {result.success ? t("storage.restoreSuccess") : t("storage.restoreWarnings")}{" "}
+            {result.success
+              ? t("storage.restoreSuccess")
+              : result.filesReplaced
+                ? t("storage.restoreWarnings")
+                : t("storage.restoreFilesKept")}{" "}
             {t("storage.restoreDetail", { count: result.filesRestored })}
           </Hint>
           {result.warnings && (
@@ -255,6 +266,15 @@ function RestoreSection() {
             </Button>
             {file && <span className="text-[12.5px] text-muted-foreground">{file.name}</span>}
           </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={replaceDespiteErrors}
+              onChange={(e) => setReplaceDespiteErrors(e.target.checked)}
+              className="size-3.5 shrink-0 accent-primary"
+            />
+            {t("storage.restoreReplaceDespiteErrors")}
+          </label>
           <div>
             <Button
               variant="destructive"

@@ -1,6 +1,6 @@
-import { X } from "lucide-react"
+import { RefreshCw, X } from "lucide-react"
 
-import { localizeProcess, type ProcessRef } from "@/api/types"
+import { localizeProcess, type Process, type ProcessRef } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -14,6 +14,22 @@ import { Hint } from "@/components/ui/hint"
 import { useProcesses } from "@/features/processes/use-processes"
 import { useDocumentationLanguageId } from "@/features/project-languages/use-documentation-language-id"
 import { useLanguage } from "@/i18n/use-language"
+
+// Czy kopia obróbki w elemencie różni się od jej wpisu w katalogu (nazwa, opis albo tłumaczenia).
+// Kolejność tłumaczeń bez znaczenia; brak opisu i pusty opis to to samo.
+function differsFromCatalog(ref: ProcessRef, entry: Process): boolean {
+  const norm = (texts: { languageId: number; name: string; description: string | null }[] | undefined) =>
+    JSON.stringify(
+      [...(texts ?? [])]
+        .sort((a, b) => a.languageId - b.languageId)
+        .map((x) => [x.languageId, x.name, x.description || null])
+    )
+  return (
+    ref.name !== entry.name ||
+    (ref.description || null) !== (entry.description || null) ||
+    norm(ref.texts) !== norm(entry.texts)
+  )
+}
 
 interface Entry {
   key: string
@@ -116,6 +132,11 @@ function ProcessSelect({
         <ul className="flex flex-col gap-0.5 text-sm">
           {value.map((ref, i) => {
             const text = shown(ref)
+            // Element trzyma kopię obróbki z chwili wyboru; jeśli w katalogu poprawiono opis albo
+            // dodano tłumaczenie, można ją odświeżyć — tylko ręcznie i tylko gdy pole jest
+            // edytowalne (element w pracy), więc wydana specyfikacja nie zmienia się po cichu.
+            const catalogEntry = ref.id !== null ? processes.find((p) => p.id === ref.id) : undefined
+            const stale = !disabled && catalogEntry !== undefined && differsFromCatalog(ref, catalogEntry)
             return (
             <li key={selectedKeys[i]} className="flex items-start gap-1.5">
               <Button
@@ -133,6 +154,26 @@ function ProcessSelect({
                   <span className="whitespace-pre-line text-muted-foreground"> — {text.description}</span>
                 )}
               </span>
+              {stale && catalogEntry && (
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="ml-auto shrink-0"
+                  aria-label={t("part.processesRefresh", { name: text.name })}
+                  title={t("part.processesRefreshHint")}
+                  onClick={() =>
+                    onChange(
+                      value.map((r, j) =>
+                        j === i
+                          ? { id: catalogEntry.id, name: catalogEntry.name, description: catalogEntry.description, texts: catalogEntry.texts }
+                          : r
+                      )
+                    )
+                  }
+                >
+                  <RefreshCw className="size-3.5 text-amber-600 dark:text-amber-400" />
+                </Button>
+              )}
             </li>
             )
           })}

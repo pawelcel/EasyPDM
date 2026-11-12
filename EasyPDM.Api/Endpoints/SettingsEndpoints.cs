@@ -329,6 +329,8 @@ static class SettingsEndpoints
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
                 return Results.BadRequest("No backup file in the 'file' field.");
+            // Podmienić pliki także wtedy, gdy pg_restore zgłosi błędy (zob. niżej).
+            var replaceFilesDespiteErrors = string.Equals(form["replaceFilesDespiteErrors"], "true", StringComparison.OrdinalIgnoreCase);
 
             var tempDir = Path.Combine(Path.GetTempPath(), $"pdm_restore_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
@@ -421,6 +423,33 @@ static class SettingsEndpoints
                         $"the database does not have the expected structure after the restore. File storage was NOT touched.\n{stderr}");
                 }
 
+                // pg_restore zgłosił błędy, ale baza ma podstawową strukturę. Może to być nieszkodliwe
+                // ostrzeżenie albo prawdziwy częściowy błąd — tego nie da się rozstrzygnąć z kodu
+                // wyjścia. Bez wyraźnej zgody pliki NIE są podmieniane, żeby baza i magazyn nie
+                // pochodziły z różnych chwil; administrator widzi błędy i może przywrócić jeszcze
+                // raz z zaznaczonym "podmień pliki mimo błędów". Migracje i tak się wykonują, bo baza
+                // jest już zmieniona.
+                if (process.ExitCode != 0 && !replaceFilesDespiteErrors)
+                {
+                    try
+                    {
+                        await MigrationRunner.ApplyPendingMigrationsAsync(connectionString, app.Logger);
+                    }
+                    catch (Exception ex)
+                    {
+                        app.Logger.LogError(ex, "Restore: migrations after a restore with errors failed.");
+                    }
+                    return Results.Ok(new
+                    {
+                        success = false,
+                        warnings = stderr,
+                        filesRestored = 0,
+                        filesReplaced = false,
+                        pathsRewritten = 0,
+                        filesMissing = 0,
+                    });
+                }
+
                 var filesRestored = 0;
                 var storageBackupDir = Path.Combine(extractDir, "storage");
                 if (Directory.Exists(storageBackupDir))
@@ -469,7 +498,7 @@ static class SettingsEndpoints
                     await pathTx.CommitAsync();
                 }
 
-                return Results.Ok(new { success = process.ExitCode == 0, warnings = stderr, filesRestored, pathsRewritten, filesMissing });
+                return Results.Ok(new { success = process.ExitCode == 0, warnings = stderr, filesRestored, filesReplaced = true, pathsRewritten, filesMissing });
             }
             finally
             {

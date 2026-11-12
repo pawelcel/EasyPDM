@@ -30,6 +30,10 @@ import { ProjectAccessView } from "@/features/users/project-access-view"
 import { useUsers } from "@/features/users/use-users"
 import { useLanguage } from "@/i18n/use-language"
 
+// Ta sama granica co PasswordPolicy.MinLength po stronie serwera — tu tylko po to, żeby
+// komunikat był w języku interfejsu, zanim serwer odpowie po angielsku.
+const MIN_PASSWORD_LENGTH = 8
+
 function UsersView() {
   const { t } = useLanguage()
   const { users, refetch } = useUsers()
@@ -203,6 +207,10 @@ function AddUserDialog({ onAdded }: { onAdded: () => void | Promise<void> }) {
   async function add() {
     if (!username.trim() || !password || !firstName.trim() || !lastName.trim()) {
       setError(t("users.addValidation"))
+      return
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(t("users.passwordTooShort", { min: String(MIN_PASSWORD_LENGTH) }))
       return
     }
     try {
@@ -398,6 +406,10 @@ function ResetPasswordDialog({ user, onClose }: { user: ManagedUser; onClose: ()
   async function submit() {
     if (!password) {
       setError(t("users.newPasswordRequired"))
+      return
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(t("users.passwordTooShort", { min: String(MIN_PASSWORD_LENGTH) }))
       return
     }
     setSubmitting(true)

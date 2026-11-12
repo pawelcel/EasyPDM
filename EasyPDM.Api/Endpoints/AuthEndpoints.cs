@@ -246,6 +246,8 @@ static class AuthEndpoints
 
             if (string.IsNullOrWhiteSpace(body.NewPassword))
                 return Results.BadRequest("The new password cannot be empty.");
+            if (PasswordPolicy.Validate(body.NewPassword) is { } passwordError)
+                return Results.BadRequest(passwordError);
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();

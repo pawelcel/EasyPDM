@@ -8,6 +8,14 @@ static class StructureEndpoints
     // stała, unikalna w obrębie aplikacji (MigrationRunner ma swoją).
     private const long StructureLockKey = 875_142_002;
 
+    // Struktura (BOM) złożenia jest częścią tego, co się wydaje — tak jak nazwa i właściwości,
+    // zmienia się tylko w statusie "W pracy". Wcześniej wydane złożenie dawało się przebudować
+    // (dopisać komponent, zmienić ilość) bez nowej rewizji, więc wydana rewizja przestawała
+    // odpowiadać temu, co poszło do produkcji. Dotyczy listy dzieci RODZICA: wydany element dalej
+    // można dopiąć jako komponent do złożenia w pracy.
+    internal static IResult StructureLocked() => Results.BadRequest(
+        "The structure of this assembly can only be changed while it is In progress — set it back to In progress first.");
+
     public static void MapStructureEndpoints(this WebApplication app, string connectionString)
     {
         // GET /api/items/{id}/children — bezpośrednie dzieci (item_relations, depth=1) tego
@@ -265,6 +273,8 @@ static class StructureEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
+            if (ItemEndpoints.IsLocked(parentInfo.Value.ItemType, parentInfo.Value.Status))
+                return StructureLocked();
 
             // Zapobiega cyklowi: odrzuć, jeśli parentId jest już potomkiem childId
             // (czyli dodanie tej krawędzi zamknęłoby pętlę w strukturze).
@@ -365,6 +375,8 @@ static class StructureEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
+            if (ItemEndpoints.IsLocked(parentInfo.Value.ItemType, parentInfo.Value.Status))
+                return StructureLocked();
 
             // Sprawdzenie "czy numer wolny" i UPDATE są tu jednym atomowym zapytaniem (zamiast
             // dawnych dwóch osobnych) — bazuje na ograniczeniu UNIQUE (parent_id, position)
@@ -405,6 +417,8 @@ static class StructureEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
+            if (ItemEndpoints.IsLocked(parentInfo.Value.ItemType, parentInfo.Value.Status))
+                return StructureLocked();
 
             await using var tx = await conn.BeginTransactionAsync();
 
@@ -455,6 +469,8 @@ static class StructureEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
+            if (ItemEndpoints.IsLocked(parentInfo.Value.ItemType, parentInfo.Value.Status))
+                return StructureLocked();
 
             const string sql = "DELETE FROM item_relations WHERE parent_id = @parentId AND child_id = @childId;";
             await using var cmd = new NpgsqlCommand(sql, conn);

@@ -488,6 +488,16 @@ otherwise `DocumentLabels` falls back to the built-in text for the language code
 codes. Saving an empty text, or one equal to the built-in, deletes the row so the label
 keeps following the built-in.
 
+An assembly's child list is part of what is released: `POST/DELETE .../children`, the
+position and reorder endpoints and creating a node with a `parentId` refuse a parent
+outside `w_pracy` (`StructureEndpoints.StructureLocked`). Only the parent's status
+matters, so a released item can still become a component of an assembly in progress. `GET
+/api/items` takes an optional `limit` (the whole database view sends 500) and sets
+`X-Truncated: true` when more rows matched; without it the list is complete, as the macros
+and pickers expect. Migration 070 adds catalog `texts` to process entries of items in
+`w_pracy` that predate them; the item panel offers a manual refresh from the catalog for
+entries that differ from it.
+
 ### Selecting several items in the tree
 
 Rows are selected with Ctrl (Cmd) + click, alongside the older "Select multiple" button and

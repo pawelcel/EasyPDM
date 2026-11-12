@@ -8,8 +8,14 @@ interface ItemFilters {
   tags: string[]
 }
 
+// "Cała baza" pokazuje najwyżej tyle elementów naraz — duża baza nie ładuje się w całości przy
+// każdym otwarciu; gdy pasuje więcej, lista prosi o zawężenie wyszukiwania.
+export const ITEMS_LIMIT = 500
+
 export function useItems(filters: ItemFilters) {
   const [items, setItems] = useState<Item[]>([])
+  // Lista dostała tylko pierwsze ITEMS_LIMIT pasujących — trzeba zawęzić wyszukiwanie.
+  const [truncated, setTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   // Tylko pierwsze wczytanie ma pokazywać "loading" — odświeżenia wywołane np. zapisaniem
@@ -26,9 +32,10 @@ export function useItems(filters: ItemFilters) {
     if (!hasLoadedOnceRef.current) setLoading(true)
     setError(false)
     try {
-      const data = await api.getItems(filters)
+      const data = await api.getItemsPage({ ...filters, limit: ITEMS_LIMIT })
       if (requestIdRef.current !== requestId) return
-      setItems(data)
+      setItems(data.items)
+      setTruncated(data.truncated)
       hasLoadedOnceRef.current = true
     } catch {
       if (requestIdRef.current === requestId) setError(true)
@@ -42,5 +49,5 @@ export function useItems(filters: ItemFilters) {
     refetch()
   }, [refetch])
 
-  return { items, loading, error, refetch }
+  return { items, truncated, loading, error, refetch }
 }

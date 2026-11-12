@@ -185,6 +185,18 @@ export const api = {
     return fetch(`${BASE}/items${qs ? `?${qs}` : ""}`).then((r) => handleResponse<Item[]>(r))
   },
 
+  // "Cała baza": pierwsze `limit` pasujących; truncated = coś zostało pominięte (serwer ustawia
+  // nagłówek X-Truncated), więc trzeba zawęzić wyszukiwanie.
+  getItemsPage: async (params: { search?: string; tags?: string[]; limit: number }) => {
+    const query = new URLSearchParams()
+    if (params.search) query.set("search", params.search)
+    for (const tag of params.tags ?? []) query.append("tag", tag)
+    query.set("limit", String(params.limit))
+    const res = await fetch(`${BASE}/items?${query.toString()}`)
+    const items = await handleResponse<Item[]>(res)
+    return { items, truncated: res.headers.get("X-Truncated") === "true" }
+  },
+
   getItem: (id: string) => fetch(`${BASE}/items/${id}`).then((r) => handleResponse<Item>(r)),
 
   uploadItem: (projectId: string, formData: FormData) =>
@@ -858,11 +870,12 @@ export const api = {
       body: JSON.stringify({ nextNumber }),
     }).then((r) => handleResponse<void>(r)),
 
-  restoreBackup: (file: File) => {
+  restoreBackup: (file: File, replaceFilesDespiteErrors: boolean) => {
     const formData = new FormData()
     formData.append("file", file)
+    if (replaceFilesDespiteErrors) formData.append("replaceFilesDespiteErrors", "true")
     return fetch(`${BASE}/settings/restore`, { method: "POST", body: formData }).then((r) =>
-      handleResponse<{ success: boolean; warnings: string; filesRestored: number }>(r)
+      handleResponse<{ success: boolean; warnings: string; filesRestored: number; filesReplaced: boolean }>(r)
     )
   },
 

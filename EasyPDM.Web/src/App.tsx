@@ -89,6 +89,7 @@ function App() {
   const { tags: allTags, refetch: refetchTags } = useTags()
   const {
     items,
+    truncated: itemsTruncated,
     loading,
     error,
     refetch: refetchItems,
@@ -306,6 +307,7 @@ function App() {
           {view === "database" && (
             <ItemList
               items={items}
+              truncated={itemsTruncated}
               loading={loading}
               error={error}
               projects={projects}

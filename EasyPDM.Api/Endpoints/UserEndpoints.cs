@@ -48,6 +48,8 @@ static class UserEndpoints
                 return Results.BadRequest("A username is required.");
             if (string.IsNullOrWhiteSpace(body.Password))
                 return Results.BadRequest("A password is required.");
+            if (PasswordPolicy.Validate(body.Password) is { } passwordError)
+                return Results.BadRequest(passwordError);
             if (string.IsNullOrWhiteSpace(body.DisplayName))
                 return Results.BadRequest("A display name is required.");
             if (string.IsNullOrWhiteSpace(body.FirstName) || string.IsNullOrWhiteSpace(body.LastName))
@@ -97,6 +99,9 @@ static class UserEndpoints
             // pominięte (null) to "bez zmian".
             if (body.FirstName is { } f && string.IsNullOrWhiteSpace(f) || body.LastName is { } l && string.IsNullOrWhiteSpace(l))
                 return Results.BadRequest("First and last name cannot be empty.");
+            // Puste hasło = bez zmiany; podane musi spełniać wymagania.
+            if (!string.IsNullOrEmpty(body.Password) && PasswordPolicy.Validate(body.Password) is { } passwordError)
+                return Results.BadRequest(passwordError);
             if (body.DisplayName is { } d && string.IsNullOrWhiteSpace(d))
                 return Results.BadRequest("The display name cannot be empty.");
 

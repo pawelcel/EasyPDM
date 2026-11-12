@@ -24,7 +24,7 @@ import {
 } from "lucide-react"
 
 import { api } from "@/api/client"
-import { itemDisplayLabel, type ClientVerificationSummary, type Item } from "@/api/types"
+import { isLocked, itemDisplayLabel, type ClientVerificationSummary, type Item } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useOptimisticOrder } from "@/lib/optimistic-order"
@@ -204,10 +204,13 @@ function TreeNode({
   onError,
   onRemoveFromStructure,
   clientVerifications,
+  parentLocked = false,
 }: {
   item: Item
   quantity: number | null
   parentId: string | null
+  // Rodzic ma zamrożoną strukturę (złożenie poza "W pracy") — nie da się z niego odpiąć elementu.
+  parentLocked?: boolean
   depth: number
   projectId: string
   childrenOf: Tree["childrenOf"]
@@ -254,6 +257,8 @@ function TreeNode({
     setActiveChildId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
+    // Kolejność komponentów zamrożonego złożenia też jest częścią wydanej struktury.
+    if (isLocked(item)) return
 
     const ids = children.map((c) => c.item.id)
     const fromIndex = ids.indexOf(String(active.id))
@@ -365,7 +370,7 @@ function TreeNode({
         </button>
 
         <div className="hidden items-center gap-0.5 group-hover:flex">
-          {(item.itemType === "folder" || item.itemType === "assembly") && (
+          {(item.itemType === "folder" || item.itemType === "assembly") && !isLocked(item) && (
             <AddNodeDialog
               trigger={
                 <Button size="icon-xs" variant="ghost" aria-label={t("addNode.addSubitemAria")}>
@@ -378,7 +383,7 @@ function TreeNode({
               onCreated={onRefetch}
             />
           )}
-          {parentId && (
+          {parentId && !parentLocked && (
             <Button
               size="icon-xs"
               variant="ghost"
@@ -420,6 +425,7 @@ function TreeNode({
                   item={child}
                   quantity={childQty}
                   parentId={item.id}
+                  parentLocked={isLocked(item)}
                   depth={depth + 1}
                   projectId={projectId}
                   childrenOf={childrenOf}

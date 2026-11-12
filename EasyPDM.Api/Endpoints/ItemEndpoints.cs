@@ -304,6 +304,8 @@ static class ItemEndpoints
                 // była poprawnie blokowana.
                 if (!CanEditOwnerLocked(user.Id, parentInfo.Value.OwnerId, parentInfo.Value.OwnerLocked))
                     return OwnerLockedForbidden();
+                if (IsLocked(parentInfo.Value.ItemType, parentInfo.Value.Status))
+                    return StructureEndpoints.StructureLocked();
             }
 
             var itemId = Guid.NewGuid();
@@ -595,7 +597,7 @@ static class ItemEndpoints
         // projekcie (jego drzewa/struktury) i zapisów, nie samego globalnego odczytu/
         // wyszukiwania elementów ("Cała baza" ma być czytelna dla wszystkich).
         // ============================================================
-        app.MapGet("/api/items", async (string? search, string[]? tag, Guid? projectId, HttpContext ctx) =>
+        app.MapGet("/api/items", async (string? search, string[]? tag, Guid? projectId, int? limit, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -628,7 +630,8 @@ static class ItemEndpoints
                         JOIN tags t ON t.id = it.tag_id
                         WHERE it.item_id = i.id AND t.name = ANY(@tags)) = cardinality(@tags))
                   AND (@projectId::uuid IS NULL OR i.project_id = @projectId)
-                ORDER BY i.file_name;
+                ORDER BY i.file_name
+                LIMIT @limitPlusOne;
                 """;
 
             await using var cmd = new NpgsqlCommand(sql, conn);
@@ -637,6 +640,13 @@ static class ItemEndpoints
             var tags = (tag ?? Array.Empty<string>()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToArray();
             cmd.Parameters.AddWithValue("tags", tags);
             cmd.Parameters.AddWithValue("projectId", (object?)projectId ?? DBNull.Value);
+            // limit (opcjonalny) — "Cała baza" prosi o pierwsze N pasujących, żeby duża baza nie
+            // ładowała się w całości; jeden wiersz więcej mówi, czy coś zostało pominięte. Bez
+            // limitu (makra CAD, listy wyboru) wynik jest pełny jak dotąd. LIMIT NULL = bez limitu.
+            cmd.Parameters.Add(new NpgsqlParameter("limitPlusOne", NpgsqlTypes.NpgsqlDbType.Integer)
+            {
+                Value = limit is > 0 ? limit.Value + 1 : DBNull.Value,
+            });
 
             var items = new List<Dictionary<string, object?>>();
             var ids = new List<Guid>();
@@ -705,6 +715,13 @@ static class ItemEndpoints
                     var id = (Guid)item["id"]!;
                     item["tags"] = tagsByItem.TryGetValue(id, out var t) ? t : new List<string>();
                 }
+            }
+
+            if (limit is > 0 && items.Count > limit.Value)
+            {
+                items.RemoveRange(limit.Value, items.Count - limit.Value);
+                ids.RemoveRange(limit.Value, ids.Count - limit.Value);
+                ctx.Response.Headers["X-Truncated"] = "true";
             }
 
             return Results.Ok(items);

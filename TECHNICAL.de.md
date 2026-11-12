@@ -477,6 +477,17 @@ Englisch zurück, da Dokumentationssprachen unter beliebigen Kürzeln angelegt w
 leerer Text oder einer gleich dem eingebauten löscht die Zeile, sodass die Beschriftung
 weiter dem eingebauten folgt.
 
+Die Kindliste einer Baugruppe gehört zu dem, was freigegeben wird: `POST/DELETE
+.../children`, die Positions- und Reihenfolge-Endpunkte und das Anlegen eines Elements mit
+`parentId` lehnen einen Elternteil außerhalb von `w_pracy` ab
+(`StructureEndpoints.StructureLocked`). Es zählt nur der Status des Elternteils, sodass
+ein freigegebenes Element weiterhin Komponente einer Baugruppe in Bearbeitung werden kann.
+`GET /api/items` nimmt ein optionales `limit` (die Ansicht der gesamten Datenbank sendet
+500) und setzt `X-Truncated: true`, wenn mehr passten; ohne ist die Liste vollständig, wie
+Makros und Auswahllisten es erwarten. Migration 070 ergänzt `texts` aus dem Katalog bei
+Bearbeitungen von Elementen in `w_pracy`, die sie noch nicht hatten; der Elementbereich
+bietet eine manuelle Aktualisierung aus dem Katalog für abweichende Einträge.
+
 ### Mehrere Elemente im Baum auswählen
 
 Zeilen werden mit Strg (Cmd) + Klick ausgewählt, neben der älteren Schaltfläche „Mehrere auswählen" und ihren Kontrollkästchen — die Schaltfläche bleibt, denn ein Tablet hat keine Strg-Taste. Ein Strg+Klick schaltet den Auswahlmodus selbst ein: Kontrollkästchen und Aktionsleiste gibt es nur dort, der erste solche Klick würde sonst etwas Unsichtbares auswählen.

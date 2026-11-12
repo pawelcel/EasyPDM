@@ -212,6 +212,7 @@ const pl = {
   "tag.removeFailed": "Nie udało się usunąć tagu.",
 
   "database.loadError": "Błąd ładowania danych z API.",
+  "database.truncatedHint": "Pokazano pierwsze {limit} pasujących elementów — zawęź wyszukiwanie albo filtry, żeby zobaczyć resztę.",
   "database.empty": "Brak rekordów pasujących do wybranych filtrów.",
 
   "addNode.title": "Dodaj element",
@@ -330,6 +331,8 @@ const pl = {
   "process.deleteConfirmDescription": "Obróbka „{name}” zniknie z katalogu. Części i złożenia, które ją mają, zachowają jej nazwę.",
   "part.processes": "Obróbka",
   "part.processesPick": "Kliknij, aby wybrać…",
+  "part.processesRefresh": "Odśwież {name} z katalogu",
+  "part.processesRefreshHint": "W katalogu obróbek jest nowsza wersja tej obróbki (opis albo tłumaczenia) — kliknij, aby ją pobrać.",
   "part.processesNoMatch": "Brak pasującej obróbki — dodaj ją w menu „Obróbka”.",
   "part.processesEmptyCatalog": "Brak obróbek — dodaj je w menu „Obróbka”.",
   "part.processesOutside": "spoza katalogu",
@@ -818,6 +821,7 @@ const pl = {
   "users.resetPasswordTitle": "Zmień hasło — {username}",
   "users.newPasswordLabel": "Nowe hasło",
   "users.newPasswordRequired": "Podaj nowe hasło.",
+  "users.passwordTooShort": "Hasło musi mieć co najmniej {min} znaków.",
   "users.resetPasswordFailed": "Nie udało się zmienić hasła.",
 
   "storage.pathEmpty": "Nowa ścieżka nie może być pusta.",
@@ -842,6 +846,8 @@ const pl = {
   "storage.restoreLabel": "Przywracanie z kopii zapasowej",
   "storage.restoreSuccess": "Przywrócono pomyślnie.",
   "storage.restoreWarnings": "Przywrócono z ostrzeżeniami — sprawdź poniżej.",
+  "storage.restoreFilesKept": "Przywracanie bazy zgłosiło błędy (poniżej) — pliki NIE zostały podmienione, żeby baza i magazyn nie pochodziły z różnych chwil. Jeśli błędy są nieszkodliwe, zaloguj się ponownie i przywróć jeszcze raz z zaznaczonym „Podmień pliki mimo błędów”.",
+  "storage.restoreReplaceDespiteErrors": "Podmień pliki mimo błędów przywracania bazy",
   "storage.restoreDetail": "Przywrócono {count} plików. Twoja sesja przestała być ważna — zaloguj się ponownie.",
   "storage.reloadPageButton": "Odśwież stronę",
   "storage.restoreHint": "Wgraj plik ZIP pobrany wcześniej jako kopia zapasowa. To NADPISZE całą bieżącą bazę danych i magazyn plików — operacji nie da się cofnąć.",
@@ -1109,6 +1115,7 @@ const en: Record<TranslationKey, string> = {
   "tag.removeFailed": "Failed to remove the tag.",
 
   "database.loadError": "Failed to load data from the API.",
+  "database.truncatedHint": "Showing the first {limit} matching items — narrow the search or filters to see the rest.",
   "database.empty": "No records match the selected filters.",
 
   "addNode.title": "Add item",
@@ -1227,6 +1234,8 @@ const en: Record<TranslationKey, string> = {
   "process.deleteConfirmDescription": "The process \"{name}\" will be removed from the catalog. Parts and assemblies that have it keep its name.",
   "part.processes": "Processes",
   "part.processesPick": "Click to choose…",
+  "part.processesRefresh": "Refresh {name} from the catalog",
+  "part.processesRefreshHint": "The process catalog has a newer version of this process (description or translations) — click to take it.",
   "part.processesNoMatch": "No matching process — add it in the \"Processes\" menu.",
   "part.processesEmptyCatalog": "No processes — add them in the \"Processes\" menu.",
   "part.processesOutside": "not in the catalog",
@@ -1714,6 +1723,7 @@ const en: Record<TranslationKey, string> = {
   "users.resetPasswordTitle": "Change password — {username}",
   "users.newPasswordLabel": "New password",
   "users.newPasswordRequired": "Enter a new password.",
+  "users.passwordTooShort": "The password must be at least {min} characters long.",
   "users.resetPasswordFailed": "Failed to change the password.",
 
   "storage.pathEmpty": "The new path can't be empty.",
@@ -1738,6 +1748,8 @@ const en: Record<TranslationKey, string> = {
   "storage.restoreLabel": "Restore from backup",
   "storage.restoreSuccess": "Restored successfully.",
   "storage.restoreWarnings": "Restored with warnings — check below.",
+  "storage.restoreFilesKept": "Restoring the database reported errors (below) — the files were NOT replaced, so the database and storage do not come from different moments. If the errors are harmless, log in again and restore once more with “Replace files despite errors” ticked.",
+  "storage.restoreReplaceDespiteErrors": "Replace files despite database restore errors",
   "storage.restoreDetail": "Restored {count} files. Your session is no longer valid — please log in again.",
   "storage.reloadPageButton": "Reload page",
   "storage.restoreHint": "Upload a ZIP file downloaded earlier as a backup. This will OVERWRITE the entire current database and file storage — this cannot be undone.",
@@ -2003,6 +2015,7 @@ const de: Record<TranslationKey, string> = {
   "tag.removeFailed": "Der Tag konnte nicht entfernt werden.",
 
   "database.loadError": "Fehler beim Laden der Daten von der API.",
+  "database.truncatedHint": "Die ersten {limit} passenden Elemente werden angezeigt — grenzen Sie Suche oder Filter ein, um den Rest zu sehen.",
   "database.empty": "Keine Datensätze entsprechen den ausgewählten Filtern.",
 
   "addNode.title": "Element hinzufügen",
@@ -2121,6 +2134,8 @@ const de: Record<TranslationKey, string> = {
   "process.deleteConfirmDescription": "Die Bearbeitung „{name}“ wird aus dem Katalog entfernt. Teile und Baugruppen, die sie haben, behalten ihren Namen.",
   "part.processes": "Bearbeitung",
   "part.processesPick": "Klicken, um auszuwählen…",
+  "part.processesRefresh": "{name} aus dem Katalog aktualisieren",
+  "part.processesRefreshHint": "Im Bearbeitungskatalog gibt es eine neuere Fassung dieser Bearbeitung (Beschreibung oder Übersetzungen) — klicken, um sie zu übernehmen.",
   "part.processesNoMatch": "Keine passende Bearbeitung — im Menü „Bearbeitung“ hinzufügen.",
   "part.processesEmptyCatalog": "Keine Bearbeitungen — im Menü „Bearbeitung“ hinzufügen.",
   "part.processesOutside": "nicht im Katalog",
@@ -2608,6 +2623,7 @@ const de: Record<TranslationKey, string> = {
   "users.resetPasswordTitle": "Passwort ändern — {username}",
   "users.newPasswordLabel": "Neues Passwort",
   "users.newPasswordRequired": "Geben Sie ein neues Passwort ein.",
+  "users.passwordTooShort": "Das Passwort muss mindestens {min} Zeichen lang sein.",
   "users.resetPasswordFailed": "Das Passwort konnte nicht geändert werden.",
 
   "storage.pathEmpty": "Der neue Pfad darf nicht leer sein.",
@@ -2632,6 +2648,8 @@ const de: Record<TranslationKey, string> = {
   "storage.restoreLabel": "Aus Sicherung wiederherstellen",
   "storage.restoreSuccess": "Erfolgreich wiederhergestellt.",
   "storage.restoreWarnings": "Mit Warnungen wiederhergestellt — siehe unten.",
+  "storage.restoreFilesKept": "Die Datenbankwiederherstellung meldete Fehler (unten) — die Dateien wurden NICHT ersetzt, damit Datenbank und Speicher nicht aus verschiedenen Zeitpunkten stammen. Wenn die Fehler harmlos sind, melden Sie sich erneut an und stellen Sie noch einmal mit „Dateien trotz Fehlern ersetzen“ wieder her.",
+  "storage.restoreReplaceDespiteErrors": "Dateien trotz Fehlern bei der Datenbankwiederherstellung ersetzen",
   "storage.restoreDetail": "{count} Dateien wiederhergestellt. Ihre Sitzung ist nicht mehr gültig — bitte melden Sie sich erneut an.",
   "storage.reloadPageButton": "Seite neu laden",
   "storage.restoreHint": "Laden Sie eine zuvor als Sicherung heruntergeladene ZIP-Datei hoch. Dies ÜBERSCHREIBT die gesamte aktuelle Datenbank und den Dateispeicher — der Vorgang kann nicht rückgängig gemacht werden.",

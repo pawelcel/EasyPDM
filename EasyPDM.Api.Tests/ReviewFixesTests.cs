@@ -54,7 +54,7 @@ public class ReviewFixesTests
         await second.LoginAsync(username, "haslo123");
 
         // Własna zmiana hasła: sesja, z której zmieniono, zostaje; druga wygasa.
-        (await first.PatchAsJsonAsync("/api/auth/password", new { currentPassword = "haslo123", newPassword = "nowe456" })).EnsureSuccessStatusCode();
+        (await first.PatchAsJsonAsync("/api/auth/password", new { currentPassword = "haslo123", newPassword = "nowe4567" })).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.OK, (await first.GetAsync("/api/auth/me")).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await second.GetAsync("/api/auth/me")).StatusCode);
 
@@ -148,5 +148,61 @@ public class ReviewFixesTests
         var response = await client.GetAsync("/api/auth/me");
         Assert.Equal("nosniff", response.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.Equal("SAMEORIGIN", response.Headers.GetValues("X-Frame-Options").Single());
+    }
+
+    [Fact]
+    public async Task Nowe_haslo_musi_miec_co_najmniej_8_znakow()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var admin = factory.CreateClient();
+        await admin.LoginAsync("admin", "admin");
+        var username = "haslo" + Guid.NewGuid().ToString("N")[..8];
+
+        var tooShort = await admin.PostAsJsonAsync("/api/users",
+            new { username, password = "krotkie", displayName = "X", firstName = "A", lastName = "B", role = "user" });
+        Assert.Equal(HttpStatusCode.BadRequest, tooShort.StatusCode);
+
+        var userId = await admin.CreateUserAsync(username, "haslo123");
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PatchAsJsonAsync($"/api/users/{userId}", new { password = "1234567" })).StatusCode);
+        // Zmiana innych pól bez hasła nie podlega regule.
+        (await admin.PatchAsJsonAsync($"/api/users/{userId}", new { displayName = "Nowa" })).EnsureSuccessStatusCode();
+
+        using var user = factory.CreateClient();
+        await user.LoginAsync(username, "haslo123");
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await user.PatchAsJsonAsync("/api/auth/password", new { currentPassword = "haslo123", newPassword = "abc" })).StatusCode);
+    }
+
+    // Struktura wydanego złożenia jest zamrożona jak jego właściwości; wydany element dalej
+    // można dopiąć jako komponent do złożenia w pracy.
+    [Fact]
+    public async Task Struktury_wydanego_zlozenia_nie_da_sie_zmienic()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var admin = factory.CreateClient();
+        await admin.LoginAsync("admin", "admin");
+        var projectId = await admin.CreateProjectAsync($"BOM wydany {Guid.NewGuid()}");
+        var released = await admin.CreateNodeAsync(projectId, "Rama", "assembly");
+        var part = await admin.CreateNodeAsync(projectId, "Plyta", "part");
+        var extra = await admin.CreateNodeAsync(projectId, "Sruba", "part");
+        (await admin.PostAsJsonAsync($"/api/items/{released}/children", new { childId = part })).EnsureSuccessStatusCode();
+        foreach (var status in new[] { "sprawdzany", "wydany" })
+            (await admin.PatchAsJsonAsync($"/api/items/{part}/status", new { status })).EnsureSuccessStatusCode();
+        foreach (var status in new[] { "sprawdzany", "wydany" })
+            (await admin.PatchAsJsonAsync($"/api/items/{released}/status", new { status })).EnsureSuccessStatusCode();
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync($"/api/items/{released}/children", new { childId = extra })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PatchAsJsonAsync($"/api/items/{released}/children/{part}/position", new { position = 2 })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.DeleteAsync($"/api/items/{released}/children/{part}")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync($"/api/projects/{projectId}/nodes",
+            new { name = "Nowa", itemType = "part", properties = new { rodzaj = "Wykonywana" }, parentId = released })).StatusCode);
+
+        // Wydane złożenie jako komponent nowego złożenia w pracy — dozwolone.
+        var parent = await admin.CreateNodeAsync(projectId, "Linia", "assembly");
+        (await admin.PostAsJsonAsync($"/api/items/{parent}/children", new { childId = released })).EnsureSuccessStatusCode();
+
+        // Po powrocie do "W pracy" struktura znów się zmienia.
+        (await admin.PatchAsJsonAsync($"/api/items/{released}/status", new { status = "w_pracy" })).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync($"/api/items/{released}/children", new { childId = extra })).EnsureSuccessStatusCode();
     }
 }

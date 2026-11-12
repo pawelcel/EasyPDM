@@ -425,6 +425,15 @@ administratora; w pozostałych `DocumentLabels` bierze tekst wbudowany dla skró
 Zapis pustego tekstu albo równego wbudowanemu usuwa wiersz, więc podpis dalej podąża za
 wbudowanym.
 
+Lista dzieci złożenia jest częścią tego, co się wydaje: `POST/DELETE .../children`,
+endpointy pozycji i kolejności oraz tworzenie elementu z `parentId` odrzucają rodzica poza
+`w_pracy` (`StructureEndpoints.StructureLocked`). Liczy się tylko status rodzica, więc
+wydany element dalej może zostać komponentem złożenia w pracy. `GET /api/items` przyjmuje
+opcjonalny `limit` (widok całej bazy wysyła 500) i ustawia `X-Truncated: true`, gdy
+pasowało więcej; bez niego lista jest pełna, czego oczekują makra i listy wyboru. Migracja
+070 dopisuje `texts` z katalogu do obróbek elementów w `w_pracy`, które ich nie miały;
+panel elementu pozwala ręcznie odświeżyć obróbkę różniącą się od katalogu.
+
 ### Zaznaczanie wielu elementów w drzewie
 
 Wiersze zaznacza się Ctrl (Cmd) + klikiem, obok starszego przycisku „Zaznacz wiele" i jego checkboxów — przycisk zostaje, bo na tablecie nie ma klawisza Ctrl. Ctrl+klik sam włącza tryb zaznaczania: checkboxy i belka akcji istnieją tylko w nim, więc pierwszy taki klik zaznaczałby inaczej coś, czego nie widać.
