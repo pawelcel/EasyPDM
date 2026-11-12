@@ -121,25 +121,37 @@ function ClientDetailPanel({
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 flex flex-col gap-2">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={save}
-            disabled={!editable}
-            className="text-[15px] font-semibold"
-            placeholder={t("common.name")}
-          />
-          <div className="flex-1 flex flex-col gap-1">
-            <Label htmlFor="client-location">{t("client.locationLabel")}</Label>
-            <Input
-              id="client-location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              onBlur={save}
-              disabled={!editable}
-              placeholder={t("client.locationPlaceholder")}
-            />
-          </div>
+          {/* Tylko do odczytu: zwykły tekst zamiast zablokowanych pól — wyszarzone pole wyglądało
+              na nieaktywne, a podpowiedź pustej lokalizacji („np. Warszawa”) na prawdziwą wartość. */}
+          {editable ? (
+            <>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={save}
+                className="text-[15px] font-semibold"
+                placeholder={t("common.name")}
+              />
+              <div className="flex-1 flex flex-col gap-1">
+                <Label htmlFor="client-location">{t("client.locationLabel")}</Label>
+                <Input
+                  id="client-location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  onBlur={save}
+                  placeholder={t("client.locationPlaceholder")}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[15px] font-semibold">{client.name}</div>
+              <div className="flex flex-col gap-1">
+                <Label>{t("client.locationLabel")}</Label>
+                <div className="text-sm">{client.location || "—"}</div>
+              </div>
+            </>
+          )}
           <FormError>{nameError}</FormError>
         </div>
         {editable && (

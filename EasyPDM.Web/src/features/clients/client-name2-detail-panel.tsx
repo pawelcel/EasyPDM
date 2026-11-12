@@ -140,25 +140,35 @@ function ClientName2DetailPanel({
           <div className="text-[15px] text-muted-foreground">
             {t("client.parentClientLabel")}: {parentClientName}
           </div>
-          <Input
-            value={name2}
-            onChange={(e) => setName2(e.target.value)}
-            onBlur={save}
-            disabled={!editable}
-            className="text-[15px] font-semibold"
-            placeholder={t("client.name2Label")}
-          />
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="client-name2-location">{t("client.locationLabel")}</Label>
-            <Input
-              id="client-name2-location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              onBlur={save}
-              disabled={!editable}
-              placeholder={t("client.locationPlaceholder")}
-            />
-          </div>
+          {editable ? (
+            <>
+              <Input
+                value={name2}
+                onChange={(e) => setName2(e.target.value)}
+                onBlur={save}
+                className="text-[15px] font-semibold"
+                placeholder={t("client.name2Label")}
+              />
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="client-name2-location">{t("client.locationLabel")}</Label>
+                <Input
+                  id="client-name2-location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  onBlur={save}
+                  placeholder={t("client.locationPlaceholder")}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[15px] font-semibold">{detail.name2}</div>
+              <div className="flex flex-col gap-1">
+                <Label>{t("client.locationLabel")}</Label>
+                <div className="text-sm">{detail.location || "—"}</div>
+              </div>
+            </>
+          )}
           <FormError>{nameError}</FormError>
         </div>
         {editable && (

@@ -408,13 +408,16 @@ function ManufacturerDetailPanel({
     <div>
       <div className="mb-1 flex items-start justify-between gap-2">
         <div className="flex-1">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={saveName}
-            disabled={!editable}
-            className="text-[15px] font-semibold"
-          />
+          {editable ? (
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={saveName}
+              className="text-[15px] font-semibold"
+            />
+          ) : (
+            <div className="py-1.5 text-[15px] font-semibold">{manufacturer.name}</div>
+          )}
           <FormError>{nameError}</FormError>
         </div>
         {editable && (
