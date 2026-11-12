@@ -11,6 +11,16 @@ All notable changes to EasyPDM are documented in this file.
 
 _0.8 will get point releases (0.8.x) as drawing sheets — title block templates filled in from EasyPDM — are created._
 
+**In short:** 0.8 is a development release that lays the groundwork for drawing title blocks filled in from EasyPDM. It adds:
+
+- **Processes** — a catalog of what is done to a part or assembly (cutting, bending, welding, hardening, painting…), picked per item and shown in the BOM and its CSV exports.
+- **Documentation in several languages** — company documentation languages, a main language per project, multilingual projects, and translated item names, processes and BOM headers.
+- **Title block data** — users' first and last names, a Company page with name and logo, and document labels translated per language.
+- **Administrator control** — optional admin-only releasing and admin-only catalog editing, tag management across the whole database, and revocable login tokens for CAD macros.
+- **Safety and reliability** — assembly structure locked outside In progress, names locked once a CAD file uses them, backups and restores that work across servers and large storage, and stronger password rules.
+
+Details of every change follow.
+
 ### Added
 - **CAD macros log in with their own revocable token.** Each macro login (FreeCAD, SolidWorks, Inventor) now gets a separate token instead of a browser session; Settings → Users lists the logged-in macros with when each was last used and can sign out any of them, and changing a user's password signs out all their macros. Opening the browser from a macro starts its own browser session. The updated macros fall back to the old login on a server older than 0.8, and older macros keep working with this server.
 - **Items in progress get translations for processes picked before 0.8.** An update migration adds the catalog's translations to their processes; released items are left as they were.
