@@ -1198,6 +1198,14 @@ right after logging in.
    `ScheduledBackupService` in the background, saved to a separate `backups/` directory
    (independent of `storage/`, so a backup doesn't pack itself), with a configurable
    number of kept recent copies (14 by default — older ones are automatically deleted).
+   Restoring runs `pg_restore` as the connection string's role with `--no-owner
+   --no-privileges` (a backup from another deployment has another owner and other GRANTs),
+   then applies pending migrations at once, so a backup from an older version is usable
+   without a restart. File paths in the database are absolute, so the backup ZIP carries
+   `storage-root.txt` and the restore rewrites every path column listed in
+   `StoragePaths.FileTables` onto this server's storage; for older backups without that
+   file each path is found by its tail inside the restored storage. Moving the storage
+   uses the same table list.
    One CAD file per revision comes from the file names the macros give
    (`record name.REVISION.ext`, in all three macros, uploaded over HTTP or, in SolidWorks and
    Inventor, registered in `storage/components/`): the same name replaces that revision's file and a new

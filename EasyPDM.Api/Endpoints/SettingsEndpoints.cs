@@ -76,14 +76,10 @@ static class SettingsEndpoints
                 await conn.OpenAsync();
                 await using var tx = await conn.BeginTransactionAsync();
 
-                await RewriteFilePathsAsync(conn, tx, "items", oldPath, newPath);
-                await RewriteFilePathsAsync(conn, tx, "item_attachments", oldPath, newPath);
-                // client_nodes (dokumenty Klientów, zob. ClientEndpoints.cs) ma dokładnie ten
-                // sam kształt (id UUID + file_path TEXT) — bez tego wpisu pliki fizycznie
-                // przenoszone przez CopyDirectoryRecursive wyżej (obejmuje CAŁY storage.Path,
-                // w tym podkatalog "clients/") zostawałyby z file_path wskazującym na STARĄ,
-                // zaraz kasowaną lokalizację — każdy dokument Klienta 404-owałby trwale.
-                await RewriteFilePathsAsync(conn, tx, "client_nodes", oldPath, newPath);
+                // Wszystkie tabele ze ścieżkami (StoragePaths.FileTables) — pominięta tabela
+                // zostawiłaby file_path wskazujące na STARĄ, zaraz kasowaną lokalizację, i jej
+                // pliki 404-owałyby trwale (tak było z załącznikami projektu i weryfikacji).
+                await StoragePaths.RelocateAllAsync(conn, tx, oldPath, newPath, File.Exists);
 
                 await tx.CommitAsync();
 
@@ -355,18 +351,24 @@ static class SettingsEndpoints
                 psi.ArgumentList.Add(csb.Host ?? "localhost");
                 psi.ArgumentList.Add("-p");
                 psi.ArgumentList.Add((csb.Port == 0 ? 5432 : csb.Port).ToString());
-                // Tabele w tej bazie należą do "postgres" (schemat był zakładany tą rolą —
-                // ten sam powód, dla którego część migracji w db/migrations/ wymaga
-                // uruchomienia jako "postgres", nie zwykłego pdm_user z connection stringa).
-                // --clean musi więc łączyć się jako właściciel, inaczej DROP/CREATE każdej
-                // tabeli kończy się błędem "must be owner of table" i restore nic nie zmienia.
+                // Rola i hasło z connection stringa, jak przy pg_dump. Wcześniej było tu na sztywno
+                // "postgres" bez hasła, z czasów gdy schemat zakładała ta rola; od 0.6 ładuje go rola
+                // aplikacji (pdm_user w Dockerze i na Windows, easypdm w instalacji natywnej) i to
+                // ona jest właścicielem tabel. Roli "postgres" bez hasła w tych wdrożeniach nie ma,
+                // więc przywracanie kończyło się błędem logowania.
                 psi.ArgumentList.Add("-U");
-                psi.ArgumentList.Add("postgres");
+                psi.ArgumentList.Add(csb.Username ?? "");
                 psi.ArgumentList.Add("-d");
                 psi.ArgumentList.Add(csb.Database ?? "");
                 psi.ArgumentList.Add("--clean");
                 psi.ArgumentList.Add("--if-exists");
+                // Kopia z innego wdrożenia ma innego właściciela i inne GRANT-y (np. pdm_user
+                // zamiast easypdm). Obiekty mają należeć do roli, która przywraca, a uprawnienia
+                // właściciel ma z urzędu — bez tych opcji każdy cudzy ALTER OWNER/GRANT to błąd.
+                psi.ArgumentList.Add("--no-owner");
+                psi.ArgumentList.Add("--no-privileges");
                 psi.ArgumentList.Add(dumpPath);
+                psi.Environment["PGPASSWORD"] = csb.Password ?? "";
 
                 using var process = Process.Start(psi)
                     ?? throw new InvalidOperationException("Nie udało się uruchomić pg_restore.");
@@ -423,7 +425,36 @@ static class SettingsEndpoints
                     filesRestored = CopyDirectoryRecursive(storageBackupDir, storage.Path);
                 }
 
-                return Results.Ok(new { success = process.ExitCode == 0, warnings = stderr, filesRestored });
+                // Kopia mogła powstać w starszej wersji programu. Migracje wykonuje się przy starcie,
+                // więc bez tego baza zostawała ze starym schematem aż do restartu i program sypał
+                // błędami na brakujących kolumnach.
+                try
+                {
+                    await MigrationRunner.ApplyPendingMigrationsAsync(connectionString, app.Logger);
+                }
+                catch (Exception ex)
+                {
+                    return Results.Problem(
+                        "Baza i pliki zostały przywrócone, ale dostosowanie bazy do tej wersji programu " +
+                        $"nie powiodło się: {ex.Message}. Szczegóły w logach programu.");
+                }
+
+                // Ścieżki plików w bazie wskazują katalog magazynu z serwera, na którym zrobiono
+                // kopię. Na tym serwerze magazyn może leżeć gdzie indziej — wtedy każdy plik dawał
+                // 404. Po migracjach, bo dopiero wtedy istnieją wszystkie tabele ze ścieżkami.
+                var rootEntryPath = Path.Combine(extractDir, StorageRootEntry);
+                var oldRoot = File.Exists(rootEntryPath) ? (await File.ReadAllTextAsync(rootEntryPath)).Trim() : null;
+                int pathsRewritten, filesMissing;
+                await using (var pathConn = new NpgsqlConnection(connectionString))
+                {
+                    await pathConn.OpenAsync();
+                    await using var pathTx = await pathConn.BeginTransactionAsync();
+                    (pathsRewritten, filesMissing) = await StoragePaths.RelocateAllAsync(
+                        pathConn, pathTx, string.IsNullOrEmpty(oldRoot) ? null : oldRoot, storage.Path, File.Exists);
+                    await pathTx.CommitAsync();
+                }
+
+                return Results.Ok(new { success = process.ExitCode == 0, warnings = stderr, filesRestored, pathsRewritten, filesMissing });
             }
             finally
             {
@@ -765,6 +796,12 @@ static class SettingsEndpoints
             using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
             {
                 zip.CreateEntryFromFile(dumpPath, "database.dump");
+                // Katalog magazynu w chwili kopii — ścieżki plików w bazie są bezwzględne, więc
+                // przywrócenie na serwerze z innym katalogiem magazynu musi wiedzieć, jaki
+                // początek ścieżki podmienić (zob. StoragePaths.Relocate).
+                var rootEntry = zip.CreateEntry(StorageRootEntry);
+                await using (var writer = new StreamWriter(rootEntry.Open()))
+                    await writer.WriteAsync(storage.Path);
                 if (Directory.Exists(storage.Path))
                 {
                     foreach (var file in Directory.EnumerateFiles(storage.Path, "*", SearchOption.AllDirectories))
@@ -818,33 +855,6 @@ static class SettingsEndpoints
         return count;
     }
 
-    // "table" jest zawsze jedną z dwóch literalnych, stałych wartości podanych niżej w tym
-    // pliku (nigdy danymi od użytkownika), więc budowanie z niej SQL-a przez interpolację
-    // jest tu bezpieczne.
-    private static async Task RewriteFilePathsAsync(
-        NpgsqlConnection conn, NpgsqlTransaction tx, string table, string oldRoot, string newRoot)
-    {
-        var rows = new List<(Guid Id, string OldPath)>();
-        await using (var selectCmd = new NpgsqlCommand($"SELECT id, file_path FROM {table} WHERE file_path IS NOT NULL;", conn, tx))
-        {
-            await using var reader = await selectCmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-                rows.Add((reader.GetGuid(0), reader.GetString(1)));
-        }
-
-        foreach (var (id, oldFilePath) in rows)
-        {
-            if (!oldFilePath.StartsWith(oldRoot, StringComparison.Ordinal))
-                continue;
-
-            var newFilePath = newRoot + oldFilePath[oldRoot.Length..];
-            await using var updateCmd = new NpgsqlCommand($"UPDATE {table} SET file_path = @newPath WHERE id = @id;", conn, tx);
-            updateCmd.Parameters.AddWithValue("newPath", newFilePath);
-            updateCmd.Parameters.AddWithValue("id", id);
-            await updateCmd.ExecuteNonQueryAsync();
-        }
-    }
-
     private static async Task PersistStorageRootAsync(string appSettingsPath, string newPath)
     {
         // Plik może jeszcze nie istnieć (typowe dla appsettings.Local.json na "czystej"
@@ -855,6 +865,8 @@ static class SettingsEndpoints
         node["StorageRoot"] = newPath;
         await File.WriteAllTextAsync(appSettingsPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
+
+    private const string StorageRootEntry = "storage-root.txt";
 
     private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
 }

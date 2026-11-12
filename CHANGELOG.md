@@ -24,6 +24,10 @@ All notable changes to EasyPDM are documented in this file.
 - **An item's name can no longer be changed once it has a file in a dedicated slot**, just like its kind. The name is part of the CAD file's name, e.g. `C0005(plate).A.sldprt`, so a new name would no longer match the file on disk or what the CAD macros look for. The field is greyed out with an explanation, and the server refuses the change. Items created without the name in their record name, e.g. `C0005.A.sldprt`, can still be renamed.
 
 ### Fixed
+- **Restoring a backup works in Docker and native installs.** It logged in to the database as `postgres` without a password, a role those deployments do not have; it now uses the application's own database account, and a backup from another installation, owned by a different role, restores cleanly.
+- **A restored backup from an older version works without a restart.** The database is brought up to date right after restoring instead of at the next start, which left the program failing on missing columns until then.
+- **Files open after restoring a backup on a different server.** The backup now records where its file storage was, and restoring points every file at this server's storage, so files no longer return "not found" when the storage folder differs; older backups are matched file by file.
+- **Moving the file storage keeps project documents and client verification files.** Order documents (quotes, confirmations) and files attached to client verifications were left pointing at the old, deleted location after moving the storage in Settings.
 - **A tag with a slash in its name can be removed from an item.** Removing a tag such as `a/b` did nothing, because the slash arrived encoded in the address and matched no tag; it is now removed like any other.
 - **A link straight to an administrator's settings page opens that page.** Opening or refreshing an address such as `?view=settings&section=users` sent an administrator to Appearance, because the page checked the rights before it knew who was logged in. Ordinary users are still sent to Appearance.
 

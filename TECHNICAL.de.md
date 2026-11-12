@@ -982,7 +982,15 @@ Sie dieses Passwort sofort nach der Anmeldung.
    vom `ScheduledBackupService` geprüft, gespeichert in einem separaten Verzeichnis
    `backups/` (unabhängig von `storage/`, damit eine Sicherung sich nicht selbst
    einpackt), mit einer konfigurierbaren Anzahl aufbewahrter letzter Kopien
-   (standardmäßig 14 — ältere werden automatisch gelöscht). Eine CAD-Datei pro Revision ergibt sich aus den Dateinamen der Makros
+   (standardmäßig 14 — ältere werden automatisch gelöscht). Die Wiederherstellung führt
+   `pg_restore` mit der Rolle aus dem Connection-String und `--no-owner --no-privileges` aus
+   (eine Sicherung aus einer anderen Installation hat einen anderen Eigentümer und andere
+   GRANTs) und wendet danach sofort ausstehende Migrationen an, sodass eine Sicherung aus einer
+   älteren Version ohne Neustart nutzbar ist. Dateipfade in der Datenbank sind absolut, daher
+   enthält das Sicherungs-ZIP `storage-root.txt`, und die Wiederherstellung schreibt jede
+   Pfadspalte aus `StoragePaths.FileTables` auf den Speicher dieses Servers um; bei älteren
+   Sicherungen ohne diese Datei wird jeder Pfad über sein Ende im wiederhergestellten Speicher
+   gefunden. Das Verschieben des Speichers nutzt dieselbe Tabellenliste. Eine CAD-Datei pro Revision ergibt sich aus den Dateinamen der Makros
    (`Datensatzname.REVISION.Endung`, in allen dreien, per HTTP-Upload oder, in SolidWorks und
    Inventor, per Registrierung in `storage/components/`): Derselbe Name ersetzt die Datei dieser
    Revision, ein neuer steht daneben. Eine von Hand unter demselben Namen in einen CAD-Platz

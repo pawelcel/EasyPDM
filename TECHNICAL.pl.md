@@ -891,7 +891,14 @@ razu po zalogowaniu.
    oraz dnia i godziny — sprawdzane co minutę przez `ScheduledBackupService` w tle, zapisywane
    do osobnego katalogu `backups/` (niezależnego od `storage/`, żeby kopia nie pakowała samej
    siebie), z konfigurowalną liczbą przechowywanych ostatnich kopii (domyślnie 14 — starsze
-   są automatycznie kasowane). Jeden plik CAD na rewizję wynika z nazw nadawanych przez makra
+   są automatycznie kasowane). Przywracanie uruchamia `pg_restore` rolą z connection stringa
+   z `--no-owner --no-privileges` (kopia z innego wdrożenia ma innego właściciela i inne
+   GRANT-y), po czym od razu wykonuje zaległe migracje, więc kopia ze starszej wersji działa
+   bez restartu. Ścieżki plików w bazie są bezwzględne, dlatego ZIP kopii zawiera
+   `storage-root.txt`, a przywracanie przepisuje każdą kolumnę ścieżek z
+   `StoragePaths.FileTables` na magazyn tego serwera; w starszych kopiach bez tego pliku
+   każda ścieżka jest odnajdywana po końcówce w przywróconym magazynie. Przenoszenie magazynu
+   korzysta z tej samej listy tabel. Jeden plik CAD na rewizję wynika z nazw nadawanych przez makra
    (`nazwa rekordu.REWIZJA.rozszerzenie`, we wszystkich trzech, przy wysyłce HTTP albo, w
    SolidWorksie i Inventorze, przy rejestracji w `storage/components/`): ta sama nazwa zastępuje plik tej rewizji, a nowa
    staje obok. Plik dołączony ręcznie do miejsca CAD pod tą samą nazwą zastępuje poprzedni,

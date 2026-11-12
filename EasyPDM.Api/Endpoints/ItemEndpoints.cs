@@ -341,7 +341,12 @@ static class ItemEndpoints
                 )
                 RETURNING item_number, item_number_prefix, item_number_digits, item_number_with_name;
                 """;
-            await using var insertCmd = new NpgsqlCommand(insertSql, conn);
+            // Element, wpis w katalogu materiałów i relacja z rodzicem powstają razem albo wcale.
+            // Bez transakcji błąd przy relacji (np. rodzic usunięty w międzyczasie) zostawiał
+            // element z show_in_tree = false i bez rodzica -- niewidoczny w drzewie projektu,
+            // a z zajętym numerem.
+            await using var tx = await conn.BeginTransactionAsync();
+            await using var insertCmd = new NpgsqlCommand(insertSql, conn, tx);
             insertCmd.Parameters.AddWithValue("id", itemId);
             insertCmd.Parameters.AddWithValue("projectId", (object?)projectId ?? DBNull.Value);
             insertCmd.Parameters.AddWithValue("itemType", body.ItemType);
@@ -363,7 +368,7 @@ static class ItemEndpoints
             // wtedy katalog może go jeszcze nie znać -- zob. MaterialCatalog. Po utworzeniu, bo
             // wpis w katalogu ma sens tylko dla elementu, który naprawdę powstał.
             if (body.Properties.HasValue)
-                await MaterialCatalog.EnsureFromPropertiesAsync(body.Properties.Value, conn);
+                await MaterialCatalog.EnsureFromPropertiesAsync(body.Properties.Value, conn, tx);
 
             if (body.ParentId is not null)
             {
@@ -374,11 +379,22 @@ static class ItemEndpoints
                         @parentId, @childId, 1,
                         COALESCE((SELECT MAX(position) FROM item_relations WHERE parent_id = @parentId), 0) + 1
                     );
-                    """, conn);
+                    """, conn, tx);
                 relCmd.Parameters.AddWithValue("parentId", body.ParentId.Value);
                 relCmd.Parameters.AddWithValue("childId", itemId);
-                await relCmd.ExecuteNonQueryAsync();
+                try
+                {
+                    await relCmd.ExecuteNonQueryAsync();
+                }
+                catch (PostgresException ex) when (ex.SqlState == "23503")
+                {
+                    // Rodzic zniknął między sprawdzeniem a zapisem -- transakcja wycofuje też
+                    // sam element, więc nie zostaje po nim żaden ślad.
+                    return Results.NotFound("Element nadrzędny nie istnieje.");
+                }
             }
+
+            await tx.CommitAsync();
 
             // Zamyka pętlę dla makra CAD, które otworzyło przeglądarkę i teraz odpytuje
             // GET /create-tickets/{ticket} — zob. CreateTicketStore.cs. Czysto addytywne,
