@@ -50,6 +50,20 @@ CREATE TABLE projects (
     is_sample   BOOLEAN NOT NULL DEFAULT false  -- projekt startowy zasiany przez EnsureSampleProjectAsync (Program.cs)
 );
 
+-- Tokeny makr CAD: osobne od sesji przeglądarki, odwoływalne, w bazie tylko skrót SHA-256
+-- (zob. migracja 071).
+CREATE TABLE macro_tokens (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash    TEXT NOT NULL UNIQUE,
+    client        TEXT NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_used_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at    TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX macro_tokens_user_idx ON macro_tokens (user_id);
+
 -- Przypisania użytkowników do projektów — zwykły użytkownik ("user") widzi i może
 -- przeglądać strukturę tylko przypisanych projektów; administrator zawsze widzi wszystko
 -- (sprawdzane w kodzie aplikacji, nie tutaj).

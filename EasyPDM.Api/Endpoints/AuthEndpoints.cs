@@ -72,73 +72,122 @@ static class AuthEndpoints
         cmd.Parameters.AddWithValue("userId", userId);
         cmd.Parameters.Add(new NpgsqlParameter("except", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object?)exceptToken ?? DBNull.Value });
         await cmd.ExecuteNonQueryAsync();
+        // Tokeny makr też — po zmianie hasła makra logują się nowym (zob. migracja 071).
+        await using var macroCmd = new NpgsqlCommand("DELETE FROM macro_tokens WHERE user_id = @userId;", conn);
+        macroCmd.Parameters.AddWithValue("userId", userId);
+        await macroCmd.ExecuteNonQueryAsync();
     }
 
     public static string? CurrentSessionToken(HttpContext ctx) =>
         ctx.Request.Cookies.TryGetValue(CookieName, out var token) && !string.IsNullOrEmpty(token) ? token : null;
+
+    // Sprawdza nazwę użytkownika i hasło z blokadą po serii pomyłek. Wspólne dla logowania
+    // przeglądarki i makr — ta sama ochrona przed zgadywaniem haseł na obu drogach.
+    private static async Task<(CurrentUser? User, IResult? Error)> VerifyCredentialsAsync(
+        NpgsqlConnection conn, string? username, string? password)
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            return (null, Results.BadRequest("Enter a username and password."));
+
+        if (FailedAttempts.TryGetValue(username, out var attemptState))
+        {
+            DateTime lockedUntil;
+            lock (attemptState) { lockedUntil = attemptState.LockedUntil; }
+            if (lockedUntil > DateTime.UtcNow)
+                return (null, Results.Text(
+                    "Too many failed login attempts. Try again in a few minutes.",
+                    statusCode: StatusCodes.Status429TooManyRequests));
+        }
+
+        CurrentUser user;
+        string passwordHash;
+        await using (var cmd = new NpgsqlCommand(
+            "SELECT id, username, display_name, role, password_hash FROM users WHERE username = @username;", conn))
+        {
+            cmd.Parameters.AddWithValue("username", username);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            // Ten sam komunikat dla złego loginu i złego hasła — nie zdradzamy, które z nich.
+            if (!await reader.ReadAsync())
+            {
+                RecordFailedLogin(username);
+                return (null, Results.BadRequest("Incorrect username or password."));
+            }
+            user = new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3));
+            passwordHash = reader.GetString(4);
+        }
+
+        if (!PasswordHasher.Verify(password, passwordHash))
+        {
+            RecordFailedLogin(username);
+            return (null, Results.BadRequest("Incorrect username or password."));
+        }
+
+        FailedAttempts.TryRemove(username, out _);
+        return (user, null);
+    }
+
+    // Nowa sesja przeglądarki dla użytkownika (logowanie i most z makra do przeglądarki).
+    private static async Task<(string Token, DateTime ExpiresAt)> CreateSessionAsync(NpgsqlConnection conn, Guid userId)
+    {
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var expiresAt = DateTime.UtcNow.Add(SessionLifetime);
+
+        // Wygasłe sesje nigdy nie były usuwane — tabela tylko rosła. Logowanie jest rzadkie,
+        // więc to dobry moment na sprzątanie, bez osobnej usługi w tle.
+        await using (var cleanup = new NpgsqlCommand("DELETE FROM sessions WHERE expires_at < now();", conn))
+            await cleanup.ExecuteNonQueryAsync();
+
+        await using var cmd = new NpgsqlCommand(
+            "INSERT INTO sessions (token, user_id, expires_at) VALUES (@token, @userId, @expiresAt);", conn);
+        cmd.Parameters.AddWithValue("token", token);
+        cmd.Parameters.AddWithValue("userId", userId);
+        cmd.Parameters.AddWithValue("expiresAt", expiresAt);
+        await cmd.ExecuteNonQueryAsync();
+        return (token, expiresAt);
+    }
+
+    private static readonly TimeSpan MacroTokenLifetime = TimeSpan.FromDays(365);
+
+    // Tokeny makr trzymane są w bazie tylko jako skrót SHA-256 (zob. migracja 071).
+    internal static string HashMacroToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
+
+    // Użytkownik dla tokenu makra (null = nieznany albo wygasły). Znacznik ostatniego użycia
+    // odświeżany najwyżej co 5 minut — makro wysyła dziesiątki zapytań na jedną wysyłkę, a lista w
+    // ustawieniach potrzebuje tylko przybliżonego "kiedy ostatnio".
+    private static async Task<CurrentUser?> ValidateMacroTokenAsync(NpgsqlConnection conn, string token)
+    {
+        await using var cmd = new NpgsqlCommand("""
+            WITH hit AS (
+                UPDATE macro_tokens SET last_used_at = now()
+                WHERE token_hash = @hash AND expires_at > now() AND last_used_at < now() - interval '5 minutes'
+                RETURNING user_id
+            )
+            SELECT u.id, u.username, u.display_name, u.role
+            FROM macro_tokens m JOIN users u ON u.id = m.user_id
+            WHERE m.token_hash = @hash AND m.expires_at > now();
+            """, conn);
+        cmd.Parameters.AddWithValue("hash", HashMacroToken(token));
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3))
+            : null;
+    }
 
     public static void MapAuthEndpoints(this WebApplication app, string connectionString, BrowserBridgeTicketStore ticketStore)
     {
         // POST /api/auth/login   body: { "username": "...", "password": "..." }
         app.MapPost("/api/auth/login", async (HttpContext ctx, LoginRequest body) =>
         {
-            if (string.IsNullOrWhiteSpace(body.Username) || string.IsNullOrWhiteSpace(body.Password))
-                return Results.BadRequest("Enter a username and password.");
-
-            if (FailedAttempts.TryGetValue(body.Username, out var attemptState))
-            {
-                DateTime lockedUntil;
-                lock (attemptState) { lockedUntil = attemptState.LockedUntil; }
-                if (lockedUntil > DateTime.UtcNow)
-                    return Results.Text(
-                        "Too many failed login attempts. Try again in a few minutes.",
-                        statusCode: StatusCodes.Status429TooManyRequests);
-            }
-
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            CurrentUser user;
-            string passwordHash;
-            await using (var cmd = new NpgsqlCommand(
-                "SELECT id, username, display_name, role, password_hash FROM users WHERE username = @username;", conn))
-            {
-                cmd.Parameters.AddWithValue("username", body.Username);
-                await using var reader = await cmd.ExecuteReaderAsync();
-                // Ten sam komunikat dla złego loginu i złego hasła — nie zdradzamy, które z nich.
-                if (!await reader.ReadAsync())
-                {
-                    RecordFailedLogin(body.Username);
-                    return Results.BadRequest("Incorrect username or password.");
-                }
-                user = new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3));
-                passwordHash = reader.GetString(4);
-            }
+            var (verified, error) = await VerifyCredentialsAsync(conn, body.Username, body.Password);
+            if (verified is null)
+                return error!;
+            var user = verified;
 
-            if (!PasswordHasher.Verify(body.Password, passwordHash))
-            {
-                RecordFailedLogin(body.Username);
-                return Results.BadRequest("Incorrect username or password.");
-            }
-
-            FailedAttempts.TryRemove(body.Username, out _);
-
-            var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-            var expiresAt = DateTime.UtcNow.Add(SessionLifetime);
-
-            // Wygasłe sesje nigdy nie były usuwane — tabela tylko rosła. Logowanie jest rzadkie,
-            // więc to dobry moment na sprzątanie, bez osobnej usługi w tle.
-            await using (var cleanup = new NpgsqlCommand("DELETE FROM sessions WHERE expires_at < now();", conn))
-                await cleanup.ExecuteNonQueryAsync();
-
-            await using (var cmd = new NpgsqlCommand(
-                "INSERT INTO sessions (token, user_id, expires_at) VALUES (@token, @userId, @expiresAt);", conn))
-            {
-                cmd.Parameters.AddWithValue("token", token);
-                cmd.Parameters.AddWithValue("userId", user.Id);
-                cmd.Parameters.AddWithValue("expiresAt", expiresAt);
-                await cmd.ExecuteNonQueryAsync();
-            }
+            var (token, expiresAt) = await CreateSessionAsync(conn, user.Id);
 
             ctx.Response.Cookies.Append(CookieName, token, new CookieOptions
             {
@@ -166,6 +215,60 @@ static class AuthEndpoints
         });
 
         // POST /api/auth/logout
+        // POST /api/auth/macro-login   body: { username, password, client }
+        // Logowanie makra CAD: wydaje osobny token makra (zob. migracja 071), widoczny i
+        // odwoływalny w Ustawienia -> Użytkownicy, zamiast sesji przeglądarki. Odpowiedź ma ten
+        // sam kształt co /auth/login — token w polu "sessionToken" i w ciasteczku pdm_session —
+        // żeby makra (także VBA, które czyta pole z JSON-a) zmieniły tylko adres logowania.
+        // Ciasteczko to tylko nośnik dla makra; przeglądarka i tak loguje się przez /auth/login.
+        app.MapPost("/api/auth/macro-login", async (HttpContext ctx, MacroLoginRequest body) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            var (user, error) = await VerifyCredentialsAsync(conn, body.Username, body.Password);
+            if (user is null)
+                return error!;
+
+            var token = "pdmm_" + Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            var expiresAt = DateTime.UtcNow.Add(MacroTokenLifetime);
+            var client = string.IsNullOrWhiteSpace(body.Client) ? "CAD macro" : body.Client.Trim();
+            if (client.Length > 100) client = client[..100];
+
+            await using (var cleanup = new NpgsqlCommand("DELETE FROM macro_tokens WHERE expires_at < now();", conn))
+                await cleanup.ExecuteNonQueryAsync();
+            await using (var cmd = new NpgsqlCommand("""
+                INSERT INTO macro_tokens (user_id, token_hash, client, expires_at)
+                VALUES (@userId, @hash, @client, @expiresAt);
+                """, conn))
+            {
+                cmd.Parameters.AddWithValue("userId", user.Id);
+                cmd.Parameters.AddWithValue("hash", HashMacroToken(token));
+                cmd.Parameters.AddWithValue("client", client);
+                cmd.Parameters.AddWithValue("expiresAt", expiresAt);
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            ctx.Response.Cookies.Append(CookieName, token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = ctx.Request.IsHttps,
+                SameSite = SameSiteMode.Strict,
+                Expires = expiresAt,
+                Path = "/",
+            });
+
+            return Results.Ok(new
+            {
+                id = user.Id,
+                username = user.Username,
+                displayName = user.DisplayName,
+                role = user.Role,
+                sessionToken = token,
+                macroToken = token,
+            });
+        });
+
         app.MapPost("/api/auth/logout", async (HttpContext ctx) =>
         {
             if (ctx.Request.Cookies.TryGetValue(CookieName, out var token) && !string.IsNullOrEmpty(token))
@@ -175,6 +278,10 @@ static class AuthEndpoints
                 await using var cmd = new NpgsqlCommand("DELETE FROM sessions WHERE token = @token;", conn);
                 cmd.Parameters.AddWithValue("token", token);
                 await cmd.ExecuteNonQueryAsync();
+                // Wylogowanie makra (ten sam endpoint, ten sam nośnik) odwołuje jego token.
+                await using var macroCmd = new NpgsqlCommand("DELETE FROM macro_tokens WHERE token_hash = @hash;", conn);
+                macroCmd.Parameters.AddWithValue("hash", HashMacroToken(token));
+                await macroCmd.ExecuteNonQueryAsync();
             }
 
             ctx.Response.Cookies.Delete(CookieName, new CookieOptions { Path = "/" });
@@ -218,6 +325,27 @@ static class AuthEndpoints
             var target = SanitizeRedirect(redirect);
 
             var token = string.IsNullOrEmpty(ticket) ? null : ticketStore.TryConsume(ticket);
+            // Bilet wydany makru (token makra) zakłada przeglądarce WŁASNĄ sesję — token makra
+            // nie trafia do przeglądarki, a wylogowanie przeglądarki nie wylogowuje makra.
+            if (token is not null && token.StartsWith("pdmm_", StringComparison.Ordinal))
+            {
+                await using var conn = new NpgsqlConnection(connectionString);
+                await conn.OpenAsync();
+                var macroUser = await ValidateMacroTokenAsync(conn, token);
+                token = null;
+                if (macroUser is not null)
+                {
+                    var (browserToken, browserExpires) = await CreateSessionAsync(conn, macroUser.Id);
+                    ctx.Response.Cookies.Append(CookieName, browserToken, new CookieOptions
+                    {
+                        HttpOnly = true,
+                        Secure = ctx.Request.IsHttps,
+                        SameSite = SameSiteMode.Lax,
+                        Expires = browserExpires,
+                        Path = "/",
+                    });
+                }
+            }
             if (token is not null)
             {
                 var session = await ValidateToken(connectionString, token);
@@ -293,7 +421,13 @@ static class AuthEndpoints
             return null;
 
         var session = await ValidateToken(connectionString, token);
-        return session?.User;
+        if (session is not null)
+            return session.Value.User;
+        if (!token.StartsWith("pdmm_", StringComparison.Ordinal))
+            return null;
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync();
+        return await ValidateMacroTokenAsync(conn, token);
     }
 
     // Współdzielone przez GetCurrentUser (ciasteczko) i /auth/browser-login (token z URL) —
@@ -344,4 +478,5 @@ static class AuthEndpoints
 
 record CurrentUser(Guid Id, string Username, string DisplayName, string Role);
 record LoginRequest(string Username, string Password);
+record MacroLoginRequest(string? Username, string? Password, string? Client);
 record ChangePasswordRequest(string CurrentPassword, string NewPassword);

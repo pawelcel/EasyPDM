@@ -96,6 +96,7 @@ app.Use(async (context, next) =>
 {
     if (context.Request.Path.StartsWithSegments("/api") &&
         !context.Request.Path.StartsWithSegments("/api/auth/login") &&
+        !context.Request.Path.StartsWithSegments("/api/auth/macro-login") &&
         !context.Request.Path.StartsWithSegments("/api/auth/browser-login"))
     {
         var user = await AuthEndpoints.GetCurrentUser(context, connectionString);
@@ -149,6 +150,7 @@ app.MapProjectLanguageEndpoints(connectionString);
 app.MapItemNameEndpoints(connectionString);
 app.MapCompanyEndpoints(connectionString);
 app.MapDocumentLabelEndpoints(connectionString);
+app.MapMacroTokenEndpoints(connectionString);
 app.MapManufacturerEndpoints(connectionString);
 app.MapClientEndpoints(connectionString, storage);
 app.MapSavedFilterEndpoints(connectionString);

@@ -644,6 +644,17 @@ unberührt — ein Element speichert Material und Bearbeitungen selbst. `GET
 /api/settings/catalog-policy` darf jeder lesen, damit die Katalogansichten ihre
 Bearbeitungselemente ausblenden können.
 
+CAD-Makros melden sich über `POST /api/auth/macro-login` an (`macro_tokens`, Migration
+071): ein zufälliges Token `pdmm_…`, in der Datenbank nur als SHA-256-Hash, ein Jahr
+gültig, unter Einstellungen → Benutzer aufgelistet und widerrufbar und bei einer
+Passwortänderung gelöscht. Die Antwort hat dieselbe Form wie `/auth/login`, und das Token
+reist im selben Cookie `pdm_session`, sodass die Makros nur ihre Anmelde-URL geändert
+haben (mit Rückfall auf `/auth/login` bei 404 auf älteren Servern); die Middleware
+akzeptiert eine Sitzung oder ein Makro-Token. `/auth/logout` widerruft auch ein
+Makro-Token. Ein für ein Makro-Token ausgestelltes Browser-Brücken-Ticket lässt
+`/auth/browser-login` eine eigene Browsersitzung anlegen, sodass das Makro-Token nie im
+Browser landet.
+
 Wenn die Tabelle `users` beim Start der API leer ist, legt sie selbst ein Standardkonto
 **`admin` / `admin`** an (siehe Konsole beim ersten Start) — ändern Sie dieses Passwort
 sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwendung).
@@ -680,6 +691,8 @@ Meldung des Servers unverändert.
 | GET/PATCH | `/api/auth/me` \| `/password` | Daten des angemeldeten Benutzers / Änderung des EIGENEN Passworts |
 | POST | `/api/auth/browser-bridge-ticket` | stellt ein einmaliges, kurzlebiges Anmelde-Ticket für die eigene Sitzung des Aufrufers aus |
 | GET | `/api/auth/browser-login` | tauscht ein Anmelde-Ticket (nicht das rohe Sitzungstoken) gegen ein Browser-Cookie, für CAD-Makros (öffnet den Browser bereits angemeldet) |
+| POST | `/api/auth/macro-login` | Anmeldung eines CAD-Makros — eigenes, widerrufbares Makro-Token in derselben Antwortform wie `/auth/login` |
+| GET/DELETE | `/api/macro-tokens[/{id}]` | Tokens angemeldeter Makros — der Administrator sieht und widerruft alle, ein Benutzer nur seine eigenen |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | Kontenverwaltung — **nur Administrator** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | Liste/Erstellung/Bearbeitung/Löschung eines Projekts (Schreiben — nur Administrator; Liste nach Zugriff gefiltert) |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | Verwaltung von Benutzer-Projekt-Zuweisungen — **nur Administrator** |

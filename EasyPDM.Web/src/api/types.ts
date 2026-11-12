@@ -259,6 +259,18 @@ export interface DocumentLabel {
   baseText: string
 }
 
+// Token makra CAD (Ustawienia -> Użytkownicy): kto, z którego makra, kiedy ostatnio użyty.
+export interface MacroToken {
+  id: string
+  userId: string
+  username: string
+  displayName: string
+  client: string
+  createdAt: string
+  lastUsedAt: string
+  expiresAt: string
+}
+
 // Ustawienia -> Tagi (administrator): tag z liczbą elementów, które go noszą.
 export interface TagUsage {
   name: string

@@ -882,23 +882,37 @@ def api_login(username, password):
     ten sam mechanizm co ApiBaseUrl, więc logowanie przetrwa restart FreeCAD, dopóki sesja
     jest ważna po stronie serwera (30 dni, tak samo jak w aplikacji webowej). Zwraca dict
     użytkownika ({"username", "displayName", "role", ...}, tak jak POST /api/auth/login)."""
-    data = json.dumps({"username": username, "password": password}).encode("utf-8")
-    req = request.Request(
-        get_base_url() + "/auth/login", data=data, method="POST",
-        headers={"Content-Type": "application/json"},
-    )
-    try:
+    # Logowanie makra (POST /api/auth/macro-login) daje osobny token makra — widoczny i
+    # odwoływalny w Ustawienia -> Użytkownicy — zamiast sesji przeglądarki. Odpowiedź ma ten sam
+    # kształt co /auth/login, więc reszta działa bez zmian. Serwer sprzed 0.8 nie zna tej ścieżki
+    # (404) — wtedy zwykłe logowanie, jak dotąd.
+    data = json.dumps({"username": username, "password": password, "client": "FreeCAD Upload"}).encode("utf-8")
+
+    def _post_login(path):
+        req = request.Request(
+            get_base_url() + path, data=data, method="POST",
+            headers={"Content-Type": "application/json"},
+        )
         with request.urlopen(req, timeout=10) as resp:
-            body = resp.read().decode("utf-8")
-            user = json.loads(body) if body else {}
-            set_cookie_header = resp.headers.get("Set-Cookie", "")
+            raw = resp.read().decode("utf-8")
+            return (json.loads(raw) if raw else {}), resp.headers.get("Set-Cookie", "")
+
+    try:
+        try:
+            user, set_cookie_header = _post_login("/auth/macro-login")
+        except error.HTTPError as e:
+            if e.code != 404:
+                raise
+            user, set_cookie_header = _post_login("/auth/login")
     except error.HTTPError as e:
         raise RuntimeError(_read_error_body(e))
     except error.URLError as e:
         raise RuntimeError(t("no_connection", url=get_base_url(), reason=e.reason))
 
-    token = None
-    for part in set_cookie_header.split(";"):
+    # Token najpierw z treści odpowiedzi (pole "sessionToken" — także dla tokenu makra), potem
+    # z ciasteczka, jak dotąd.
+    token = user.get("sessionToken") or None
+    for part in ([] if token else set_cookie_header.split(";")):
         part = part.strip()
         if part.startswith(f"{SESSION_COOKIE_NAME}="):
             token = part[len(SESSION_COOKIE_NAME) + 1:]

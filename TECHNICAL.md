@@ -818,6 +818,16 @@ anyone remembering a check; `StartsWithSegments` compares whole segments, which 
 material and processes itself. `GET /api/settings/catalog-policy` is readable by everyone
 so the catalog views can hide their edit controls.
 
+CAD macros log in through `POST /api/auth/macro-login` (`macro_tokens`, migration 071): a
+random `pdmm_…` token stored only as a SHA-256 hash, valid for a year, listed and
+revocable in Settings → Users, and deleted when the user's password changes. The response
+has the same shape as `/auth/login` and the token travels in the same `pdm_session`
+cookie, so the macros only changed their login URL (with a 404 fallback to `/auth/login`
+for older servers); the middleware accepts either a session or a macro token.
+`/auth/logout` revokes a macro token too. A browser-bridge ticket issued for a macro token
+makes `/auth/browser-login` create a separate browser session, so the macro token never
+reaches the browser.
+
 If the `users` table is empty when the API starts, it sets up a default
 **`admin` / `admin`** account on its own (see the console on first run) — change this
 password right after logging in (`PATCH /api/auth/password`, or from within the web
@@ -851,6 +861,8 @@ and the server's message otherwise; the CAD macros show the server's message as 
 | GET/PATCH | `/api/auth/me` \| `/password` | the logged-in user's data / changing YOUR OWN password |
 | POST | `/api/auth/browser-bridge-ticket` | mints a one-time, short-lived login-bridge ticket for the caller's own session |
 | GET | `/api/auth/browser-login` | exchanges a bridge ticket (not the raw session token) for a browser cookie, for CAD macros (opens the browser already logged in) |
+| POST | `/api/auth/macro-login` | CAD macro login — a separate, revocable macro token in the same response shape as `/auth/login` |
+| GET/DELETE | `/api/macro-tokens[/{id}]` | logged-in macro tokens — the administrator sees and revokes all, a user only their own |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | account management — **administrator only** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | list/create/edit/delete a project (writes — administrator only; list filtered by access) |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | managing user-to-project assignments — **administrator only** |

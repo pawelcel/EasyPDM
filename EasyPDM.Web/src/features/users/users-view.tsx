@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useAuth } from "@/features/auth/use-auth"
+import { MacroTokensSection } from "@/features/users/macro-tokens-section"
 import { ProjectAccessView } from "@/features/users/project-access-view"
 import { useUsers } from "@/features/users/use-users"
 import { useLanguage } from "@/i18n/use-language"
@@ -159,6 +160,7 @@ function UsersView() {
 
       <ReleasePolicySection />
       <CatalogPolicySection />
+      <MacroTokensSection />
 
       {deletingUser && (
         <ConfirmDialog

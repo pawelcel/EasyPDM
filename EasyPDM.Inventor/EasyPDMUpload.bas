@@ -130,6 +130,8 @@ Private Const APP_SETTINGS_NAME As String = "EasyPDM"
 Private Const SETTINGS_SECTION As String = "Connection"
 Private Const DEFAULT_BASE_URL As String = "http://localhost:5000/api"
 Private Const SESSION_COOKIE_NAME As String = "pdm_session"
+' Shown in Settings -> Users next to the macro token this macro logs in with.
+Private Const MACRO_CLIENT_NAME As String = "Inventor Upload"
 
 ' Names of the document iProperties (custom/user-defined properties) used to store the PDM
 ' link -- see module header. Renamed once from EasyPDM_ItemId/EasyPDM_ItemNumber on a theory
@@ -1640,17 +1642,28 @@ End Function
 Function ApiLogin(ByVal username As String, ByVal password As String) As Object
     Dim http As Object
     Set http = NewHttpRequest()
-    http.Open "POST", GetBaseUrl() & "/auth/login", False
+    ' Macro login (POST /api/auth/macro-login) issues a separate macro token -- listed and
+    ' revocable in Settings -> Users -- instead of a browser session. The response has the same
+    ' shape as /auth/login (token in sessionToken), so the rest is unchanged. A server older
+    ' than 0.8 does not know this path (404): fall back to the browser login, as before.
+    http.Open "POST", GetBaseUrl() & "/auth/macro-login", False
     http.setRequestHeader "Content-Type", "application/json"
 
     Dim bodyJson As String
-    bodyJson = "{""username"":" & JsonStr(username) & ",""password"":" & JsonStr(password) & "}"
+    bodyJson = "{""username"":" & JsonStr(username) & ",""password"":" & JsonStr(password) & _
+        ",""client"":" & JsonStr(MACRO_CLIENT_NAME) & "}"
 
     On Error GoTo NetErr
     http.send bodyJson
+    If http.Status = 404 Then
+        Set http = NewHttpRequest()
+        http.Open "POST", GetBaseUrl() & "/auth/login", False
+        http.setRequestHeader "Content-Type", "application/json"
+        http.send bodyJson
+    End If
     On Error GoTo 0
 
-    LogLine "POST /auth/login -> " & http.Status & " (user: " & username & ")"
+    LogLine "POST /auth/macro-login -> " & http.Status & " (user: " & username & ")"
     If http.Status = 401 Or http.Status < 200 Or http.Status >= 300 Then
         LogLine "Login failed: " & http.responseText
         Err.Raise ERR_API, "EasyPDM", T("LoginFailedPrefix") & http.responseText
@@ -1682,7 +1695,7 @@ Function ApiLogin(ByVal username As String, ByVal password As String) As Object
     Set ApiLogin = user
     Exit Function
 NetErr:
-    LogLine "POST /auth/login -> NO CONNECTION: " & Err.Description
+    LogLine "POST /auth/macro-login -> NO CONNECTION: " & Err.Description
     Err.Raise ERR_API, "EasyPDM", T("NoConnectionPrefix") & GetBaseUrl() & ": " & Err.Description
 End Function
 

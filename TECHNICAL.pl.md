@@ -583,6 +583,16 @@ zostaje bez zmian — element sam zapisuje swój materiał i obróbki. `GET
 /api/settings/catalog-policy` czyta każdy, żeby widoki katalogów mogły schować przyciski
 edycji.
 
+Makra CAD logują się przez `POST /api/auth/macro-login` (`macro_tokens`, migracja 071):
+losowy token `pdmm_…`, w bazie tylko jako skrót SHA-256, ważny rok, widoczny i odwoływalny
+w Ustawienia → Użytkownicy i usuwany przy zmianie hasła użytkownika. Odpowiedź ma ten sam
+kształt co `/auth/login`, a token jedzie tym samym ciasteczkiem `pdm_session`, więc makra
+zmieniły tylko adres logowania (z powrotem do `/auth/login` przy 404 na starszym
+serwerze); middleware przyjmuje sesję albo token makra. `/auth/logout` odwołuje też token
+makra. Bilet mostu do przeglądarki wydany dla tokenu makra sprawia, że
+`/auth/browser-login` zakłada osobną sesję przeglądarki, więc token makra nigdy nie trafia
+do przeglądarki.
+
 Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
 **`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
 po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
@@ -617,6 +627,8 @@ zmian.
 | GET/PATCH | `/api/auth/me` \| `/password` | dane zalogowanego użytkownika / zmiana WŁASNEGO hasła |
 | POST | `/api/auth/browser-bridge-ticket` | wystawia jednorazowy, krótkotrwały bilet logowania dla bieżącej sesji wołającego |
 | GET | `/api/auth/browser-login` | zamienia bilet logowania (nie sam token sesji) na ciasteczko przeglądarki, dla makr CAD (otwiera przeglądarkę już zalogowaną) |
+| POST | `/api/auth/macro-login` | logowanie makra CAD — osobny, odwoływalny token makra, w tym samym kształcie odpowiedzi co `/auth/login` |
+| GET/DELETE | `/api/macro-tokens[/{id}]` | tokeny zalogowanych makr — administrator widzi i odwołuje wszystkie, użytkownik tylko swoje |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | zarządzanie kontami — **tylko administrator** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | lista/tworzenie/edycja/usunięcie projektu (zapis — tylko administrator; lista filtrowana wg dostępu) |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | zarządzanie przypisaniami użytkowników do projektów — **tylko administrator** |

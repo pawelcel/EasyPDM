@@ -35,6 +35,7 @@ import type {
   CadRequest,
   Tag,
   TagUsage,
+  MacroToken,
   DocumentLabel,
   CompanyProfile,
   ItemNameSuggestion,
@@ -410,6 +411,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ labels }),
     }).then((r) => handleResponse<void>(r)),
+
+  getMacroTokens: () => fetch(`${BASE}/macro-tokens`).then((r) => handleResponse<MacroToken[]>(r)),
+
+  revokeMacroToken: (id: string) =>
+    fetch(`${BASE}/macro-tokens/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
   getTagUsage: () => fetch(`${BASE}/settings/tags`).then((r) => handleResponse<TagUsage[]>(r)),
 
