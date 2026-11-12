@@ -24,7 +24,7 @@ static class ItemNameEndpoints
         {
             var needle = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
             if (itemType is not ("part" or "assembly"))
-                return Results.BadRequest("itemType to part albo assembly.");
+                return Results.BadRequest("itemType must be 'part' or 'assembly'.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();

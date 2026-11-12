@@ -14,12 +14,12 @@ static class CadRequestEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
 
             if (string.IsNullOrWhiteSpace(body.Ticket))
-                return Results.BadRequest("Pole 'ticket' nie może być puste.");
+                return Results.BadRequest("Field 'ticket' cannot be empty.");
             if (body.Mode is not ("create" or "download"))
-                return Results.BadRequest("Pole 'mode' musi być 'create' albo 'download'.");
+                return Results.BadRequest("Field 'mode' must be 'create' or 'download'.");
 
             if (string.IsNullOrWhiteSpace(body.RunId))
-                return Results.BadRequest("Pole 'runId' nie może być puste.");
+                return Results.BadRequest("Field 'runId' cannot be empty.");
 
             store.Publish(user.Id, new CadRequest(
                 DateTime.UtcNow, null, body.RunId, body.Ticket, body.Mode,

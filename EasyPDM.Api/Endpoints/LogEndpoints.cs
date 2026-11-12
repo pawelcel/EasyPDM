@@ -35,7 +35,7 @@ static class LogEndpoints
                 return Forbidden();
 
             if (!IsValidDate(date))
-                return Results.BadRequest("Nieprawidłowy format daty — oczekiwano yyyy-MM-dd.");
+                return Results.BadRequest("Invalid date format — expected yyyy-MM-dd.");
 
             var path = Path.Combine(logRoot, $"easypdm-{date}.log");
             if (!File.Exists(path))
@@ -55,7 +55,7 @@ static class LogEndpoints
                 return Forbidden();
 
             if (!IsValidDate(date))
-                return Results.BadRequest("Nieprawidłowy format daty — oczekiwano yyyy-MM-dd.");
+                return Results.BadRequest("Invalid date format — expected yyyy-MM-dd.");
 
             var path = Path.Combine(logRoot, $"easypdm-{date}.log");
             if (!File.Exists(path))
@@ -70,5 +70,5 @@ static class LogEndpoints
     private static bool IsValidDate(string date) =>
         DateTime.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
 
-    private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+    private static IResult Forbidden() => Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
 }

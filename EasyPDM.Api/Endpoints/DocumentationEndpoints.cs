@@ -42,7 +42,7 @@ static class DocumentationEndpoints
             var itemIds = await GetSelfAndDescendantIdsAsync(conn, id);
             var zip = await BuildZipAsync(conn, itemIds, ext);
             if (zip is null)
-                return Results.BadRequest("Brak załączników pasujących do wybranych rozszerzeń.");
+                return Results.BadRequest("No attachments match the selected extensions.");
 
             return Results.File(TempFiles.OpenDeleteOnClose(zip), "application/zip", "dokumentacja.zip");
         });
@@ -77,14 +77,14 @@ static class DocumentationEndpoints
             var itemIds = await GetProjectItemIdsAsync(conn, projectId);
             var zip = await BuildZipAsync(conn, itemIds, ext);
             if (zip is null)
-                return Results.BadRequest("Brak załączników pasujących do wybranych rozszerzeń.");
+                return Results.BadRequest("No attachments match the selected extensions.");
 
             return Results.File(TempFiles.OpenDeleteOnClose(zip), "application/zip", "dokumentacja.zip");
         });
     }
 
     private static IResult AccessForbidden() =>
-        Results.Text("Brak dostępu do tego projektu.", statusCode: StatusCodes.Status403Forbidden);
+        Results.Text("You do not have access to this project.", statusCode: StatusCodes.Status403Forbidden);
 
     private static async Task<bool> HasProjectAccessAsync(NpgsqlConnection conn, HttpContext ctx, Guid projectId)
     {

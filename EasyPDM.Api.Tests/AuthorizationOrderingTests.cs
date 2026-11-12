@@ -6,7 +6,7 @@ namespace EasyPDM.Api.Tests;
 // Regresja dla znaleziska z przeglądu kodu w tej samej sesji: kilka endpointów sprawdzało
 // sprawy biznesowe (dozwolone przejście statusu, blokadę właściciela) PRZED sprawdzeniem
 // dostępu do projektu, więc użytkownik bez dostępu dostawał 400 z treścią zdradzającą stan
-// elementu zamiast 403 "Brak dostępu do tego projektu." — zob. ItemEndpoints.cs (PATCH
+// elementu zamiast 403 "You do not have access to this project." — zob. ItemEndpoints.cs (PATCH
 // /status i inne). Ten test pilnuje, żeby ta poprawka się nie cofnęła.
 [Collection("EasyPDM database")]
 public class AuthorizationOrderingTests
@@ -37,7 +37,7 @@ public class AuthorizationOrderingTests
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var text = await response.Content.ReadAsStringAsync();
-        Assert.Contains("dostępu", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("access", text, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

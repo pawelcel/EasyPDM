@@ -596,6 +596,12 @@ usunąć (`DELETE /api/notifications/{id}`).
 
 ### Endpointy API
 
+Komunikaty błędów zwracane przez serwer (tekstowa treść odpowiedzi 400/403/404/409) i logi
+serwera są po angielsku, niezależnie od języka interfejsu. Aplikacja webowa pokazuje
+własny, przetłumaczony tekst tam, gdzie rozpoznaje przypadek (np. 409 przy powtórzonej
+nazwie), a w pozostałych komunikat serwera; makra CAD pokazują komunikat serwera bez
+zmian.
+
 | Metoda | Ścieżka | Co robi |
 |---|---|---|
 | POST | `/api/auth/login` \| `/logout` | logowanie / wylogowanie — login to jedyny endpoint bez wymaganej sesji |

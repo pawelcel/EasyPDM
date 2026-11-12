@@ -45,15 +45,15 @@ static class UserEndpoints
                 return Forbidden();
 
             if (string.IsNullOrWhiteSpace(body.Username))
-                return Results.BadRequest("Nazwa użytkownika jest wymagana.");
+                return Results.BadRequest("A username is required.");
             if (string.IsNullOrWhiteSpace(body.Password))
-                return Results.BadRequest("Hasło jest wymagane.");
+                return Results.BadRequest("A password is required.");
             if (string.IsNullOrWhiteSpace(body.DisplayName))
-                return Results.BadRequest("Wyświetlana nazwa jest wymagana.");
+                return Results.BadRequest("A display name is required.");
             if (string.IsNullOrWhiteSpace(body.FirstName) || string.IsNullOrWhiteSpace(body.LastName))
-                return Results.BadRequest("Imię i nazwisko są wymagane.");
+                return Results.BadRequest("First and last name are required.");
             if (body.Role != "admin" && body.Role != "user")
-                return Results.BadRequest("Nieprawidłowa rola — dozwolone: 'admin', 'user'.");
+                return Results.BadRequest("Invalid role — allowed: 'admin', 'user'.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -80,7 +80,7 @@ static class UserEndpoints
             }
             catch (PostgresException e) when (e.SqlState == "23505")
             {
-                return Results.Conflict("Użytkownik o tej nazwie już istnieje.");
+                return Results.Conflict("A user with this name already exists.");
             }
 
             return Results.Created($"/api/users/{userId}", new { id = userId });
@@ -92,13 +92,13 @@ static class UserEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (body.Role is not null && body.Role != "admin" && body.Role != "user")
-                return Results.BadRequest("Nieprawidłowa rola — dozwolone: 'admin', 'user'.");
+                return Results.BadRequest("Invalid role — allowed: 'admin', 'user'.");
             // Imienia, nazwiska ani wyświetlanej nazwy nie da się wyczyścić — przysłane puste to błąd,
             // pominięte (null) to "bez zmian".
             if (body.FirstName is { } f && string.IsNullOrWhiteSpace(f) || body.LastName is { } l && string.IsNullOrWhiteSpace(l))
-                return Results.BadRequest("Imię i nazwisko nie mogą być puste.");
+                return Results.BadRequest("First and last name cannot be empty.");
             if (body.DisplayName is { } d && string.IsNullOrWhiteSpace(d))
-                return Results.BadRequest("Wyświetlana nazwa nie może być pusta.");
+                return Results.BadRequest("The display name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -144,7 +144,7 @@ static class UserEndpoints
                 await using var existsCmd = new NpgsqlCommand("SELECT 1 FROM users WHERE id = @id;", conn);
                 existsCmd.Parameters.AddWithValue("id", id);
                 if (await existsCmd.ExecuteScalarAsync() is not null)
-                    return Results.BadRequest("Nie można odebrać roli administratora ostatniemu adminowi.");
+                    return Results.BadRequest("The last administrator cannot lose the administrator role.");
                 return Results.NotFound();
             }
 
@@ -188,12 +188,12 @@ static class UserEndpoints
             await using var existsCmd = new NpgsqlCommand("SELECT 1 FROM users WHERE id = @id;", conn);
             existsCmd.Parameters.AddWithValue("id", id);
             if (await existsCmd.ExecuteScalarAsync() is not null)
-                return Results.BadRequest("Nie można usunąć ostatniego administratora.");
+                return Results.BadRequest("The last administrator cannot be deleted.");
             return Results.NotFound();
         });
     }
 
-    private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+    private static IResult Forbidden() => Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
 }
 
 record CreateUserRequest(string Username, string Password, string DisplayName, string? Email, string Role,

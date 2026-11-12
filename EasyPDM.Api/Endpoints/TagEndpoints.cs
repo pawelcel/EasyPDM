@@ -77,7 +77,7 @@ static class TagEndpoints
         app.MapPost("/api/items/{id:guid}/tags", async (Guid id, TagRequest body, HttpContext ctx) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa tagu nie może być pusta.");
+                return Results.BadRequest("The tag name cannot be empty.");
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
             if (info is null)
@@ -92,7 +92,7 @@ static class TagEndpoints
                 return ItemEndpoints.ProjectAccessForbidden();
 
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
-                return Results.BadRequest("Tagi można zmieniać tylko w statusie 'W pracy'.");
+                return Results.BadRequest("Tags can only be changed while the item is In progress.");
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
@@ -134,7 +134,7 @@ static class TagEndpoints
                 return ItemEndpoints.ProjectAccessForbidden();
 
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
-                return Results.BadRequest("Tagi można zmieniać tylko w statusie 'W pracy'.");
+                return Results.BadRequest("Tags can only be changed while the item is In progress.");
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
@@ -160,7 +160,7 @@ static class TagEndpoints
     private static string DecodeTagName(string tagName) =>
         tagName.Replace("%2F", "/", StringComparison.OrdinalIgnoreCase);
 
-    private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+    private static IResult Forbidden() => Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
 }
 
 record TagRequest(string Name);

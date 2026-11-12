@@ -34,7 +34,7 @@ static class MaterialEndpoints
         app.MapPost("/api/materials", async (MaterialRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa materiału nie może być pusta.");
+                return Results.BadRequest("The material name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -56,7 +56,7 @@ static class MaterialEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Materiał o tej nazwie już istnieje.");
+                return Results.Conflict("A material with this name already exists.");
             }
         });
 
@@ -64,7 +64,7 @@ static class MaterialEndpoints
         app.MapPatch("/api/materials/{id:int}", async (int id, MaterialRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa materiału nie może być pusta.");
+                return Results.BadRequest("The material name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -86,7 +86,7 @@ static class MaterialEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Materiał o tej nazwie już istnieje.");
+                return Results.Conflict("A material with this name already exists.");
             }
         });
 

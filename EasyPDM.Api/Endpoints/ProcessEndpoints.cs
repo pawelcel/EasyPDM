@@ -120,7 +120,7 @@ static class ProcessEndpoints
                 .GroupBy(t => t.LanguageId).Select(g => g.Last())
                 .ToList();
             if (texts.Count == 0)
-                return Results.BadRequest("Obróbka musi mieć nazwę w co najmniej jednym języku.");
+                return Results.BadRequest("A process needs a name in at least one language.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -129,7 +129,7 @@ static class ProcessEndpoints
             {
                 check.Parameters.AddWithValue("ids", texts.Select(t => t.LanguageId).ToArray());
                 if ((long)(await check.ExecuteScalarAsync())! != texts.Count)
-                    return Results.BadRequest("Wybrano język, którego nie ma na liście języków dokumentacji.");
+                    return Results.BadRequest("The selected language is not on the documentation language list.");
             }
 
             await using var tx = await conn.BeginTransactionAsync();
@@ -192,16 +192,16 @@ static class ProcessEndpoints
         cmd.Parameters.AddWithValue("description",
             string.IsNullOrWhiteSpace(body.Description) ? DBNull.Value : body.Description.Trim());
         return await cmd.ExecuteNonQueryAsync() == 0
-            ? Results.BadRequest("Wybrano język, którego nie ma na liście języków dokumentacji.")
+            ? Results.BadRequest("The selected language is not on the documentation language list.")
             : null;
     }
 
     private static IResult? Validate(ProcessRequest body)
     {
         if (string.IsNullOrWhiteSpace(body.Name))
-            return Results.BadRequest("Nazwa obróbki nie może być pusta.");
+            return Results.BadRequest("The process name cannot be empty.");
         if (!body.ForParts && !body.ForAssemblies)
-            return Results.BadRequest("Obróbka musi dotyczyć części, złożeń albo obu.");
+            return Results.BadRequest("A process must apply to parts, assemblies or both.");
         return null;
     }
 

@@ -55,7 +55,7 @@ static class ProjectEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa projektu nie może być pusta.");
+                return Results.BadRequest("The project name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -102,7 +102,7 @@ static class ProjectEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Projekt o tej nazwie już istnieje.");
+                return Results.Conflict("A project with this name already exists.");
             }
         });
 
@@ -112,7 +112,7 @@ static class ProjectEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa projektu nie może być pusta.");
+                return Results.BadRequest("The project name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -170,7 +170,7 @@ static class ProjectEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Projekt o tej nazwie już istnieje.");
+                return Results.Conflict("A project with this name already exists.");
             }
         });
 
@@ -227,7 +227,7 @@ static class ProjectEndpoints
                 var all = languageIds.Append(body.MainLanguageId).Distinct().ToArray();
                 check.Parameters.AddWithValue("ids", all);
                 if ((long)(await check.ExecuteScalarAsync())! != all.Length)
-                    return Results.BadRequest("Wybrano język, którego nie ma na liście języków dokumentacji.");
+                    return Results.BadRequest("The selected language is not on the documentation language list.");
             }
 
             await using var tx = await conn.BeginTransactionAsync();
@@ -395,9 +395,9 @@ static class ProjectEndpoints
         cmd.Parameters.AddWithValue("id", clientName2Id.Value);
         var actualClientId = (int?)await cmd.ExecuteScalarAsync();
         if (actualClientId is null)
-            return "Wskazana Nazwa 2 nie istnieje.";
+            return "The given Name 2 does not exist.";
         if (actualClientId != clientId)
-            return "Wskazana Nazwa 2 nie należy do wybranego klienta.";
+            return "The given Name 2 does not belong to the selected client.";
         return null;
     }
 
@@ -411,23 +411,23 @@ static class ProjectEndpoints
         if (leadContactId is null)
             return null;
         if (clientId is null)
-            return "Nie można wskazać prowadzącego projekt bez wybranego klienta.";
+            return "A project lead cannot be set without a selected client.";
 
         await using var cmd = new NpgsqlCommand("SELECT client_id, name2_id FROM client_contacts WHERE id = @id;", conn);
         cmd.Parameters.AddWithValue("id", leadContactId.Value);
         await using var reader = await cmd.ExecuteReaderAsync();
         if (!await reader.ReadAsync())
-            return "Wskazany kontakt prowadzącego nie istnieje.";
+            return "The given project lead contact does not exist.";
         var contactClientId = reader.GetInt32(0);
         int? contactName2Id = reader.IsDBNull(1) ? null : reader.GetInt32(1);
         if (contactClientId != clientId)
-            return "Wskazany kontakt nie należy do wybranego klienta.";
+            return "The given contact does not belong to the selected client.";
         if (contactName2Id is not null && contactName2Id != clientName2Id)
-            return "Wskazany kontakt należy do innej Nazwy 2 tego klienta.";
+            return "The given contact belongs to another of this client's Name 2 entries.";
         return null;
     }
 
-    private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+    private static IResult Forbidden() => Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
 }
 
 record ProjectLanguagesRequest(int MainLanguageId, bool Multilingual, int[]? LanguageIds);

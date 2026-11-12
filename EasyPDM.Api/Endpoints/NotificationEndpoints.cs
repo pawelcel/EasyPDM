@@ -156,7 +156,7 @@ static class NotificationEndpoints
         app.MapPatch("/api/notification-preferences", async (HttpContext ctx, NotificationPreferenceRequest body) =>
         {
             if (!AllTypes.Contains(body.Type))
-                return Results.BadRequest("Nieprawidłowy typ powiadomienia.");
+                return Results.BadRequest("Invalid notification type.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
 

@@ -108,7 +108,9 @@ async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const text = await res.text().catch(() => "")
     if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
-    throw new ApiError(res.status, text || `Żądanie nie powiodło się (${res.status}).`)
+    // Komunikaty błędów serwera są po angielsku (zob. TECHNICAL.md), więc i zapasowy tekst dla
+    // odpowiedzi bez treści.
+    throw new ApiError(res.status, text || `Request failed (${res.status}).`)
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()

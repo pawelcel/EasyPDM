@@ -83,7 +83,7 @@ static class AuthEndpoints
         app.MapPost("/api/auth/login", async (HttpContext ctx, LoginRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Username) || string.IsNullOrWhiteSpace(body.Password))
-                return Results.BadRequest("Podaj nazwę użytkownika i hasło.");
+                return Results.BadRequest("Enter a username and password.");
 
             if (FailedAttempts.TryGetValue(body.Username, out var attemptState))
             {
@@ -91,7 +91,7 @@ static class AuthEndpoints
                 lock (attemptState) { lockedUntil = attemptState.LockedUntil; }
                 if (lockedUntil > DateTime.UtcNow)
                     return Results.Text(
-                        "Zbyt wiele nieudanych prób logowania. Spróbuj ponownie za kilka minut.",
+                        "Too many failed login attempts. Try again in a few minutes.",
                         statusCode: StatusCodes.Status429TooManyRequests);
             }
 
@@ -109,7 +109,7 @@ static class AuthEndpoints
                 if (!await reader.ReadAsync())
                 {
                     RecordFailedLogin(body.Username);
-                    return Results.BadRequest("Nieprawidłowa nazwa użytkownika lub hasło.");
+                    return Results.BadRequest("Incorrect username or password.");
                 }
                 user = new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3));
                 passwordHash = reader.GetString(4);
@@ -118,7 +118,7 @@ static class AuthEndpoints
             if (!PasswordHasher.Verify(body.Password, passwordHash))
             {
                 RecordFailedLogin(body.Username);
-                return Results.BadRequest("Nieprawidłowa nazwa użytkownika lub hasło.");
+                return Results.BadRequest("Incorrect username or password.");
             }
 
             FailedAttempts.TryRemove(body.Username, out _);
@@ -245,7 +245,7 @@ static class AuthEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
 
             if (string.IsNullOrWhiteSpace(body.NewPassword))
-                return Results.BadRequest("Nowe hasło nie może być puste.");
+                return Results.BadRequest("The new password cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -258,7 +258,7 @@ static class AuthEndpoints
             }
 
             if (!PasswordHasher.Verify(body.CurrentPassword, currentHash))
-                return Results.BadRequest("Obecne hasło jest nieprawidłowe.");
+                return Results.BadRequest("The current password is incorrect.");
 
             var newHash = PasswordHasher.Hash(body.NewPassword);
             await using (var cmd = new NpgsqlCommand("UPDATE users SET password_hash = @hash WHERE id = @id;", conn))

@@ -21,7 +21,7 @@ static class PropertyEndpoints
             // rzucałoby niezłapany wyjątek niżej (EnumerateObject()/JSONB `||` na nie-obiekcie) —
             // 500 zamiast czytelnego 400.
             if (body.ValueKind != JsonValueKind.Object)
-                return Results.BadRequest("Body musi być obiektem JSON.");
+                return Results.BadRequest("The body must be a JSON object.");
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, id);
             if (info is null)
@@ -42,7 +42,7 @@ static class PropertyEndpoints
                 {
                     if (!AlwaysEditableKeys.Contains(prop.Name))
                         return Results.BadRequest(
-                            "Właściwości można zmieniać tylko w statusie 'W pracy' (wyjątek: cena, waluta, brutto/netto).");
+                            "Properties can only be changed while the item is In progress (except price, currency, gross/net).");
                 }
             }
 
@@ -77,9 +77,9 @@ static class PropertyEndpoints
                 && await HasNamedFileAsync(conn, id))
             {
                 return Results.BadRequest(
-                    "Nie można zmienić rodzaju — element ma już plik w jednym z wyróżnionych pól " +
-                    "(CAD, rysunek, PDF, model 3D), a nazwy tych plików zawierają jego numer, " +
-                    "który od rodzaju zależy.");
+                    "The kind cannot be changed — the item already has a file in one of the dedicated slots " +
+                    "(CAD, drawing, PDF, 3D model), and those file names contain its number, " +
+                    "which depends on the kind.");
             }
 
             await using var tx = await conn.BeginTransactionAsync();
@@ -147,7 +147,7 @@ static class PropertyEndpoints
 
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status) && !AlwaysEditableKeys.Contains(key))
                 return Results.BadRequest(
-                    "Właściwości można zmieniać tylko w statusie 'W pracy' (wyjątek: cena, waluta, brutto/netto).");
+                    "Properties can only be changed while the item is In progress (except price, currency, gross/net).");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))

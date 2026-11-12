@@ -124,7 +124,7 @@ static class ManufacturerEndpoints
         app.MapPost("/api/manufacturers", async (ManufacturerRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa producenta nie może być pusta.");
+                return Results.BadRequest("The manufacturer name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -140,7 +140,7 @@ static class ManufacturerEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Producent o tej nazwie już istnieje.");
+                return Results.Conflict("A manufacturer with this name already exists.");
             }
         });
 
@@ -148,7 +148,7 @@ static class ManufacturerEndpoints
         app.MapPatch("/api/manufacturers/{id:int}", async (int id, ManufacturerRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa producenta nie może być pusta.");
+                return Results.BadRequest("The manufacturer name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -164,7 +164,7 @@ static class ManufacturerEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Producent o tej nazwie już istnieje.");
+                return Results.Conflict("A manufacturer with this name already exists.");
             }
         });
 
@@ -192,7 +192,7 @@ static class ManufacturerEndpoints
             {
                 checkCmd.Parameters.AddWithValue("id", id);
                 if (await checkCmd.ExecuteScalarAsync() is null)
-                    return Results.NotFound("Producent nie istnieje.");
+                    return Results.NotFound("The manufacturer does not exist.");
             }
 
             const string sql = """
@@ -246,7 +246,7 @@ static class ManufacturerEndpoints
         app.MapPost("/api/manufacturers/{id:int}/product-types", async (int id, ProductTypeRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa typu produktu nie może być pusta.");
+                return Results.BadRequest("The product type name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -255,7 +255,7 @@ static class ManufacturerEndpoints
             {
                 checkCmd.Parameters.AddWithValue("id", id);
                 if (await checkCmd.ExecuteScalarAsync() is null)
-                    return Results.NotFound("Producent nie istnieje.");
+                    return Results.NotFound("The manufacturer does not exist.");
             }
 
             await using var cmd = new NpgsqlCommand(
@@ -271,7 +271,7 @@ static class ManufacturerEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Ten producent ma już typ produktu o tej nazwie.");
+                return Results.Conflict("This manufacturer already has a product type with this name.");
             }
         });
 
@@ -279,7 +279,7 @@ static class ManufacturerEndpoints
         app.MapPatch("/api/manufacturers/{id:int}/product-types/{typeId:int}", async (int id, int typeId, ProductTypeRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa typu produktu nie może być pusta.");
+                return Results.BadRequest("The product type name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -298,7 +298,7 @@ static class ManufacturerEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Ten producent ma już typ produktu o tej nazwie.");
+                return Results.Conflict("This manufacturer already has a product type with this name.");
             }
         });
 
@@ -325,7 +325,7 @@ static class ManufacturerEndpoints
         app.MapPost("/api/manufacturers/{id:int}/product-types/{typeId:int}/subtypes", async (int id, int typeId, ProductTypeRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa podtypu nie może być pusta.");
+                return Results.BadRequest("The subtype name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -336,7 +336,7 @@ static class ManufacturerEndpoints
                 checkCmd.Parameters.AddWithValue("typeId", typeId);
                 checkCmd.Parameters.AddWithValue("manufacturerId", id);
                 if (await checkCmd.ExecuteScalarAsync() is null)
-                    return Results.NotFound("Seria/typ nie istnieje.");
+                    return Results.NotFound("The series/type does not exist.");
             }
 
             await using var cmd = new NpgsqlCommand(
@@ -352,7 +352,7 @@ static class ManufacturerEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Ta seria/typ ma już podtyp o tej nazwie.");
+                return Results.Conflict("This series/type already has a subtype with this name.");
             }
         });
 
@@ -361,7 +361,7 @@ static class ManufacturerEndpoints
             async (int id, int typeId, int subtypeId, ProductTypeRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa podtypu nie może być pusta.");
+                return Results.BadRequest("The subtype name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -385,7 +385,7 @@ static class ManufacturerEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Ta seria/typ ma już podtyp o tej nazwie.");
+                return Results.Conflict("This series/type already has a subtype with this name.");
             }
         });
 

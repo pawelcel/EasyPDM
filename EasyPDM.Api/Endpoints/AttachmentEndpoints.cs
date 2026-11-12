@@ -55,21 +55,21 @@ static class AttachmentEndpoints
         app.MapPost("/api/items/{itemId:guid}/attachments", async (Guid itemId, HttpRequest request, HttpContext ctx) =>
         {
             if (!request.HasFormContentType)
-                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+                return Results.BadRequest("Expected multipart/form-data.");
 
             var form = await request.ReadFormAsync();
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
-                return Results.BadRequest("Brak pliku w polu 'file'.");
+                return Results.BadRequest("No file in the 'file' field.");
 
             var role = form["role"].ToString();
             if (role == "") role = null;
             if (role is not null && role is not ("pdf" or "step" or "cad" or "drawing" or "image"))
-                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad', 'drawing', 'image' albo puste.");
+                return Results.BadRequest("Field 'role' must be 'pdf', 'step', 'cad', 'drawing', 'image' or empty.");
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
-                return Results.NotFound("Element nie istnieje.");
+                return Results.NotFound("The item does not exist.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -78,9 +78,9 @@ static class AttachmentEndpoints
                 return ItemEndpoints.ProjectAccessForbidden();
 
             if (!AcceptsAttachments(info.Value.ItemType))
-                return Results.BadRequest("Ten typ elementu nie przyjmuje załączników.");
+                return Results.BadRequest("This item type does not take attachments.");
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
-                return Results.BadRequest("Załączniki można dodawać tylko w statusie 'W pracy'.");
+                return Results.BadRequest("Attachments can only be added while the item is In progress.");
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
@@ -143,11 +143,11 @@ static class AttachmentEndpoints
         app.MapPost("/api/items/{itemId:guid}/attachments/register", async (Guid itemId, RegisterAttachmentRequest body, HttpContext ctx) =>
         {
             if (body.Role is not null && body.Role is not ("pdf" or "step" or "cad" or "drawing" or "image"))
-                return Results.BadRequest("Pole 'role' musi być 'pdf', 'step', 'cad', 'drawing', 'image' albo puste.");
+                return Results.BadRequest("Field 'role' must be 'pdf', 'step', 'cad', 'drawing', 'image' or empty.");
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
-                return Results.NotFound("Element nie istnieje.");
+                return Results.NotFound("The item does not exist.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -156,9 +156,9 @@ static class AttachmentEndpoints
                 return ItemEndpoints.ProjectAccessForbidden();
 
             if (!AcceptsAttachments(info.Value.ItemType))
-                return Results.BadRequest("Ten typ elementu nie przyjmuje załączników.");
+                return Results.BadRequest("This item type does not take attachments.");
             if (ItemEndpoints.IsLocked(info.Value.ItemType, info.Value.Status))
-                return Results.BadRequest("Załączniki można dodawać tylko w statusie 'W pracy'.");
+                return Results.BadRequest("Attachments can only be added while the item is In progress.");
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
@@ -172,14 +172,14 @@ static class AttachmentEndpoints
             }
             catch (ArgumentException)
             {
-                return Results.BadRequest("Niepoprawna ścieżka pliku.");
+                return Results.BadRequest("Invalid file path.");
             }
 
             if (!fullPath.StartsWith(storageRootFull + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-                return Results.BadRequest("Ścieżka musi znajdować się wewnątrz magazynu plików serwera.");
+                return Results.BadRequest("The path must be inside the server's file storage.");
 
             if (!File.Exists(fullPath))
-                return Results.NotFound("Plik nie istnieje pod podaną ścieżką.");
+                return Results.NotFound("No file exists at the given path.");
 
             var attachmentId = Guid.NewGuid();
             var fileName = Path.GetFileName(fullPath);
@@ -241,7 +241,7 @@ static class AttachmentEndpoints
             }
 
             if (!File.Exists(path))
-                return Results.NotFound("Plik zniknął z magazynu na dysku serwera.");
+                return Results.NotFound("The file is missing from the server's storage.");
 
             return Results.File(path, "application/octet-stream", fileName);
         });
@@ -287,7 +287,7 @@ static class AttachmentEndpoints
                 return ItemEndpoints.ProjectAccessForbidden();
 
             if (ItemEndpoints.IsLocked(itemType, status))
-                return Results.BadRequest("Załączniki można usuwać tylko w statusie 'W pracy'.");
+                return Results.BadRequest("Attachments can only be removed while the item is In progress.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, ownerId, ownerLocked))

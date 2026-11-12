@@ -46,9 +46,9 @@ static class ItemEndpoints
         {
             var info = await GetItemTypeAndStatus(connectionString, body.ItemId);
             if (info is null)
-                return Results.NotFound("Element nie istnieje.");
+                return Results.NotFound("The item does not exist.");
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
-                return Results.BadRequest("Można dograć plik tylko do Części albo Złożenia.");
+                return Results.BadRequest("A file can only be added to a part or an assembly.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -93,9 +93,9 @@ static class ItemEndpoints
         {
             var info = await GetItemTypeAndStatus(connectionString, body.ItemId);
             if (info is null)
-                return Results.NotFound("Element nie istnieje.");
+                return Results.NotFound("The item does not exist.");
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
-                return Results.BadRequest("Rysunek można podpiąć tylko do Części albo Złożenia.");
+                return Results.BadRequest("A drawing can only be attached to a part or an assembly.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -114,12 +114,12 @@ static class ItemEndpoints
         app.MapPost("/api/projects/{projectId:guid}/items", async (Guid projectId, HttpRequest request, HttpContext ctx) =>
         {
             if (!request.HasFormContentType)
-                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+                return Results.BadRequest("Expected multipart/form-data.");
 
             var form = await request.ReadFormAsync();
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
-                return Results.BadRequest("Brak pliku w polu 'file'.");
+                return Results.BadRequest("No file in the 'file' field.");
 
             Guid? parentId = null;
             if (form.TryGetValue("parentId", out var parentIdValue) && !string.IsNullOrWhiteSpace(parentIdValue))
@@ -136,7 +136,7 @@ static class ItemEndpoints
             {
                 checkCmd.Parameters.AddWithValue("id", projectId);
                 if (await checkCmd.ExecuteScalarAsync() is null)
-                    return Results.NotFound("Projekt nie istnieje.");
+                    return Results.NotFound("The project does not exist.");
             }
 
             if (!await HasProjectAccessAsync(conn, ctx, projectId))
@@ -146,9 +146,9 @@ static class ItemEndpoints
             {
                 var parentInfo = await GetItemTypeAndStatus(connectionString, parentId.Value);
                 if (parentInfo is null)
-                    return Results.NotFound("Element nadrzędny nie istnieje.");
+                    return Results.NotFound("The parent item does not exist.");
                 if (!IsChildTypeAllowed(parentInfo.Value.ItemType, "file"))
-                    return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
+                    return Results.BadRequest("Nothing can be added under this item in the structure.");
                 // Rodzic zablokowany przez innego właściciela nie może dostać nowego dziecka —
                 // ta sama reguła co dla dopięcia JUŻ ISTNIEJĄCEGO elementu (POST .../children).
                 // W praktyce rodzicem "file" może tu być tylko folder (IsChildTypeAllowed), a
@@ -260,9 +260,9 @@ static class ItemEndpoints
         async Task<IResult> CreateNodeAsync(Guid? projectId, CreateNodeRequest body, HttpContext ctx)
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa jest wymagana.");
+                return Results.BadRequest("A name is required.");
             if (body.ItemType != "folder" && body.ItemType != "part" && body.ItemType != "file" && body.ItemType != "assembly")
-                return Results.BadRequest("Nieprawidłowy typ elementu — dozwolone: 'folder', 'part', 'file', 'assembly'.");
+                return Results.BadRequest("Invalid item type — allowed: 'folder', 'part', 'file', 'assembly'.");
             if (body.Properties.HasValue && ItemPropertyShapes.Validate(body.Properties.Value) is { } shapeError)
                 return Results.BadRequest(shapeError);
 
@@ -274,7 +274,7 @@ static class ItemEndpoints
                 await using var checkCmd = new NpgsqlCommand("SELECT 1 FROM projects WHERE id = @id;", conn);
                 checkCmd.Parameters.AddWithValue("id", projectId.Value);
                 if (await checkCmd.ExecuteScalarAsync() is null)
-                    return Results.NotFound("Projekt nie istnieje.");
+                    return Results.NotFound("The project does not exist.");
             }
 
             if (!await HasProjectAccessAsync(conn, ctx, projectId))
@@ -286,9 +286,9 @@ static class ItemEndpoints
             {
                 var parentInfo = await GetItemTypeAndStatus(connectionString, body.ParentId.Value);
                 if (parentInfo is null)
-                    return Results.NotFound("Element nadrzędny nie istnieje.");
+                    return Results.NotFound("The parent item does not exist.");
                 if (!IsChildTypeAllowed(parentInfo.Value.ItemType, body.ItemType))
-                    return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
+                    return Results.BadRequest("Nothing can be added under this item in the structure.");
                 // Dostęp do projektu RODZICA, nie tylko docelowego. Wcześniej sprawdzany był tylko
                 // projekt nowego elementu, więc POST /api/nodes (element bez projektu, który
                 // przechodzi to sprawdzenie zawsze) z parentId dopisywał pozycję do BOM-u złożenia w
@@ -399,7 +399,7 @@ static class ItemEndpoints
                 {
                     // Rodzic zniknął między sprawdzeniem a zapisem -- transakcja wycofuje też
                     // sam element, więc nie zostaje po nim żaden ślad.
-                    return Results.NotFound("Element nadrzędny nie istnieje.");
+                    return Results.NotFound("The parent item does not exist.");
                 }
             }
 
@@ -458,7 +458,7 @@ static class ItemEndpoints
             if (info is null)
                 return Results.NotFound();
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
-                return Results.BadRequest("Duplikować można tylko Części i Złożenia.");
+                return Results.BadRequest("Only parts and assemblies can be duplicated.");
             var currentUser = (CurrentUser)ctx.Items["CurrentUser"]!;
 
             await using var conn = new NpgsqlConnection(connectionString);
@@ -571,7 +571,7 @@ static class ItemEndpoints
                     return Results.NotFound();
 
                 if (reader.IsDBNull(0))
-                    return Results.BadRequest("Ten element nie ma przypisanego pliku.");
+                    return Results.BadRequest("This item has no file.");
 
                 path = reader.GetString(0);
                 fileName = reader.GetString(1);
@@ -580,7 +580,7 @@ static class ItemEndpoints
             // Odczyt pliku elementu — świadomie otwarty dla KAŻDEGO zalogowanego użytkownika,
             // zob. GET /api/items niżej.
             if (!File.Exists(path))
-                return Results.NotFound("Plik zniknął z magazynu na dysku serwera.");
+                return Results.NotFound("The file is missing from the server's storage.");
 
             return Results.File(path, "application/octet-stream", fileName);
         });
@@ -881,7 +881,7 @@ static class ItemEndpoints
         app.MapPatch("/api/items/{id:guid}/name", async (Guid id, RenameRequest body, HttpContext ctx) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa nie może być pusta.");
+                return Results.BadRequest("The name cannot be empty.");
 
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
@@ -894,7 +894,7 @@ static class ItemEndpoints
                 return ProjectAccessForbidden();
 
             if (IsLocked(info.Value.ItemType, info.Value.Status))
-                return Results.BadRequest("Nazwę można zmieniać tylko w statusie 'W pracy'.");
+                return Results.BadRequest("The name can only be changed while the item is In progress.");
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             if (!CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return OwnerLockedForbidden();
@@ -921,8 +921,8 @@ static class ItemEndpoints
                 await nameReader.CloseAsync();
                 if (nameInFile && currentName != body.Name.Trim() && await PropertyEndpoints.HasNamedFileAsync(conn, id))
                     return Results.BadRequest(
-                        "Nie można zmienić nazwy — element ma już plik w jednym z wyróżnionych pól " +
-                        "(CAD, rysunek, PDF, model 3D), a nazwy tych plików zawierają jego nazwę.");
+                        "The name cannot be changed — the item already has a file in one of the dedicated slots " +
+                        "(CAD, drawing, PDF, 3D model), and those file names contain its name.");
             }
 
             // Tłumaczenia nazwy (properties.nameTexts) tłumaczą DOTYCHCZASOWĄ nazwę -- po jej zmianie
@@ -954,7 +954,7 @@ static class ItemEndpoints
         app.MapGet("/api/items/{id:guid}/status-precheck", async (Guid id, string target, HttpContext ctx) =>
         {
             if (target != "sprawdzany" && target != "wydany")
-                return Results.BadRequest("Sprawdzenie dotyczy wyłącznie przejścia na 'sprawdzany' albo 'wydany'.");
+                return Results.BadRequest("The check only applies to a change to 'sprawdzany' or 'wydany'.");
 
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
@@ -1003,7 +1003,7 @@ static class ItemEndpoints
         app.MapPatch("/api/items/{id:guid}/status", async (Guid id, StatusRequest body, HttpContext ctx) =>
         {
             if (body.Status != "w_pracy" && body.Status != "sprawdzany" && body.Status != "wydany" && body.Status != "anulowana")
-                return Results.BadRequest("Nieprawidłowy status — dozwolone: 'w_pracy', 'sprawdzany', 'wydany', 'anulowana'.");
+                return Results.BadRequest("Invalid status — allowed: 'w_pracy', 'sprawdzany', 'wydany', 'anulowana'.");
 
             var info = await GetItemTypeAndStatus(connectionString, id);
             if (info is null)
@@ -1019,7 +1019,7 @@ static class ItemEndpoints
             var currentStatus = info.Value.Status;
 
             if (itemType != "part" && itemType != "assembly")
-                return Results.BadRequest("Status dotyczy tylko Części i Złożeń.");
+                return Results.BadRequest("Only parts and assemblies have a status.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             // Jedyne miejsce w API, gdzie admin OMIJA blokadę właściciela (w odróżnieniu od
@@ -1043,7 +1043,7 @@ static class ItemEndpoints
                 _ => false
             };
             if (!isValidTransition)
-                return Results.BadRequest($"Nie można zmienić statusu z '{currentStatus}' na '{body.Status}'.");
+                return Results.BadRequest($"The status cannot change from '{currentStatus}' to '{body.Status}'.");
 
             // Opcjonalna reguła "wydaje tylko administrator" (Ustawienia -> Użytkownicy).
             // Sprawdzana tutaj, nie tylko w interfejsie, bo status zmieniają też makra CAD.
@@ -1051,7 +1051,7 @@ static class ItemEndpoints
             // żądaniem, więc odmowa dla złożenia zatrzymuje też komponenty.
             if (body.Status == "wydany" && currentStatus != "wydany" && user.Role != "admin"
                 && await ReleasePolicy.GetAdminOnlyAsync(conn))
-                return Results.Text("Status \"Wydany\" może nadać tylko administrator.",
+                return Results.Text("Only an administrator can set the status \"Released\".",
                     statusCode: StatusCodes.Status403Forbidden);
 
             // Złożenie z anulowanym elementem w BOM-ie (na dowolnej głębokości, nie tylko
@@ -1063,7 +1063,7 @@ static class ItemEndpoints
                 var cancelledDescendants = await FindCancelledDescendantLabelsAsync(conn, id);
                 if (cancelledDescendants.Count > 0)
                     return Results.BadRequest(
-                        $"Nie można ustawić statusu \"Wydany\" — złożenie zawiera anulowane elementy: {string.Join(", ", cancelledDescendants)}.");
+                        $"The status \"Released\" cannot be set — the assembly contains cancelled items: {string.Join(", ", cancelledDescendants)}.");
             }
 
             // === Reguła BOM (0.4.1) ===
@@ -1075,8 +1075,8 @@ static class ItemEndpoints
             if (itemType == "assembly" && body.Status != currentStatus
                 && (body.Status == "sprawdzany" || body.Status == "wydany"))
             {
-                var targetLabel = body.Status == "wydany" ? "Wydany" : "Sprawdzany";
-                var requiredLabel = body.Status == "wydany" ? "wydane" : "co najmniej sprawdzone";
+                var targetLabel = body.Status == "wydany" ? "Released" : "In review";
+                var requiredLabel = body.Status == "wydany" ? "released" : "at least in review";
                 var children = await GetDirectBomChildrenAsync(conn, id);
                 var classified = await ClassifyNonConformingChildrenAsync(conn, ctx, user, children, body.Status);
 
@@ -1084,12 +1084,12 @@ static class ItemEndpoints
                 // jest gotowe, nie ma sensu rozmawiać o pojedynczych częściach.
                 if (classified.SubAssemblies.Count > 0)
                     return Results.BadRequest(
-                        $"Nie można ustawić statusu \"{targetLabel}\" — najpierw zajmij się podzłożeniami, " +
-                        $"które nie są jeszcze {requiredLabel}: {string.Join(", ", classified.SubAssemblies.Select(c => c.Label))}.");
+                        $"The status \"{targetLabel}\" cannot be set — first deal with the sub-assemblies " +
+                        $"that are not yet {requiredLabel}: {string.Join(", ", classified.SubAssemblies.Select(c => c.Label))}.");
 
                 if (classified.Blocked.Count > 0)
                     return Results.BadRequest(
-                        $"Nie można ustawić statusu \"{targetLabel}\" — tych komponentów nie da się przestawić: " +
+                        $"The status \"{targetLabel}\" cannot be set — these components cannot be changed: " +
                         string.Join(", ", classified.Blocked.Select(b => $"{b.Child.Label} ({BlockedReasonText(b.Reason)})")) + ".");
 
                 if (classified.Promotable.Count > 0)
@@ -1097,7 +1097,7 @@ static class ItemEndpoints
                     // Bez jawnej zgody nic nie ruszamy — front pokazuje listę i pyta.
                     if (!body.PromoteChildren)
                         return Results.BadRequest(
-                            $"Nie można ustawić statusu \"{targetLabel}\" — te komponenty nie są jeszcze {requiredLabel}: " +
+                            $"The status \"{targetLabel}\" cannot be set — these components are not yet {requiredLabel}: " +
                             string.Join(", ", classified.Promotable.Select(c => c.Label)) + ".");
                     childrenToPromote = classified.Promotable;
                 }
@@ -1126,7 +1126,7 @@ static class ItemEndpoints
                 // Ten sam warunek na poprzedni status co przy złożeniu niżej — jeśli ktoś
                 // zmienił komponent między naszym odczytem a tym UPDATE-em, wycofujemy całość.
                 if (await childCmd.ExecuteNonQueryAsync() == 0)
-                    return Results.Conflict("Status jednego z komponentów zmienił się w międzyczasie — odśwież i spróbuj ponownie.");
+                    return Results.Conflict("One of the components' status changed in the meantime — refresh and try again.");
 
                 await using var childHistoryCmd = new NpgsqlCommand("""
                     INSERT INTO item_status_history (item_id, from_status, to_status, changed_by)
@@ -1178,7 +1178,7 @@ static class ItemEndpoints
             }
 
             if (!rowFound)
-                return Results.Conflict("Status elementu zmienił się w międzyczasie — odśwież i spróbuj ponownie.");
+                return Results.Conflict("The item's status changed in the meantime — refresh and try again.");
 
             // Przejście na "wydany" niejawnie zwalnia właściciela (CASE WHEN w UPDATE-cie
             // wyżej) — w odróżnieniu od jawnego POST /release to zdarzenie nigdzie się dotąd
@@ -1290,9 +1290,9 @@ static class ItemEndpoints
                 return ProjectAccessForbidden();
 
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
-                return Results.BadRequest("Właściciela/blokadę mają tylko Części i Złożenia.");
+                return Results.BadRequest("Only parts and assemblies have an owner lock.");
             if (info.Value.Status == "wydany" || info.Value.Status == "anulowana")
-                return Results.BadRequest("Wydanych ani anulowanych elementów nie można blokować — są zawsze zwolnione.");
+                return Results.BadRequest("Released or cancelled items cannot be locked — they are always unlocked.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             var isAdmin = user.Role == "admin";
@@ -1341,17 +1341,17 @@ static class ItemEndpoints
                 return ProjectAccessForbidden();
 
             if (info.Value.ItemType != "part" && info.Value.ItemType != "assembly")
-                return Results.BadRequest("Właściciela/blokadę mają tylko Części i Złożenia.");
+                return Results.BadRequest("Only parts and assemblies have an owner lock.");
             if (info.Value.Status == "wydany" || info.Value.Status == "anulowana")
-                return Results.BadRequest("Wydane i anulowane elementy są zawsze zwolnione.");
+                return Results.BadRequest("Released and cancelled items are always unlocked.");
             if (!IsOwnerLocked(info.Value.OwnerId, info.Value.OwnerLocked))
-                return Results.BadRequest("Element nie jest zablokowany.");
+                return Results.BadRequest("The item is not locked.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             var isAdmin = user.Role == "admin";
             if (info.Value.OwnerId != user.Id && !isAdmin)
                 return Results.Text(
-                    "Tylko właściciel może zwolnić ten element.", statusCode: StatusCodes.Status403Forbidden);
+                    "Only the owner can unlock this item.", statusCode: StatusCodes.Status403Forbidden);
 
             // Zwolniony element nie ma właściciela — i tak może go edytować każdy, więc nie ma
             // sensu pamiętać, kto ostatnio go blokował. Nowego właściciela nadaje dopiero
@@ -1371,7 +1371,7 @@ static class ItemEndpoints
             var affected = await cmd.ExecuteNonQueryAsync();
 
             if (affected == 0)
-                return Results.Conflict("Właściciel elementu zmienił się w międzyczasie — odśwież i spróbuj ponownie.");
+                return Results.Conflict("The item's owner changed in the meantime — refresh and try again.");
 
             await LogOwnerHistoryAsync(conn, id, "released", user.Id);
 
@@ -1474,7 +1474,7 @@ static class ItemEndpoints
                 {
                     checkCmd.Parameters.AddWithValue("projectId", body.ProjectId.Value);
                     if (await checkCmd.ExecuteScalarAsync() is null)
-                        return Results.NotFound("Projekt docelowy nie istnieje.");
+                        return Results.NotFound("The target project does not exist.");
                 }
 
                 if (!await HasProjectAccessAsync(conn, ctx, body.ProjectId))
@@ -1523,7 +1523,7 @@ static class ItemEndpoints
         app.MapDelete("/api/items/{id:guid}", async (Guid id, HttpContext httpContext) =>
         {
             if ((httpContext.Items["CurrentUser"] as CurrentUser)?.Role != "admin")
-                return Results.Text("Tylko administrator może usuwać elementy całkowicie z bazy.", statusCode: StatusCodes.Status403Forbidden);
+                return Results.Text("Only an administrator can delete items from the database completely.", statusCode: StatusCodes.Status403Forbidden);
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -1772,9 +1772,9 @@ static class ItemEndpoints
     // spoza przeglądarki (makra CAD, curl); przeglądarka tłumaczy sobie sam kod.
     internal static string BlockedReasonText(string reason) => reason switch
     {
-        BlockedCancelled => "anulowany",
-        BlockedOwnerLocked => "zablokowany przez innego użytkownika",
-        BlockedNoAccess => "w projekcie bez dostępu",
+        BlockedCancelled => "cancelled",
+        BlockedOwnerLocked => "locked by another user",
+        BlockedNoAccess => "in a project you cannot access",
         _ => reason,
     };
 
@@ -1896,7 +1896,7 @@ static class ItemEndpoints
     }
 
     internal static IResult ProjectAccessForbidden() =>
-        Results.Text("Brak dostępu do tego projektu.", statusCode: StatusCodes.Status403Forbidden);
+        Results.Text("You do not have access to this project.", statusCode: StatusCodes.Status403Forbidden);
 
     // Właściciel (Właściciel/owner_id + owner_locked) — NIEZALEŻNE od statusu 'w_pracy'/IsLocked
     // powyżej. Dopóki element jest zablokowany, tylko owner_id może go edytować — nawet
@@ -1907,7 +1907,7 @@ static class ItemEndpoints
         !IsOwnerLocked(ownerId, ownerLocked) || ownerId == currentUserId;
 
     internal static IResult OwnerLockedForbidden() => Results.Text(
-        "Ten element jest zablokowany przez innego użytkownika — tylko właściciel może go edytować.",
+        "This item is locked by another user — only the owner can edit it.",
         statusCode: StatusCodes.Status403Forbidden);
 
     // Wpis do panelu "Historia" — kto i kiedy zablokował (przejął na własność) albo zwolnił

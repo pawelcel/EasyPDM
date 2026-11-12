@@ -63,14 +63,14 @@ static class CompanyEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (!request.HasFormContentType)
-                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+                return Results.BadRequest("Expected multipart/form-data.");
 
             var form = await request.ReadFormAsync();
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
-                return Results.BadRequest("Brak pliku w polu 'file'.");
+                return Results.BadRequest("No file in the 'file' field.");
             if (file.Length > MaxLogoBytes)
-                return Results.BadRequest("Logo może mieć najwyżej 2 MB.");
+                return Results.BadRequest("The logo can be at most 2 MB.");
 
             using var buffer = new MemoryStream();
             await file.CopyToAsync(buffer);
@@ -78,7 +78,7 @@ static class CompanyEndpoints
             // Rodzaj rozpoznawany po zawartości, nie po rozszerzeniu ani nagłówku z przeglądarki.
             var contentType = DetectImageType(bytes);
             if (contentType is null)
-                return Results.BadRequest("Logo musi być plikiem PNG albo JPEG.");
+                return Results.BadRequest("The logo must be a PNG or JPEG file.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -118,7 +118,7 @@ static class CompanyEndpoints
         return null;
     }
 
-    private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+    private static IResult Forbidden() => Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
 }
 
 record CompanyRequest(string? Name);

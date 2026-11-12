@@ -37,7 +37,7 @@ static class Notifications
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Nie udało się zapisać powiadomienia typu '{Type}' dla użytkownika {UserId}.", type, userId);
+            logger.LogError(ex, "Could not save a notification of type '{Type}' for user {UserId}.", type, userId);
         }
     }
 }

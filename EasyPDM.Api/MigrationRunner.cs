@@ -52,7 +52,7 @@ static class MigrationRunner
         if (!await TableExistsAsync(conn, "users"))
         {
             logger.LogWarning(
-                "MigrationRunner: tabela 'users' nie istnieje — pomijam automatyczne migracje " +
+                "MigrationRunner: table 'users' does not exist — skipping automatic migrations " +
                 "(najpierw zastosuj db/schema.sql).");
             return;
         }
@@ -81,8 +81,8 @@ static class MigrationRunner
         if (applied.Count == 0 && migrations.Count > 0)
         {
             logger.LogInformation(
-                "MigrationRunner: pierwsza kontrola po wprowadzeniu śledzenia migracji — " +
-                "oznaczam {Count} już znanych migracji jako zastosowane bez ich ponownego wykonywania.",
+                "MigrationRunner: first check since migration tracking was introduced — " +
+                "marking {Count} known migrations as applied without running them again.",
                 migrations.Count);
             foreach (var (_, fileName) in migrations)
                 await MarkAppliedAsync(conn, fileName);
@@ -94,14 +94,14 @@ static class MigrationRunner
             if (applied.Contains(fileName))
                 continue;
 
-            logger.LogInformation("MigrationRunner: stosuję {FileName}...", fileName);
+            logger.LogInformation("MigrationRunner: applying {FileName}...", fileName);
 
             try
             {
                 // Każdy plik migracji sam zarządza własną transakcją (BEGIN;...COMMIT;) — nie
                 // owijamy tego dodatkowo transakcją ADO.NET, żeby uniknąć zagnieżdżenia.
                 await using (var stream = assembly.GetManifestResourceStream(resourceName)
-                    ?? throw new InvalidOperationException($"Brak zasobu {resourceName}."))
+                    ?? throw new InvalidOperationException($"Missing resource {resourceName}."))
                 using (var streamReader = new StreamReader(stream))
                 {
                     var sql = await streamReader.ReadToEndAsync();
@@ -123,11 +123,11 @@ static class MigrationRunner
                 // faktycznie już jest w bazie, i jeśli tak, ręcznie dopisać wiersz do
                 // schema_migrations zamiast próbować wykonać SQL drugi raz.
                 logger.LogError(ex,
-                    "MigrationRunner: migracja {FileName} zakończyła się błędem — program NIE " +
-                    "wystartuje z potencjalnie niespójnym schematem. Jeśli zmiana z tego pliku " +
-                    "faktycznie już jest w bazie (proces mógł paść PO wykonaniu, PRZED zapisaniem " +
-                    "postępu), sprawdź ręcznie i dopisz wiersz do schema_migrations zamiast " +
-                    "ponawiać ten sam SQL.",
+                    "MigrationRunner: migration {FileName} failed — the program will NOT " +
+                    "start with a possibly inconsistent schema. If the change from this file " +
+                    "is in fact already in the database (the process may have died AFTER running it, BEFORE recording " +
+                    "progress), check by hand and add the row to schema_migrations instead of " +
+                    "retrying the same SQL.",
                     fileName);
                 throw;
             }

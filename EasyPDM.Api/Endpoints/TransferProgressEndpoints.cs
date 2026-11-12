@@ -26,9 +26,9 @@ static class TransferProgressEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
 
             if (body.Kind is not ("upload" or "download"))
-                return Results.BadRequest("Pole 'kind' musi być 'upload' albo 'download'.");
+                return Results.BadRequest("Field 'kind' must be 'upload' or 'download'.");
             if (body.Entries is null || body.Entries.Count == 0)
-                return Results.BadRequest("Pole 'entries' nie może być puste.");
+                return Results.BadRequest("Field 'entries' cannot be empty.");
 
             // Klucze muszą być unikalne, bo po nich idzie odhaczanie. Przy wysyłce złożenia
             // ten sam plik potrafi wystąpić w drzewie wielokrotnie (ta sama śruba w kilku
@@ -38,7 +38,7 @@ static class TransferProgressEndpoints
             foreach (var e in body.Entries)
             {
                 if (string.IsNullOrWhiteSpace(e.Key) || string.IsNullOrWhiteSpace(e.Label))
-                    return Results.BadRequest("Każda pozycja musi mieć niepuste 'key' i 'label'.");
+                    return Results.BadRequest("Every entry needs a non-empty 'key' and 'label'.");
                 if (!seen.Add(e.Key))
                     return Results.BadRequest($"Zduplikowany klucz pozycji: '{e.Key}'.");
                 entries.Add(new TransferProgressEntry { Key = e.Key, Label = e.Label });
@@ -70,9 +70,9 @@ static class TransferProgressEndpoints
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
 
             if (body.Status is not ("pending" or "active" or "done" or "failed" or "skipped"))
-                return Results.BadRequest("Pole 'status' musi być 'pending', 'active', 'done', 'failed' albo 'skipped'.");
+                return Results.BadRequest("Field 'status' must be 'pending', 'active', 'done', 'failed' or 'skipped'.");
             if (string.IsNullOrWhiteSpace(body.Key))
-                return Results.BadRequest("Pole 'key' nie może być puste.");
+                return Results.BadRequest("Field 'key' cannot be empty.");
 
             return Results.Ok(new { matched = store.Mark(user.Id, body.Key, body.Status) });
         });

@@ -89,7 +89,7 @@ static class ProjectAccessEndpoints
         });
     }
 
-    private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+    private static IResult Forbidden() => Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
 
     private static async Task<string?> GetProjectNameAsync(NpgsqlConnection conn, Guid projectId)
     {

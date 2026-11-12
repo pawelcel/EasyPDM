@@ -27,10 +27,10 @@ static class DocumentLabelEndpoints
         app.MapPut("/api/document-labels/{languageId:int}", async (int languageId, DocumentLabelsRequest body, HttpContext ctx) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
-                return Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+                return Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
             var labels = body.Labels ?? [];
             if (labels.Keys.FirstOrDefault(k => !DocumentLabels.IsKnownKey(k)) is { } unknown)
-                return Results.BadRequest($"Nieznany podpis: {unknown}.");
+                return Results.BadRequest($"Unknown label: {unknown}.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();

@@ -54,12 +54,12 @@ static class ProjectAttachmentEndpoints
         app.MapPost("/api/projects/{projectId:guid}/attachments", async (Guid projectId, HttpRequest request, HttpContext ctx) =>
         {
             if (!request.HasFormContentType)
-                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+                return Results.BadRequest("Expected multipart/form-data.");
 
             var form = await request.ReadFormAsync();
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
-                return Results.BadRequest("Brak pliku w polu 'file'.");
+                return Results.BadRequest("No file in the 'file' field.");
 
             // Brak roli = zwykły załącznik (trzecia, nieograniczona kategoria obok oferty
             // i potwierdzenia zlecenia).
@@ -67,7 +67,7 @@ static class ProjectAttachmentEndpoints
             if (string.IsNullOrWhiteSpace(role))
                 role = null;
             else if (!Roles.Contains(role))
-                return Results.BadRequest($"Pole 'role' musi być '{string.Join("' albo '", Roles)}' albo puste.");
+                return Results.BadRequest($"Field 'role' must be '{string.Join("' albo '", Roles)}' or empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -79,7 +79,7 @@ static class ProjectAttachmentEndpoints
             {
                 checkCmd.Parameters.AddWithValue("id", projectId);
                 if (await checkCmd.ExecuteScalarAsync() is null)
-                    return Results.NotFound("Projekt nie istnieje.");
+                    return Results.NotFound("The project does not exist.");
             }
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
@@ -143,7 +143,7 @@ static class ProjectAttachmentEndpoints
                 return ItemEndpoints.ProjectAccessForbidden();
 
             if (!File.Exists(filePath))
-                return Results.NotFound("Plik nie istnieje w magazynie.");
+                return Results.NotFound("The file does not exist in storage.");
 
             return Results.File(filePath, "application/octet-stream", fileName);
         });

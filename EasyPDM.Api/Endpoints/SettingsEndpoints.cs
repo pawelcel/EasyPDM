@@ -45,15 +45,15 @@ static class SettingsEndpoints
                 return Forbidden();
 
             if (string.IsNullOrWhiteSpace(body.NewPath))
-                return Results.BadRequest("Nowa ścieżka nie może być pusta.");
+                return Results.BadRequest("The new path cannot be empty.");
             if (!Path.IsPathRooted(body.NewPath))
-                return Results.BadRequest("Ścieżka musi być bezwzględna (np. /mnt/dysk/magazyn).");
+                return Results.BadRequest("The path must be absolute (e.g. /mnt/disk/storage).");
 
             var oldPath = Path.GetFullPath(storage.Path);
             var newPath = Path.GetFullPath(body.NewPath);
 
             if (string.Equals(oldPath, newPath, StringComparison.Ordinal))
-                return Results.BadRequest("Nowa ścieżka jest taka sama jak obecna.");
+                return Results.BadRequest("The new path is the same as the current one.");
 
             try
             {
@@ -64,7 +64,7 @@ static class SettingsEndpoints
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return Results.BadRequest($"Nie można zapisać w podanej lokalizacji: {ex.Message}");
+                return Results.BadRequest($"Cannot write to the given location: {ex.Message}");
             }
 
             var migratedFiles = 0;
@@ -105,7 +105,7 @@ static class SettingsEndpoints
                 return Forbidden();
 
             if (!body.Projects && !body.Materials && !body.Processes && !body.Manufacturers && !body.Clients && !body.Company)
-                return Results.BadRequest("Wybierz przynajmniej jedną kategorię do wyczyszczenia.");
+                return Results.BadRequest("Choose at least one category to clear.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -276,17 +276,17 @@ static class SettingsEndpoints
                 return Forbidden();
 
             if (body.Frequency != "daily" && body.Frequency != "weekly" && body.Frequency != "monthly")
-                return Results.BadRequest("Nieprawidłowa częstotliwość — dozwolone: 'daily', 'weekly', 'monthly'.");
+                return Results.BadRequest("Invalid frequency — allowed: 'daily', 'weekly', 'monthly'.");
             if (body.Frequency == "weekly" && (body.DayOfWeek is null || body.DayOfWeek is < 0 or > 6))
-                return Results.BadRequest("Dla częstotliwości 'weekly' wymagany jest 'dayOfWeek' w zakresie 0-6.");
+                return Results.BadRequest("Frequency 'weekly' requires 'dayOfWeek' in the range 0-6.");
             if (body.Frequency == "monthly" && (body.DayOfMonth is null || body.DayOfMonth is < 1 or > 31))
-                return Results.BadRequest("Dla częstotliwości 'monthly' wymagany jest 'dayOfMonth' w zakresie 1-31.");
+                return Results.BadRequest("Frequency 'monthly' requires 'dayOfMonth' in the range 1-31.");
             if (body.Hour is < 0 or > 23)
-                return Results.BadRequest("Godzina musi być w zakresie 0-23.");
+                return Results.BadRequest("The hour must be in the range 0-23.");
             if (body.Minute is < 0 or > 59)
-                return Results.BadRequest("Minuta musi być w zakresie 0-59.");
+                return Results.BadRequest("The minute must be in the range 0-59.");
             if (body.RetentionCount is < 1 or > 365)
-                return Results.BadRequest("Liczba przechowywanych kopii musi być w zakresie 1-365.");
+                return Results.BadRequest("The number of kept copies must be in the range 1-365.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -323,12 +323,12 @@ static class SettingsEndpoints
                 return Forbidden();
 
             if (!request.HasFormContentType)
-                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+                return Results.BadRequest("Expected multipart/form-data.");
 
             var form = await request.ReadFormAsync();
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
-                return Results.BadRequest("Brak pliku kopii zapasowej w polu 'file'.");
+                return Results.BadRequest("No backup file in the 'file' field.");
 
             var tempDir = Path.Combine(Path.GetTempPath(), $"pdm_restore_{Guid.NewGuid():N}");
             Directory.CreateDirectory(tempDir);
@@ -345,14 +345,14 @@ static class SettingsEndpoints
                 }
                 catch (InvalidDataException)
                 {
-                    return Results.BadRequest("Przesłany plik nie jest poprawnym archiwum ZIP.");
+                    return Results.BadRequest("The uploaded file is not a valid ZIP archive.");
                 }
 
                 var dumpPath = Path.Combine(extractDir, "database.dump");
                 if (!File.Exists(dumpPath))
                 {
                     return Results.BadRequest(
-                        "Plik ZIP nie zawiera database.dump — to nie jest kopia zapasowa EasyPDM.");
+                        "The ZIP has no database.dump — it is not an EasyPDM backup.");
                 }
 
                 var csb = new NpgsqlConnectionStringBuilder(connectionString);
@@ -386,7 +386,7 @@ static class SettingsEndpoints
                 psi.Environment["PGPASSWORD"] = csb.Password ?? "";
 
                 using var process = Process.Start(psi)
-                    ?? throw new InvalidOperationException("Nie udało się uruchomić pg_restore.");
+                    ?? throw new InvalidOperationException("Could not start pg_restore.");
                 var stderr = await process.StandardError.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
@@ -417,8 +417,8 @@ static class SettingsEndpoints
                 if (!databaseLooksRestored)
                 {
                     return Results.Problem(
-                        $"pg_restore najprawdopodobniej się nie powiódł (kod wyjścia {process.ExitCode}) — " +
-                        $"baza nie ma oczekiwanej struktury po przywróceniu. Magazyn plików NIE został ruszony.\n{stderr}");
+                        $"pg_restore most likely failed (exit code {process.ExitCode}) — " +
+                        $"the database does not have the expected structure after the restore. File storage was NOT touched.\n{stderr}");
                 }
 
                 var filesRestored = 0;
@@ -450,8 +450,8 @@ static class SettingsEndpoints
                 catch (Exception ex)
                 {
                     return Results.Problem(
-                        "Baza i pliki zostały przywrócone, ale dostosowanie bazy do tej wersji programu " +
-                        $"nie powiodło się: {ex.Message}. Szczegóły w logach programu.");
+                        "The database and files were restored, but updating the database to this program version " +
+                        $"failed: {ex.Message}. See the program logs for details.");
                 }
 
                 // Ścieżki plików w bazie wskazują katalog magazynu z serwera, na którym zrobiono
@@ -522,11 +522,11 @@ static class SettingsEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (!ItemNumberPrefixKinds.Contains(rodzaj))
-                return Results.BadRequest("Nieprawidłowy rodzaj.");
+                return Results.BadRequest("Invalid kind.");
 
             var prefix = string.IsNullOrWhiteSpace(body.Prefix) ? null : body.Prefix.Trim();
             if (prefix is not null && prefix.Length > 4)
-                return Results.BadRequest("Prefiks może mieć maksymalnie 4 znaki.");
+                return Results.BadRequest("A prefix can be at most 4 characters.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -582,9 +582,9 @@ static class SettingsEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (body.Digits is < 0 or > 10)
-                return Results.BadRequest("Liczba cyfr musi mieścić się w zakresie 0-10.");
+                return Results.BadRequest("The number of digits must be in the range 0-10.");
             if (body.Digits is null && body.WithName is null)
-                return Results.BadRequest("Podaj przynajmniej jedno z pól: 'digits', 'withName'.");
+                return Results.BadRequest("Give at least one of the fields: 'digits', 'withName'.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -711,7 +711,7 @@ static class SettingsEndpoints
             if (!AuthEndpoints.IsAdmin(ctx))
                 return Forbidden();
             if (body.NextNumber < 1)
-                return Results.BadRequest("Numer musi być dodatnią liczbą całkowitą.");
+                return Results.BadRequest("The number must be a positive whole number.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -738,8 +738,8 @@ static class SettingsEndpoints
                 {
                     await tx.RollbackAsync();
                     return Results.BadRequest(
-                        $"Nie można cofnąć numeracji do {body.NextNumber} -- w bazie jest już element z numerem " +
-                        $"{body.NextNumber} lub wyższym. Usuń go (albo wybierz niższy numer) i spróbuj ponownie.");
+                        $"Numbering cannot be rewound to {body.NextNumber} -- the database already has an item numbered " +
+                        $"{body.NextNumber} or higher. Delete it (or choose a lower number) and try again.");
                 }
             }
 
@@ -803,11 +803,11 @@ static class SettingsEndpoints
             psi.Environment["PGPASSWORD"] = csb.Password ?? "";
 
             using var process = Process.Start(psi)
-                ?? throw new InvalidOperationException("Nie udało się uruchomić pg_dump.");
+                ?? throw new InvalidOperationException("Could not start pg_dump.");
             var stderr = await process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
             if (process.ExitCode != 0)
-                throw new BackupFailedException($"pg_dump zakończył się błędem: {stderr}");
+                throw new BackupFailedException($"pg_dump failed: {stderr}");
 
             using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
             {
@@ -883,7 +883,7 @@ static class SettingsEndpoints
 
     private const string StorageRootEntry = "storage-root.txt";
 
-    private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+    private static IResult Forbidden() => Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
 }
 
 // Rzucany, gdy samo pg_dump zawiedzie (odróżniony od zwykłych wyjątków I/O, żeby

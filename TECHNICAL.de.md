@@ -657,6 +657,12 @@ gelesen markiert oder gelöscht werden (`DELETE /api/notifications/{id}`).
 
 ### API-Endpunkte
 
+Vom Server zurückgegebene Fehlermeldungen (der Textinhalt von 400/403/404/409-Antworten)
+und die Serverprotokolle sind auf Englisch, unabhängig von der Oberflächensprache. Die
+Webanwendung zeigt ihren eigenen übersetzten Text, wo sie einen Fall erkennt (z. B. 409
+bei einem doppelten Namen), sonst die Meldung des Servers; die CAD-Makros zeigen die
+Meldung des Servers unverändert.
+
 | Methode | Pfad | Was es tut |
 |---|---|---|
 | POST | `/api/auth/login` \| `/logout` | Anmeldung / Abmeldung — Login ist der einzige Endpunkt ohne erforderliche Sitzung |

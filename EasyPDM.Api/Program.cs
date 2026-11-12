@@ -25,7 +25,7 @@ builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLi
 var app = builder.Build();
 
 string connectionString = app.Configuration["ConnectionString"]
-    ?? throw new InvalidOperationException("Brak ConnectionString w appsettings.json");
+    ?? throw new InvalidOperationException("ConnectionString is missing from appsettings.json");
 
 // Katalog, w którym API fizycznie trzyma wgrane pliki (ręczne dodawanie elementów).
 // Ścieżka względna liczona jest od katalogu aplikacji, żeby działało niezależnie od tego,
@@ -102,7 +102,7 @@ app.Use(async (context, next) =>
         if (user is null)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsync("Nie zalogowano.");
+            await context.Response.WriteAsync("Not logged in.");
             return;
         }
 
@@ -117,7 +117,7 @@ app.Use(async (context, next) =>
             if (await CatalogPolicy.GetAdminOnlyAsync(conn))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsync("Katalogi może zmieniać tylko administrator.");
+                await context.Response.WriteAsync("Only an administrator can change the catalogs.");
                 return;
             }
         }
@@ -194,8 +194,8 @@ static async Task EnsureDefaultAdminAsync(string connectionString)
     await insertCmd.ExecuteNonQueryAsync();
 
     Console.WriteLine(
-        "Utworzono domyślne konto administratora — login: admin, hasło: admin. " +
-        "Zmień hasło zaraz po pierwszym zalogowaniu.");
+        "Created the default administrator account — login: admin, password: admin. " +
+        "Change the password right after the first login.");
 }
 
 // Jeśli tabela projects jest pusta (świeża instalacja — po EnsureDefaultAdminAsync wyżej
@@ -381,7 +381,7 @@ static async Task EnsureSampleProjectAsync(string connectionString, ILogger logg
         // proces nie ma podłączonej konsoli, więc Console.WriteLine nigdzie by nie trafiło;
         // logger jest podpięty do FileLoggerProvider (Ustawienia -> Logi) niezależnie od trybu
         // uruchomienia.
-        logger.LogInformation("Utworzono przykładowy projekt startowy — usuń go przed rozpoczęciem prawdziwej pracy (Ustawienia -> Magazyn plików -> Danger zone).");
+        logger.LogInformation("Created a sample starter project — delete it before real work (Settings -> File storage -> Danger zone).");
     }
     catch (PostgresException ex) when (ex.SqlState == "23505")
     {

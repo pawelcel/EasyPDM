@@ -28,7 +28,7 @@ class DiskSpaceMonitorService(string connectionString, StorageSettings storage, 
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Monitor miejsca na dysku: nieoczekiwany błąd podczas sprawdzania.");
+                logger.LogError(ex, "Disk space monitor: unexpected error while checking.");
             }
 
             try
@@ -54,7 +54,7 @@ class DiskSpaceMonitorService(string connectionString, StorageSettings storage, 
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Monitor miejsca na dysku: nie udało się odczytać informacji o dysku dla ścieżki '{Path}'.", storage.Path);
+            logger.LogError(ex, "Disk space monitor: could not read disk information for path '{Path}'.", storage.Path);
             return;
         }
 

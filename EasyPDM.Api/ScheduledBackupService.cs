@@ -29,7 +29,7 @@ class ScheduledBackupService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Automatyczna kopia zapasowa: nieoczekiwany błąd podczas sprawdzania harmonogramu.");
+                logger.LogError(ex, "Automatic backup: unexpected error while checking the schedule.");
             }
 
             try
@@ -126,8 +126,8 @@ class ScheduledBackupService(
         {
             _lastFailedAttemptAt = now;
             logger.LogError(ex,
-                "Automatyczna kopia zapasowa: nie udało się jej wykonać — ponowię próbę za {Minutes} min " +
-                "(o ile dzień się nie zmieni).", RetryInterval.TotalMinutes);
+                "Automatic backup: it failed — retrying in {Minutes} min " +
+                "(unless the day changes).", RetryInterval.TotalMinutes);
         }
     }
 

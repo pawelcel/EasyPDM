@@ -236,19 +236,19 @@ static class StructureEndpoints
         app.MapPost("/api/items/{parentId:guid}/children", async (Guid parentId, ChildRelationRequest body, HttpContext ctx) =>
         {
             if (parentId == body.ChildId)
-                return Results.BadRequest("Element nie może być podelementem samego siebie.");
+                return Results.BadRequest("An item cannot be a child of itself.");
 
             if (body.Quantity is <= 0)
-                return Results.BadRequest("Ilość musi być większa od zera.");
+                return Results.BadRequest("The quantity must be greater than zero.");
 
             var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
             if (parentInfo is null)
-                return Results.NotFound("Element nadrzędny nie istnieje.");
+                return Results.NotFound("The parent item does not exist.");
             var childInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, body.ChildId);
             if (childInfo is null)
-                return Results.NotFound("Element podrzędny nie istnieje.");
+                return Results.NotFound("The child item does not exist.");
             if (!ItemEndpoints.IsChildTypeAllowed(parentInfo.Value.ItemType, childInfo.Value.ItemType))
-                return Results.BadRequest("Do tego elementu nie można nic dodać w strukturze.");
+                return Results.BadRequest("Nothing can be added under this item in the structure.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -293,7 +293,7 @@ static class StructureEndpoints
                 cycleCmd.Parameters.AddWithValue("childId", body.ChildId);
                 cycleCmd.Parameters.AddWithValue("parentId", parentId);
                 if (await cycleCmd.ExecuteScalarAsync() is not null)
-                    return Results.BadRequest("Nie można dodać — spowodowałoby to cykl w strukturze.");
+                    return Results.BadRequest("Cannot add — it would create a cycle in the structure.");
             }
 
             // Nowa relacja trafia na koniec BOM-u rodzica (position = max + 1); przy aktualizacji
@@ -350,11 +350,11 @@ static class StructureEndpoints
         app.MapPatch("/api/items/{parentId:guid}/children/{childId:guid}/position", async (Guid parentId, Guid childId, PositionRequest body, HttpContext ctx) =>
         {
             if (body.Position <= 0)
-                return Results.BadRequest("L.p. musi być liczbą całkowitą większą od zera.");
+                return Results.BadRequest("The position must be a whole number greater than zero.");
 
             var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
             if (parentInfo is null)
-                return Results.NotFound("Element nadrzędny nie istnieje.");
+                return Results.NotFound("The parent item does not exist.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -383,7 +383,7 @@ static class StructureEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Ten numer L.p. jest już zajęty w tym BOM-ie.");
+                return Results.Conflict("This position is already taken in this BOM.");
             }
         });
 
@@ -394,7 +394,7 @@ static class StructureEndpoints
         {
             var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
             if (parentInfo is null)
-                return Results.NotFound("Element nadrzędny nie istnieje.");
+                return Results.NotFound("The parent item does not exist.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -421,7 +421,7 @@ static class StructureEndpoints
             if (existingIds.Count != body.ChildIds.Count || existingIds.ToHashSet().SetEquals(body.ChildIds) is false)
             {
                 await tx.RollbackAsync();
-                return Results.BadRequest("Nowa kolejność musi zawierać dokładnie te same podelementy, co obecny BOM.");
+                return Results.BadRequest("The new order must contain exactly the same children as the current BOM.");
             }
 
             for (var i = 0; i < body.ChildIds.Count; i++)
@@ -444,7 +444,7 @@ static class StructureEndpoints
         {
             var parentInfo = await ItemEndpoints.GetItemTypeAndStatus(connectionString, parentId);
             if (parentInfo is null)
-                return Results.NotFound("Element nadrzędny nie istnieje.");
+                return Results.NotFound("The parent item does not exist.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -500,7 +500,7 @@ static class StructureEndpoints
             if (existingIds.Count != body.ItemIds.Count || existingIds.ToHashSet().SetEquals(body.ItemIds) is false)
             {
                 await tx.RollbackAsync();
-                return Results.BadRequest("Nowa kolejność musi zawierać dokładnie te same korzenie, co obecne drzewko.");
+                return Results.BadRequest("The new order must contain exactly the same roots as the current tree.");
             }
 
             for (var i = 0; i < body.ItemIds.Count; i++)

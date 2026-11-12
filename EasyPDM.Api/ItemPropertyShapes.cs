@@ -18,18 +18,18 @@ static class ItemPropertyShapes
         if (properties.TryGetProperty("nameTexts", out var nameTexts) && nameTexts.ValueKind != JsonValueKind.Null)
         {
             if (nameTexts.ValueKind != JsonValueKind.Array)
-                return "nameTexts musi być listą tłumaczeń.";
+                return "nameTexts must be a list of translations.";
             foreach (var t in nameTexts.EnumerateArray())
             {
                 if (t.ValueKind != JsonValueKind.Object || !IsInt(t, "languageId") || !IsText(t, "name", required: true))
-                    return "Każde tłumaczenie nazwy musi mieć languageId (liczba) i niepustą nazwę.";
+                    return "Every name translation needs a languageId (number) and a non-empty name.";
             }
         }
 
         if (properties.TryGetProperty("processes", out var processes) && processes.ValueKind != JsonValueKind.Null)
         {
             if (processes.ValueKind != JsonValueKind.Array)
-                return "processes musi być listą obróbek.";
+                return "processes must be a list of processes.";
             foreach (var p in processes.EnumerateArray())
             {
                 // Zwykły napis to zapis sprzed wariantów obróbek — nadal czytany jako nazwa.
@@ -39,16 +39,16 @@ static class ItemPropertyShapes
                     || !IsText(p, "name", required: true)
                     || !IsOptionalText(p, "description")
                     || (p.TryGetProperty("id", out var pid) && pid.ValueKind is not (JsonValueKind.Number or JsonValueKind.Null)))
-                    return "Każda obróbka musi mieć nazwę, a opis i id — tekst i liczbę albo brak.";
+                    return "Every process needs a name; description and id must be text and a number, or absent.";
                 if (p.TryGetProperty("texts", out var texts) && texts.ValueKind != JsonValueKind.Null)
                 {
                     if (texts.ValueKind != JsonValueKind.Array)
-                        return "Tłumaczenia obróbki (texts) muszą być listą.";
+                        return "Process translations (texts) must be a list.";
                     foreach (var t in texts.EnumerateArray())
                     {
                         if (t.ValueKind != JsonValueKind.Object || !IsInt(t, "languageId")
                             || !IsText(t, "name", required: true) || !IsOptionalText(t, "description"))
-                            return "Każde tłumaczenie obróbki musi mieć languageId (liczba) i niepustą nazwę.";
+                            return "Every process translation needs a languageId (number) and a non-empty name.";
                     }
                 }
             }

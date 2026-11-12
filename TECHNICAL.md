@@ -830,6 +830,11 @@ a notification can be marked read or deleted (`DELETE /api/notifications/{id}`).
 
 ### API endpoints
 
+Error messages returned by the server (the plain-text bodies of 400/403/404/409 responses)
+and the server logs are in English, whatever the interface language. The web application
+shows its own translated text where it recognises a case (e.g. a 409 on a duplicate name)
+and the server's message otherwise; the CAD macros show the server's message as it is.
+
 | Method | Path | What it does |
 |---|---|---|
 | POST | `/api/auth/login` \| `/logout` | login / logout — login is the only endpoint that doesn't require a session |

@@ -138,7 +138,7 @@ static partial class ProjectLanguageEndpoints
                 if (isDefault is null)
                     return Results.NotFound();
                 if ((bool)isDefault)
-                    return Results.BadRequest("Nie można usunąć domyślnego języka dokumentacji — najpierw wybierz inny.");
+                    return Results.BadRequest("The default documentation language cannot be deleted — choose another one first.");
             }
 
             // Teksty obróbek w tym języku znikają razem z nim (CASCADE), ale obróbka, która ma
@@ -152,7 +152,7 @@ static partial class ProjectLanguageEndpoints
             {
                 onlyText.Parameters.AddWithValue("id", id);
                 if (await onlyText.ExecuteScalarAsync() is not null)
-                    return Results.Conflict("W tym języku jest jedyna nazwa którejś obróbki — najpierw dodaj jej tłumaczenie.");
+                    return Results.Conflict("A process has its only name in this language — add a translation for it first.");
             }
 
             await using var cmd = new NpgsqlCommand("DELETE FROM project_languages WHERE id = @id AND NOT is_default;", conn);
@@ -165,7 +165,7 @@ static partial class ProjectLanguageEndpoints
             {
                 // Język jest głównym językiem albo jednym z języków jakiegoś projektu
                 // (ON DELETE RESTRICT, migracja 064).
-                return Results.Conflict("Język jest używany w projekcie — najpierw zmień go we właściwościach projektu.");
+                return Results.Conflict("The language is used in a project — change it in the project properties first.");
             }
         });
     }
@@ -177,18 +177,18 @@ static partial class ProjectLanguageEndpoints
         var name = (body.Name ?? "").Trim();
         var code = (body.Code ?? "").Trim().ToUpperInvariant();
         if (name.Length == 0)
-            return (name, code, Results.BadRequest("Nazwa języka nie może być pusta."));
+            return (name, code, Results.BadRequest("The language name cannot be empty."));
         if (!CodePattern().IsMatch(code))
-            return (name, code, Results.BadRequest("Skrót języka to od 1 do 3 liter A-Z."));
+            return (name, code, Results.BadRequest("A language code is 1 to 3 letters A-Z."));
         return (name, code, null);
     }
 
     [GeneratedRegex("^[A-Z]{1,3}$")]
     private static partial Regex CodePattern();
 
-    private static IResult Conflict() => Results.Conflict("Język o tej nazwie albo tym skrócie już istnieje.");
+    private static IResult Conflict() => Results.Conflict("A language with this name or code already exists.");
 
-    private static IResult Forbidden() => Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+    private static IResult Forbidden() => Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
 }
 
 record ProjectLanguageRequest(string? Name, string? Code);

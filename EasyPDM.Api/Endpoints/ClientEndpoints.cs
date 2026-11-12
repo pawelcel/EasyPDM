@@ -168,7 +168,7 @@ static class ClientEndpoints
         app.MapPost("/api/clients", async (ClientRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa klienta nie może być pusta.");
+                return Results.BadRequest("The client name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -184,7 +184,7 @@ static class ClientEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Klient o tej nazwie już istnieje.");
+                return Results.Conflict("A client with this name already exists.");
             }
         });
 
@@ -192,7 +192,7 @@ static class ClientEndpoints
         app.MapPatch("/api/clients/{id:int}", async (int id, ClientRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa klienta nie może być pusta.");
+                return Results.BadRequest("The client name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -209,7 +209,7 @@ static class ClientEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Klient o tej nazwie już istnieje.");
+                return Results.Conflict("A client with this name already exists.");
             }
         });
 
@@ -256,7 +256,7 @@ static class ClientEndpoints
             {
                 checkCmd.Parameters.AddWithValue("id", id);
                 if (await checkCmd.ExecuteScalarAsync() is null)
-                    return Results.NotFound("Klient nie istnieje.");
+                    return Results.NotFound("The client does not exist.");
             }
 
             const string sql = """
@@ -310,7 +310,7 @@ static class ClientEndpoints
         app.MapPost("/api/clients/{id:int}/name2", async (int id, Name2Request body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name2))
-                return Results.BadRequest("Nazwa 2 nie może być pusta.");
+                return Results.BadRequest("Name 2 cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -319,7 +319,7 @@ static class ClientEndpoints
             {
                 checkCmd.Parameters.AddWithValue("id", id);
                 if (await checkCmd.ExecuteScalarAsync() is null)
-                    return Results.NotFound("Klient nie istnieje.");
+                    return Results.NotFound("The client does not exist.");
             }
 
             await using var cmd = new NpgsqlCommand(
@@ -334,7 +334,7 @@ static class ClientEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Ten klient ma już taką nazwę 2.");
+                return Results.Conflict("This client already has this Name 2.");
             }
         });
 
@@ -385,7 +385,7 @@ static class ClientEndpoints
         app.MapPatch("/api/clients/{id:int}/name2/{name2Id:int}", async (int id, int name2Id, Name2Request body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name2))
-                return Results.BadRequest("Nazwa 2 nie może być pusta.");
+                return Results.BadRequest("Name 2 cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -404,7 +404,7 @@ static class ClientEndpoints
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.Conflict("Ten klient ma już taką nazwę 2.");
+                return Results.Conflict("This client already has this Name 2.");
             }
         });
 
@@ -419,7 +419,7 @@ static class ClientEndpoints
             await conn.OpenAsync();
 
             if (!await Name2ExistsAsync(conn, id, name2Id))
-                return Results.NotFound("Nazwa 2 nie istnieje.");
+                return Results.NotFound("Name 2 does not exist.");
 
             const string sql = """
                 INSERT INTO client_contacts (client_id, name2_id, first_name, last_name, phone, position, email, address)
@@ -539,7 +539,7 @@ static class ClientEndpoints
         app.MapPost("/api/clients/{id:int}/nodes/folder", async (int id, CreateFolderRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa folderu nie może być pusta.");
+                return Results.BadRequest("The folder name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -566,12 +566,12 @@ static class ClientEndpoints
         app.MapPost("/api/clients/{id:int}/nodes/file", async (int id, HttpRequest request) =>
         {
             if (!request.HasFormContentType)
-                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+                return Results.BadRequest("Expected multipart/form-data.");
 
             var form = await request.ReadFormAsync();
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
-                return Results.BadRequest("Brak pliku w polu 'file'.");
+                return Results.BadRequest("No file in the 'file' field.");
 
             Guid? parentId = null;
             var parentIdRaw = form["parentId"].ToString();
@@ -638,7 +638,7 @@ static class ClientEndpoints
         app.MapPatch("/api/clients/{id:int}/nodes/{nodeId:guid}", async (int id, Guid nodeId, RenameNodeRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa nie może być pusta.");
+                return Results.BadRequest("The name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -720,7 +720,7 @@ static class ClientEndpoints
             }
 
             if (!File.Exists(path))
-                return Results.NotFound("Plik zniknął z magazynu na dysku serwera.");
+                return Results.NotFound("The file is missing from the server's storage.");
 
             return Results.File(path, "application/octet-stream", fileName);
         });
@@ -802,7 +802,7 @@ static class ClientEndpoints
         app.MapPost("/api/clients/{id:int}/name2/{name2Id:int}/nodes/folder", async (int id, int name2Id, CreateFolderRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa folderu nie może być pusta.");
+                return Results.BadRequest("The folder name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -830,12 +830,12 @@ static class ClientEndpoints
         app.MapPost("/api/clients/{id:int}/name2/{name2Id:int}/nodes/file", async (int id, int name2Id, HttpRequest request) =>
         {
             if (!request.HasFormContentType)
-                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+                return Results.BadRequest("Expected multipart/form-data.");
 
             var form = await request.ReadFormAsync();
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
-                return Results.BadRequest("Brak pliku w polu 'file'.");
+                return Results.BadRequest("No file in the 'file' field.");
 
             Guid? parentId = null;
             var parentIdRaw = form["parentId"].ToString();
@@ -903,7 +903,7 @@ static class ClientEndpoints
             async (int id, int name2Id, Guid nodeId, RenameNodeRequest body) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
-                return Results.BadRequest("Nazwa nie może być pusta.");
+                return Results.BadRequest("The name cannot be empty.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -993,7 +993,7 @@ static class ClientEndpoints
             }
 
             if (!File.Exists(path))
-                return Results.NotFound("Plik zniknął z magazynu na dysku serwera.");
+                return Results.NotFound("The file is missing from the server's storage.");
 
             return Results.File(path, "application/octet-stream", fileName);
         });

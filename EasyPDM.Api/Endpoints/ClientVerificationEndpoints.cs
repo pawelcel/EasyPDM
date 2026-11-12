@@ -152,7 +152,7 @@ static class ClientVerificationEndpoints
             async (Guid projectId, Guid itemId, HttpRequest request, HttpContext ctx) =>
         {
             if (!request.HasFormContentType)
-                return Results.BadRequest("Oczekiwano danych multipart/form-data.");
+                return Results.BadRequest("Expected multipart/form-data.");
 
             var form = await request.ReadFormAsync();
             // Brak wyniku jest DOZWOLONY i znaczy "w trakcie weryfikacji" — rzecz poszła do
@@ -162,7 +162,7 @@ static class ClientVerificationEndpoints
             if (string.IsNullOrWhiteSpace(verificationResult))
                 verificationResult = null;
             else if (verificationResult is not (ResultVerified or ResultNeedsWork))
-                return Results.BadRequest($"Pole 'result' musi być '{ResultVerified}', '{ResultNeedsWork}' albo puste.");
+                return Results.BadRequest($"Field 'result' must be '{ResultVerified}', '{ResultNeedsWork}' or empty.");
 
             var comment = form["comment"].ToString();
             if (string.IsNullOrWhiteSpace(comment))
@@ -170,15 +170,15 @@ static class ClientVerificationEndpoints
 
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
-                return Results.NotFound("Element nie istnieje.");
+                return Results.NotFound("The item does not exist.");
             if (info.Value.ItemType is not ("part" or "assembly"))
-                return Results.BadRequest("Weryfikacji klienta podlegają tylko Części i Złożenia.");
+                return Results.BadRequest("Only parts and assemblies can be verified by the client.");
 
             // Weryfikuje się to, co klient faktycznie dostał, czyli wersję WYDANĄ — dla elementu
             // w pracy/sprawdzanego nie ma jeszcze czego akceptować. Ten sam warunek decyduje po
             // stronie frontu o pokazaniu przycisku; tu jest powtórzony, bo UI nie jest strażą.
             if (info.Value.Status != "wydany")
-                return Results.BadRequest("Weryfikację klienta można prowadzić tylko dla elementu w statusie 'Wydany'.");
+                return Results.BadRequest("Client verification is only possible for a Released item.");
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -190,7 +190,7 @@ static class ClientVerificationEndpoints
             // komponent (współdzielona Część spod złożenia z tego projektu) -- inaczej dałoby
             // się dopisać weryfikację do zupełnie niezwiązanego elementu, podając dowolne id.
             if (!await IsItemInProjectAsync(conn, itemId, projectId))
-                return Results.BadRequest("Ten element nie należy do wskazanego projektu.");
+                return Results.BadRequest("This item does not belong to the given project.");
 
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             var verificationId = Guid.NewGuid();
@@ -325,7 +325,7 @@ static class ClientVerificationEndpoints
                 return ItemEndpoints.ProjectAccessForbidden();
 
             if (!File.Exists(filePath))
-                return Results.NotFound("Plik nie istnieje w magazynie.");
+                return Results.NotFound("The file does not exist in storage.");
 
             return Results.File(filePath, "application/octet-stream", fileName);
         });
@@ -336,7 +336,7 @@ static class ClientVerificationEndpoints
         app.MapDelete("/api/client-verifications/{id:guid}", async (Guid id, HttpContext ctx) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
-                return Results.Text("Wymagane uprawnienia administratora.", statusCode: StatusCodes.Status403Forbidden);
+                return Results.Text("Administrator rights required.", statusCode: StatusCodes.Status403Forbidden);
 
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
