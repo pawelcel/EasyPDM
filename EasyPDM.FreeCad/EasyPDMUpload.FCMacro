@@ -462,12 +462,13 @@ def _revisions_table(right, top, width, rows, headers, measure):
             o_text.append(_sh_text(x0 + w_rev + w_date + pad, y + 5.3 + i * LH, line, SIZE))
         for i, line in enumerate(by_l):
             o_text.append(_sh_text(right - w_by + pad, y + 5.3 + i * LH, line, SIZE))
+        if r is not rows[-1]:
+            o_lines.append(_sh_line(x0, y + h, right, y + h))   # the last one is the frame's edge
         y += h
-        o_lines.append(_sh_line(x0, y, right, y))
     bottom = y
     for cx in (x0 + w_rev, x0 + w_rev + w_date, right - w_by):
         o_lines.append(_sh_line(cx, top, cx, bottom))
-    o = ['<g style="%s">' % _THIN] + o_lines[:-1] + ["</g>"]
+    o = ['<g style="%s">' % _THIN] + o_lines + ["</g>"]
     o.append('<rect x="%s" y="%s" width="%s" height="%s" style="%s"/>' % (_sh_f(x0), _sh_f(top), _sh_f(width), _sh_f(bottom - top), _THICK))
     hx = (x0 + pad, x0 + w_rev + pad, x0 + w_rev + w_date + pad, right - w_by + pad)
     for x, h in zip(hx, headers):
