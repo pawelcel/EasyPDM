@@ -657,6 +657,7 @@ zmian.
 | DELETE | `/api/settings/tags/{tagName}` | usunięcie tagu z całej bazy, także z elementów wydanych (tylko administrator) |
 | PATCH/DELETE | `/api/items/{id}/properties[/{key}]` | zarządzanie właściwościami (zablokowane poza statusem `w_pracy` i poza blokadą właściciela — wyjątek: pola ceny) |
 | GET | `/api/items/{id}/revisions` | historia komentarzy rewizji (tylko rewizje z komentarzem) |
+| GET | `/api/items/{id}/title-block` | dane do tabelki rysunkowej w głównym języku projektu elementu: podpisy pól, nazwa (+ tłumaczenia, jeśli projekt jest wielojęzyczny), numer rysunku, rewizja, materiał, narysował / zatwierdził z datami (tylko bieżąca rewizja), obróbki, tabela rewizji (B, C, …), nazwa i logo firmy |
 | GET | `/api/items/{id}/history` | pełna historia: utworzenie, zmiany statusu, rewizje, dodanie/usunięcie załącznika, blokada/zwolnienie właściciela (kiedy/kto/opis), chronologicznie |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | katalog materiałów (nazwa + grupa/podgrupa) |
 | GET/POST/PATCH/DELETE | `/api/processes[/{id}]` | katalog obróbek (nazwa, opis, `forParts`/`forAssemblies`) |

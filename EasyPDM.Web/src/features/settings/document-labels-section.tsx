@@ -19,10 +19,17 @@ import { useProjectLanguages } from "@/features/project-languages/use-project-la
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
-// Podpisy w dokumentach generowanych przez program (na razie nagłówki kolumn eksportu CSV z
-// BOM-u), osobno dla każdego języka dokumentacji. Wbudowane są tłumaczenia PL, EN i DE; każde
+// Podpisy w dokumentach generowanych przez program (nagłówki kolumn eksportu CSV z BOM-u
+// i pola tabelki rysunkowej), osobno dla każdego języka dokumentacji. Wbudowane są tłumaczenia PL, EN i DE; każde
 // można zmienić, a dla innych języków wpisać. Puste pole = podpis wbudowany (pokazany jako
 // podpowiedź). Zmienia administrator, pozostali tylko widzą.
+// Grupy po prefiksie klucza z serwera (DocumentLabels.BuiltIn): ten sam podpis "Data" bywa
+// w kilku miejscach, więc bez podziału nie wiadomo, którego dokumentu dotyczy.
+const LABEL_GROUPS: { prefix: string; title: TranslationKey }[] = [
+  { prefix: "csv.", title: "documentLabels.csvGroup" },
+  { prefix: "titleblock.", title: "documentLabels.titleBlockGroup" },
+]
+
 function DocumentLabelsSection({ isAdmin }: { isAdmin: boolean }) {
   const { t } = useLanguage()
   const { languages } = useProjectLanguages()
@@ -110,33 +117,39 @@ function DocumentLabelsSection({ isAdmin }: { isAdmin: boolean }) {
         </Select>
       </div>
 
-      <div className="mt-3">
-        <div className="mb-1 text-[12.5px] font-medium text-muted-foreground">{t("documentLabels.csvGroup")}</div>
-        <div className="mb-1 grid grid-cols-[minmax(0,16rem)_1fr] gap-2 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">
-          <span>English</span>
-          <span>{selected ? `${selected.name} (${selected.code})` : ""}</span>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {labels.map((l) => (
-            <div key={l.key} className="grid grid-cols-[minmax(0,16rem)_1fr] items-center gap-2">
-              {/* Podpis angielski jako punkt odniesienia; opis, do czego służy, w podpowiedzi. */}
-              <span className="text-sm" title={t(`documentLabels.key.${l.key}` as TranslationKey)}>
-                {l.baseText}
-              </span>
-              {isAdmin ? (
-                <Input
-                  aria-label={t(`documentLabels.key.${l.key}` as TranslationKey)}
-                  value={draft[l.key] ?? ""}
-                  placeholder={l.defaultText}
-                  onChange={(e) => setDraft((d) => ({ ...d, [l.key]: e.target.value }))}
-                />
-              ) : (
-                <span className="text-sm">{l.text}</span>
-              )}
+      {LABEL_GROUPS.map((group) => {
+        const rows = labels.filter((l) => l.key.startsWith(group.prefix))
+        if (rows.length === 0) return null
+        return (
+          <div key={group.prefix} className="mt-3">
+            <div className="mb-1 text-[12.5px] font-medium text-muted-foreground">{t(group.title)}</div>
+            <div className="mb-1 grid grid-cols-[minmax(0,16rem)_1fr] gap-2 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">
+              <span>English</span>
+              <span>{selected ? `${selected.name} (${selected.code})` : ""}</span>
             </div>
-          ))}
-        </div>
-      </div>
+            <div className="flex flex-col gap-1.5">
+              {rows.map((l) => (
+                <div key={l.key} className="grid grid-cols-[minmax(0,16rem)_1fr] items-center gap-2">
+                  {/* Podpis angielski jako punkt odniesienia; opis, do czego służy, w podpowiedzi. */}
+                  <span className="text-sm" title={t(`documentLabels.key.${l.key}` as TranslationKey)}>
+                    {l.baseText}
+                  </span>
+                  {isAdmin ? (
+                    <Input
+                      aria-label={t(`documentLabels.key.${l.key}` as TranslationKey)}
+                      value={draft[l.key] ?? ""}
+                      placeholder={l.defaultText}
+                      onChange={(e) => setDraft((d) => ({ ...d, [l.key]: e.target.value }))}
+                    />
+                  ) : (
+                    <span className="text-sm">{l.text}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
 
       {isAdmin && (
         <div className="mt-3 flex items-center gap-3">

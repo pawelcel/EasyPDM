@@ -1,7 +1,7 @@
 using Npgsql;
 
 // Podpisy w dokumentach generowanych przez program, w języku dokumentacji: nagłówki kolumn
-// eksportu CSV (a w kolejnej wersji pola tabelki rysunkowej). Języki dokumentacji administrator
+// eksportu CSV i pola tabelki rysunkowej. Języki dokumentacji administrator
 // zakłada pod dowolnym skrótem, więc wbudowane tłumaczenia są tylko dla PL, EN i DE; każdy podpis
 // da się zmienić, a dla innych języków wpisać, w Ustawienia -> Język (tabela document_labels).
 // Kolejność rozstrzygania: podpis zapisany dla języka -> wbudowany dla jego skrótu -> angielski.
@@ -20,6 +20,26 @@ static class DocumentLabels
         ("csv.orderNumber1", "Numer zamówieniowy 1", "Order number 1", "Bestellnummer 1"),
         ("csv.orderNumber2", "Numer zamówieniowy 2", "Order number 2", "Bestellnummer 2"),
         ("csv.processes", "Obróbka", "Processes", "Bearbeitung"),
+        // Drawing title block (GET /api/items/{id}/title-block, filled in by the CAD macros).
+        ("titleblock.drawnBy", "Narysował", "Drawn by", "Gezeichnet"),
+        ("titleblock.approvedBy", "Zatwierdził", "Approved by", "Freigegeben"),
+        ("titleblock.date", "Data", "Date", "Datum"),
+        ("titleblock.material", "Materiał", "Material", "Werkstoff"),
+        ("titleblock.scale", "Skala", "Scale", "Maßstab"),
+        ("titleblock.sheet", "Arkusz", "Sheet", "Blatt"),
+        ("titleblock.mass", "Masa", "Mass", "Masse"),
+        ("titleblock.company", "Firma", "Company", "Firma"),
+        ("titleblock.name", "Nazwa", "Name", "Benennung"),
+        ("titleblock.drawingNumber", "Numer rysunku", "Drawing number", "Zeichnungsnummer"),
+        ("titleblock.revision", "Rewizja", "Revision", "Revision"),
+        ("titleblock.format", "Format", "Format", "Format"),
+        ("titleblock.processNo", "Lp.", "No.", "Pos."),
+        ("titleblock.process", "Obróbka", "Process", "Bearbeitung"),
+        ("titleblock.processDescription", "Opis", "Description", "Beschreibung"),
+        ("titleblock.revisionLetter", "Rew.", "Rev.", "Rev."),
+        ("titleblock.revisionDate", "Data", "Date", "Datum"),
+        ("titleblock.revisionDescription", "Opis zmiany", "Change description", "Änderung"),
+        ("titleblock.revisionBy", "Kto", "By", "Name"),
     ];
 
     public static bool IsKnownKey(string key) => BuiltIn.Any(b => b.Key == key);

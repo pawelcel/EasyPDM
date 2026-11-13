@@ -721,6 +721,7 @@ Meldung des Servers unverändert.
 | DELETE | `/api/settings/tags/{tagName}` | Tag aus der gesamten Datenbank löschen, auch bei freigegebenen Elementen (nur Administrator) |
 | PATCH/DELETE | `/api/items/{id}/properties[/{key}]` | Eigenschaftenverwaltung (gesperrt außerhalb des Status `w_pracy`/in Bearbeitung und bei Eigentümersperre — Ausnahme: Preisfelder) |
 | GET | `/api/items/{id}/revisions` | Historie der Revisionskommentare (nur Revisionen mit Kommentar) |
+| GET | `/api/items/{id}/title-block` | Daten für das Zeichnungsschriftfeld in der Hauptsprache des Heimatprojekts: Feldbeschriftungen, Benennung (+ Übersetzungen bei mehrsprachigem Projekt), Zeichnungsnummer, Revision, Werkstoff, gezeichnet / freigegeben mit Datum (nur aktuelle Revision), Bearbeitungen, Revisionstabelle (B, C, …), Firmenname und Logo |
 | GET | `/api/items/{id}/history` | vollständige Historie: Erstellung, Statusänderungen, Revisionen, hinzugefügter/entfernter Anhang, Eigentümersperre/-freigabe (wann/wer/Beschreibung), chronologisch |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | Materialkatalog (Name + Gruppe/Untergruppe) |
 | GET/POST/PATCH/DELETE | `/api/processes[/{id}]` | Bearbeitungskatalog (Name, Beschreibung, `forParts`/`forAssemblies`) |

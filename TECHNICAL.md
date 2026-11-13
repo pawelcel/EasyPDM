@@ -891,6 +891,7 @@ and the server's message otherwise; the CAD macros show the server's message as 
 | DELETE | `/api/settings/tags/{tagName}` | delete a tag from the whole database, released items included (admin only) |
 | PATCH/DELETE | `/api/items/{id}/properties[/{key}]` | property management (locked outside the `w_pracy`/in-progress status and while owner-locked — exception: price fields) |
 | GET | `/api/items/{id}/revisions` | revision comment history (only revisions with a comment) |
+| GET | `/api/items/{id}/title-block` | data for a drawing title block, in the home project's main language: field labels, name (+ translations if the project is multilingual), drawing number, revision, material, drawn by / approved by with dates (current revision only), processes, revision table (B, C, …), company name and logo |
 | GET | `/api/items/{id}/history` | full history: creation, status changes, revisions, attachment added/removed, owner lock/release (when/who/description), chronologically |
 | GET/POST/PATCH/DELETE | `/api/materials[/{id}]` | material catalog (name + group/subgroup) |
 | GET/POST/PATCH/DELETE | `/api/processes[/{id}]` | process catalog (name, description, `forParts`/`forAssemblies`) |

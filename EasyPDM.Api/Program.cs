@@ -149,6 +149,7 @@ app.MapProcessEndpoints(connectionString);
 app.MapProjectLanguageEndpoints(connectionString);
 app.MapItemNameEndpoints(connectionString);
 app.MapCompanyEndpoints(connectionString);
+app.MapTitleBlockEndpoints(connectionString);
 app.MapDocumentLabelEndpoints(connectionString);
 app.MapMacroTokenEndpoints(connectionString);
 app.MapManufacturerEndpoints(connectionString);
