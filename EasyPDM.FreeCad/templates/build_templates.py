@@ -4,9 +4,13 @@
     python3 build_templates.py
 
 writes EasyPDM_A3_Landscape.svg next to this file AND copies the shared block below (between
-the BEGIN/END SHARED markers) into ../EasyPDMDrawing.FCMacro, so the committed template and
-the sheet the macro builds per drawing come from the same code. Edit this file, not the SVG
-and not the copy in the macro, then rerun it.
+the BEGIN/END SHARED markers) into ../EasyPDMUpload.FCMacro and ../EasyPDMDownload.FCMacro,
+so the committed template and the sheet the macros build per drawing come from the same code.
+Edit this file, not the SVG and not the copies in the macros, then rerun it.
+
+The Upload macro refreshes the sheet before it saves and sends a document (so the CAD file and
+the PDF in EasyPDM carry current data) and offers it once for an ordinary TechDraw page; the
+Download macro refreshes it after opening a file (e.g. to show who approved it).
 
 Layout (agreed mockup, ISO 5457 / ISO 7200 style):
   - drawing frame 20 mm from the left edge (filing margin), 10 mm from the others;
@@ -34,7 +38,11 @@ import os
 import re
 import sys
 
-# ===== BEGIN SHARED (copied into EasyPDMDrawing.FCMacro by build_templates.py) =====
+# ===== BEGIN SHARED (copied into EasyPDMUpload.FCMacro and EasyPDMDownload.FCMacro by templates/build_templates.py; edit it there) =====
+import base64 as _sh_base64
+import glob as _sh_glob
+import time as _sh_time
+from datetime import datetime as _sh_datetime
 from xml.sax.saxutils import escape as _xml_escape
 
 FREECAD_NS = "https://www.freecad.org/wiki/index.php?title=Svg_Namespace"
@@ -66,11 +74,11 @@ SHEET_LABELS = {
 }
 
 
-def _f(v):
+def _sh_f(v):
     return ("%.2f" % v).rstrip("0").rstrip(".")
 
 
-def _esc(text):
+def _sh_esc(text):
     return _xml_escape(text or "", {'"': "&quot;"})
 
 
@@ -115,13 +123,13 @@ def wrap_joined(parts, width, size, measure, sep=" · "):
     return lines
 
 
-def _text(x, y, content, size, extra=""):
+def _sh_text(x, y, content, size, extra=""):
     return '<text x="%s" y="%s" style="font-size:%spx;fill:#000000%s">%s</text>' % (
-        _f(x), _f(y), _f(size), extra, _esc(content))
+        _sh_f(x), _sh_f(y), _sh_f(size), extra, _sh_esc(content))
 
 
-def _line(x1, y1, x2, y2):
-    return '<path d="M %s,%s L %s,%s"/>' % (_f(x1), _f(y1), _f(x2), _f(y2))
+def _sh_line(x1, y1, x2, y2):
+    return '<path d="M %s,%s L %s,%s"/>' % (_sh_f(x1), _sh_f(y1), _sh_f(x2), _sh_f(y2))
 
 
 def build_base_sheet(fmt_name):
@@ -136,34 +144,34 @@ def build_base_sheet(fmt_name):
     OL, OT, OR, OB = 15, 5, W - 5, H - 5         # outer line of the grid strip
     cx, cy = W / 2.0, H / 2.0
     add('<rect id="drawing_frame" x="%s" y="%s" width="%s" height="%s" style="%s"/>'
-        % (FL, FT, _f(FR - FL), _f(FB - FT), _THICK))
+        % (FL, FT, _sh_f(FR - FL), _sh_f(FB - FT), _THICK))
     xs = [cx + 50 * k for k in range(-20, 21) if FL < cx + 50 * k < FR]
     ys = [cy + 50 * k for k in range(-20, 21) if FT < cy + 50 * k < FB]
     add('<g id="grid_reference" style="%s">' % _THIN)
-    add('<rect x="%s" y="%s" width="%s" height="%s"/>' % (OL, OT, _f(OR - OL), _f(OB - OT)))
+    add('<rect x="%s" y="%s" width="%s" height="%s"/>' % (OL, OT, _sh_f(OR - OL), _sh_f(OB - OT)))
     for x in xs:
-        add(_line(x, OT, x, FT))
-        add(_line(x, FB, x, OB))
+        add(_sh_line(x, OT, x, FT))
+        add(_sh_line(x, FB, x, OB))
     for y in ys:
-        add(_line(OL, y, FL, y))
-        add(_line(FR, y, OR, y))
+        add(_sh_line(OL, y, FL, y))
+        add(_sh_line(FR, y, OR, y))
     add("</g>")
     cols, rows = [FL] + xs + [FR], [FT] + ys + [FB]
     add('<g id="grid_reference_markers" style="font-size:3.5px;text-anchor:middle;fill:#000000;stroke:none">')
     for i in range(len(cols) - 1):
         m = (cols[i] + cols[i + 1]) / 2
         for y in (OT + 3.75, FB + 3.75):
-            add('<text x="%s" y="%s">%d</text>' % (_f(m), _f(y), i + 1))
+            add('<text x="%s" y="%s">%d</text>' % (_sh_f(m), _sh_f(y), i + 1))
     for i in range(len(rows) - 1):
         m = (rows[i] + rows[i + 1]) / 2 + 1.25
         for x in ((OL + FL) / 2.0, (FR + OR) / 2.0):
-            add('<text x="%s" y="%s">%s</text>' % (_f(x), _f(m), ZONE_LETTERS[i]))
+            add('<text x="%s" y="%s">%s</text>' % (_sh_f(x), _sh_f(m), ZONE_LETTERS[i]))
     add("</g>")
     add('<g id="centring_marks" style="%s">' % _THICK)
-    add(_line(cx, 0, cx, FT + 5))
-    add(_line(cx, H, cx, FB - 5))
-    add(_line(0, cy, FL + 5, cy))
-    add(_line(W, cy, FR - 5, cy))
+    add(_sh_line(cx, 0, cx, FT + 5))
+    add(_sh_line(cx, H, cx, FB - 5))
+    add(_sh_line(0, cy, FL + 5, cy))
+    add(_sh_line(W, cy, FR - 5, cy))
     add("</g>")
 
     # Title block 180 x 44 mm in the bottom-right corner.
@@ -171,34 +179,34 @@ def build_base_sheet(fmt_name):
     X = lambda dx: x0 + dx
     Y = lambda dy: y0 + dy
     add('<g id="title_block_lines" style="%s">' % _THIN)
-    add(_line(X(70), Y(0), X(70), Y(44)))
+    add(_sh_line(X(70), Y(0), X(70), Y(44)))
     for dy in (11, 22, 33):
-        add(_line(X(0), Y(dy), X(70), Y(dy)))
-    add(_line(X(46), Y(0), X(46), Y(22)))
-    add(_line(X(22), Y(33), X(22), Y(44)))
-    add(_line(X(40), Y(33), X(40), Y(44)))
-    add(_line(X(70), Y(11), X(180), Y(11)))
-    add(_line(X(70), Y(28), X(180), Y(28)))
-    add(_line(X(163), Y(11), X(163), Y(28)))
-    add(_line(X(140), Y(28), X(140), Y(44)))
-    add(_line(X(162), Y(28), X(162), Y(44)))
+        add(_sh_line(X(0), Y(dy), X(70), Y(dy)))
+    add(_sh_line(X(46), Y(0), X(46), Y(22)))
+    add(_sh_line(X(22), Y(33), X(22), Y(44)))
+    add(_sh_line(X(40), Y(33), X(40), Y(44)))
+    add(_sh_line(X(70), Y(11), X(180), Y(11)))
+    add(_sh_line(X(70), Y(28), X(180), Y(28)))
+    add(_sh_line(X(163), Y(11), X(163), Y(28)))
+    add(_sh_line(X(140), Y(28), X(140), Y(44)))
+    add(_sh_line(X(162), Y(28), X(162), Y(44)))
     add("</g>")
     add('<rect id="title_block_frame" x="%s" y="%s" width="180" height="44" style="%s"/>'
-        % (_f(x0), _f(y0), _THICK))
+        % (_sh_f(x0), _sh_f(y0), _THICK))
 
     def label(key, x, y):
         add('<text freecad:editable="pdm_label_%s" x="%s" y="%s" style="font-size:2px;fill:#000000">'
-            "<tspan>%s</tspan></text>" % (key, _f(x), _f(y), _esc(SHEET_LABELS[key][1])))
+            "<tspan>%s</tspan></text>" % (key, _sh_f(x), _sh_f(y), _sh_esc(SHEET_LABELS[key][1])))
 
     def value(key, x, y, size=3.5, text="", bold=False, anchor="start", autofill=None):
-        style = "font-size:%spx;fill:#000000" % _f(size)
+        style = "font-size:%spx;fill:#000000" % _sh_f(size)
         if bold:
             style += ";font-weight:bold"
         if anchor != "start":
             style += ";text-anchor:%s" % anchor
         extra = ' freecad:autofill="%s"' % autofill if autofill else ""
         add('<text freecad:editable="pdm_%s"%s x="%s" y="%s" style="%s"><tspan>%s</tspan></text>'
-            % (key, extra, _f(x), _f(y), style, _esc(text)))
+            % (key, extra, _sh_f(x), _sh_f(y), style, _sh_esc(text)))
 
     add('<g id="title_block_fields" style="fill:#000000;stroke:none">')
     label("drawn_by", X(1.5), Y(3));        value("drawn_by", X(1.5), Y(8.5))
@@ -217,9 +225,9 @@ def build_base_sheet(fmt_name):
     label("format", X(163.5), Y(31));       value("format", X(171), Y(40.5), text=fmt_name, anchor="middle")
     add("</g>")
 
-    add('<g id="pdm_logo" data-x="%s" data-y="%s" data-size="17"/>' % (_f(X(163)), _f(Y(11))))
-    add('<g id="pdm_processes" data-x="%s" data-bottom="%s" data-width="180"/>' % (_f(x0), _f(y0)))
-    add('<g id="pdm_revisions" data-right="%s" data-top="%s" data-width="160"/>' % (_f(FR), _f(FT)))
+    add('<g id="pdm_logo" data-x="%s" data-y="%s" data-size="17"/>' % (_sh_f(X(163)), _sh_f(Y(11))))
+    add('<g id="pdm_processes" data-x="%s" data-bottom="%s" data-width="180"/>' % (_sh_f(x0), _sh_f(y0)))
+    add('<g id="pdm_revisions" data-right="%s" data-top="%s" data-width="160"/>' % (_sh_f(FR), _sh_f(FT)))
     add("</g>")
 
     return (
@@ -229,7 +237,7 @@ def build_base_sheet(fmt_name):
         ' xmlns:freecad="%s" version="1.1"\n'
         '     width="%smm" height="%smm" viewBox="0 0 %s %s">\n'
         '  <title>%s %s landscape</title>\n'
-        % (FREECAD_NS, _f(W), _f(H), _f(W), _f(H), SHEET_TITLE_PREFIX, fmt_name)
+        % (FREECAD_NS, _sh_f(W), _sh_f(H), _sh_f(W), _sh_f(H), SHEET_TITLE_PREFIX, fmt_name)
         + "\n".join("  " + p for p in o) + "\n</svg>\n"
     )
 
@@ -252,34 +260,34 @@ def _processes_table(x0, bottom, width, rows, headers, measure):
     hdr_top = bottom - HDR
     top = hdr_top - sum(b[5] for b in built)
     o = ['<g style="%s">' % _THIN]
-    o.append(_line(x0 + w_no, top, x0 + w_no, bottom))
-    o.append(_line(x0 + w_no + w_name, top, x0 + w_no + w_name, bottom))
-    o.append(_line(x0, hdr_top, x0 + width, hdr_top))
+    o.append(_sh_line(x0 + w_no, top, x0 + w_no, bottom))
+    o.append(_sh_line(x0 + w_no + w_name, top, x0 + w_no + w_name, bottom))
+    o.append(_sh_line(x0, hdr_top, x0 + width, hdr_top))
     yb = hdr_top
     for b in built:
         yt = yb - b[5]
-        o.append(_line(x0, yt, x0 + width, yt))
+        o.append(_sh_line(x0, yt, x0 + width, yt))
         yb = yt
     o.append('</g><g style="%s">' % _THICK)
-    o.append('<rect x="%s" y="%s" width="%s" height="%s"/>' % (_f(x0), _f(top), _f(width), _f(bottom - top)))
+    o.append('<rect x="%s" y="%s" width="%s" height="%s"/>' % (_sh_f(x0), _sh_f(top), _sh_f(width), _sh_f(bottom - top)))
     o.append("</g>")
-    o.append(_text(x0 + pad, hdr_top + 4.2, headers[0], 2.4, ";font-weight:bold"))
-    o.append(_text(x0 + w_no + pad, hdr_top + 4.2, headers[1], 2.4, ";font-weight:bold"))
-    o.append(_text(x0 + w_no + w_name + pad, hdr_top + 4.2, headers[2], 2.4, ";font-weight:bold"))
+    o.append(_sh_text(x0 + pad, hdr_top + 4.2, headers[0], 2.4, ";font-weight:bold"))
+    o.append(_sh_text(x0 + w_no + pad, hdr_top + 4.2, headers[1], 2.4, ";font-weight:bold"))
+    o.append(_sh_text(x0 + w_no + w_name + pad, hdr_top + 4.2, headers[2], 2.4, ";font-weight:bold"))
     yb = hdr_top
     for n, name_l, desc_l, ntr_l, dtr_l, h in built:
         yt = yb - h
-        o.append(_text(x0 + w_no / 2.0, yt + 5.0, str(n), MAIN, ";text-anchor:middle"))
+        o.append(_sh_text(x0 + w_no / 2.0, yt + 5.0, str(n), MAIN, ";text-anchor:middle"))
         for col_x, main_l, small_l in ((x0 + w_no + pad, name_l, ntr_l), (x0 + w_no + w_name + pad, desc_l, dtr_l)):
             y = yt + 4.4
             for line in main_l:
-                o.append(_text(col_x, y, line, MAIN))
+                o.append(_sh_text(col_x, y, line, MAIN))
                 y += LH_MAIN
             if not main_l:
                 y += LH_MAIN
             y -= 0.6
             for line in small_l:
-                o.append(_text(col_x, y, line, SMALL))
+                o.append(_sh_text(col_x, y, line, SMALL))
                 y += LH_SMALL
         yb = yt
     return o
@@ -294,27 +302,27 @@ def _revisions_table(right, top, width, rows, headers, measure):
     SIZE, LH, HDR, pad = 2.6, 3.2, 6.0, 1.5
     o_lines, o_text = [], []
     y = top + HDR
-    o_lines.append(_line(x0, y, right, y))
+    o_lines.append(_sh_line(x0, y, right, y))
     for r in rows:
         desc_l = wrap_text(r.get("description", ""), w_desc - 2 * pad, SIZE, measure) or [""]
         by_l = wrap_text(r.get("by", ""), w_by - 2 * pad, SIZE, measure) or [""]
         h = max(8.0, 3.0 + LH * max(len(desc_l), len(by_l)))
-        o_text.append(_text(x0 + w_rev / 2.0, y + 5.3, r.get("label", ""), 3.4, ";font-weight:bold;text-anchor:middle"))
-        o_text.append(_text(x0 + w_rev + pad, y + 5.3, r.get("date", ""), SIZE))
+        o_text.append(_sh_text(x0 + w_rev / 2.0, y + 5.3, r.get("label", ""), 3.4, ";font-weight:bold;text-anchor:middle"))
+        o_text.append(_sh_text(x0 + w_rev + pad, y + 5.3, r.get("date", ""), SIZE))
         for i, line in enumerate(desc_l):
-            o_text.append(_text(x0 + w_rev + w_date + pad, y + 5.3 + i * LH, line, SIZE))
+            o_text.append(_sh_text(x0 + w_rev + w_date + pad, y + 5.3 + i * LH, line, SIZE))
         for i, line in enumerate(by_l):
-            o_text.append(_text(right - w_by + pad, y + 5.3 + i * LH, line, SIZE))
+            o_text.append(_sh_text(right - w_by + pad, y + 5.3 + i * LH, line, SIZE))
         y += h
-        o_lines.append(_line(x0, y, right, y))
+        o_lines.append(_sh_line(x0, y, right, y))
     bottom = y
     for cx in (x0 + w_rev, x0 + w_rev + w_date, right - w_by):
-        o_lines.append(_line(cx, top, cx, bottom))
+        o_lines.append(_sh_line(cx, top, cx, bottom))
     o = ['<g style="%s">' % _THIN] + o_lines[:-1] + ["</g>"]
-    o.append('<rect x="%s" y="%s" width="%s" height="%s" style="%s"/>' % (_f(x0), _f(top), _f(width), _f(bottom - top), _THICK))
+    o.append('<rect x="%s" y="%s" width="%s" height="%s" style="%s"/>' % (_sh_f(x0), _sh_f(top), _sh_f(width), _sh_f(bottom - top), _THICK))
     hx = (x0 + pad, x0 + w_rev + pad, x0 + w_rev + w_date + pad, right - w_by + pad)
     for x, h in zip(hx, headers):
-        o.append(_text(x, top + 4.2, h, 2.4, ";font-weight:bold"))
+        o.append(_sh_text(x, top + 4.2, h, 2.4, ";font-weight:bold"))
     return o + o_text
 
 
@@ -351,7 +359,7 @@ def fill_sheet(svg, values, processes=None, revisions=None, process_headers=None
         name = m.group(2)
         if name not in values:
             return m.group(0)
-        return m.group(1) + "<tspan>%s</tspan>" % _esc(values[name]) + m.group(4)
+        return m.group(1) + "<tspan>%s</tspan>" % _sh_esc(values[name]) + m.group(4)
 
     svg = re.sub(r'(<text\b[^>]*\bfreecad:editable="([^"]+)"[^>]*>)(.*?)(</text>)', fill, svg, flags=re.S)
 
@@ -375,13 +383,229 @@ def fill_sheet(svg, values, processes=None, revisions=None, process_headers=None
         if logo_href:
             size, pad = float(a.get("size", 17)), 1.5
             inner = ['<image x="%s" y="%s" width="%s" height="%s" preserveAspectRatio="xMidYMid meet" xlink:href="%s"/>'
-                     % (_f(float(a.get("x", 0)) + pad), _f(float(a.get("y", 0)) + pad), _f(size - 2 * pad), _f(size - 2 * pad), logo_href)]
+                     % (_sh_f(float(a.get("x", 0)) + pad), _sh_f(float(a.get("y", 0)) + pad), _sh_f(size - 2 * pad), _sh_f(size - 2 * pad), logo_href)]
         svg = _replace_group(svg, "pdm_logo", inner)
     return svg
+
+# --- FreeCAD side: refreshing the EasyPDM sheet on a document's TechDraw pages. Uses the
+# host macro's api_get / api_get_binary and FreeCAD's App; nothing here runs on import.
+
+def _sh_qt_measure():
+    """Text width from the real osifont metrics when Qt is available (inside FreeCAD's GUI),
+    so wrapping matches what TechDraw draws; approx_text_width otherwise."""
+    try:
+        try:
+            from PySide6 import QtGui as _QtGui
+        except ImportError:
+            try:
+                from PySide2 import QtGui as _QtGui
+            except ImportError:
+                from PySide import QtGui as _QtGui
+        font_path = os.path.join(App.getResourceDir(), "Mod", "TechDraw", "Resources", "fonts", "osifont-lgpl3fe.ttf")
+        families = []
+        if os.path.exists(font_path):
+            fid = _QtGui.QFontDatabase.addApplicationFont(font_path)
+            families = _QtGui.QFontDatabase.applicationFontFamilies(fid) if fid >= 0 else []
+        if not families:
+            return approx_text_width
+        font = _QtGui.QFont(families[0])
+        font.setPixelSize(100)
+        metrics = _QtGui.QFontMetricsF(font)
+        advance = getattr(metrics, "horizontalAdvance", None) or metrics.width
+        return lambda text, size: advance(text or "") * size / 100.0
+    except Exception:
+        return approx_text_width
+
+
+def _sh_local_date(iso):
+    """"2026-11-12T09:14:03.5Z" -> "2026-11-12" in the computer's own time zone."""
+    if not iso:
+        return ""
+    try:
+        s = re.sub(r"\.(\d{6})\d+", r".\1", iso.replace("Z", "+00:00"))
+        dt = _sh_datetime.fromisoformat(s)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone()
+        return dt.strftime("%Y-%m-%d")
+    except Exception:
+        return iso[:10]
+
+
+def _sh_scale_text(scale):
+    try:
+        s = float(scale)
+    except Exception:
+        return "1:1"
+    if s <= 0:
+        return "1:1"
+    if s < 1:
+        return "1:%s" % ("%g" % round(1.0 / s, 3))
+    return "%s:1" % ("%g" % round(s, 3))
+
+
+def _sh_logo_href(tb):
+    company = tb.get("company") or {}
+    if not company.get("hasLogo"):
+        return None
+    try:
+        data = api_get_binary("/settings/company/logo")
+    except Exception:
+        return None
+    mime = "image/png" if data[:4] == b"\x89PNG" else "image/jpeg" if data[:2] == b"\xff\xd8" else None
+    if not mime:
+        return None
+    return "data:%s;base64,%s" % (mime, _sh_base64.b64encode(data).decode("ascii"))
+
+
+def sheet_values(tb, page_scale, sheet_no, sheet_count):
+    """Values for the pdm_* fields from GET /items/{id}/title-block."""
+    labels = tb.get("labels") or {}
+    v = {}
+    for field, (key, english) in SHEET_LABELS.items():
+        v["pdm_label_" + field] = (labels.get(key) or english).upper()
+    drawn = tb.get("drawnBy") or {}
+    approved = tb.get("approvedBy") or {}
+    company = tb.get("company") or {}
+    mass = tb.get("mass")
+    v.update({
+        "pdm_drawn_by": drawn.get("name") or "",
+        "pdm_drawn_date": _sh_local_date(drawn.get("at")),
+        "pdm_approved_by": approved.get("name") or "",
+        "pdm_approved_date": _sh_local_date(approved.get("at")),
+        "pdm_material": tb.get("material") or "",
+        "pdm_mass": ("%s kg" % mass) if mass else "",
+        "pdm_company": company.get("name") or "",
+        "pdm_name": tb.get("name") or "",
+        "pdm_name_translations": " \u00b7 ".join(
+            "%s: %s" % (x.get("languageCode"), x.get("name")) for x in tb.get("nameTranslations") or []),
+        "pdm_drawing_number": tb.get("drawingNumber") or "",
+        "pdm_revision": tb.get("revisionLabel") or "",
+        "pdm_scale": _sh_scale_text(page_scale),
+        "pdm_sheet": "%d / %d" % (sheet_no, sheet_count),
+    })
+    return v
+
+
+def sheet_tables(tb):
+    labels = tb.get("labels") or {}
+    lab = lambda k, d: (labels.get(k) or d).upper()
+    processes = []
+    for p in tb.get("processes") or []:
+        tr = p.get("translations") or []
+        processes.append({
+            "name": p.get("name") or "",
+            "description": p.get("description") or "",
+            "nameTr": ["%s: %s" % (x.get("languageCode"), x.get("name")) for x in tr if x.get("name")],
+            "descTr": ["%s: %s" % (x.get("languageCode"), x.get("description")) for x in tr if x.get("description")],
+        })
+    revisions = [{
+        "label": r.get("revisionLabel") or "",
+        "date": _sh_local_date(r.get("at")),
+        "description": r.get("description") or "",
+        "by": r.get("by") or "",
+    } for r in tb.get("revisions") or []]
+    return (processes, revisions,
+            (lab("processNo", "No."), lab("process", "Process"), lab("processDescription", "Description")),
+            (lab("revisionLetter", "Rev."), lab("revisionDate", "Date"), lab("revisionDescription", "Change description"), lab("revisionBy", "By")))
+
+
+def is_pdm_template(tpl):
+    try:
+        return tpl is not None and any(k.startswith("pdm_") for k in dict(tpl.EditableTexts))
+    except Exception:
+        return False
+
+
+def _sh_template_text(tpl):
+    for path in (getattr(tpl, "Template", ""), getattr(tpl, "PageResult", "")):
+        if path and os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                return f.read()
+    return ""
+
+
+def _sh_write_sheet(doc, page, svg):
+    """A new file name on every refresh: FreeCAD reloads a template only when the path
+    changes. Older working copies of the same page are removed; the .FCStd keeps its own."""
+    d = os.path.join(App.getUserAppDataDir(), "EasyPDM", "sheets")
+    os.makedirs(d, exist_ok=True)
+    prefix = re.sub(r"[^A-Za-z0-9_-]+", "_", "%s_%s" % (doc.Name, page.Name))
+    for old in _sh_glob.glob(os.path.join(d, prefix + "_*.svg")):
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+    path = os.path.join(d, "%s_%d.svg" % (prefix, int(_sh_time.time() * 1000)))
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(svg)
+    return path
+
+
+def _sh_refresh_page(doc, page, tb, sheet_no, sheet_count, logo_href, measure):
+    """Rebuilds one page's sheet; returns False when nothing changed (the template is then
+    left alone, so an unchanged document does not turn "modified")."""
+    tpl = page.Template
+    current = _sh_template_text(tpl) if tpl is not None else ""
+    own = (not current) or (SHEET_TITLE_PREFIX in current)
+    if own:
+        m = re.search(re.escape(SHEET_TITLE_PREFIX) + r" (\w+)", current or "")
+        base = build_base_sheet(m.group(1) if m and m.group(1) in SHEET_FORMATS else "A3")
+    else:
+        base = current
+    values = sheet_values(tb, getattr(page, "Scale", 1.0), sheet_no, sheet_count)
+    if not own:
+        values.pop("pdm_label_format", None)
+    processes, revisions, p_head, r_head = sheet_tables(tb)
+    svg = fill_sheet(base, values, processes, revisions, p_head, r_head, logo_href, measure)
+
+    old_texts = dict(tpl.EditableTexts) if tpl is not None else {}
+    if tpl is not None and svg == current and all(old_texts.get(k) == v for k, v in values.items() if k in old_texts):
+        return False
+    if tpl is None:
+        tpl = doc.addObject("TechDraw::DrawSVGTemplate", "EasyPDMTemplate")
+        page.Template = tpl
+    tpl.Template = _sh_write_sheet(doc, page, svg)
+    texts = dict(tpl.EditableTexts)
+    for k, val in old_texts.items():
+        if not k.startswith("pdm_") and k in texts:
+            texts[k] = val     # fields of a custom template keep what was typed into them
+    for k, val in values.items():
+        if k in texts:
+            texts[k] = val
+    tpl.EditableTexts = texts
+    return True
+
+
+def refresh_sheets(doc, item_id, ask_existing_page=None):
+    """Fills every TechDraw page of `doc` that uses the EasyPDM sheet (pdm_* fields) with the
+    item's title block data. When the document has pages but none with the sheet,
+    `ask_existing_page(page)` -- if given -- decides whether the sheet goes on the first of
+    them (its views stay). Never creates a page. Returns the pages that changed."""
+    pages = [o for o in doc.Objects if o.TypeId == "TechDraw::DrawPage"]
+    targets = [p for p in pages if is_pdm_template(p.Template)]
+    if not targets and pages and ask_existing_page is not None and ask_existing_page(pages[0]):
+        old = pages[0].Template
+        tpl = doc.addObject("TechDraw::DrawSVGTemplate", "EasyPDMTemplate")
+        pages[0].Template = tpl
+        if old is not None and not old.InList:
+            doc.removeObject(old.Name)
+        targets = [pages[0]]
+    if not targets:
+        return []
+    tb = api_get("/items/%s/title-block" % item_id)
+    logo = _sh_logo_href(tb)
+    measure = _sh_qt_measure()
+    changed = [p for p in targets
+               if _sh_refresh_page(doc, p, tb, pages.index(p) + 1, len(pages), logo, measure)]
+    if changed:
+        doc.recompute()
+    return changed
+
 # ===== END SHARED =====
 
 
-MACRO = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "EasyPDMDrawing.FCMacro")
+MACROS = [os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, name)
+          for name in ("EasyPDMUpload.FCMacro", "EasyPDMDownload.FCMacro")]
 BEGIN = "# ===== BEGIN SHARED"
 END = "# ===== END SHARED ====="
 
@@ -394,12 +618,9 @@ def _shared_block():
     return src[start:end]
 
 
-def sync_macro():
-    """Replaces the shared block in EasyPDMDrawing.FCMacro with the one above."""
-    path = os.path.abspath(MACRO)
-    if not os.path.exists(path):
-        print("skip macro sync:", path, "does not exist")
-        return
+def sync_macro(path):
+    """Replaces the shared block in one macro with the one above."""
+    path = os.path.abspath(path)
     with open(path, encoding="utf-8", newline="") as f:
         macro = f.read()
     start = macro.index(BEGIN)
@@ -418,6 +639,5 @@ if __name__ == "__main__":
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(build_base_sheet(name))
         print("wrote", path)
-    sync_macro()
-    if "--check" in sys.argv:
-        pass
+    for macro in MACROS:
+        sync_macro(macro)

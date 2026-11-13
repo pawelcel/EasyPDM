@@ -2,7 +2,7 @@
 
 [English](README.md) | **Polski** | [Deutsch](README.de.md)
 
-Trzy niezależne makra: wysyłanie, pobieranie/otwieranie i arkusz rysunkowy:
+Dwa niezależne makra, jedno na wysyłanie, jedno na pobieranie/otwieranie:
 
 - **`EasyPDMUpload.FCMacro`** wysyła aktywny dokument FreeCAD do EasyPDM. Makro nie pyta
   lokalnie o NIC poza folderem zapisu — nawet wybór "nowy element czy dogranie do
@@ -14,10 +14,10 @@ Trzy niezależne makra: wysyłanie, pobieranie/otwieranie i arkusz rysunkowy:
 - **`EasyPDMDownload.FCMacro`** pobiera Część/Złożenie z EasyPDM (razem ze WSZYSTKIMI jego
   składnikami, jeśli to Złożenie) i od razu je otwiera w FreeCAD (opisane w osobnej sekcji
   na końcu tego pliku).
-- **`EasyPDMDrawing.FCMacro`** wstawia arkusz rysunkowy EasyPDM na stronę TechDraw dokumentu
-  i wypełnia tabelkę danymi z EasyPDM (sekcja na samym końcu).
+- Oba pilnują też, żeby **arkusz rysunkowy EasyPDM** na stronie TechDraw dokumentu był
+  wypełniony danymi z EasyPDM (sekcja na samym końcu).
 
-Wszystkie trzy dzielą to samo logowanie i adres API (te same preferencje FreeCAD) — zalogowanie się
+Oba dzielą to samo logowanie i adres API (te same preferencje FreeCAD) — zalogowanie się
 w jednym starcza dla drugiego.
 
 ## Instalacja
@@ -450,35 +450,37 @@ wgrany załącznik jako najlepsze przybliżenie.
 
 **Potwierdzone na żywo na prawdziwym FreeCAD 1.1** i działającym serwerze: wybór elementu w przeglądarce, pobranie całego złożenia z komponentami, sprawdzanie plików obecnych już w folderze i otwarcie wyniku, także złożenia wysłanego i pobranego z powrotem.
 
-# EasyPDMDrawing.FCMacro — arkusz rysunkowy z tabelką
+# Arkusz rysunkowy z tabelką
 
-Uruchamia się je na dokumencie części albo złożenia, który już jest w EasyPDM (wysłany
-makrem `EasyPDMUpload.FCMacro`, więc jego nazwa to nazwa rekordu elementu, np.
-`C0005(Wspornik).B`).
+Arkusz EasyPDM (`templates/EasyPDM_A3_Landscape.svg`: ramka i strefy wg ISO 5457, tabelka
+w prawym dolnym rogu) wypełniają oba makra powyżej — nie ma do tego osobnego makra.
 
-## Co robi
+## Kiedy jest wypełniany
 
-- Pobiera z EasyPDM dane do tabelki elementu (`GET /api/items/{id}/title-block`).
-- Odświeża strony TechDraw z arkuszem EasyPDM. Dokument bez takiej strony dostaje nową; jeśli
-  ma już zwykłą stronę, makro pyta, czy wstawić na nią arkusz EasyPDM (widoki zostają), czy
-  dodać nową stronę.
-- Wpisuje: narysował / zatwierdził z datami (tylko bieżąca rewizja — puste, dopóki element nie
-  zostanie sprawdzony i wydany), nazwę z tłumaczeniami (projekty wielojęzyczne), numer
-  rysunku, rewizję, materiał, masę, firmę i logo, skalę strony i numer arkusza. Podpisy pól są
-  w głównym języku projektu (Ustawienia → Język → Podpisy w dokumentach).
-- Buduje tabelę obróbek nad tabelką (nagłówek na dole, wiersze rosną w górę, długie opisy i
-  tłumaczenia się zawijają) i tabelę rewizji w prawym górnym rogu (B, C, …; rewizja A to
-  pierwsze wydanie i nie jest wypisywana).
+- **Upload**, zanim zapisze i wyśle dokument: odświeża każdą stronę TechDraw z arkuszem
+  EasyPDM, więc plik CAD i PDF w EasyPDM mają aktualną tabelkę. Jeśli dokument ma zamiast tego
+  zwykłą stronę TechDraw, makro raz pyta, czy wstawić na nią arkusz EasyPDM (widoki zostają);
+  „Nie” zostaje zapamiętane w dokumencie. Dokument bez strony rysunku zostaje bez zmian.
+- **Download**, po otwarciu pliku: odświeża strony z arkuszem EasyPDM — tak „zatwierdził”
+  trafia na rysunek wysłany przed wydaniem elementu (wydanego elementu nie da się wysłać
+  ponownie). Niczego tu nie dodaje ani o nic nie pyta.
+- Żeby zacząć rysunek od arkusza: TechDraw → Wstaw stronę z szablonu →
+  `EasyPDM_A3_Landscape.svg`; najbliższy Upload go wypełni.
 
-Uruchom je ponownie, gdy coś zmieni się w EasyPDM: odświeża wszystko, więc wartości wpisane
-ręcznie w pola EasyPDM zostaną nadpisane.
+## Co pokazuje
+
+Narysował / zatwierdził z datami (tylko bieżąca rewizja — puste, dopóki element nie zostanie
+sprawdzony i wydany), nazwę z tłumaczeniami (projekty wielojęzyczne), numer rysunku, rewizję,
+materiał, masę, firmę i logo, skalę strony i numer arkusza; tabelę obróbek nad tabelką
+(nagłówek na dole, wiersze rosną w górę, długie opisy i tłumaczenia się zawijają) i tabelę
+rewizji w prawym górnym rogu (B, C, …; rewizja A to pierwsze wydanie i nie jest wypisywana).
+Podpisy pól są w głównym języku projektu (Ustawienia → Język → Podpisy w dokumentach).
+Wartości wpisane ręcznie w pola EasyPDM zostaną nadpisane przy najbliższym odświeżeniu.
 
 ## Szablon
 
-`templates/EasyPDM_A3_Landscape.svg` (ramka i strefy wg ISO 5457, tabelka w prawym dolnym
-rogu) można też wstawić ręcznie w TechDraw. Generuje go `templates/build_templates.py`, który
-kopiuje też kod budujący arkusz do tego makra — zmieniaj skrypt, nie SVG ani kopię, i uruchom
-go ponownie.
+`templates/build_templates.py` generuje SVG i kopiuje kod budujący arkusz do obu makr —
+zmieniaj skrypt, nie SVG ani kopie, i uruchom go ponownie.
 
 Własny szablon też zadziała, jeśli nazwie pola tak jak szablon EasyPDM (`pdm_name`,
 `pdm_drawn_by`, `pdm_label_name`, …), a dla tabel i logo ma puste grupy o id `pdm_processes`,

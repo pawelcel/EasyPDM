@@ -2,7 +2,7 @@
 
 [English](README.md) | [Polski](README.pl.md) | **Deutsch**
 
-Drei unabhängige Makros: Senden, Herunterladen/Öffnen und das Zeichnungsblatt:
+Zwei unabhängige Makros, eines zum Senden, eines zum Herunterladen/Öffnen:
 
 - **`EasyPDMUpload.FCMacro`** sendet das aktive FreeCAD-Dokument an EasyPDM. Das Makro
   fragt lokal NICHTS ab außer dem Speicherordner — sogar die Wahl "neues Element oder
@@ -16,10 +16,10 @@ Drei unabhängige Makros: Senden, Herunterladen/Öffnen und das Zeichnungsblatt:
   (zusammen mit ALLEN seinen/ihren Komponenten, falls es sich um eine Baugruppe handelt)
   und öffnet es/sie sofort in FreeCAD (in einem eigenen Abschnitt am Ende dieser Datei
   beschrieben).
-- **`EasyPDMDrawing.FCMacro`** setzt das EasyPDM-Zeichnungsblatt auf die TechDraw-Seite des
-  Dokuments und füllt das Schriftfeld aus EasyPDM (Abschnitt ganz am Ende).
+- Beide halten auch das **EasyPDM-Zeichnungsblatt** auf der TechDraw-Seite eines Dokuments
+  mit Daten aus EasyPDM gefüllt (Abschnitt ganz am Ende).
 
-Alle drei teilen sich dieselbe Anmeldung und API-Adresse (dieselben FreeCAD-Einstellungen) —
+Beide teilen sich dieselbe Anmeldung und API-Adresse (dieselben FreeCAD-Einstellungen) —
 die Anmeldung bei einem reicht für das andere.
 
 ## Installation
@@ -509,36 +509,42 @@ nimmt es einfach den zuletzt hochgeladenen Anhang als beste Annäherung.
 
 **Live bestätigt auf einem echten FreeCAD 1.1** mit laufendem Server: Auswahl des Elements im Browser, Herunterladen einer ganzen Baugruppe mit Komponenten, die Prüfung bereits im Ordner vorhandener Dateien und das Öffnen des Ergebnisses, auch bei einer hochgeladenen und wieder heruntergeladenen Baugruppe.
 
-# EasyPDMDrawing.FCMacro — Zeichnungsblatt mit Schriftfeld
+# Zeichnungsblatt mit Schriftfeld
 
-Es wird auf einem Teil- oder Baugruppendokument ausgeführt, das bereits in EasyPDM ist (mit
-`EasyPDMUpload.FCMacro` gesendet, sodass sein Name der Datensatzname des Elements ist, z. B.
-`C0005(Halter).B`).
+Das EasyPDM-Blatt (`templates/EasyPDM_A3_Landscape.svg`: Rahmen und Feldeinteilung nach
+ISO 5457, Schriftfeld rechts unten) wird von den beiden Makros oben ausgefüllt — ein eigenes
+Makro dafür gibt es nicht.
 
-## Was es tut
+## Wann es ausgefüllt wird
 
-- Liest die Schriftfelddaten des Elements aus EasyPDM (`GET /api/items/{id}/title-block`).
-- Aktualisiert die TechDraw-Seiten mit dem EasyPDM-Blatt. Ein Dokument ohne eine solche Seite
-  erhält eine neue; hat es bereits eine gewöhnliche Seite, fragt das Makro, ob das EasyPDM-Blatt
-  darauf gesetzt (die Ansichten bleiben) oder eine neue Seite hinzugefügt werden soll.
-- Trägt ein: gezeichnet / freigegeben mit Datum (nur aktuelle Revision — leer, bis das Element
-  geprüft und freigegeben ist), Benennung mit Übersetzungen (mehrsprachige Projekte),
-  Zeichnungsnummer, Revision, Werkstoff, Masse, Firma und Logo, Seitenmaßstab und Blattnummer.
-  Die Feldbeschriftungen sind in der Hauptsprache des Projekts (Einstellungen → Sprache →
-  Beschriftungen in Dokumenten).
-- Baut die Bearbeitungstabelle über dem Schriftfeld (Kopfzeile unten, Zeilen wachsen nach oben,
-  lange Beschreibungen und Übersetzungen werden umbrochen) und die Revisionstabelle in der
-  rechten oberen Ecke (B, C, …; Revision A ist die erste Freigabe und wird nicht aufgeführt).
+- **Upload**, bevor es ein Dokument speichert und sendet: Jede TechDraw-Seite mit dem
+  EasyPDM-Blatt wird aktualisiert, sodass die CAD-Datei und das PDF in EasyPDM das aktuelle
+  Schriftfeld tragen. Hat das Dokument stattdessen eine gewöhnliche TechDraw-Seite, fragt das
+  Makro einmal, ob das EasyPDM-Blatt darauf gesetzt werden soll (die Ansichten bleiben);
+  „Nein“ wird im Dokument gespeichert. Ein Dokument ohne Zeichnungsseite bleibt unverändert.
+- **Download**, nach dem Öffnen der Datei: Seiten mit dem EasyPDM-Blatt werden aktualisiert —
+  so gelangt „freigegeben“ auf eine Zeichnung, die vor der Freigabe gesendet wurde (ein
+  freigegebenes Element kann nicht erneut gesendet werden). Hier wird nichts hinzugefügt und
+  nichts gefragt.
+- Um eine Zeichnung mit dem Blatt zu beginnen: TechDraw → Seite mit Vorlage einfügen →
+  `EasyPDM_A3_Landscape.svg`; der nächste Upload füllt sie aus.
 
-Führen Sie es erneut aus, wenn sich in EasyPDM etwas geändert hat: Alles wird aktualisiert,
-von Hand in die EasyPDM-Felder eingetragene Werte werden also überschrieben.
+## Was es zeigt
+
+Gezeichnet / freigegeben mit Datum (nur aktuelle Revision — leer, bis das Element geprüft und
+freigegeben ist), Benennung mit Übersetzungen (mehrsprachige Projekte), Zeichnungsnummer,
+Revision, Werkstoff, Masse, Firma und Logo, Seitenmaßstab und Blattnummer; eine
+Bearbeitungstabelle über dem Schriftfeld (Kopfzeile unten, Zeilen wachsen nach oben, lange
+Beschreibungen und Übersetzungen werden umbrochen) und eine Revisionstabelle in der rechten
+oberen Ecke (B, C, …; Revision A ist die erste Freigabe und wird nicht aufgeführt). Die
+Feldbeschriftungen sind in der Hauptsprache des Projekts (Einstellungen → Sprache →
+Beschriftungen in Dokumenten). Von Hand in die EasyPDM-Felder eingetragene Werte werden bei
+der nächsten Aktualisierung überschrieben.
 
 ## Die Vorlage
 
-`templates/EasyPDM_A3_Landscape.svg` (Rahmen und Feldeinteilung nach ISO 5457, Schriftfeld
-rechts unten) kann auch von Hand in TechDraw eingefügt werden. Sie wird von
-`templates/build_templates.py` erzeugt, das auch den Code zum Aufbau des Blatts in dieses
-Makro kopiert — ändern Sie das Skript, nicht das SVG oder die Kopie, und führen Sie es erneut
+`templates/build_templates.py` erzeugt das SVG und kopiert den Code zum Aufbau des Blatts in
+beide Makros — ändern Sie das Skript, nicht das SVG oder die Kopien, und führen Sie es erneut
 aus.
 
 Eine eigene Vorlage funktioniert ebenfalls, wenn sie ihre Felder wie die EasyPDM-Vorlage
