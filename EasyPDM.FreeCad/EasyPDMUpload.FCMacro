@@ -741,7 +741,12 @@ def refresh_sheets(doc, item_id, ask_existing_page=None):
     them (its views stay). Never creates a page. Returns the pages that changed."""
     pages = [o for o in doc.Objects if o.TypeId == "TechDraw::DrawPage"]
     targets = [p for p in pages if is_pdm_template(p.Template)]
-    if not targets and pages and ask_existing_page is not None and ask_existing_page(pages[0]):
+    if not pages or (not targets and ask_existing_page is None):
+        return []
+    # Data first, changes after: a server without this endpoint (older than 0.8.1) fails
+    # here, before an ordinary page has had its template swapped for an empty one.
+    tb = api_get("/items/%s/title-block" % item_id)
+    if not targets and ask_existing_page(pages[0]):
         old = pages[0].Template
         tpl = doc.addObject("TechDraw::DrawSVGTemplate", "EasyPDMTemplate")
         pages[0].Template = tpl
@@ -750,7 +755,6 @@ def refresh_sheets(doc, item_id, ask_existing_page=None):
         targets = [pages[0]]
     if not targets:
         return []
-    tb = api_get("/items/%s/title-block" % item_id)
     logo = _sh_logo_href(tb)
     measure = _sh_qt_measure()
     changed = [p for p in targets
