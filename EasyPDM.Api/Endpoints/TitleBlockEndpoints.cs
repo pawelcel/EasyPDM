@@ -67,7 +67,8 @@ static class TitleBlockEndpoints
             if (itemType != "part" && itemType != "assembly")
                 return Results.BadRequest("Only parts and assemblies have a title block.");
 
-            // Other languages of a multilingual project, in a stable order, with their codes.
+            // Other languages of a multilingual project, in the order they were added (English and
+            // Polish come built in, others follow), so translations read "EN: Cube · DE: Würfel".
             var otherLanguages = new List<(int Id, string Code)>();
             if (multilingual)
             {
@@ -75,7 +76,7 @@ static class TitleBlockEndpoints
                     SELECT l.id, l.code FROM project_language_links pl
                     JOIN project_languages l ON l.id = pl.language_id
                     WHERE pl.project_id = @project AND l.id <> @main
-                    ORDER BY l.code;
+                    ORDER BY l.id;
                     """, conn);
                 cmd.Parameters.AddWithValue("project", projectId!.Value);
                 cmd.Parameters.AddWithValue("main", (object?)languageId ?? DBNull.Value);
@@ -198,6 +199,8 @@ static class TitleBlockEndpoints
                 revisionLabel = RevisionLabeling.Label(revisionNumber),
                 status,
                 material = Text(properties, "material"),
+                // Mass in kg as the upload macros store it (properties.mass, plain number text).
+                mass = Text(properties, "mass"),
                 drawnBy,
                 approvedBy,
                 processes,

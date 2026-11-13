@@ -79,6 +79,9 @@ jobs:
           cp EasyPDM.Inventor/EasyPDMDownload.bas "artifacts/macros/EasyPDM_Inventor_Download_v${VERSION}.bas"
           cp EasyPDM.FreeCad/EasyPDMUpload.FCMacro   "artifacts/macros/EasyPDM_FreeCad_Upload_v${VERSION}.FCMacro"
           cp EasyPDM.FreeCad/EasyPDMDownload.FCMacro "artifacts/macros/EasyPDM_FreeCad_Download_v${VERSION}.FCMacro"
+          cp EasyPDM.FreeCad/EasyPDMDrawing.FCMacro  "artifacts/macros/EasyPDM_FreeCad_Drawing_v${VERSION}.FCMacro"
+          # The drawing macro builds the sheet itself; the template is attached for inserting by hand.
+          cp EasyPDM.FreeCad/templates/EasyPDM_A3_Landscape.svg "artifacts/macros/EasyPDM_FreeCad_A3_Landscape_v${VERSION}.svg"
 
       # Tag to np. "v0.2", nagłówek w CHANGELOG.md to "## [0.2]" (bez "v") — wycina samą
       # sekcję dla tej wersji (od nagłówka do NASTĘPNEGO "## [", wyłącznie), do notatek

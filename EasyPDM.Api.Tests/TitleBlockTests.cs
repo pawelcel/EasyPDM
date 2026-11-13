@@ -50,6 +50,7 @@ public class TitleBlockTests
             {
                 rodzaj = "Wykonywana",
                 material = "S355J2",
+                mass = "2.4",
                 nameTexts = new[] { new { languageId = en, name = "Cube" } },
                 processes = new[]
                 {
@@ -82,6 +83,7 @@ public class TitleBlockTests
         Assert.Equal("Hartowanie", process.GetProperty("name").GetString());
         Assert.Equal("to 50 HRC", process.GetProperty("translations").EnumerateArray().Single().GetProperty("description").GetString());
         Assert.Equal("S355J2", tb.GetProperty("material").GetString());
+        Assert.Equal("2.4", tb.GetProperty("mass").GetString());
 
         (await anna.PatchAsJsonAsync($"/api/items/{itemId}/status", new { status = "sprawdzany" })).EnsureSuccessStatusCode();
         // The author's owner lock would keep the reviewer out; hand the item over.
