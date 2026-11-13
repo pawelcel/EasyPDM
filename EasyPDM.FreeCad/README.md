@@ -480,8 +480,8 @@ best approximation.
 
 # Drawing sheet with the title block
 
-The EasyPDM sheet (`templates/EasyPDM_A3_Landscape.svg`: ISO 5457 frame and grid reference,
-title block in the bottom-right corner) is filled in by the two macros above — there is no
+The EasyPDM sheets (`templates/EasyPDM_A3_Landscape.svg`, `…_A2_…`, `…_A1_…`: ISO 5457 frame
+and grid reference, the same title block in the bottom-right corner) is filled in by the two macros above — there is no
 separate macro for it.
 
 ## When it is filled in
@@ -495,7 +495,7 @@ separate macro for it.
   how "approved by" reaches a drawing sent before the item was released (a released item
   cannot be uploaded again). Nothing is added or asked here.
 - To start a drawing with the sheet: TechDraw → Insert page using template →
-  `EasyPDM_A3_Landscape.svg`; the next upload fills it in.
+  `EasyPDM_A3_Landscape.svg` (or A2 / A1); the next upload fills it in.
 
 ## What it shows
 
@@ -510,7 +510,7 @@ refresh.
 
 ## The template
 
-`templates/build_templates.py` generates the SVG and copies the sheet-building code into both
+`templates/build_templates.py` generates the SVGs and copies the sheet-building code into both
 macros — edit the script, not the SVG or the copies, and rerun it.
 
 A custom template works too if it names its fields like the EasyPDM one (`pdm_name`,

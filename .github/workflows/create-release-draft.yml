@@ -81,7 +81,9 @@ jobs:
           cp EasyPDM.FreeCad/EasyPDMDownload.FCMacro "artifacts/macros/EasyPDM_FreeCad_Download_v${VERSION}.FCMacro"
           # The Upload/Download macros build the drawing sheet themselves; the template is attached
           # for inserting an empty EasyPDM page by hand.
-          cp EasyPDM.FreeCad/templates/EasyPDM_A3_Landscape.svg "artifacts/macros/EasyPDM_FreeCad_A3_Landscape_v${VERSION}.svg"
+          for f in A3 A2 A1; do
+            cp "EasyPDM.FreeCad/templates/EasyPDM_${f}_Landscape.svg" "artifacts/macros/EasyPDM_FreeCad_${f}_Landscape_v${VERSION}.svg"
+          done
 
       # Tag to np. "v0.2", nagłówek w CHANGELOG.md to "## [0.2]" (bez "v") — wycina samą
       # sekcję dla tej wersji (od nagłówka do NASTĘPNEGO "## [", wyłącznie), do notatek

@@ -452,8 +452,8 @@ wgrany załącznik jako najlepsze przybliżenie.
 
 # Arkusz rysunkowy z tabelką
 
-Arkusz EasyPDM (`templates/EasyPDM_A3_Landscape.svg`: ramka i strefy wg ISO 5457, tabelka
-w prawym dolnym rogu) wypełniają oba makra powyżej — nie ma do tego osobnego makra.
+Arkusze EasyPDM (`templates/EasyPDM_A3_Landscape.svg`, `…_A2_…`, `…_A1_…`: ramka i strefy
+wg ISO 5457, ta sama tabelka w prawym dolnym rogu) wypełniają oba makra powyżej — nie ma do tego osobnego makra.
 
 ## Kiedy jest wypełniany
 
@@ -465,7 +465,7 @@ w prawym dolnym rogu) wypełniają oba makra powyżej — nie ma do tego osobneg
   trafia na rysunek wysłany przed wydaniem elementu (wydanego elementu nie da się wysłać
   ponownie). Niczego tu nie dodaje ani o nic nie pyta.
 - Żeby zacząć rysunek od arkusza: TechDraw → Wstaw stronę z szablonu →
-  `EasyPDM_A3_Landscape.svg`; najbliższy Upload go wypełni.
+  `EasyPDM_A3_Landscape.svg` (albo A2 / A1); najbliższy Upload go wypełni.
 
 ## Co pokazuje
 
@@ -479,7 +479,7 @@ Wartości wpisane ręcznie w pola EasyPDM zostaną nadpisane przy najbliższym o
 
 ## Szablon
 
-`templates/build_templates.py` generuje SVG i kopiuje kod budujący arkusz do obu makr —
+`templates/build_templates.py` generuje pliki SVG i kopiuje kod budujący arkusz do obu makr —
 zmieniaj skrypt, nie SVG ani kopie, i uruchom go ponownie.
 
 Własny szablon też zadziała, jeśli nazwie pola tak jak szablon EasyPDM (`pdm_name`,

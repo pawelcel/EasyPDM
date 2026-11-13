@@ -511,8 +511,8 @@ nimmt es einfach den zuletzt hochgeladenen Anhang als beste Annäherung.
 
 # Zeichnungsblatt mit Schriftfeld
 
-Das EasyPDM-Blatt (`templates/EasyPDM_A3_Landscape.svg`: Rahmen und Feldeinteilung nach
-ISO 5457, Schriftfeld rechts unten) wird von den beiden Makros oben ausgefüllt — ein eigenes
+Die EasyPDM-Blätter (`templates/EasyPDM_A3_Landscape.svg`, `…_A2_…`, `…_A1_…`: Rahmen und
+Feldeinteilung nach ISO 5457, dasselbe Schriftfeld rechts unten) wird von den beiden Makros oben ausgefüllt — ein eigenes
 Makro dafür gibt es nicht.
 
 ## Wann es ausgefüllt wird
@@ -527,7 +527,7 @@ Makro dafür gibt es nicht.
   freigegebenes Element kann nicht erneut gesendet werden). Hier wird nichts hinzugefügt und
   nichts gefragt.
 - Um eine Zeichnung mit dem Blatt zu beginnen: TechDraw → Seite mit Vorlage einfügen →
-  `EasyPDM_A3_Landscape.svg`; der nächste Upload füllt sie aus.
+  `EasyPDM_A3_Landscape.svg` (oder A2 / A1); der nächste Upload füllt sie aus.
 
 ## Was es zeigt
 
@@ -543,7 +543,7 @@ der nächsten Aktualisierung überschrieben.
 
 ## Die Vorlage
 
-`templates/build_templates.py` erzeugt das SVG und kopiert den Code zum Aufbau des Blatts in
+`templates/build_templates.py` erzeugt die SVG-Dateien und kopiert den Code zum Aufbau des Blatts in
 beide Makros — ändern Sie das Skript, nicht das SVG oder die Kopien, und führen Sie es erneut
 aus.
 

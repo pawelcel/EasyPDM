@@ -3,7 +3,7 @@
 
     python3 build_templates.py
 
-writes EasyPDM_A3_Landscape.svg next to this file AND copies the shared block below (between
+writes EasyPDM_A3/A2/A1_Landscape.svg next to this file AND copies the shared block below (between
 the BEGIN/END SHARED markers) into ../EasyPDMUpload.FCMacro and ../EasyPDMDownload.FCMacro,
 so the committed template and the sheet the macros build per drawing come from the same code.
 Edit this file, not the SVG and not the copies in the macros, then rerun it.
@@ -49,7 +49,15 @@ FREECAD_NS = "https://www.freecad.org/wiki/index.php?title=Svg_Namespace"
 SHEET_TITLE_PREFIX = "EasyPDM drawing sheet"
 SHEET_FONT = "osifont"  # ISO 3098 lettering shipped with FreeCAD (Mod/TechDraw/Resources/fonts)
 ZONE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-SHEET_FORMATS = {"A3": (420, 297)}
+# Landscape formats: width, height (mm) and the number of grid reference fields across and
+# down, as ISO 5457 sets them. The fields are 50 mm, laid out symmetrically from the centre
+# lines, so the outermost ones absorb the remainder (A1: 50.5 mm at the left) instead of
+# leaving a sliver next to the frame.
+SHEET_FORMATS = {
+    "A3": (420, 297, 8, 6),
+    "A2": (594, 420, 12, 8),
+    "A1": (841, 594, 16, 12),
+}
 
 _THIN = "fill:none;stroke:#000000;stroke-width:0.35;stroke-linecap:round;stroke-linejoin:round"
 _THICK = "fill:none;stroke:#000000;stroke-width:0.7;stroke-linecap:round;stroke-linejoin:round"
@@ -135,7 +143,7 @@ def _sh_line(x1, y1, x2, y2):
 def build_base_sheet(fmt_name):
     """The bare template for one format: frame, grid reference, title block with empty
     pdm_* fields and the three empty groups."""
-    W, H = SHEET_FORMATS[fmt_name]
+    W, H, fields_x, fields_y = SHEET_FORMATS[fmt_name]
     o = []
     add = o.append
     add('<g id="sheet" style="font-family:%s">' % SHEET_FONT)
@@ -145,8 +153,8 @@ def build_base_sheet(fmt_name):
     cx, cy = W / 2.0, H / 2.0
     add('<rect id="drawing_frame" x="%s" y="%s" width="%s" height="%s" style="%s"/>'
         % (FL, FT, _sh_f(FR - FL), _sh_f(FB - FT), _THICK))
-    xs = [cx + 50 * k for k in range(-20, 21) if FL < cx + 50 * k < FR]
-    ys = [cy + 50 * k for k in range(-20, 21) if FT < cy + 50 * k < FB]
+    xs = [cx + 50 * k for k in range(-(fields_x // 2 - 1), fields_x // 2)]
+    ys = [cy + 50 * k for k in range(-(fields_y // 2 - 1), fields_y // 2)]
     add('<g id="grid_reference" style="%s">' % _THIN)
     add('<rect x="%s" y="%s" width="%s" height="%s"/>' % (OL, OT, _sh_f(OR - OL), _sh_f(OB - OT)))
     for x in xs:
