@@ -488,8 +488,8 @@ separate macro for it.
 
 - **Upload**, before it saves and sends a document: every TechDraw page that uses the EasyPDM
   sheet is refreshed, so the CAD file and the PDF in EasyPDM carry the current title block.
-  If the document has an ordinary TechDraw page instead, the macro asks once whether to put
-  the EasyPDM sheet on it (its views stay); "No" is remembered in the document. A document
+  If the document has an ordinary TechDraw page instead, the macro asks on every upload
+  whether to put the EasyPDM sheet on it (its views stay), until the page has it. A document
   without a drawing page is left alone.
 - **Download**, after opening the file: pages with the EasyPDM sheet are refreshed — this is
   how "approved by" reaches a drawing sent before the item was released (a released item

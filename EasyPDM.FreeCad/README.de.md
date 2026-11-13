@@ -520,8 +520,8 @@ Makro dafür gibt es nicht.
 - **Upload**, bevor es ein Dokument speichert und sendet: Jede TechDraw-Seite mit dem
   EasyPDM-Blatt wird aktualisiert, sodass die CAD-Datei und das PDF in EasyPDM das aktuelle
   Schriftfeld tragen. Hat das Dokument stattdessen eine gewöhnliche TechDraw-Seite, fragt das
-  Makro einmal, ob das EasyPDM-Blatt darauf gesetzt werden soll (die Ansichten bleiben);
-  „Nein“ wird im Dokument gespeichert. Ein Dokument ohne Zeichnungsseite bleibt unverändert.
+  Makro bei jedem Upload, ob das EasyPDM-Blatt darauf gesetzt werden soll (die Ansichten
+  bleiben), bis die Seite es hat. Ein Dokument ohne Zeichnungsseite bleibt unverändert.
 - **Download**, nach dem Öffnen der Datei: Seiten mit dem EasyPDM-Blatt werden aktualisiert —
   so gelangt „freigegeben“ auf eine Zeichnung, die vor der Freigabe gesendet wurde (ein
   freigegebenes Element kann nicht erneut gesendet werden). Hier wird nichts hinzugefügt und

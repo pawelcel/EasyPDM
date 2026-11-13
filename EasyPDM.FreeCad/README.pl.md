@@ -459,8 +459,8 @@ w prawym dolnym rogu) wypełniają oba makra powyżej — nie ma do tego osobneg
 
 - **Upload**, zanim zapisze i wyśle dokument: odświeża każdą stronę TechDraw z arkuszem
   EasyPDM, więc plik CAD i PDF w EasyPDM mają aktualną tabelkę. Jeśli dokument ma zamiast tego
-  zwykłą stronę TechDraw, makro raz pyta, czy wstawić na nią arkusz EasyPDM (widoki zostają);
-  „Nie” zostaje zapamiętane w dokumencie. Dokument bez strony rysunku zostaje bez zmian.
+  zwykłą stronę TechDraw, makro przy każdej wysyłce pyta, czy wstawić na nią arkusz EasyPDM
+  (widoki zostają), dopóki go tam nie ma. Dokument bez strony rysunku zostaje bez zmian.
 - **Download**, po otwarciu pliku: odświeża strony z arkuszem EasyPDM — tak „zatwierdził”
   trafia na rysunek wysłany przed wydaniem elementu (wydanego elementu nie da się wysłać
   ponownie). Niczego tu nie dodaje ani o nic nie pyta.

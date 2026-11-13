@@ -807,7 +807,7 @@ TRANSLATIONS = {
         "yes_button": "Tak",
         "no_button": "Nie",
         "login_missing_fields": "Podaj nazwę użytkownika i hasło.",
-        "sheet_ask_existing_page": "Dokument ma stronę rysunku „{page}” bez arkusza EasyPDM.\n\nWstawić na nią arkusz EasyPDM z tabelką wypełnianą z PDM? Widoki zostają.\n\n„Nie” zostanie zapamiętane dla tego dokumentu.",
+        "sheet_ask_existing_page": "Dokument ma stronę rysunku „{page}” bez arkusza EasyPDM.\n\nWstawić na nią arkusz EasyPDM z tabelką wypełnianą z PDM? Widoki zostają.",
         "target_folder_dialog_title": "Wyślij do PDM",
         "logged_in_as": "Zalogowano jako: {name}",
         "logout_button": "Wyloguj",
@@ -921,7 +921,7 @@ TRANSLATIONS = {
         "yes_button": "Yes",
         "no_button": "No",
         "login_missing_fields": "Enter your username and password.",
-        "sheet_ask_existing_page": "The document has the drawing page \"{page}\" without the EasyPDM sheet.\n\nPut the EasyPDM sheet on it, with the title block filled in from PDM? Its views stay.\n\n\"No\" is remembered for this document.",
+        "sheet_ask_existing_page": "The document has the drawing page \"{page}\" without the EasyPDM sheet.\n\nPut the EasyPDM sheet on it, with the title block filled in from PDM? Its views stay.",
         "target_folder_dialog_title": "Send to PDM",
         "logged_in_as": "Logged in as: {name}",
         "logout_button": "Log out",
@@ -1035,7 +1035,7 @@ TRANSLATIONS = {
         "yes_button": "Ja",
         "no_button": "Nein",
         "login_missing_fields": "Geben Sie Benutzername und Passwort ein.",
-        "sheet_ask_existing_page": "Das Dokument hat die Zeichnungsseite „{page}“ ohne EasyPDM-Blatt.\n\nDas EasyPDM-Blatt mit aus PDM ausgefülltem Schriftfeld darauf setzen? Die Ansichten bleiben.\n\n„Nein“ wird für dieses Dokument gespeichert.",
+        "sheet_ask_existing_page": "Das Dokument hat die Zeichnungsseite „{page}“ ohne EasyPDM-Blatt.\n\nDas EasyPDM-Blatt mit aus PDM ausgefülltem Schriftfeld darauf setzen? Die Ansichten bleiben.",
         "target_folder_dialog_title": "An PDM senden",
         "logged_in_as": "Angemeldet als: {name}",
         "logout_button": "Abmelden",
@@ -2254,19 +2254,13 @@ def _push_mass_and_material(doc, item_id):
 
 
 def _ask_sheet_on_page(doc, page):
-    """Asked once per document: put the EasyPDM sheet on its ordinary TechDraw page? "No" is
-    remembered in the document itself (Meta), so the next upload does not ask again."""
-    meta = dict(doc.Meta)
-    if meta.get("EasyPDMSheet") == "declined":
-        return False
+    """Put the EasyPDM sheet on the document's ordinary TechDraw page? Asked on every upload
+    until the page has the sheet -- a "No" clicked by mistake must not lock the sheet out for
+    good, and once the sheet is there the question no longer comes up."""
     answer = QtWidgets.QMessageBox.question(
         None, t("pdm_title"), t("sheet_ask_existing_page", page=page.Label),
         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.Yes)
-    if answer == QtWidgets.QMessageBox.Yes:
-        return True
-    meta["EasyPDMSheet"] = "declined"
-    doc.Meta = meta
-    return False
+    return answer == QtWidgets.QMessageBox.Yes
 
 
 def _refresh_drawing_sheet(doc, item_id):
