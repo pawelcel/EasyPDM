@@ -498,6 +498,23 @@ and pickers expect. Migration 070 adds catalog `texts` to process entries of ite
 `w_pracy` that predate them; the item panel offers a manual refresh from the catalog for
 entries that differ from it.
 
+**Released parts lists stay as released** (`Release.cs`, migration 078). Locking the child
+list is not enough on its own: `item_relations` names a child, not a revision of it, so a
+released part sent back to work (a new revision, then a new name or material) used to change
+every released list that named it. Moving a part or assembly to `wydany` therefore copies its
+name, number and properties into `item_releases`, and its list into `item_release_lines` with
+each child's revision, in the status change's transaction; the BOM rule above guarantees every
+child is released by then, and one released before this change is copied on the way through.
+One rule then holds at every level: a revision that was released reads its copy, any other
+reads `item_relations`. `GET /bom`, both CSV exports and `GET /released-list` (the whole frozen list,
+which the item panel shows for a released assembly) use it, so a released sub-assembly keeps its
+own list inside a released assembly while a new revision of the parent picks up new parts.
+`item_relations` itself is left alone; the tree and the macros keep reading it. An item a
+released list names cannot be deleted (409), since `child_id` deliberately has no foreign key.
+CAD and drawing files are pinned through `item_attachments.revision_number`; PDF and STEP keep
+one current file per role and are not. Migration 078 copies today's released items when every
+part under them is still released; the rest stay live, since their released list is not known.
+
 ### Selecting several items in the tree
 
 Rows are selected with Ctrl (Cmd) + click, alongside the older "Select multiple" button and
@@ -882,6 +899,7 @@ and the server's message otherwise; the CAD macros show the server's message as 
 | PATCH | `/api/items/{parentId}/children/{childId}/position` \| `/reorder` | change BOM position (a single position or the whole new order) |
 | PATCH | `/api/projects/{projectId}/roots/reorder` | change the order of a project's tree roots |
 | GET | `/api/items/{id}/bom` \| `/bom/csv` \| `/bom/aggregated-csv` | nested BOM (JSON) / CSV export (full / aggregated) |
+| GET | `/api/items/{id}/released-list` | a released revision's parts list as released, every level (404 when the current revision is not released) |
 | GET | `/api/items/{id}/used-in` | every assembly, at any depth, that contains this item — inverse of BOM |
 | GET | `/api/items/{id}/documentation/extensions`, `/documentation` | file extensions available to download / a ZIP with attachments (item + subtree) |
 | GET | `/api/projects/{projectId}/documentation/extensions`, `/documentation` | the same, for a whole project |

@@ -488,6 +488,25 @@ Makros und Auswahllisten es erwarten. Migration 070 ergänzt `texts` aus dem Kat
 Bearbeitungen von Elementen in `w_pracy`, die sie noch nicht hatten; der Elementbereich
 bietet eine manuelle Aktualisierung aus dem Katalog für abweichende Einträge.
 
+**Freigegebene Stücklisten bleiben wie freigegeben** (`Release.cs`, Migration 078). Die Sperre der
+Kindliste allein genügt nicht: `item_relations` nennt ein Kind, nicht dessen Revision, sodass ein
+freigegebenes Teil, das wieder in Arbeit ging (neue Revision, dann neuer Name oder Werkstoff), jede
+freigegebene Stückliste änderte, die es nannte. Der Wechsel eines Teils oder einer Baugruppe auf
+`wydany` kopiert deshalb Name, Nummer und Eigenschaften nach `item_releases` und die Liste nach
+`item_release_lines` mit der Revision jedes Kindes, in der Transaktion des Statuswechsels; die
+Stücklistenregel oben stellt sicher, dass dann alle Kinder freigegeben sind, und ein vor dieser
+Änderung freigegebenes Kind wird unterwegs mitkopiert. Auf jeder Ebene gilt eine Regel: Eine
+freigegebene Revision liest ihre Kopie, jede andere `item_relations`. `GET /bom`, beide CSV-Exporte
+und `GET /released-list` (die ganze eingefrorene Liste, die der Elementbereich bei einer freigegebenen
+Baugruppe zeigt) nutzen sie, sodass eine freigegebene Unterbaugruppe ihre eigene Liste in einer
+freigegebenen Baugruppe behält, während eine neue Revision des Elternteils neue Teile sieht.
+`item_relations` selbst bleibt unverändert; Baum und Makros lesen es weiter. Ein Element, das eine
+freigegebene Liste nennt, kann nicht gelöscht werden (409), da `child_id` bewusst keinen
+Fremdschlüssel hat. CAD- und Zeichnungsdateien sind über `item_attachments.revision_number`
+festgelegt; PDF und STEP haben eine aktuelle Datei pro Rolle und sind es nicht. Migration 078
+kopiert heute freigegebene Elemente, wenn alle Teile darunter noch freigegeben sind; die übrigen
+werden live gelesen, da ihre freigegebene Liste nicht mehr bekannt ist.
+
 ### Mehrere Elemente im Baum auswählen
 
 Zeilen werden mit Strg (Cmd) + Klick ausgewählt, neben der älteren Schaltfläche „Mehrere auswählen" und ihren Kontrollkästchen — die Schaltfläche bleibt, denn ein Tablet hat keine Strg-Taste. Ein Strg+Klick schaltet den Auswahlmodus selbst ein: Kontrollkästchen und Aktionsleiste gibt es nur dort, der erste solche Klick würde sonst etwas Unsichtbares auswählen.

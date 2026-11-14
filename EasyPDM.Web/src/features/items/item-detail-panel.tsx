@@ -25,6 +25,7 @@ import {
   revisionLabel,
   type BomEntry,
   type ClientVerificationSummary,
+  type ItemRelease,
   type Item,
 } from "@/api/types"
 import { Badge } from "@/components/ui/badge"
@@ -268,6 +269,9 @@ function ItemDetailPanel({
   const [bomError, setBomError] = useState<string | null>(null)
   const [activeChildId, setActiveChildId] = useState<string | null>(null)
   const [nestedBom, setNestedBom] = useState<BomEntry[]>([])
+  // Wydana rewizja złożenia ma zestawienie zamrożone w chwili wydania (Release.cs): pokazujemy
+  // je zamiast bieżącej struktury, bo części mogły od tego czasu wrócić do pracy.
+  const [release, setRelease] = useState<ItemRelease | null>(null)
   const dragSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   // Elementy zagłębione głębiej niż bezpośrednie dziecko (np. część w złożeniu podpiętym
@@ -287,6 +291,21 @@ function ItemDetailPanel({
     if (item.itemType !== "assembly") return
     refetchNestedBom()
   }, [item.itemType, refetchNestedBom, childEntries])
+
+  useEffect(() => {
+    if (item.itemType !== "assembly" || item.status === "w_pracy") {
+      setRelease(null)
+      return
+    }
+    let current = true
+    api
+      .getRelease(item.id)
+      .then((r) => current && setRelease(r))
+      .catch(() => current && setRelease(null))
+    return () => {
+      current = false
+    }
+  }, [item.id, item.itemType, item.status])
 
   // path[0] odpowiada "position" bezpośredniego dziecka, pod którym dany wpis się
   // zagłębia — backend zwraca wiersze już posortowane po path, więc kolejność w każdej
@@ -533,7 +552,9 @@ function ItemDetailPanel({
               </a>
             </div>
           </div>
-          {bomEntries.length > 0 ? (
+          {release ? (
+            <ReleasedBomTable release={release} parentId={item.id} onSelectChild={onSelectChild} />
+          ) : bomEntries.length > 0 ? (
             <DndContext
               sensors={dragSensors}
               collisionDetection={closestCenter}
@@ -839,6 +860,79 @@ function SortableBomRow({
         </TableRow>
       ))}
     </Fragment>
+  )
+}
+
+// Zestawienie wydanej rewizji, wszystkie poziomy, tylko do odczytu: nazwy, rewizje i właściwości
+// takie, jak w chwili wydania.
+function ReleasedBomTable({
+  release,
+  parentId,
+  onSelectChild,
+}: {
+  release: ItemRelease
+  parentId: string
+  onSelectChild?: (id: string, parentId: string | null | undefined) => void
+}) {
+  const languageId = useDocumentationLanguageId()
+  const { t, language } = useLanguage()
+  return (
+    <>
+      <Hint>{t("item.releasedListHint", { date: new Date(release.releasedAt).toLocaleString(language) })}</Hint>
+      {release.lines.length === 0 ? (
+        <Hint>{t("item.noPartsInAssembly")}</Hint>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">{t("item.colPosition")}</TableHead>
+              <TableHead>{t("common.name")}</TableHead>
+              <TableHead>{t("item.colRevision")}</TableHead>
+              <TableHead className="text-right">{t("common.quantity")}</TableHead>
+              <TableHead>{t("common.material")}</TableHead>
+              <TableHead>{t("part.processes")}</TableHead>
+              <TableHead>{t("part.norm")}</TableHead>
+              <TableHead>{t("common.manufacturer")}</TableHead>
+              <TableHead>{t("item.colOrderNumber1")}</TableHead>
+              <TableHead>{t("item.colOrderNumber2")}</TableHead>
+              <TableHead className="w-8" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {release.lines.map((entry) => (
+              <TableRow
+                key={entry.itemId + bomPositionLabel(entry.path)}
+                className={entry.depth > 1 ? "text-muted-foreground" : undefined}
+              >
+                <TableCell>{bomPositionLabel(entry.path)}</TableCell>
+                <TableCell style={{ paddingLeft: (entry.depth - 1) * 16 }}>{entry.recordName ?? entry.fileName}</TableCell>
+                <TableCell>{entry.revisionLabel ?? "—"}</TableCell>
+                <TableCell className="text-right">{entry.quantity}</TableCell>
+                <TableCell>{bomPropertyOrDash(entry.properties, "material")}</TableCell>
+                <TableCell>{bomProcessesOrDash(entry.properties, languageId)}</TableCell>
+                <TableCell>{bomPropertyOrDash(entry.properties, "norm")}</TableCell>
+                <TableCell>{bomPropertyOrDash(entry.properties, "manufacturer")}</TableCell>
+                <TableCell>{bomPropertyOrDash(entry.properties, "orderNumber")}</TableCell>
+                <TableCell>{bomPropertyOrDash(entry.properties, "orderNumber2")}</TableCell>
+                <TableCell>
+                  {onSelectChild && (
+                    <Button
+                      type="button"
+                      size="icon-xs"
+                      onClick={() => onSelectChild(entry.itemId, entry.depth === 1 ? parentId : undefined)}
+                      aria-label={t("item.goToItemAria")}
+                      title={t("item.goToItemAria")}
+                    >
+                      <ArrowUpRight />
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </>
   )
 }
 

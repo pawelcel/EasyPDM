@@ -44,6 +44,40 @@ static class BomEndpoints
             return Results.Ok(result);
         });
 
+        // GET /api/items/{id}/released-list — zestawienie wydanej rewizji (wszystkie poziomy, depth >= 1),
+        // tak jak zostało wydane. 404, gdy bieżąca rewizja nie jest wydana (wtedy zestawienie to
+        // item_relations, które front i tak pokazuje z drzewa).
+        app.MapGet("/api/items/{id:guid}/released-list", async (Guid id, HttpContext ctx) =>
+        {
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            if (await Release.ReleasedAtAsync(conn, id) is not { } releasedAt)
+                return Results.NotFound();
+
+            var rows = await FetchBomRowsAsync(conn, id);
+            return Results.Ok(new
+            {
+                releasedAt,
+                lines = rows.Select(r => new
+                {
+                    itemId = r.ChildId,
+                    quantity = r.Quantity,
+                    depth = r.Depth,
+                    path = r.Path,
+                    itemNumber = r.ItemNumber,
+                    itemNumberPrefix = r.ItemNumberPrefix,
+                    itemNumberLabel = ItemNumbering.Label(r.ItemNumber, r.ItemNumberPrefix, r.ItemNumberDigits),
+                    recordName = ItemNumbering.RecordName(r.ItemNumber, r.ItemNumberPrefix,
+                        r.ItemNumberDigits, r.ItemNumberWithName, r.FileName),
+                    fileName = r.FileName,
+                    revisionNumber = r.RevisionNumber,
+                    revisionLabel = RevisionLabeling.Label(r.RevisionNumber),
+                    properties = JsonDocument.Parse(r.PropertiesJson).RootElement,
+                }),
+            });
+        });
+
         // GET /api/items/{id}/bom/csv — pełny (depth >= 1), zagłębiony BOM jako CSV
         // do pobrania (średnik jako separator + BOM UTF-8, żeby polski Excel otwierał
         // to poprawnie).
@@ -328,33 +362,16 @@ static class BomEndpoints
         return value;
     }
 
-    // Rekurencyjnie schodzi w głąb item_relations od @id, zwracając WSZYSTKIE zagłębione
+    // Rekurencyjnie schodzi w głąb zestawienia od @id, zwracając WSZYSTKIE zagłębione
     // wpisy (depth 1 = bezpośrednie dzieci, depth 2 = wnuki, ...) posortowane po ścieżce
     // L.p. (path) — czyli w kolejności depth-first zgodnej z numeracją "2.1". "visited"
     // to zabezpieczenie przed nieskończoną rekurencją, gdyby mimo cycle-checku przy
     // POST /children powstał kiedyś cykl inną drogą (np. bezpośrednio w bazie).
     private static async Task<List<BomRow>> FetchBomRowsAsync(NpgsqlConnection conn, Guid id)
     {
-        const string sql = """
-            WITH RECURSIVE bom AS (
-                SELECT ir.child_id, ir.quantity, ir.quantity AS extended_quantity, 1 AS depth,
-                       ARRAY[ir.position] AS path, ARRAY[ir.parent_id] AS visited
-                FROM item_relations ir
-                WHERE ir.parent_id = @id
-                UNION ALL
-                SELECT ir.child_id, ir.quantity, b.extended_quantity * ir.quantity, b.depth + 1,
-                       b.path || ir.position, b.visited || ir.parent_id
-                FROM item_relations ir
-                JOIN bom b ON ir.parent_id = b.child_id
-                WHERE NOT (ir.parent_id = ANY(b.visited))
-            )
-            SELECT b.child_id, b.quantity, b.extended_quantity, b.depth, b.path,
-                   i.item_number, i.item_number_prefix, i.file_name, i.revision_number, i.properties,
-                   i.item_number_digits, i.item_number_with_name
-            FROM bom b
-            JOIN items i ON i.id = b.child_id
-            ORDER BY b.path;
-            """;
+        // Wydana rewizja czyta swoje zamrożone zestawienie, każda inna item_relations -- na każdym
+        // poziomie (Release.cs).
+        const string sql = Release.LinesSql;
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("id", id);
 
@@ -374,7 +391,8 @@ static class BomEndpoints
                 RevisionNumber: reader.IsDBNull(8) ? null : reader.GetInt32(8),
                 PropertiesJson: reader.GetFieldValue<string>(9),
                 ItemNumberDigits: reader.IsDBNull(10) ? null : reader.GetInt32(10),
-                ItemNumberWithName: reader.IsDBNull(11) ? null : reader.GetBoolean(11)));
+                ItemNumberWithName: reader.IsDBNull(11) ? null : reader.GetBoolean(11),
+                Frozen: reader.GetBoolean(12)));
         }
         return rows;
     }
@@ -382,5 +400,5 @@ static class BomEndpoints
     private record BomRow(
         Guid ChildId, decimal Quantity, decimal ExtendedQuantity, int Depth, int[] Path,
         int? ItemNumber, string? ItemNumberPrefix, string FileName, int? RevisionNumber, string PropertiesJson,
-        int? ItemNumberDigits, bool? ItemNumberWithName);
+        int? ItemNumberDigits, bool? ItemNumberWithName, bool Frozen);
 }

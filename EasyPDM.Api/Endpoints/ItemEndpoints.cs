@@ -1157,6 +1157,10 @@ static class ItemEndpoints
 
                 if (body.Status == "wydany" && child.OwnerId is not null)
                     await LogOwnerHistoryAsync(conn, child.Id, "released", user.Id, tx);
+
+                // Wydana rewizja zapamiętuje swoją nazwę, właściwości i zestawienie (Release.cs).
+                if (body.Status == Release.Stage && await Release.FreezeAsync(conn, tx, child.Id, user.Id) is { } childRefused)
+                    return childRefused;
             }
 
             // Wydany element nie może mieć właściciela ani być zablokowany — zawsze jest zwolniony
@@ -1204,6 +1208,12 @@ static class ItemEndpoints
             // "recipientId" niżej) — poprawny warunek "był właściciel do zwolnienia".
             if (body.Status == "wydany" && info.Value.OwnerId is not null)
                 await LogOwnerHistoryAsync(conn, id, "released", user.Id, tx);
+
+            // Zestawienie wydanej rewizji zostaje takie, jak w chwili wydania, nawet gdy jego
+            // części wrócą potem do pracy (Release.cs).
+            if (body.Status == Release.Stage && itemType is "part" or "assembly"
+                && await Release.FreezeAsync(conn, tx, id, user.Id) is { } refused)
+                return refused;
 
             if (bumpRevision && revisionNumber is not null && !string.IsNullOrWhiteSpace(body.Comment))
             {
@@ -1615,6 +1625,13 @@ static class ItemEndpoints
                         filePaths.Add(reader.GetString(1));
                 }
             }
+
+            // Element wymieniony w wydanym zestawieniu innego elementu zostaje: wiersz zestawienia
+            // nie ma klucza obcego, więc usunięcie po cichu skróciłoby wydaną listę (Release.cs).
+            var namedBy = await Release.BlockingDeleteAsync(conn, null, idsToDelete.ToArray());
+            if (namedBy.Count > 0)
+                return Results.Conflict(
+                    "This cannot be deleted — a released parts list names it: " + string.Join(", ", namedBy) + ".");
 
             // Część/Złożenie trzymają swój plik CAD (i podgląd STEP/PDF) w item_attachments,
             // NIE w items.file_path (to pole jest tylko dla Plików) -- bez tego te pliki

@@ -453,6 +453,34 @@ CREATE TABLE item_attachments (
 
 CREATE INDEX idx_item_attachments_item ON item_attachments (item_id);
 
+-- Wydane rewizje Części/Złożeń i ich zamrożone zestawienia (migracja 078, Release.cs).
+CREATE TABLE item_releases (
+    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id               UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    revision_number       INTEGER,
+    released_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    released_by           UUID REFERENCES users(id) ON DELETE SET NULL,
+    file_name             TEXT NOT NULL,
+    item_number           INTEGER,
+    item_number_prefix    TEXT,
+    item_number_digits    INTEGER,
+    item_number_with_name BOOLEAN,
+    properties            JSONB NOT NULL DEFAULT '{}'
+);
+CREATE UNIQUE INDEX uq_item_releases_revision ON item_releases (item_id, COALESCE(revision_number, -1));
+GRANT SELECT, INSERT ON item_releases TO CURRENT_USER;
+
+CREATE TABLE item_release_lines (
+    release_id     UUID NOT NULL REFERENCES item_releases(id) ON DELETE CASCADE,
+    child_id       UUID NOT NULL,
+    child_revision INTEGER,
+    quantity       NUMERIC,
+    position       INTEGER NOT NULL,
+    PRIMARY KEY (release_id, child_id)
+);
+CREATE INDEX idx_item_release_lines_child ON item_release_lines (child_id);
+GRANT SELECT, INSERT ON item_release_lines TO CURRENT_USER;
+
 -- ============================================================
 -- Komentarze do rewizji Części/Złożenia (opcjonalne) — tworzone przy zmianie statusu
 -- Wydany -> W pracy, zarówno w aplikacji webowej, jak i przez makro FreeCAD.

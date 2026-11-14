@@ -323,6 +323,13 @@ export interface ItemRelation {
 // Zagłębiony wpis BOM-u (głębiej niż bezpośrednie dziecko) — zwracany przez
 // GET /api/items/{id}/bom. "path" to pełna ścieżka L.p. od bieżącego złożenia w dół,
 // np. [2, 1] dla drugiego bezpośredniego dziecka, pierwszego elementu w jego BOM-ie.
+// GET /api/items/{id}/released-list — zestawienie wydanej rewizji, wszystkie poziomy (depth >= 1),
+// tak jak zostało wydane (Release.cs). Brak (404), gdy bieżąca rewizja nie jest wydana.
+export interface ItemRelease {
+  releasedAt: string
+  lines: BomEntry[]
+}
+
 export interface BomEntry {
   itemId: string
   quantity: number

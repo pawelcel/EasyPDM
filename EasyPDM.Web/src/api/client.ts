@@ -1,4 +1,5 @@
 import type {
+  ItemRelease,
   Attachment,
   BackupSchedule,
   BomEntry,
@@ -344,7 +345,7 @@ export const api = {
     ),
 
   releaseItem: (itemId: string) =>
-    fetch(`${BASE}/items/${itemId}/release`, { method: "POST" }).then((r) =>
+    fetch(`${BASE}/items/${itemId}/released-list`, { method: "POST" }).then((r) =>
       handleResponse<{ ownerId: string | null; ownerLocked: boolean }>(r)
     ),
 
@@ -493,6 +494,12 @@ export const api = {
 
   getBom: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/bom`).then((r) => handleResponse<BomEntry[]>(r)),
+
+  // null: bieżąca rewizja nie jest wydana, więc zestawienie to bieżąca struktura.
+  getRelease: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/released-list`).then((r) =>
+      r.status === 404 ? null : handleResponse<ItemRelease>(r)
+    ),
 
   bomCsvUrl: (itemId: string) => `${BASE}/items/${itemId}/bom/csv`,
 
