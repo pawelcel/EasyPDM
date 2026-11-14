@@ -940,10 +940,13 @@ razu po zalogowaniu.
    SolidWorksie i Inventorze, przy rejestracji w `storage/components/`): ta sama nazwa zastępuje plik tej rewizji, a nowa
    staje obok. Plik dołączony ręcznie do miejsca CAD pod tą samą nazwą zastępuje poprzedni,
    niezależnie od jego rewizji.
-3. **Nie każda operacja zapisuje "kto to zrobił"** — utworzenie elementu (`created_by`),
-   zmiana statusu, komentarz do rewizji, dodanie/usunięcie załącznika i blokada/zwolnienie
-   właściciela już to robią (widać w „Historii"), ale np. zmiana właściwości/nazwy/tagów
-   nie zapisuje autora.
+3. **Historia obejmuje tylko elementy.** Utworzenie elementu, zmiany statusu, komentarze do
+   rewizji, załączniki, blokada/zwolnienie właściciela oraz zmiany nazwy, właściwości i tagów
+   (`item_change_history`, migracja 077) zapisują, kto to zrobił — widać to w „Historii";
+   edycja BOM, przenoszenie w strukturze i zmiany projektu czy klienta — nie. Zmiana
+   właściwości lub nazwy trafia do historii tylko wtedy, gdy wartość naprawdę się zmienia
+   (porównanie `jsonb`, więc `1.50` to `1.5`), więc masa i materiał wysyłane przez makro CAD
+   przy każdym zapisie niczego nie dodają.
 4. **W Dockerze „Zmień lokalizację” magazynu plików (Ustawienia -> Magazyn plików) nie
    przetrwa przebudowania obrazu** — ta operacja zapisuje nową ścieżkę do
    `appsettings.json` wewnątrz kontenera `api` (poza wolumenem `pdm-data`), więc po
@@ -954,4 +957,3 @@ razu po zalogowaniu.
 ## Następne kroki (proponowana kolejność)
 
 1. Walidacja uploadu (typ/rozmiar) dla elementów i załączników.
-2. Zapisywanie autora zmiany właściwości/nazwy/tagów (punkt 3 wyżej).

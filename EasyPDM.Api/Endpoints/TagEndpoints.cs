@@ -66,9 +66,21 @@ static class TagEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
 
-            await using var cmd = new NpgsqlCommand("DELETE FROM tags WHERE name = @name;", conn);
+            // Każdy element, z którego tag znika kaskadą, dostaje wpis "tag_removed" w historii,
+            // w tym samym zapytaniu (CTE czyta item_tags sprzed usunięcia).
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            await using var cmd = new NpgsqlCommand("""
+                WITH gone AS (DELETE FROM tags WHERE name = @name RETURNING id),
+                logged AS (
+                    INSERT INTO item_change_history (item_id, change, old_value, user_id)
+                    SELECT it.item_id, 'tag_removed', @name, @userId
+                    FROM item_tags it JOIN gone g ON g.id = it.tag_id
+                )
+                SELECT count(*) FROM gone;
+                """, conn);
             cmd.Parameters.AddWithValue("name", DecodeTagName(tagName));
-            return await cmd.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.Ok();
+            cmd.Parameters.AddWithValue("userId", user.Id);
+            return (long)(await cmd.ExecuteScalarAsync())! == 0 ? Results.NotFound() : Results.Ok();
         });
 
         // ============================================================
@@ -106,13 +118,21 @@ static class TagEndpoints
             cmd.Parameters.AddWithValue("name", name);
             var tagId = (int)(await cmd.ExecuteScalarAsync())!;
 
+            // Tag, który element już ma, nie dodaje wpisu w historii (ON CONFLICT nic nie zwraca).
             const string linkSql = """
-                INSERT INTO item_tags (item_id, tag_id) VALUES (@itemId, @tagId)
-                ON CONFLICT DO NOTHING;
+                WITH linked AS (
+                    INSERT INTO item_tags (item_id, tag_id) VALUES (@itemId, @tagId)
+                    ON CONFLICT DO NOTHING
+                    RETURNING item_id
+                )
+                INSERT INTO item_change_history (item_id, change, new_value, user_id)
+                SELECT item_id, 'tag_added', @name, @userId FROM linked;
                 """;
             await using var linkCmd = new NpgsqlCommand(linkSql, conn);
             linkCmd.Parameters.AddWithValue("itemId", id);
             linkCmd.Parameters.AddWithValue("tagId", tagId);
+            linkCmd.Parameters.AddWithValue("name", name);
+            linkCmd.Parameters.AddWithValue("userId", user.Id);
             await linkCmd.ExecuteNonQueryAsync();
 
             return Results.Ok();
@@ -140,13 +160,19 @@ static class TagEndpoints
                 return ItemEndpoints.OwnerLockedForbidden();
 
             const string sql = """
-                DELETE FROM item_tags
-                WHERE item_id = @itemId
-                  AND tag_id = (SELECT id FROM tags WHERE name = @tagName);
+                WITH removed AS (
+                    DELETE FROM item_tags
+                    WHERE item_id = @itemId
+                      AND tag_id = (SELECT id FROM tags WHERE name = @tagName)
+                    RETURNING item_id
+                )
+                INSERT INTO item_change_history (item_id, change, old_value, user_id)
+                SELECT item_id, 'tag_removed', @tagName, @userId FROM removed;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("itemId", id);
             cmd.Parameters.AddWithValue("tagName", DecodeTagName(tagName));
+            cmd.Parameters.AddWithValue("userId", user.Id);
             await cmd.ExecuteNonQueryAsync();
 
             return Results.Ok();

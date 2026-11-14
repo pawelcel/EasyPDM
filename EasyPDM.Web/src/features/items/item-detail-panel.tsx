@@ -321,6 +321,7 @@ function ItemDetailPanel({
 
   async function handleAddTag(name: string) {
     await api.addTag(item.id, name)
+    setHistoryRefreshSignal((n) => n + 1)
     await onTagsRefetch()
     await onItemsRefetch()
   }
@@ -329,6 +330,7 @@ function ItemDetailPanel({
     try {
       setActionError(null)
       await api.removeTag(item.id, tagName)
+      setHistoryRefreshSignal((n) => n + 1)
       await onItemsRefetch()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : t("tag.removeFailed"))

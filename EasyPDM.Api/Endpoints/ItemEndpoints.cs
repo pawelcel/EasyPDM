@@ -945,16 +945,29 @@ static class ItemEndpoints
             // Tłumaczenia nazwy (properties.nameTexts) tłumaczą DOTYCHCZASOWĄ nazwę -- po jej zmianie
             // "Wspornik" nosiłby dalej angielskie "Cube" po "Kostce". Znikają razem ze starą nazwą;
             // ta sama nazwa przysłana ponownie niczego nie rusza.
+            // Jedno zapytanie, więc zmiana nazwy i jej wpis w historii lądują razem. "old" czyta
+            // nazwę sprzed UPDATE tego samego zapytania; ta sama nazwa nie dodaje wpisu.
             const string sql = """
-                UPDATE items SET
-                    properties = CASE WHEN file_name IS DISTINCT FROM @name THEN properties - 'nameTexts' ELSE properties END,
-                    file_name = @name
-                WHERE id = @id;
+                WITH old AS (SELECT id, file_name FROM items WHERE id = @id),
+                renamed AS (
+                    UPDATE items SET
+                        properties = CASE WHEN file_name IS DISTINCT FROM @name THEN properties - 'nameTexts' ELSE properties END,
+                        file_name = @name
+                    WHERE id = @id
+                    RETURNING id
+                ),
+                logged AS (
+                    INSERT INTO item_change_history (item_id, change, old_value, new_value, user_id)
+                    SELECT old.id, 'name', old.file_name, @name, @userId FROM old
+                    WHERE old.file_name IS DISTINCT FROM @name
+                )
+                SELECT count(*) FROM renamed;
                 """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("name", body.Name.Trim());
-            var affected = await cmd.ExecuteNonQueryAsync();
+            cmd.Parameters.AddWithValue("userId", user.Id);
+            var affected = (long)(await cmd.ExecuteScalarAsync())!;
 
             return affected == 0 ? Results.NotFound() : Results.Ok();
         });

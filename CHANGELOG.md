@@ -2,6 +2,11 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **An item's History now shows who changed its name, properties and tags, with the value before and after.** Each write and its history row go in one statement or one transaction, so neither lands without the other. Only a real change is recorded: properties are compared as `jsonb` (1.50 equals 1.5), so the mass and material a CAD macro sends on every save add nothing, and the price signature the server stamps (`priceBy`) is not a change of its own. Re-adding a tag the item has, removing one it lacks, removing a missing property or renaming to the same name add nothing either. An administrator deleting a tag from the whole database (Settings) leaves a "tag removed" line on every item that had it. Long values are cut at 60 characters in the panel.
+
 ## [0.8.1]
 
 ### Added
