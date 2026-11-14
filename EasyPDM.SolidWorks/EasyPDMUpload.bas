@@ -152,6 +152,9 @@ Private Const SW_DOC_ASSEMBLY As Long = 2                   ' swDocumentTypes_e.
 Private Const SW_DOC_DRAWING As Long = 3                    ' swDocumentTypes_e.swDocDRAWING
 Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e.swCustomInfoText
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
+' Bumped by hand on every change and written into the first log line, so a log shows at once
+' whether the latest macro was imported or an older copy ran (happened twice in testing).
+Private Const MACRO_REVISION As String = "2026-11-14.2"
 Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
                                                              ' live SolidWorks install, confirm on first real test (see
                                                              ' UploadStepAttachment).
@@ -4412,7 +4415,7 @@ End Function
 ' ============================================================================
 
 Sub main()
-    LogLine "=== EasyPDM macro started ==="
+    LogLine "=== EasyPDM macro started (revision " & MACRO_REVISION & ") ==="
     gCancelledFromBrowser = False
 
     On Error Resume Next
