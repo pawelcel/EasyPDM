@@ -22,7 +22,10 @@ CREATE TABLE users (
     last_name     TEXT,
     email         TEXT,
     password_hash TEXT NOT NULL,
-    role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user'))
+    role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+    -- Identyfikator u dostawcy logowania jednokrotnego ("<wystawca>|<sub>", migracja 074);
+    -- NULL = konto logujące się tylko hasłem.
+    oidc_subject  TEXT CONSTRAINT users_oidc_subject_key UNIQUE
 );
 
 -- Sesje logowania (ciasteczko httpOnly "pdm_session" trzyma losowy token z tej tabeli).

@@ -15,6 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.10" />
     <PackageReference Include="Npgsql" Version="8.0.3" />
     <!-- UseWindowsService() w Program.cs jest bezpieczne na każdej platformie (aktywuje się
          tylko, gdy proces faktycznie działa pod Windows Service Control Manager) — potrzebne
@@ -31,4 +32,9 @@
     <EmbeddedResource Include="..\db\migrations\*.sql" LinkBase="Migrations" />
   </ItemGroup>
 
+  <!-- Testy wywołują logikę logowania jednokrotnego (OidcSignIn.SignInAsync) wprost, bez
+       prawdziwego dostawcy OpenID Connect. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="EasyPDM.Api.Tests" />
+  </ItemGroup>
 </Project>

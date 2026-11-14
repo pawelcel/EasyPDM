@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { api, UNAUTHORIZED_EVENT } from "@/api/client"
 import type { CurrentUser } from "@/api/types"
 import { AuthContext } from "@/features/auth/auth-context"
+import { SSO_PAUSED_KEY } from "@/features/auth/login-view"
 
 function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null)
@@ -19,6 +20,11 @@ function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    try {
+      sessionStorage.setItem(SSO_PAUSED_KEY, "1")
+    } catch {
+      // pamięć sesji zablokowana: z Oidc:AutoRedirect strona logowania może zalogować od razu przez SSO
+    }
     try {
       await api.logout()
     } finally {

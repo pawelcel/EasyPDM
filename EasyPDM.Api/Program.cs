@@ -22,6 +22,8 @@ builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 
 // Kestrel one above would still 413 on anything bigger than 128 MB. Same reasoning as
 // Kestrel's limit: no sane fixed cap for arbitrary CAD files, so it's removed too.
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = long.MaxValue);
+// Logowanie jednokrotne (OidcSignIn.cs), włączone, gdy ustawiono Oidc:Authority.
+builder.AddOidcSignIn();
 var app = builder.Build();
 
 string connectionString = app.Configuration["ConnectionString"]
@@ -87,6 +89,9 @@ app.Use(async (context, next) =>
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+// Obsługuje powrót od dostawcy logowania jednokrotnego (/api/auth/oidc/callback, OidcSignIn.cs).
+app.UseAuthentication();
+
 // Każda ścieżka /api/* (poza logowaniem i mostem token->ciasteczko dla przeglądarki
 // otwieranej przez makra CAD) wymaga poprawnej sesji — reszta endpointów nie musi tego
 // sprawdzać samodzielnie. Zalogowany użytkownik trafia do HttpContext.Items pod kluczem
@@ -97,7 +102,9 @@ app.Use(async (context, next) =>
     if (context.Request.Path.StartsWithSegments("/api") &&
         !context.Request.Path.StartsWithSegments("/api/auth/login") &&
         !context.Request.Path.StartsWithSegments("/api/auth/macro-login") &&
-        !context.Request.Path.StartsWithSegments("/api/auth/browser-login"))
+        !context.Request.Path.StartsWithSegments("/api/auth/browser-login") &&
+        !context.Request.Path.StartsWithSegments("/api/auth/config") &&
+        !context.Request.Path.StartsWithSegments("/api/auth/oidc"))
     {
         var user = await AuthEndpoints.GetCurrentUser(context, connectionString);
         if (user is null)
@@ -134,6 +141,7 @@ var transferProgressStore = new TransferProgressStore();
 var cadRequestStore = new CadRequestStore();
 
 app.MapAuthEndpoints(connectionString, browserBridgeTicketStore);
+app.MapOidcEndpoints();
 app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
 app.MapProjectAccessEndpoints(connectionString);

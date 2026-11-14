@@ -958,6 +958,9 @@ export const api = {
 
   getMe: () => fetch(`${BASE}/auth/me`).then((r) => handleResponse<CurrentUser>(r)),
 
+  getAuthConfig: () =>
+    fetch(`${BASE}/auth/config`).then((r) => handleResponse<{ sso: boolean; ssoAutoRedirect: boolean }>(r)),
+
   changePassword: (currentPassword: string, newPassword: string) =>
     fetch(`${BASE}/auth/password`, {
       method: "PATCH",
