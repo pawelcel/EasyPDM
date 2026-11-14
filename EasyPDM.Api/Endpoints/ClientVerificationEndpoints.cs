@@ -192,6 +192,16 @@ static class ClientVerificationEndpoints
             if (!await IsItemInProjectAsync(conn, itemId, projectId))
                 return Results.BadRequest("This item does not belong to the given project.");
 
+            // Pliki przyjmujemy pod "file" ORAZ "files" — jeden wpis potrafi nieść kilka dowodów,
+            // a różne klienty HTTP nazywają pole różnie.
+            var files = form.Files.GetFiles("file").Concat(form.Files.GetFiles("files")).ToList();
+            // Sprawdzane PRZED wstawieniem wpisu: odrzucony plik nie może zostawić wpisu bez dowodu,
+            // którego dotyczył (tak było, gdy sprawdzenie stało po INSERT-cie).
+            foreach (var upload in files)
+            {
+                if (upload.Length > 0 && uploads.Check(upload) is { } refused)
+                    return refused;
+            }
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
             var verificationId = Guid.NewGuid();
 
@@ -212,15 +222,6 @@ static class ClientVerificationEndpoints
                 await cmd.ExecuteNonQueryAsync();
             }
 
-            // Pliki przyjmujemy pod "file" ORAZ "files" — jeden wpis potrafi nieść kilka dowodów,
-            // a różne klienty HTTP nazywają pole różnie.
-            var files = form.Files.GetFiles("file").Concat(form.Files.GetFiles("files")).ToList();
-            // Sprawdzane przed zapisaniem czegokolwiek, żeby odrzucony plik nie zostawił pół wpisu.
-            foreach (var upload in files)
-            {
-                if (upload.Length > 0 && uploads.Check(upload) is { } refused)
-                    return refused;
-            }
             var storedPaths = new List<string>();
             try
             {

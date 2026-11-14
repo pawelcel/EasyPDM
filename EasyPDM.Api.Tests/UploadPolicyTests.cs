@@ -161,6 +161,34 @@ public class UploadPolicyTests
     }
 
     [Fact]
+    public async Task Odrzucony_dowod_nie_zostawia_wpisu_weryfikacji_klienta()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        var (client, projectId, partId) = await SetUpAsync(factory);
+        try
+        {
+            foreach (var status in new[] { "sprawdzany", "wydany" })
+                (await client.PatchAsJsonAsync($"/api/items/{partId}/status", new { status })).EnsureSuccessStatusCode();
+            (await SetRulesAsync(client, new { extension = ".pdf", maxSizeMb = (int?)null })).EnsureSuccessStatusCode();
+
+            using var form = new MultipartFormDataContent
+            {
+                { new StringContent("zweryfikowany"), "result" },
+                { new ByteArrayContent(Bytes(10)), "files", "mail.eml" },
+            };
+            var refused = await client.PostAsync($"/api/projects/{projectId}/items/{partId}/client-verifications", form);
+            Assert.Equal(HttpStatusCode.UnsupportedMediaType, refused.StatusCode);
+
+            var entries = await client.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/items/{partId}/client-verifications");
+            Assert.Equal(0, entries.GetArrayLength());
+        }
+        finally
+        {
+            (await SetRulesAsync(client)).EnsureSuccessStatusCode();
+        }
+    }
+
+    [Fact]
     public void Rozszerzenia_sa_normalizowane()
     {
         Assert.Equal(".sldprt", UploadPolicy.Normalize("SLDPRT"));
