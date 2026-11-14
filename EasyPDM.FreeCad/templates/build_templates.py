@@ -684,7 +684,7 @@ SW_MACRO = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, o
 # property of the same name ($PRP:"pdm_drawn_by"), which the Upload/Download macros write.
 # Bumped by hand on every change to the SolidWorks macro, and written into the first line of its
 # log -- so a log shows at once whether the latest macro was imported or an older copy ran.
-SW_MACRO_REVISION = 4
+SW_MACRO_REVISION = 5
 
 _SW_NATIVE_FIELDS = {
     "pdm_scale": '$PRP:""SW-Sheet Scale""',
@@ -913,6 +913,17 @@ Sub ClearSheetFormat()
             Next i
         End If
     End If
+    ' While the format is being edited its sketch is the active one -- tried as well, since the
+    ' sheet view's own sketch came back empty on SolidWorks 2024.
+    Set sk = swModel.GetActiveSketch2
+    If Not sk Is Nothing Then
+        segs = sk.GetSketchSegments
+        If IsArray(segs) Then
+            For i = LBound(segs) To UBound(segs)
+                If segs(i).Select4(True, Nothing) Then n = n + 1
+            Next i
+        End If
+    End If
     LogLine "clear: " & n & " sketch segments selected"
     notes = sheetView.GetNotes
     If IsArray(notes) Then
@@ -948,6 +959,12 @@ Sub main()
     Dim sheet As Object, w As Double, h As Double, fmt As String, folder As String
     Dim fmtPath As String, tplPath As String, existing As String, errs As Long, warns As Long
     On Error GoTo Fail
+    ' Module-level state survives between runs in the same VBA session; start clean, or the
+    ' counts in the log add up across runs (a second run reported 104 lines for 52).
+    gLog = ""
+    gLines = 0
+    gNotes = 0
+    gFailed = 0
     Set swApp = Application.SldWorks
     gLang = "en"
     Select Case LCase(swApp.GetCurrentLanguage)

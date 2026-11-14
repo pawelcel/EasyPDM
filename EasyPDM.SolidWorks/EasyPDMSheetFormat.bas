@@ -220,6 +220,17 @@ Sub ClearSheetFormat()
             Next i
         End If
     End If
+    ' While the format is being edited its sketch is the active one -- tried as well, since the
+    ' sheet view's own sketch came back empty on SolidWorks 2024.
+    Set sk = swModel.GetActiveSketch2
+    If Not sk Is Nothing Then
+        segs = sk.GetSketchSegments
+        If IsArray(segs) Then
+            For i = LBound(segs) To UBound(segs)
+                If segs(i).Select4(True, Nothing) Then n = n + 1
+            Next i
+        End If
+    End If
     LogLine "clear: " & n & " sketch segments selected"
     notes = sheetView.GetNotes
     If IsArray(notes) Then
@@ -255,13 +266,19 @@ Sub main()
     Dim sheet As Object, w As Double, h As Double, fmt As String, folder As String
     Dim fmtPath As String, tplPath As String, existing As String, errs As Long, warns As Long
     On Error GoTo Fail
+    ' Module-level state survives between runs in the same VBA session; start clean, or the
+    ' counts in the log add up across runs (a second run reported 104 lines for 52).
+    gLog = ""
+    gLines = 0
+    gNotes = 0
+    gFailed = 0
     Set swApp = Application.SldWorks
     gLang = "en"
     Select Case LCase(swApp.GetCurrentLanguage)
         Case "polish": gLang = "pl"
         Case "german": gLang = "de"
     End Select
-    LogLine "EasyPDMSheetFormat revision 4 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
+    LogLine "EasyPDMSheetFormat revision 5 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
 
     Set swModel = swApp.ActiveDoc
     If swModel Is Nothing Then
