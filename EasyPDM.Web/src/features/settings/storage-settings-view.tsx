@@ -44,6 +44,8 @@ const DAY_OF_WEEK_OPTIONS: { value: number; labelKey: TranslationKey }[] = [
   { value: 0, labelKey: "backup.dayOfWeek.sunday" },
 ]
 
+const CARD = "rounded-xl bg-card p-4 ring-1 ring-foreground/10"
+
 function pad2(n: number): string {
   return n.toString().padStart(2, "0")
 }
@@ -130,7 +132,9 @@ function StorageSettingsView() {
     <div className="mx-auto max-w-2xl">
       <h2 className="mb-4 text-lg font-semibold tracking-tight">{t("settings.storage")}</h2>
 
-      <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+      {/* Każda funkcja we własnej karcie, jak w Użytkownikach: lokalizacja, typy plików, kopia
+          zapasowa z odtwarzaniem, kopie automatyczne i strefa niebezpieczna to osobne sprawy. */}
+      <div className={CARD}>
         <SectionLabel>{t("storage.currentLocation")}</SectionLabel>
         <p className="text-sm">{info.path}</p>
         <p className="text-[12.5px] text-muted-foreground">
@@ -155,9 +159,13 @@ function StorageSettingsView() {
           <FormError>{error}</FormError>
           {result && <Hint>{result}</Hint>}
         </div>
+      </div>
 
+      <div className={`mt-4 ${CARD}`}>
         <UploadRulesSection />
+      </div>
 
+      <div className={`mt-4 ${CARD}`}>
         <SectionLabel>{t("storage.backupLabel")}</SectionLabel>
         <Hint>{t("storage.backupHint")}</Hint>
         <div className="mt-2">
@@ -167,9 +175,14 @@ function StorageSettingsView() {
         </div>
 
         <RestoreSection />
+      </div>
 
+      <div className={`mt-4 ${CARD}`}>
         <AutoBackupSection />
+      </div>
 
+      {/* Czerwona obwódka: to, co tu, kasuje dane bezpowrotnie. */}
+      <div className="mt-4 rounded-xl bg-card p-4 ring-1 ring-destructive/40">
         <DangerZoneSection />
       </div>
 
