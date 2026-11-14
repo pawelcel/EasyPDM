@@ -509,6 +509,20 @@ CREATE TABLE item_owner_history (
 CREATE INDEX idx_item_owner_history_item ON item_owner_history (item_id);
 GRANT SELECT, INSERT ON item_owner_history TO CURRENT_USER;
 
+-- Kto zmienił nazwę, właściwości i tagi elementu (migracja 077).
+CREATE TABLE item_change_history (
+    id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id   UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    change    TEXT NOT NULL CHECK (change IN ('name', 'property_set', 'property_removed', 'tag_added', 'tag_removed')),
+    prop_key  TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    user_id   UUID REFERENCES users(id) ON DELETE SET NULL,
+    at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_item_change_history_item ON item_change_history (item_id);
+GRANT SELECT, INSERT ON item_change_history TO CURRENT_USER;
+
 -- ============================================================
 -- Załączniki PROJEKTU -- dokumenty dotyczące całego zlecenia, nie pojedynczej Części:
 -- oferta, potwierdzenie przyjęcia zlecenia i wszystko inne, co przychodzi "do projektu".

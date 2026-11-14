@@ -1036,11 +1036,14 @@ Sie dieses Passwort sofort nach der Anmeldung.
    Inventor, per Registrierung in `storage/components/`): Derselbe Name ersetzt die Datei dieser
    Revision, ein neuer steht daneben. Eine von Hand unter demselben Namen in einen CAD-Platz
    gelegte Datei ersetzt die vorherige, egal zu welcher Revision sie gehörte.
-3. **Nicht jede Operation zeichnet auf, „wer es getan hat"** — die Erstellung eines
-   Elements (`created_by`), eine Statusänderung, ein Revisionskommentar, das
-   Hinzufügen/Entfernen eines Anhangs und die Eigentümersperre/-freigabe tun dies
-   bereits (sichtbar in der „Historie"), aber z. B. das Ändern von
-   Eigenschaften/Name/Tags zeichnet den Autor nicht auf.
+3. **Die Historie umfasst nur Elemente.** Die Erstellung eines Elements, Statusänderungen,
+   Revisionskommentare, Anhänge, Eigentümersperre/-freigabe sowie Änderungen von Name,
+   Eigenschaften und Tags (`item_change_history`, Migration 077) zeichnen auf, wer es getan
+   hat — sichtbar in der „Historie"; Stücklistenänderungen, Verschiebungen in der Struktur und
+   Änderungen an Projekt oder Kunde nicht. Eine Eigenschafts- oder Namensänderung wird nur
+   erfasst, wenn sich der Wert wirklich ändert (Vergleich als `jsonb`, also `1.50` gleich
+   `1.5`), sodass Masse und Material, die ein CAD-Makro bei jedem Speichern sendet, nichts
+   hinzufügen.
 4. **In Docker übersteht „Speicherort ändern" für den Dateispeicher (Einstellungen ->
    Dateispeicher) keinen Image-Rebuild** — diese Operation schreibt den neuen Pfad in
    `appsettings.json` innerhalb des `api`-Containers (außerhalb des Volumes
@@ -1052,4 +1055,3 @@ Sie dieses Passwort sofort nach der Anmeldung.
 ## Nächste Schritte (vorgeschlagene Reihenfolge)
 
 1. Upload-Validierung (Typ/Größe) für Elemente und Anhänge.
-2. Aufzeichnung des Autors von Eigenschafts-/Name-/Tag-Änderungen (Punkt 3 oben).

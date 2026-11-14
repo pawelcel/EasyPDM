@@ -8,7 +8,7 @@ import { useLanguage } from "@/i18n/use-language"
 
 // Historia Części/Złożenia — połączona chronologicznie z kilku źródeł po stronie backendu
 // (utworzenie, zmiany statusu, rewizje z komentarzem, dodanie/usunięcie załącznika,
-// zablokowanie/zwolnienie właściciela). Tylko do odczytu — nie da się tu niczego edytować
+// zablokowanie/zwolnienie właściciela, zmiany nazwy, właściwości i tagów). Tylko do odczytu — nie da się tu niczego edytować
 // ani usunąć.
 function ItemHistoryPanel({
   itemId,
@@ -45,6 +45,12 @@ function ItemHistoryPanel({
     return status ? t(STATUS_LABEL_KEYS[status]) : "—"
   }
 
+  // Wartości właściwości bywają długie (cały obiekt JSON): linia ma zostać czytelna.
+  function value(text: string | null): string {
+    if (text === null || text === "") return "—"
+    return text.length > 60 ? `${text.slice(0, 57)}…` : text
+  }
+
   function describe(entry: HistoryEntry): string {
     switch (entry.type) {
       case "created":
@@ -68,6 +74,20 @@ function ItemHistoryPanel({
         return t("history.ownerLocked")
       case "owner_released":
         return t("history.ownerReleased")
+      case "name_changed":
+        return t("history.nameChanged", { from: value(entry.oldValue), to: value(entry.newValue) })
+      case "property_set":
+        return t("history.propertySet", {
+          key: entry.key ?? "",
+          from: value(entry.oldValue),
+          to: value(entry.newValue),
+        })
+      case "property_removed":
+        return t("history.propertyRemoved", { key: entry.key ?? "", from: value(entry.oldValue) })
+      case "tag_added":
+        return t("history.tagAdded", { tag: entry.newValue ?? "" })
+      case "tag_removed":
+        return t("history.tagRemoved", { tag: entry.oldValue ?? "" })
     }
   }
 

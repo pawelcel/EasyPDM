@@ -300,6 +300,11 @@ export type HistoryEventType =
   | "attachment_removed"
   | "owner_locked"
   | "owner_released"
+  | "name_changed"
+  | "property_set"
+  | "property_removed"
+  | "tag_added"
+  | "tag_removed"
 
 export interface HistoryEntry {
   type: HistoryEventType
@@ -311,6 +316,11 @@ export interface HistoryEntry {
   revisionLabel: string | null
   comment: string | null
   fileName: string | null
+  // name_changed / property_* / tag_*: klucz właściwości oraz wartość przed i po
+  // (null = po tej stronie nie istniała).
+  key: string | null
+  oldValue: string | null
+  newValue: string | null
 }
 
 export interface ItemRelation {

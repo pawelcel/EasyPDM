@@ -1248,10 +1248,12 @@ right after logging in.
    Inventor, registered in `storage/components/`): the same name replaces that revision's file and a new
    name stands beside it. A file attached by hand to a CAD slot under the same name
    replaces the earlier one, whatever revision that one belonged to.
-3. **Not every operation records "who did it"** — creating an item (`created_by`), a
-   status change, a revision comment, adding/removing an attachment, and owner
-   lock/release already do (visible in the "History"), but e.g. changing
-   properties/name/tags does not record the author.
+3. **History covers items only.** Creating an item, status changes, revision comments,
+   attachments, owner lock/release and changes of name, properties and tags
+   (`item_change_history`, migration 077) all record who did it, visible in the "History";
+   BOM edits, structure moves and project or client changes do not. A property or name
+   change is recorded only when the value really changes (compared as `jsonb`, so `1.50`
+   equals `1.5`), so the mass and material a CAD macro sends on every save add nothing.
 4. **In Docker, "Change location" for file storage (Settings -> File storage) does not
    survive an image rebuild** — this operation writes the new path into
    `appsettings.json` inside the `api` container (outside the `pdm-data` volume), so
@@ -1263,4 +1265,3 @@ right after logging in.
 ## Next steps (suggested order)
 
 1. Upload validation (type/size) for items and attachments.
-2. Recording the author of property/name/tag changes (point 3 above).

@@ -97,6 +97,25 @@ static class PropertyEndpoints
 
             await using var tx = await conn.BeginTransactionAsync();
 
+            // Historia najpierw, póki stare wartości są jeszcze na miejscu: jeden wpis na klucz,
+            // którego wartość naprawdę się zmienia (porównanie jsonb, więc 1.50 i 1.5 to to samo).
+            // Makra CAD wysyłają masę i materiał przy każdym zapisie; niezmieniona wartość nie
+            // może zapychać historii. priceBy to podpis ceny stawiany przez serwer, nie zmiana.
+            const string historySql = """
+                INSERT INTO item_change_history (item_id, change, prop_key, old_value, new_value, user_id)
+                SELECT i.id, 'property_set', n.key, i.properties ->> n.key, n.value #>> '{}', @userId
+                FROM items i, jsonb_each(@props::jsonb) n
+                WHERE i.id = @id AND n.key <> @priceBy AND (i.properties -> n.key) IS DISTINCT FROM n.value;
+                """;
+            await using (var historyCmd = new NpgsqlCommand(historySql, conn, tx))
+            {
+                historyCmd.Parameters.AddWithValue("id", id);
+                historyCmd.Parameters.AddWithValue("props", props.ToJsonString());
+                historyCmd.Parameters.AddWithValue("priceBy", PriceByKey);
+                historyCmd.Parameters.AddWithValue("userId", user.Id);
+                await historyCmd.ExecuteNonQueryAsync();
+            }
+
             const string sql = """
                 UPDATE items SET properties = properties || @props::jsonb
                 WHERE id = @id;
@@ -166,10 +185,22 @@ static class PropertyEndpoints
             if (!ItemEndpoints.CanEditOwnerLocked(user.Id, info.Value.OwnerId, info.Value.OwnerLocked))
                 return ItemEndpoints.OwnerLockedForbidden();
 
-            const string sql = "UPDATE items SET properties = properties - @key WHERE id = @id;";
+            // Usunięcie i jego wpis w historii jednym zapytaniem; usunięcie klucza, którego nie
+            // ma, nie dodaje wpisu.
+            const string sql = """
+                WITH old AS (SELECT id, properties -> @key AS value FROM items WHERE id = @id),
+                removed AS (UPDATE items SET properties = properties - @key WHERE id = @id),
+                logged AS (
+                    INSERT INTO item_change_history (item_id, change, prop_key, old_value, user_id)
+                    SELECT old.id, 'property_removed', @key, old.value #>> '{}', @userId FROM old
+                    WHERE old.value IS NOT NULL
+                )
+                SELECT 1;
+                """;
             await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("key", key);
+            cmd.Parameters.AddWithValue("userId", user.Id);
             await cmd.ExecuteNonQueryAsync();
 
             return Results.Ok();
