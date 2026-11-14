@@ -154,7 +154,7 @@ Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 ' Bumped by hand on every change and written into the first log line, so a log shows at once
 ' whether the latest macro was imported or an older copy ran (happened twice in testing).
-Private Const MACRO_REVISION As String = "2026-11-14.3"
+Private Const MACRO_REVISION As String = "2026-11-14.4"
 Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
                                                              ' live SolidWorks install, confirm on first real test (see
                                                              ' UploadStepAttachment).
@@ -2655,21 +2655,21 @@ Private Function AddLines(ByVal cell As String, ByVal more As String) As String
     End If
 End Function
 
-Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As Double, ByVal scl As Double)
-    ' Walks the drawing's feature tree: every general table and every sketch picture is a
-    ' feature there. The sheet view's GetTableAnnotations returned nothing on SolidWorks 2024
-    ' (a rerun found "0 EasyPDM tables" and stacked new tables on the old ones), so tables are
-    ' recognised through their feature: GetSpecificFeature2 gives the table feature, and its
-    ' tables carry the hidden "EasyPDM ..." title. A picture is ours only when its origin lies
-    ' in the logo square.
+' Diagnostic helper: logs a feature and its sub-features (depth-first, limited), and selects the
+' ones that are ours -- a table whose tables carry the "EasyPDM ..." title, or a picture whose
+' origin lies in the logo square. Sub-features matter: in a drawing the tables and pictures may
+' sit under the sheet feature, not at the top level of the tree.
+Private Sub WalkFeatures(ByVal feat As Object, ByVal depth As Long, ByVal sheetW As Double, ByVal scl As Double, ByRef nTables As Long, ByRef nPics As Long, ByRef logged As Long)
     On Error Resume Next
-    Dim feat As Object, featType As String, nTables As Long, nPics As Long
-    Dim spec As Object, tables As Variant, i As Long, title As String, px As Double, py As Double
-    swModel.ClearSelection2 True
-    Set feat = swModel.FirstFeature
+    Dim featType As String, spec As Object, tables As Variant, i As Long, title As String
+    Dim px As Double, py As Double, child As Object
     Do While Not feat Is Nothing
         featType = ""
         featType = feat.GetTypeName2
+        If logged < 80 Then
+            LogLine "Tree: " & String(depth * 2, " ") & featType & " """ & feat.Name & """"
+            logged = logged + 1
+        End If
         If InStr(1, featType, "Table", vbTextCompare) > 0 Then
             Set spec = Nothing
             Set spec = feat.GetSpecificFeature2
@@ -2679,14 +2679,11 @@ Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As D
                 For i = LBound(tables) To UBound(tables)
                     title = ""
                     title = tables(i).Title
-                    LogLine "Sheet tables: found " & featType & " """ & feat.Name & """ titled """ & title & """"
                     If Left(title, 8) = "EasyPDM " Then
                         If feat.Select2(True, 0) Then nTables = nTables + 1
                         Exit For
                     End If
                 Next i
-            Else
-                LogLine "Sheet tables: found " & featType & " """ & feat.Name & """ without readable tables"
             End If
         ElseIf InStr(1, featType, "Bitmap", vbTextCompare) > 0 Or InStr(1, featType, "Picture", vbTextCompare) > 0 Then
             Set spec = Nothing
@@ -2696,14 +2693,58 @@ Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As D
             If Not spec Is Nothing Then spec.GetOrigin px, py
             px = px * scl
             py = py * scl
-            LogLine "Logo: found " & featType & " """ & feat.Name & """ at " & Format(px * 1000, "0") & "," & Format(py * 1000, "0") & " mm"
             If px > sheetW - 0.03 And px < sheetW - 0.009 And py > 0.024 And py < 0.045 Then
                 If feat.Select2(True, 0) Then nPics = nPics + 1
             End If
         End If
+        Set child = Nothing
+        Set child = feat.GetFirstSubFeature
+        If Not child Is Nothing And depth < 3 Then WalkFeatures child, depth + 1, sheetW, scl, nTables, nPics, logged
         Err.Clear
-        Set feat = feat.GetNextFeature
+        If depth = 0 Then
+            Set feat = feat.GetNextFeature
+        Else
+            Set feat = feat.GetNextSubFeature
+        End If
     Loop
+End Sub
+
+Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As Double, ByVal sheetH As Double, ByVal scl As Double)
+    On Error Resume Next
+    Dim nTables As Long, nPics As Long, logged As Long
+    swModel.ClearSelection2 True
+
+    ' 1) Tables seen from the sheet view, with title, size and position. Ours: the hidden
+    '    title, or an annotation standing on one of our two anchor points (within 2 mm).
+    Dim v As Object, tables As Variant, i As Long, title As String, pos As Variant, ours As Boolean
+    Set v = swModel.GetFirstView
+    tables = v.GetTableAnnotations
+    If IsArray(tables) Then
+        LogLine "Sheet tables: the sheet view lists " & (UBound(tables) - LBound(tables) + 1) & " table(s)"
+        For i = LBound(tables) To UBound(tables)
+            title = ""
+            title = tables(i).Title
+            pos = Empty
+            pos = tables(i).GetAnnotation.GetPosition
+            ours = (Left(title, 8) = "EasyPDM ")
+            If IsArray(pos) Then
+                LogLine "Sheet tables:   """ & title & """ " & tables(i).RowCount & "x" & tables(i).ColumnCount & " at " & Format(pos(0) * 1000, "0.0") & "," & Format(pos(1) * 1000, "0.0") & " mm"
+                If Abs(pos(0) - (sheetW - 0.19)) < 0.002 And Abs(pos(1) - 0.054) < 0.002 Then ours = True
+                If Abs(pos(0) - (sheetW - 0.01)) < 0.002 And Abs(pos(1) - (sheetH - 0.01)) < 0.002 Then ours = True
+            Else
+                LogLine "Sheet tables:   """ & title & """ " & tables(i).RowCount & "x" & tables(i).ColumnCount & " (no position)"
+            End If
+            If ours Then
+                If tables(i).GetAnnotation.Select3(True, Nothing) Then nTables = nTables + 1
+            End If
+        Next i
+    Else
+        LogLine "Sheet tables: the sheet view lists no tables"
+    End If
+
+    ' 2) The feature tree, logged, for tables and pictures the view did not give us.
+    WalkFeatures swModel.FirstFeature, 0, sheetW, scl, nTables, nPics, logged
+
     LogLine "Sheet tables: " & nTables & " EasyPDM table(s) selected for removal"
     LogLine "Logo: " & nPics & " old picture(s) selected for removal"
     If nTables + nPics > 0 Then swModel.EditDelete
@@ -2794,7 +2835,7 @@ Sub BuildSheetTables(ByVal swModel As Object, ByVal tb As Object)
     Dim scl As Double
     scl = SheetScale(sheet)
     LogLine "Sheet tables: sheet " & Format(w * 1000, "0") & " x " & Format(h * 1000, "0") & " mm, scale " & scl
-    DeleteEasyPdmSheetObjects swModel, w, scl
+    DeleteEasyPdmSheetObjects swModel, w, h, scl
 
     Dim labels As Object
     Set labels = JsonChild(tb, "labels")
