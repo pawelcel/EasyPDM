@@ -36,6 +36,15 @@ internal static class TestClientHelpers
         return body.GetProperty("id").GetGuid();
     }
 
+    // A delete puts the item in the recycle bin with its files kept; this purges that entry, which
+    // is when the files go (BinEndpoints.cs).
+    public static async Task PurgeFromBinAsync(this HttpClient adminClient, Guid itemId)
+    {
+        var bin = await adminClient.GetFromJsonAsync<JsonElement>("/api/bin");
+        var entry = bin.EnumerateArray().Single(e => e.GetProperty("itemId").GetGuid() == itemId);
+        (await adminClient.DeleteAsync($"/api/bin/{entry.GetProperty("id").GetGuid()}")).EnsureSuccessStatusCode();
+    }
+
     public static async Task<Guid> CreateUserAsync(this HttpClient adminClient, string username, string password, string role = "user")
     {
         var response = await adminClient.PostAsJsonAsync("/api/users", new

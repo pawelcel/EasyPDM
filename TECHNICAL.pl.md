@@ -133,7 +133,7 @@ Co wolno dodać pod czym (wymuszane i backendowo, i we froncie):
 | Część / Plik | nic — to liście struktury |
 
 Usuwanie elementu ma dwa tryby: **„Usuń ze struktury”** (odpina relację / chowa korzeń,
-rekord zostaje) i **„Usuń całkowicie”** (tylko administrator). Ten drugi schodzi w dół
+rekord zostaje) i **„Usuń”** (tylko administrator). Ten drugi schodzi w dół
 **wyłącznie przez Foldery** — Folder swoją zawartość *posiada*, więc usuwa się razem z nią,
 natomiast Złożenie swoich komponentów tylko *używa* (relacja BOM znaczy „wchodzi w skład”,
 nie „należy do”), więc usunięcie Złożenia kasuje TYLKO ten jeden rekord, a komponenty
@@ -143,14 +143,21 @@ innego złożenia także później, więc nigdy nie jest kasowane jako efekt ubo
 złożenia, w którym akurat było użyte. Wewnątrz usuwanego poddrzewa Folderów przeżywa
 dodatkowo wszystko, co ma rodzica także poza nim (zob. `survivors` w `ItemEndpoints.cs`).
 
-Całkowite usunięcie kasuje też **pliki elementu z magazynu**, nie tylko jego wiersze.
-`ON DELETE CASCADE` czyści bazę, ale dysku nie rusza, więc endpoint zbiera wszystkie ścieżki
-*przed* `DELETE`: własny plik elementu, całą zawartość `item_attachments` (plik CAD, rysunek,
-PDF, STEP, zrzut podglądu, zwykłe załączniki) oraz załączniki wiszące przy jego weryfikacjach
-klienta — te leżą we własnej tabeli, kluczowanej weryfikacją, a nie elementem, i właśnie
-dlatego zostały najpierw przeoczone i zostawały na dysku, bez żadnego wiersza, po którym dałoby
-się je odnaleźć. Usunięcie Projektu robi to samo z `project_attachments`, już po zatwierdzeniu
-transakcji, żeby nieudane usunięcie nie zabrało plików projektu, który nadal istnieje.
+Usunięcie odkłada element do **kosza** (Ustawienia → Kosz), zamiast go niszczyć. W jednej
+transakcji każdy wiersz, który skasowałaby kaskada `ON DELETE CASCADE` — element i to, co z nim
+idzie, relacje, załączniki, historia, rewizje, weryfikacje klienta — trafia jako JSON do jednego
+wiersza `recycle_bin` i dopiero potem znika z tabel, więc usunięty element odpowiada 404 wszędzie
+bez filtra „usunięty” w żadnym zapytaniu. Pliki zostają na dysku. Które tabele idą razem z
+elementem, wynika z kluczy obcych samej bazy (`RecycleBin.cs`), więc tabela podpięta pod `items`
+przez późniejszą migrację jest zachowana bez dopisywania jej do żadnej listy.
+
+**Przywróć** zapisuje wiersze z powrotem w kolejności kluczy obcych i odkłada element do
+folderów, w których był; jeśli ich już nie ma, serwer odpowiada 409 `needsFolder`, a okno pyta o
+folder albo projekt. Wiersz, którego drugi koniec w międzyczasie zniknął, jest pomijany — tak
+jak zrobiłaby kaskada. Kosz pokazuje administratorowi wszystko, a innym tylko ich własne
+usunięcia; przywrócić może administrator albo osoba, która usunęła. **Usuń na zawsze** (jeden
+wpis albo Opróżnij kosz) jest tylko dla administratora i dopiero on kasuje pliki; „Wyczyść bazę”
+opróżnia też kosz.
 
 Część/Złożenie da się też **zduplikować** (kopia dostaje nowy numer, świeży status i
 właściciela) — z poziomu drzewka kopia ląduje zaraz pod oryginałem.

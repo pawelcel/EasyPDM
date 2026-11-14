@@ -24,6 +24,7 @@ import { ManufacturersView } from "@/features/manufacturers/manufacturers-view"
 import { ClientsView } from "@/features/clients/clients-view"
 import { AppearanceSettingsView } from "@/features/settings/appearance-settings-view"
 import { AuthorSettingsView } from "@/features/settings/author-settings-view"
+import { BinView } from "@/features/settings/bin-view"
 import { CompanySettingsView } from "@/features/settings/company-settings-view"
 import { CatalogEditableContext } from "@/features/settings/catalog-editable-context"
 import { useCatalogReadOnly } from "@/features/settings/use-catalog-read-only"
@@ -383,6 +384,8 @@ function App() {
           {view === "settings" && settingsSection === "notifications" && (
             <NotificationSettingsView isAdmin={isAdmin} />
           )}
+
+          {view === "settings" && settingsSection === "bin" && <BinView isAdmin={isAdmin} />}
 
           {view === "settings" && settingsSection === "appearance" && <AppearanceSettingsView />}
 

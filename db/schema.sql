@@ -647,6 +647,28 @@ CREATE TABLE saved_filters (
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON saved_filters TO CURRENT_USER;
 
+-- Kosz (migracja 075, RecycleBin.cs, BinEndpoints.cs): usunięty element z tym, co z nim idzie,
+-- jako jeden JSON; pliki zostają na dysku do opróżnienia kosza. project_id, parent_ids i deleted_by
+-- bez kluczy obcych: projekt, folder czy osoba mogą zniknąć, a wpis ma się dalej dać przywrócić.
+CREATE TABLE recycle_bin (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    root_item_id    UUID NOT NULL,
+    item_type       TEXT NOT NULL,
+    label           TEXT NOT NULL,
+    item_count      INTEGER NOT NULL,
+    project_id      UUID,
+    project_name    TEXT,
+    parent_ids      UUID[] NOT NULL DEFAULT '{}',
+    location        TEXT,
+    deleted_by      UUID,
+    deleted_by_name TEXT NOT NULL,
+    deleted_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    payload         JSONB NOT NULL
+);
+CREATE INDEX idx_recycle_bin_deleted_at ON recycle_bin (deleted_at DESC);
+CREATE INDEX idx_recycle_bin_deleted_by ON recycle_bin (deleted_by);
+GRANT SELECT, INSERT, DELETE ON recycle_bin TO CURRENT_USER;
+
 -- ============================================================
 -- Śledzenie zastosowanych migracji — od tej wersji EasyPDM.Api sam sprawdza tę tabelę
 -- przy starcie i automatycznie stosuje nowe pliki z db/migrations/ (zob. MigrationRunner.cs).

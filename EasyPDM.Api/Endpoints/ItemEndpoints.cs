@@ -1533,6 +1533,9 @@ static class ItemEndpoints
             return Results.Ok();
         });
 
+        // DELETE /api/items/{id} -- moves the item, and what goes with it, to the recycle bin
+        // (RecycleBin.cs, BinEndpoints.cs): out of every live table, restorable until an admin
+        // purges it. Which items go along is unchanged:
         // DELETE /api/items/{id} — usuwa element CAŁKOWICIE, razem z podelementami w drzewku.
         // Element potomny jest usuwany razem z rodzicem tylko wtedy, gdy nie ma innego rodzica
         // spoza usuwanego poddrzewa (współdzielona część w innym złożeniu zostaje nietknięta —
@@ -1603,65 +1606,69 @@ static class ItemEndpoints
                 """;
 
             var idsToDelete = new List<Guid>();
-            var filePaths = new List<string>();
             await using (var selectCmd = new NpgsqlCommand(selectSql, conn))
             {
                 selectCmd.Parameters.AddWithValue("id", id);
                 await using var reader = await selectCmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
-                {
                     idsToDelete.Add(reader.GetGuid(0));
-                    if (!reader.IsDBNull(1))
-                        filePaths.Add(reader.GetString(1));
+            }
+
+            // The items go to the recycle bin (RecycleBin.cs), not out of existence: every row the
+            // cascade below removes is written into one recycle_bin row first, in the same
+            // transaction, and the stored files stay on disk. Restoring writes them back; only a
+            // purge deletes the files (BinEndpoints.cs), which is why nothing here touches them.
+            Guid binId;
+            await using (var tx = await conn.BeginTransactionAsync())
+            {
+                var deleter = (CurrentUser)httpContext.Items["CurrentUser"]!;
+                string label;
+                await using (var labelCmd = new NpgsqlCommand(
+                    "SELECT item_number, item_number_prefix, item_number_digits, item_number_with_name, file_name FROM items WHERE id = @id;", conn, tx))
+                {
+                    labelCmd.Parameters.AddWithValue("id", id);
+                    await using var reader = await labelCmd.ExecuteReaderAsync();
+                    await reader.ReadAsync();
+                    label = ItemNumbering.RecordName(
+                        reader.IsDBNull(0) ? null : reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetString(1),
+                        reader.IsDBNull(2) ? null : reader.GetInt32(2), reader.IsDBNull(3) ? null : reader.GetBoolean(3), reader.GetString(4));
                 }
+
+                // What the bin lists: the record name, where it sat (its parents outside what is
+                // deleted, which restore puts it back under) and its project, all as they are now.
+                await using (var binCmd = new NpgsqlCommand($"""
+                    INSERT INTO recycle_bin (root_item_id, item_type, label, item_count, project_id, project_name,
+                                             parent_ids, location, deleted_by, deleted_by_name, payload)
+                    SELECT i.id, i.item_type, @label, @count, i.project_id, p.name,
+                           array(SELECT r.parent_id FROM item_relations r WHERE r.child_id = i.id AND NOT r.parent_id = ANY(@ids) ORDER BY r.parent_id),
+                           (SELECT string_agg(pi.file_name, ', ' ORDER BY pi.file_name) FROM item_relations r JOIN items pi ON pi.id = r.parent_id
+                            WHERE r.child_id = i.id AND NOT r.parent_id = ANY(@ids)),
+                           @deletedBy, @deletedByName,
+                           {await RecycleBin.SnapshotSqlAsync(conn, tx)}
+                    FROM items i LEFT JOIN projects p ON p.id = i.project_id
+                    WHERE i.id = @id
+                    RETURNING id;
+                    """, conn, tx))
+                {
+                    binCmd.Parameters.AddWithValue("id", id);
+                    binCmd.Parameters.AddWithValue("ids", idsToDelete.ToArray());
+                    binCmd.Parameters.AddWithValue("label", label);
+                    binCmd.Parameters.AddWithValue("count", idsToDelete.Count);
+                    binCmd.Parameters.AddWithValue("deletedBy", deleter.Id);
+                    binCmd.Parameters.AddWithValue("deletedByName", deleter.DisplayName);
+                    binId = (Guid)(await binCmd.ExecuteScalarAsync())!;
+                }
+
+                await using (var deleteCmd = new NpgsqlCommand("DELETE FROM items WHERE id = ANY(@ids);", conn, tx))
+                {
+                    deleteCmd.Parameters.AddWithValue("ids", idsToDelete.ToArray());
+                    await deleteCmd.ExecuteNonQueryAsync();
+                }
+
+                await tx.CommitAsync();
             }
 
-            // Część/Złożenie trzymają swój plik CAD (i podgląd STEP/PDF) w item_attachments,
-            // NIE w items.file_path (to pole jest tylko dla Plików) -- bez tego te pliki
-            // zostawałyby sierotami na dysku na zawsze: ON DELETE CASCADE kasuje wiersze
-            // item_attachments razem z items, ale samych plików fizycznie nie rusza.
-            // Zapytanie MUSI polecieć przed DELETE FROM items (kaskada skasuje wiersze).
-            await using (var attachmentsCmd = new NpgsqlCommand(
-                "SELECT file_path FROM item_attachments WHERE item_id = ANY(@ids);", conn))
-            {
-                attachmentsCmd.Parameters.AddWithValue("ids", idsToDelete.ToArray());
-                await using var reader = await attachmentsCmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
-                    filePaths.Add(reader.GetString(0));
-            }
-
-            // Weryfikacja klienta ma WLASNA tabele zalacznikow (item_client_verification_attachments,
-            // podpieta pod item_client_verifications, nie pod items) i wlasne pliki w magazynie.
-            // W bazie znikaja kaskada, ale pliki -- tak samo jak wyzej -- trzeba skasowac jawnie,
-            // inaczej zostawaly na dysku na zawsze: zaden ekran ich juz nie pokazuje, a wiersza,
-            // po ktorym mozna by je odnalezc, tez juz nie ma. Zapytanie MUSI polecic przed
-            // DELETE FROM items.
-            await using (var verificationFilesCmd = new NpgsqlCommand(
-                """
-                SELECT a.file_path
-                FROM item_client_verification_attachments a
-                JOIN item_client_verifications v ON v.id = a.verification_id
-                WHERE v.item_id = ANY(@ids);
-                """, conn))
-            {
-                verificationFilesCmd.Parameters.AddWithValue("ids", idsToDelete.ToArray());
-                await using var reader = await verificationFilesCmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
-                    filePaths.Add(reader.GetString(0));
-            }
-
-            await using (var deleteCmd = new NpgsqlCommand("DELETE FROM items WHERE id = ANY(@ids);", conn))
-            {
-                deleteCmd.Parameters.AddWithValue("ids", idsToDelete.ToArray());
-                await deleteCmd.ExecuteNonQueryAsync();
-            }
-
-            foreach (var path in filePaths)
-            {
-                try { File.Delete(path); } catch (IOException) { /* magazyn i tak jest sierocy — nie blokujemy usunięcia rekordu */ }
-            }
-
-            return Results.Ok(new { deletedCount = idsToDelete.Count });
+            return Results.Ok(new { deletedCount = idsToDelete.Count, binId });
         });
     }
 

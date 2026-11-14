@@ -4,6 +4,10 @@ using System.Text.Json;
 
 namespace EasyPDM.Api.Tests;
 
+// Deleting an item now puts it in the recycle bin with its files kept; the files go when an admin
+// purges the entry (BinEndpoints.cs). So each test deletes, checks that every file is still
+// there, purges, and then expects the storage back as it was. What follows is the original rule,
+// which now holds for the purge:
 // Całkowite usunięcie elementu (DELETE /api/items/{id}, "Usuń całkowicie") ma zabrać ze sobą
 // RÓWNIEŻ pliki z magazynu, nie tylko wiersze. ON DELETE CASCADE czyści bazę, ale plików na
 // dysku nie rusza -- endpoint musi więc zebrać ich ścieżki ZANIM skasuje wiersze. Te testy
@@ -38,6 +42,18 @@ public class ItemDeleteFilesTests
         (await client.PostAsync($"/api/items/{itemId}/attachments", form)).EnsureSuccessStatusCode();
     }
 
+    // Delete, see the files stay while the entry is in the bin, then purge it.
+    private static async Task DeleteAndPurgeAsync(EasyPDMWebApplicationFactory factory, HttpClient client, Guid itemId)
+    {
+        var stored = StoredFileCount(factory);
+        (await client.DeleteAsync($"/api/items/{itemId}")).EnsureSuccessStatusCode();
+        Assert.Equal(stored, StoredFileCount(factory));
+
+        var bin = await client.GetFromJsonAsync<JsonElement>("/api/bin");
+        var entry = bin.EnumerateArray().Single(e => e.GetProperty("itemId").GetGuid() == itemId);
+        (await client.DeleteAsync($"/api/bin/{entry.GetProperty("id").GetGuid()}")).EnsureSuccessStatusCode();
+    }
+
     // Pliki leżą pod StorageRoot fabryki -- liczymy je wprost na dysku, bo właśnie o to tu
     // chodzi: czy po usunięciu elementu zostaje coś, czego nikt już nigdy nie posprząta.
     private static int StoredFileCount(EasyPDMWebApplicationFactory factory) =>
@@ -67,7 +83,7 @@ public class ItemDeleteFilesTests
 
         Assert.Equal(before + 6, StoredFileCount(factory));
 
-        (await client.DeleteAsync($"/api/items/{itemId}")).EnsureSuccessStatusCode();
+        await DeleteAndPurgeAsync(factory, client, itemId);
 
         // Zero sierot: magazyn wraca do stanu sprzed wgrywania.
         Assert.Equal(before, StoredFileCount(factory));
@@ -141,7 +157,7 @@ public class ItemDeleteFilesTests
 
         Assert.Equal(before + 1, StoredFileCount(factory));
 
-        (await client.DeleteAsync($"/api/items/{itemId}")).EnsureSuccessStatusCode();
+        await DeleteAndPurgeAsync(factory, client, itemId);
 
         Assert.Equal(before, StoredFileCount(factory));
     }
