@@ -361,7 +361,7 @@ exports its PDF — reads the item's title block data from EasyPDM and:
   revision A is not listed) — SolidWorks general tables;
 - puts the **company logo** in the square at the right end of the NAME row.
 
-Running Upload again replaces only its own tables (found by their hidden titles "EasyPDM
-processes" / "EasyPDM revisions") and the picture inside the logo square; tables and pictures
-you placed yourself stay. A drawing with any other sheet format is left alone. A part or
+Running Upload again replaces only its own tables and logo — features named "EasyPDM
+processes", "EasyPDM revisions" and "EasyPDM logo" in the FeatureManager tree; tables and
+pictures you placed yourself stay. (Don't rename those three.) A drawing with any other sheet format is left alone. A part or
 assembly upload never exports a PDF — the item's PDF is its drawing.

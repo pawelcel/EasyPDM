@@ -406,8 +406,8 @@ speichert und ihr PDF exportiert — die Schriftfelddaten aus EasyPDM und:
   Revision A wird nicht aufgeführt) — als allgemeine SolidWorks-Tabellen;
 - setzt das **Firmenlogo** in das Quadrat am rechten Ende der Zeile BENENNUNG.
 
-Ein erneuter Upload ersetzt nur seine eigenen Tabellen (erkannt an den versteckten Titeln
-„EasyPDM processes“ / „EasyPDM revisions“) und das Bild im Logo-Quadrat; selbst eingefügte
-Tabellen und Bilder bleiben. Eine Zeichnung mit einem anderen Blattformat bleibt unverändert.
+Ein erneuter Upload ersetzt nur seine eigenen Tabellen und das Logo — Features namens „EasyPDM
+processes“, „EasyPDM revisions“ und „EasyPDM logo“ im FeatureManager; selbst eingefügte
+Tabellen und Bilder bleiben. (Benennen Sie diese drei nicht um.) Eine Zeichnung mit einem anderen Blattformat bleibt unverändert.
 Das Senden eines Teils oder einer Baugruppe exportiert nie ein PDF — das PDF des Elements ist
 seine Zeichnung.

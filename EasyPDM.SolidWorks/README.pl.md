@@ -362,7 +362,7 @@ pobiera z EasyPDM dane tabelki i:
   nie jest wypisywana) — jako tabele ogólne SolidWorks;
 - wstawia **logo firmy** w kwadrat po prawej stronie wiersza NAZWA.
 
-Ponowny Upload wymienia tylko swoje tabele (rozpoznane po ukrytych tytułach „EasyPDM
-processes” / „EasyPDM revisions”) i obraz w kwadracie logo; tabele i obrazy dodane przez Ciebie
-zostają. Rysunek z innym formatem arkusza zostaje bez zmian. Wysyłka części lub złożenia nigdy
+Ponowny Upload wymienia tylko swoje tabele i logo — operacje o nazwach „EasyPDM processes”,
+„EasyPDM revisions” i „EasyPDM logo” w drzewie FeatureManager; tabele i obrazy dodane przez
+Ciebie zostają. (Nie zmieniaj nazw tych trzech operacji.) Rysunek z innym formatem arkusza zostaje bez zmian. Wysyłka części lub złożenia nigdy
 nie eksportuje PDF — PDF elementu to jego rysunek.
