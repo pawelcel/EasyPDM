@@ -2652,7 +2652,7 @@ Private Function AddLines(ByVal cell As String, ByVal more As String) As String
     End If
 End Function
 
-Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As Double)
+Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As Double, ByVal scl As Double)
     On Error Resume Next
     Dim v As Object, tables As Variant, i As Long, n As Long, title As String
     Set v = swModel.GetFirstView
@@ -2676,6 +2676,8 @@ Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As D
         If IsArray(pics) Then
             For i = LBound(pics) To UBound(pics)
                 pics(i).GetOrigin px, py
+                px = px * scl
+                py = py * scl
                 If px > sheetW - 0.03 And px < sheetW - 0.009 And py > 0.024 And py < 0.045 Then
                     If pics(i).GetFeature.Select2(True, 0) Then removedPics = removedPics + 1
                 End If
@@ -2724,6 +2726,20 @@ Private Sub SetCell(ByVal t As Object, ByVal r As Long, ByVal c As Long, ByVal t
     End If
 End Sub
 
+' The sheet's scale (0.5 for 1:2). A picture lives in the sheet's sketch, whose coordinates
+' SolidWorks multiplies by the sheet scale -- confirmed live: on a 1:2 sheet the logo came out
+' at half the size and half the distance from the corner -- so its position and size are
+' divided by this. Tables and notes are annotations in sheet space and need nothing.
+Private Function SheetScale(ByVal sheet As Object) As Double
+    On Error Resume Next
+    Dim props As Variant
+    SheetScale = 1
+    props = sheet.GetProperties2
+    If IsArray(props) Then
+        If props(2) > 0 And props(3) > 0 Then SheetScale = props(2) / props(3)
+    End If
+End Function
+
 Private Function DownloadLogo() As String
     On Error GoTo Failed
     Dim http As Object, st As Object, ctype As String, ext As String, f As String, cookie As String
@@ -2754,8 +2770,10 @@ Sub BuildSheetTables(ByVal swModel As Object, ByVal tb As Object)
     Dim sheet As Object, w As Double, h As Double
     Set sheet = swModel.GetCurrentSheet
     sheet.GetSize w, h
-    LogLine "Sheet tables: sheet " & Format(w * 1000, "0") & " x " & Format(h * 1000, "0") & " mm"
-    DeleteEasyPdmSheetObjects swModel, w
+    Dim scl As Double
+    scl = SheetScale(sheet)
+    LogLine "Sheet tables: sheet " & Format(w * 1000, "0") & " x " & Format(h * 1000, "0") & " mm, scale " & scl
+    DeleteEasyPdmSheetObjects swModel, w, scl
 
     Dim labels As Object
     Set labels = JsonChild(tb, "labels")
@@ -2844,8 +2862,8 @@ Sub BuildSheetTables(ByVal swModel As Object, ByVal tb As Object)
             If pic Is Nothing Then
                 LogLine "Logo: InsertSketchPicture failed (" & Err.Description & ")"
             Else
-                pic.SetSize 0.014, 0.014, True
-                pic.SetOrigin w - 0.0255, 0.0275
+                pic.SetSize 0.014 / scl, 0.014 / scl, True
+                pic.SetOrigin (w - 0.0255) / scl, 0.0275 / scl
                 LogLine "Logo: inserted from " & logoFile
             End If
             Kill logoFile
