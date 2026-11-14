@@ -2,6 +2,11 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **The start-up migration lock is released by hand.** `pg_advisory_lock` belongs to the database session, and a pooled connection keeps its session when it is closed: Npgsql resets it only when that connection is next rented. The lock therefore stayed held on an idle pooled connection, and the next start in the same process (or a second instance beside a running one) waited on it until the command timeout and failed.
+
 ## [0.8.1]
 
 ### Added
