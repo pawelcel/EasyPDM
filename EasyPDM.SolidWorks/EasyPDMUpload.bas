@@ -154,7 +154,7 @@ Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 ' Bumped by hand on every change and written into the first log line, so a log shows at once
 ' whether the latest macro was imported or an older copy ran (happened twice in testing).
-Private Const MACRO_REVISION As String = "2026-11-14.4"
+Private Const MACRO_REVISION As String = "2026-11-14.5"
 Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
                                                              ' live SolidWorks install, confirm on first real test (see
                                                              ' UploadStepAttachment).
@@ -2655,6 +2655,36 @@ Private Function AddLines(ByVal cell As String, ByVal more As String) As String
     End If
 End Function
 
+' The tables and the logo get fixed feature names when they are inserted ("EasyPDM processes",
+' "EasyPDM revisions", "EasyPDM logo"); a rerun deletes the features with those names before it
+' builds new ones. The earlier attempts (the sheet view's table list, a walk over the top-level
+' features) found nothing, so the name is the handle.
+Private Function NameFeature(ByVal feat As Object, ByVal newName As String) As Boolean
+    On Error Resume Next
+    If feat Is Nothing Then Exit Function
+    feat.Name = newName
+    NameFeature = (feat.Name = newName)
+    LogLine "Sheet objects: feature named """ & feat.Name & """" & IIf(NameFeature, "", " (wanted """ & newName & """)")
+End Function
+
+Private Function DeleteFeaturesNamed(ByVal swModel As Object, ByVal featName As String) As Long
+    On Error Resume Next
+    Dim feat As Object, guard As Long
+    Do
+        Set feat = Nothing
+        Set feat = swModel.FeatureByName(featName)
+        If feat Is Nothing Then Exit Do
+        swModel.ClearSelection2 True
+        If Not feat.Select2(False, 0) Then Exit Do
+        swModel.EditDelete
+        DeleteFeaturesNamed = DeleteFeaturesNamed + 1
+        guard = guard + 1
+        If guard > 20 Then Exit Do
+    Loop
+    swModel.ClearSelection2 True
+    LogLine "Sheet objects: deleted " & DeleteFeaturesNamed & " feature(s) named """ & featName & """"
+End Function
+
 ' Diagnostic helper: logs a feature and its sub-features (depth-first, limited), and selects the
 ' ones that are ours -- a table whose tables carry the "EasyPDM ..." title, or a picture whose
 ' origin lies in the logo square. Sub-features matter: in a drawing the tables and pictures may
@@ -2712,6 +2742,10 @@ End Sub
 Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As Double, ByVal sheetH As Double, ByVal scl As Double)
     On Error Resume Next
     Dim nTables As Long, nPics As Long, logged As Long
+    ' By name first -- the reliable way for everything this revision inserted.
+    DeleteFeaturesNamed swModel, "EasyPDM processes"
+    DeleteFeaturesNamed swModel, "EasyPDM revisions"
+    DeleteFeaturesNamed swModel, "EasyPDM logo"
     swModel.ClearSelection2 True
 
     ' 1) Tables seen from the sheet view, with title, size and position. Ours: the hidden
@@ -2764,6 +2798,16 @@ Private Function NewSheetTable(ByVal swModel As Object, ByVal x As Double, ByVal
     LogLine "Sheet tables: inserted " & title & ", " & t.RowCount & " rows x " & t.ColumnCount & " columns"
     t.Title = title
     t.TitleVisible = False
+    ' The table's own feature gets the same name, which is how a rerun finds it.
+    Dim gtf As Object
+    Set gtf = Nothing
+    Set gtf = t.GeneralTableFeature
+    If gtf Is Nothing Then
+        LogLine "Sheet tables: no GeneralTableFeature for " & title & " (" & Err.Description & ")"
+        Err.Clear
+    Else
+        NameFeature gtf.GetFeature, title
+    End If
     Dim tf As Object
     Set tf = t.GetTextFormat
     tf.CharHeight = 0.0026
@@ -2926,6 +2970,7 @@ Sub BuildSheetTables(ByVal swModel As Object, ByVal tb As Object)
             Else
                 pic.SetSize 0.014 / scl, 0.014 / scl, True
                 pic.SetOrigin (w - 0.0255) / scl, 0.0275 / scl
+                NameFeature pic.GetFeature, "EasyPDM logo"
                 LogLine "Logo: inserted from " & logoFile
             End If
             Kill logoFile
