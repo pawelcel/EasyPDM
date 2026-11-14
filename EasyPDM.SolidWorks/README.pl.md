@@ -325,3 +325,22 @@ zawiodło przy eksporcie albo zapisie.
   systemowa plików.
 - Kopiowanie/rejestrowanie/pobieranie pliku przez `storage/` zakłada, że ten folder jest
   widoczny w systemie plików tej maszyny.
+
+## `EasyPDMSheetFormat.bas` — format arkusza EasyPDM (w przygotowaniu)
+
+Makro do jednorazowego przygotowania: rysuje format arkusza EasyPDM — tę samą ramkę, strefy
+wg ISO 5457 i tabelkę co szablony FreeCAD — na bieżącym arkuszu pustego rysunku i zapisuje go
+jako format arkusza (`.slddrt`) i szablon rysunku (`.drwdot`) w `Dokumenty\EasyPDM\SolidWorks`.
+
+1. Plik → Nowy → Rysunek; we Właściwościach arkusza wybierz A3, A2 albo A1 (poziomo) bez
+   formatu arkusza.
+2. Uruchom `EasyPDMSheetFormat.bas` (`main`).
+3. Narzędzia → Opcje → Lokalizacje plików: dodaj ten folder do Formatów arkuszy i Szablonów
+   dokumentów.
+
+Pola tabelki to notatki powiązane z właściwościami rysunku (`$PRP:"pdm_drawn_by"`,
+`$PRP:"pdm_label_drawn_by"`, …); skala i numer arkusza korzystają z właściwości arkusza
+SolidWorks. Wypełnianie tych właściwości z EasyPDM w makrach Upload/Download oraz tabele
+obróbek i rewizji to kolejne kroki. Makro generuje `EasyPDM.FreeCad/templates/build_templates.py`
+— zmieniaj skrypt, nie `.bas`. Każde uruchomienie zapisuje log w
+`%TEMP%\EasyPDM_sheetformat.log`.

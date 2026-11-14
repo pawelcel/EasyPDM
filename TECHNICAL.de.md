@@ -612,7 +612,8 @@ Ein Fenster bleibt mit Absicht: Komponenten, die bereits mit einem PDM-Element v
 
 Jede Anfrage an `/api/*` (außer `/api/auth/login`) erfordert eine Anmeldung — eine
 Sitzung ist ein zufälliges Token in einem httpOnly-Cookie (`pdm_session`, 30 Tage
-gültig), gespeichert in der Tabelle `sessions`. Passwörter werden als PBKDF2 gespeichert
+gültig); die Tabelle `sessions` speichert nur dessen SHA-256, sodass das Lesen der
+Tabelle keine gültige Sitzung liefert. Passwörter werden als PBKDF2 gespeichert
 (eigene Implementierung in `PasswordHasher.cs`, nur `System.Security.Cryptography` —
 ohne zusätzliche NuGet-Pakete).
 

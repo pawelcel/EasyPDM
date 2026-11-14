@@ -25,14 +25,30 @@ static class MigrationRunner
 
         // Blokada na poziomie SESJI PostgreSQL — chroni przed dwiema instancjami programu
         // (np. rolling restart, albo przypadkowe podwójne uruchomienie) próbującymi
-        // zastosować tę samą migrację naraz. Zwalniana automatycznie przy zamknięciu tego
-        // połączenia (koniec tej metody), więc nie trzeba jej ręcznie odblokowywać.
+        // zastosować tę samą migrację naraz. Zamknięcie połączenia jej NIE zwalnia: pula
+        // zachowuje sesję, a Npgsql czyści ją dopiero przy następnym wypożyczeniu tego
+        // połączenia. Do tego czasu każdy, kto prosi o blokadę na innym połączeniu, czeka —
+        // dlatego zwalniamy ją ręcznie w finally.
         await using (var lockCmd = new NpgsqlCommand("SELECT pg_advisory_lock(@key);", conn))
         {
             lockCmd.Parameters.AddWithValue("key", AdvisoryLockKey);
             await lockCmd.ExecuteNonQueryAsync();
         }
 
+        try
+        {
+            await ApplyUnderLockAsync(conn, logger);
+        }
+        finally
+        {
+            await using var unlockCmd = new NpgsqlCommand("SELECT pg_advisory_unlock(@key);", conn);
+            unlockCmd.Parameters.AddWithValue("key", AdvisoryLockKey);
+            await unlockCmd.ExecuteNonQueryAsync();
+        }
+    }
+
+    private static async Task ApplyUnderLockAsync(NpgsqlConnection conn, ILogger logger)
+    {
         // Samonaprawiające się — działa też na instalacjach sprzed wprowadzenia tego
         // mechanizmu (migracja 027 tworzy tę samą tabelę, ale istniejąca baza mogła jej
         // jeszcze nie dostać, jeśli ktoś pominął ręczne stosowanie migracji do tej pory).

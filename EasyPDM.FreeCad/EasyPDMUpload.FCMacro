@@ -289,46 +289,69 @@ def _sh_line(x1, y1, x2, y2):
     return '<path d="M %s,%s L %s,%s"/>' % (_sh_f(x1), _sh_f(y1), _sh_f(x2), _sh_f(y2))
 
 
-def build_base_sheet(fmt_name):
+def build_base_sheet(fmt_name, rec=None):
     """The bare template for one format: frame, grid reference, title block with empty
-    pdm_* fields and the three empty groups."""
+    pdm_* fields and the three empty groups.
+
+    `rec`, when given ({"lines": [], "texts": [], "anchors": {}}), also receives every line
+    (x1, y1, x2, y2, width) and text (x, baseline_y, text, size, bold, anchor, field) in mm,
+    y down from the top edge -- what build_templates.py turns into the SolidWorks macro that
+    draws the same sheet format."""
     W, H, fields_x, fields_y = SHEET_FORMATS[fmt_name]
     o = []
     add = o.append
+
+    def ln(x1, y1, x2, y2, width):
+        if rec is not None:
+            rec["lines"].append((x1, y1, x2, y2, width))
+        return _sh_line(x1, y1, x2, y2)
+
+    def box(x, y, w, h, width):
+        if rec is not None:
+            for seg in ((x, y, x + w, y), (x + w, y, x + w, y + h), (x + w, y + h, x, y + h), (x, y + h, x, y)):
+                rec["lines"].append(seg + (width,))
+
+    def txt(x, y, text, size, bold=False, anchor="start", field=None):
+        if rec is not None:
+            rec["texts"].append((x, y, text, size, bold, anchor, field))
     add('<g id="sheet" style="font-family:%s">' % SHEET_FONT)
 
     FL, FT, FR, FB = 20, 10, W - 10, H - 10      # drawing frame
     OL, OT, OR, OB = 15, 5, W - 5, H - 5         # outer line of the grid strip
     cx, cy = W / 2.0, H / 2.0
+    box(FL, FT, FR - FL, FB - FT, 0.7)
     add('<rect id="drawing_frame" x="%s" y="%s" width="%s" height="%s" style="%s"/>'
         % (FL, FT, _sh_f(FR - FL), _sh_f(FB - FT), _THICK))
     xs = [cx + 50 * k for k in range(-(fields_x // 2 - 1), fields_x // 2)]
     ys = [cy + 50 * k for k in range(-(fields_y // 2 - 1), fields_y // 2)]
     add('<g id="grid_reference" style="%s">' % _THIN)
+    box(OL, OT, OR - OL, OB - OT, 0.35)
     add('<rect x="%s" y="%s" width="%s" height="%s"/>' % (OL, OT, _sh_f(OR - OL), _sh_f(OB - OT)))
     for x in xs:
-        add(_sh_line(x, OT, x, FT))
-        add(_sh_line(x, FB, x, OB))
+        add(ln(x, OT, x, FT, 0.35))
+        add(ln(x, FB, x, OB, 0.35))
     for y in ys:
-        add(_sh_line(OL, y, FL, y))
-        add(_sh_line(FR, y, OR, y))
+        add(ln(OL, y, FL, y, 0.35))
+        add(ln(FR, y, OR, y, 0.35))
     add("</g>")
     cols, rows = [FL] + xs + [FR], [FT] + ys + [FB]
     add('<g id="grid_reference_markers" style="font-size:3.5px;text-anchor:middle;fill:#000000;stroke:none">')
     for i in range(len(cols) - 1):
         m = (cols[i] + cols[i + 1]) / 2
         for y in (OT + 3.75, FB + 3.75):
+            txt(m, y, str(i + 1), 3.5, anchor="middle")
             add('<text x="%s" y="%s">%d</text>' % (_sh_f(m), _sh_f(y), i + 1))
     for i in range(len(rows) - 1):
         m = (rows[i] + rows[i + 1]) / 2 + 1.25
         for x in ((OL + FL) / 2.0, (FR + OR) / 2.0):
+            txt(x, m, ZONE_LETTERS[i], 3.5, anchor="middle")
             add('<text x="%s" y="%s">%s</text>' % (_sh_f(x), _sh_f(m), ZONE_LETTERS[i]))
     add("</g>")
     add('<g id="centring_marks" style="%s">' % _THICK)
-    add(_sh_line(cx, 0, cx, FT + 5))
-    add(_sh_line(cx, H, cx, FB - 5))
-    add(_sh_line(0, cy, FL + 5, cy))
-    add(_sh_line(W, cy, FR - 5, cy))
+    add(ln(cx, 0, cx, FT + 5, 0.7))
+    add(ln(cx, H, cx, FB - 5, 0.7))
+    add(ln(0, cy, FL + 5, cy, 0.7))
+    add(ln(W, cy, FR - 5, cy, 0.7))
     add("</g>")
 
     # Title block 180 x 44 mm in the bottom-right corner.
@@ -336,22 +359,24 @@ def build_base_sheet(fmt_name):
     X = lambda dx: x0 + dx
     Y = lambda dy: y0 + dy
     add('<g id="title_block_lines" style="%s">' % _THIN)
-    add(_sh_line(X(70), Y(0), X(70), Y(44)))
+    add(ln(X(70), Y(0), X(70), Y(44), 0.35))
     for dy in (11, 22, 33):
-        add(_sh_line(X(0), Y(dy), X(70), Y(dy)))
-    add(_sh_line(X(46), Y(0), X(46), Y(22)))
-    add(_sh_line(X(22), Y(33), X(22), Y(44)))
-    add(_sh_line(X(40), Y(33), X(40), Y(44)))
-    add(_sh_line(X(70), Y(11), X(180), Y(11)))
-    add(_sh_line(X(70), Y(28), X(180), Y(28)))
-    add(_sh_line(X(163), Y(11), X(163), Y(28)))
-    add(_sh_line(X(140), Y(28), X(140), Y(44)))
-    add(_sh_line(X(162), Y(28), X(162), Y(44)))
+        add(ln(X(0), Y(dy), X(70), Y(dy), 0.35))
+    add(ln(X(46), Y(0), X(46), Y(22), 0.35))
+    add(ln(X(22), Y(33), X(22), Y(44), 0.35))
+    add(ln(X(40), Y(33), X(40), Y(44), 0.35))
+    add(ln(X(70), Y(11), X(180), Y(11), 0.35))
+    add(ln(X(70), Y(28), X(180), Y(28), 0.35))
+    add(ln(X(163), Y(11), X(163), Y(28), 0.35))
+    add(ln(X(140), Y(28), X(140), Y(44), 0.35))
+    add(ln(X(162), Y(28), X(162), Y(44), 0.35))
     add("</g>")
+    box(x0, y0, 180, 44, 0.7)
     add('<rect id="title_block_frame" x="%s" y="%s" width="180" height="44" style="%s"/>'
         % (_sh_f(x0), _sh_f(y0), _THICK))
 
     def label(key, x, y):
+        txt(x, y, SHEET_LABELS[key][1], 2.0, field="pdm_label_" + key)
         add('<text freecad:editable="pdm_label_%s" x="%s" y="%s" style="font-size:2px;fill:#000000">'
             "<tspan>%s</tspan></text>" % (key, _sh_f(x), _sh_f(y), _sh_esc(SHEET_LABELS[key][1])))
 
@@ -361,6 +386,7 @@ def build_base_sheet(fmt_name):
             style += ";font-weight:bold"
         if anchor != "start":
             style += ";text-anchor:%s" % anchor
+        txt(x, y, text, size, bold, anchor, "pdm_" + key)
         extra = ' freecad:autofill="%s"' % autofill if autofill else ""
         add('<text freecad:editable="pdm_%s"%s x="%s" y="%s" style="%s"><tspan>%s</tspan></text>'
             % (key, extra, _sh_f(x), _sh_f(y), style, _sh_esc(text)))
@@ -382,6 +408,8 @@ def build_base_sheet(fmt_name):
     label("format", X(163.5), Y(31));       value("format", X(171), Y(40.5), text=fmt_name, anchor="middle")
     add("</g>")
 
+    if rec is not None:
+        rec["anchors"].update({"logo": (X(163), Y(11), 17.0), "processes": (x0, y0, 180.0), "revisions": (FR, FT, 160.0)})
     add('<g id="pdm_logo" data-x="%s" data-y="%s" data-size="17"/>' % (_sh_f(X(163)), _sh_f(Y(11))))
     add('<g id="pdm_processes" data-x="%s" data-bottom="%s" data-width="180"/>' % (_sh_f(x0), _sh_f(y0)))
     add('<g id="pdm_revisions" data-right="%s" data-top="%s" data-width="160"/>' % (_sh_f(FR), _sh_f(FT)))

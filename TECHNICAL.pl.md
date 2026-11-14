@@ -554,7 +554,8 @@ Jedno okno zostaje świadomie: komponenty już podpięte do PDM ze statusem „s
 ### Logowanie, role i dostęp do projektów
 
 Każde żądanie do `/api/*` (poza `/api/auth/login`) wymaga zalogowania — sesja to losowy
-token w ciasteczku httpOnly (`pdm_session`, 30 dni ważności), zapisany w tabeli `sessions`.
+token w ciasteczku httpOnly (`pdm_session`, 30 dni ważności); tabela `sessions` trzyma
+tylko jego skrót SHA-256, więc odczyt tabeli nie daje działającej sesji.
 Hasła trzymane jako PBKDF2 (własna implementacja w `PasswordHasher.cs`, tylko
 `System.Security.Cryptography` — bez dodatkowych pakietów NuGet).
 

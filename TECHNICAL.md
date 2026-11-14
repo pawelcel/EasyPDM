@@ -782,8 +782,9 @@ go up — and the file list cannot say so, because from its point of view nothin
 ### Login, roles, and project access
 
 Every request to `/api/*` (except `/api/auth/login`) requires being logged in — a
-session is a random token in an httpOnly cookie (`pdm_session`, 30-day validity), stored
-in the `sessions` table. Passwords are stored as PBKDF2 (a custom implementation in
+session is a random token in an httpOnly cookie (`pdm_session`, 30-day validity); the
+`sessions` table keeps only its SHA-256, so reading the table gives no working session.
+Passwords are stored as PBKDF2 (a custom implementation in
 `PasswordHasher.cs`, using only `System.Security.Cryptography` — no extra NuGet
 packages).
 
