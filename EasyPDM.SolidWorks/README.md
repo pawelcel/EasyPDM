@@ -331,8 +331,9 @@ references and title block as the FreeCAD templates — on the current sheet of 
 drawing and saves it as a sheet format (`.slddrt`) and a drawing template (`.drwdot`) in
 `Documents\EasyPDM\SolidWorks`.
 
-1. File → New → Drawing; in Sheet Properties choose A3, A2 or A1 (landscape) with no sheet
-   format.
+1. File → New → Drawing at A3, A2 or A1 (landscape). If the sheet already has a sheet format
+   (e.g. the standard "a3 - iso"), the macro offers to clear it first — the drawing views are
+   not part of the format and stay.
 2. Run `EasyPDMSheetFormat.bas` (`main`).
 3. Tools → Options → File Locations: add that folder to Sheet Formats and Document
    Templates.

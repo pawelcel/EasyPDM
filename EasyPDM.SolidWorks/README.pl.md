@@ -332,8 +332,9 @@ Makro do jednorazowego przygotowania: rysuje format arkusza EasyPDM — tę sam�
 wg ISO 5457 i tabelkę co szablony FreeCAD — na bieżącym arkuszu pustego rysunku i zapisuje go
 jako format arkusza (`.slddrt`) i szablon rysunku (`.drwdot`) w `Dokumenty\EasyPDM\SolidWorks`.
 
-1. Plik → Nowy → Rysunek; we Właściwościach arkusza wybierz A3, A2 albo A1 (poziomo) bez
-   formatu arkusza.
+1. Plik → Nowy → Rysunek w rozmiarze A3, A2 albo A1 (poziomo). Jeśli arkusz ma już format
+   arkusza (np. standardowy „a3 - iso”), makro zaproponuje najpierw jego wyczyszczenie — widoki
+   rysunku nie należą do formatu i zostają.
 2. Uruchom `EasyPDMSheetFormat.bas` (`main`).
 3. Narzędzia → Opcje → Lokalizacje plików: dodaj ten folder do Formatów arkuszy i Szablonów
    dokumentów.

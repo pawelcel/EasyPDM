@@ -699,8 +699,9 @@ Option Explicit
 ' FreeCAD templates -- edit the script, not this file, and rerun it.
 '
 ' How to use:
-'   1. File > New > Drawing; in Sheet Properties pick paper size A3, A2 or A1 (ISO,
-'      landscape) and NO sheet format ("Display sheet format" off / custom size).
+'   1. File > New > Drawing at paper size A3, A2 or A1 (ISO, landscape). If the sheet
+'      already has a sheet format (e.g. the standard "a3 - iso"), the macro offers to clear
+'      it first -- the drawing views are not part of the format and stay.
 '   2. Run this macro (Sub main). It draws the frame, grid references and title block in
 '      the sheet format, links the title block fields to custom properties and saves the
 '      two files.
@@ -747,7 +748,7 @@ Function T(ByVal key As String) As String
                 Case "NotDrawing": T = "Otworz rysunek (nowy, pusty), na ktorym ma powstac format arkusza EasyPDM."
                 Case "WrongSize": T = "Ustaw w Wlasciwosciach arkusza rozmiar A3, A2 albo A1 (poziomo) i uruchom makro ponownie. Obecny rozmiar: "
                 Case "HasFormat": T = "Ten arkusz ma juz format arkusza: "
-                Case "HasFormat2": T = "Zacznij od nowego rysunku bez formatu arkusza (Wlasciwosci arkusza: bez wyswietlania formatu)."
+                Case "HasFormat2": T = "Zastapic jego zawartosc formatem EasyPDM? Wszystko, co jest w formacie arkusza (ramka, tabelka, notatki), zostanie usuniete. Widoki rysunku zostaja."
                 Case "Confirm": T = "Narysowac format arkusza EasyPDM {f} na biezacym arkuszu i zapisac go jako format arkusza i szablon rysunku?"
                 Case "Done": T = "Gotowe. Zapisano:"
                 Case "Done2": T = "Dodaj ten folder w Narzedzia > Opcje > Lokalizacje plikow (Formaty arkuszy i Szablony dokumentow)."
@@ -760,7 +761,7 @@ Function T(ByVal key As String) As String
                 Case "NotDrawing": T = "Oeffnen Sie eine (neue, leere) Zeichnung, auf der das EasyPDM-Blattformat entstehen soll."
                 Case "WrongSize": T = "Stellen Sie in den Blatteigenschaften A3, A2 oder A1 (quer) ein und starten Sie das Makro erneut. Aktuelle Groesse: "
                 Case "HasFormat": T = "Dieses Blatt hat bereits ein Blattformat: "
-                Case "HasFormat2": T = "Beginnen Sie mit einer neuen Zeichnung ohne Blattformat (Blatteigenschaften: Blattformat nicht anzeigen)."
+                Case "HasFormat2": T = "Seinen Inhalt durch das EasyPDM-Format ersetzen? Alles im Blattformat (Rahmen, Schriftfeld, Notizen) wird geloescht. Die Zeichnungsansichten bleiben."
                 Case "Confirm": T = "Das EasyPDM-Blattformat {f} auf dem aktuellen Blatt zeichnen und als Blattformat und Zeichnungsvorlage speichern?"
                 Case "Done": T = "Fertig. Gespeichert:"
                 Case "Done2": T = "Fuegen Sie diesen Ordner unter Extras > Optionen > Dateipfade hinzu (Blattformate und Dokumentvorlagen)."
@@ -774,7 +775,7 @@ Function T(ByVal key As String) As String
         Case "NotDrawing": T = "Open the (new, empty) drawing the EasyPDM sheet format should be drawn on."
         Case "WrongSize": T = "Set the paper size to A3, A2 or A1 (landscape) in Sheet Properties and run the macro again. Current size: "
         Case "HasFormat": T = "This sheet already has a sheet format: "
-        Case "HasFormat2": T = "Start from a new drawing with no sheet format (Sheet Properties: do not display a sheet format)."
+        Case "HasFormat2": T = "Replace its contents with the EasyPDM format? Everything in the sheet format (frame, title block, notes) is deleted. The drawing views stay."
         Case "Confirm": T = "Draw the EasyPDM {f} sheet format on the current sheet and save it as a sheet format and a drawing template?"
         Case "Done": T = "Done. Saved:"
         Case "Done2": T = "Add this folder under Tools > Options > File Locations (Sheet Formats and Document Templates)."
@@ -925,6 +926,26 @@ Sub ApplyWidths(ByVal segs As Collection, ByVal widthMm As Double)
     On Error GoTo 0
 End Sub
 
+' Deletes everything in the sheet format being edited (lines, notes, the old title block)
+' before the EasyPDM format is drawn. Called only inside EditTemplate, where Select All
+' reaches the format's own entities and not the drawing views.
+Sub ClearSheetFormat()
+    Dim n As Long
+    On Error Resume Next
+    swModel.ClearSelection2 True
+    swModel.Extension.SelectAll
+    n = swModel.SelectionManager.GetSelectedObjectCount2(-1)
+    LogLine "clearing old sheet format: " & n & " selected"
+    If n > 0 Then swModel.EditDelete
+    n = 0
+    swModel.Extension.SelectAll
+    n = swModel.SelectionManager.GetSelectedObjectCount2(-1)
+    LogLine "left in the sheet format after delete: " & n
+    swModel.ClearSelection2 True
+    If Err.Number <> 0 Then LogLine "clear error " & Err.Number & ": " & Err.Description
+    On Error GoTo 0
+End Sub
+
 Sub SetProp(ByVal mgr As Object, ByVal name As String, ByVal value As String)
     On Error Resume Next
     mgr.Add3 name, SW_CUSTOM_INFO_TEXT, value, SW_CUSTOM_PROPERTY_REPLACE
@@ -963,14 +984,18 @@ Sub main()
         WriteLog
         Exit Sub
     End If
+    ' SolidWorks keeps the name of the sheet format the drawing started from even after its
+    ' contents were deleted or its display was switched off, so the name alone says nothing
+    ' about whether the format is empty. Instead of refusing, offer to clear it.
     existing = sheet.GetTemplateName
     LogLine "current sheet format: '" & existing & "'"
+    Dim clearFirst As Boolean
     If existing <> "" Then
-        MsgBox T("HasFormat") & existing & vbCrLf & vbCrLf & T("HasFormat2"), vbExclamation, T("Title")
-        WriteLog
+        If MsgBox(T("HasFormat") & existing & vbCrLf & vbCrLf & T("HasFormat2"), vbYesNo + vbQuestion, T("Title")) <> vbYes Then Exit Sub
+        clearFirst = True
+    ElseIf MsgBox(Replace(T("Confirm"), "{f}", fmt), vbYesNo + vbQuestion, T("Title")) <> vbYes Then
         Exit Sub
     End If
-    If MsgBox(Replace(T("Confirm"), "{f}", fmt), vbYesNo + vbQuestion, T("Title")) <> vbYes Then Exit Sub
 
     ' Label properties first, so the linked notes show text while they are being placed.
     Dim mgr As Object
@@ -984,6 +1009,7 @@ Sub main()
     Set gOffsets = CreateObject("Scripting.Dictionary")
     swModel.EditTemplate
     LogLine "editing sheet format"
+    If clearFirst Then ClearSheetFormat
     swModel.SketchManager.AddToDB = True
     Select Case fmt
 """ + "{dispatch}" + r"""
