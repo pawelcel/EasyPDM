@@ -2,6 +2,11 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Recycle bin: a deleted item is kept with its files and can be restored.** Deleting an item used to remove its rows and stored files at once, with nothing to go back to. It now goes to Settings → Recycle bin with everything that went with it — relations, attachments, history, revisions, client verifications — and its files stay on disk. Restore puts it back where it was, or asks for a folder when that folder is gone; an administrator can purge one entry or empty the bin, which is what removes the files for good. The bin shows an administrator every entry and anyone else only what they deleted. "Delete completely" is now "Delete", and its confirmation says the item goes to the bin.
+
 ## [0.8.1]
 
 ### Added

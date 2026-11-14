@@ -130,6 +130,11 @@ static class SettingsEndpoints
                 await using (var cmd = new NpgsqlCommand("DELETE FROM projects;", conn))
                     deletedProjects = await cmd.ExecuteNonQueryAsync();
 
+                // Kosz trzyma usunięte elementy jako JSON, bez kluczy obcych, więc nic powyżej go
+                // nie wyczyściło; jego pliki znikają razem z magazynem poniżej.
+                await using (var cmd = new NpgsqlCommand("DELETE FROM recycle_bin;", conn))
+                    await cmd.ExecuteNonQueryAsync();
+
                 // Po skasowaniu WSZYSTKICH elementów baza gwarantowanie nie ma już
                 // żadnego item_number — restart sekwencji od 1 jest więc zawsze
                 // bezpieczny (bez ryzyka kolizji z czymkolwiek, co mogłoby jeszcze

@@ -150,7 +150,7 @@ What's allowed as a child of what (enforced both in the backend and the frontend
 | Part / File | nothing — these are leaves of the structure |
 
 Deleting an item has two modes: **"Remove from structure"** (detaches the relation /
-hides the root, the record stays) and **"Delete completely"** (administrator only). The
+hides the root, the record stays) and **"Delete"** (administrator only). The
 second one recurses **only through Folders** — a Folder *owns* its contents, so deleting
 it takes them along, while an Assembly only *uses* its components (the BOM relation means
 "is part of", not "belongs to"), so deleting an Assembly deletes just that one record and
@@ -160,15 +160,22 @@ join any other assembly later, so it is never deleted as a side effect of deleti
 assembly it happened to be used in. Within a deleted Folder subtree, anything that also
 has a parent outside it survives as well (see `survivors` in `ItemEndpoints.cs`).
 
-Deleting completely also removes the item's **files from storage**, not just its rows.
-`ON DELETE CASCADE` clears the database but never touches the disk, so the endpoint collects
-every path *before* the `DELETE`: the item's own file, everything in `item_attachments` (CAD
-file, drawing, PDF, STEP, preview picture, ordinary attachments) and the attachments hanging
-off its client verifications — those live in their own table keyed by verification rather
-than by item, which is exactly why they were missed at first and left behind with nothing
-remaining to find them by. Deleting a Project does the same for `project_attachments`, after
-the transaction commits, so a failed delete cannot take the files of a project that still
-exists.
+Deleting puts the item in the **recycle bin** (Settings → Recycle bin) instead of destroying
+it. In one transaction every row the delete's `ON DELETE CASCADE` would remove — the item and
+what goes with it, relations, attachments, history, revisions, client verifications — is
+written into one `recycle_bin` row as JSON, and only then removed from the live tables, so a
+deleted item answers 404 everywhere without a "deleted" filter in any query. The stored files
+stay on disk. Which tables go along is read from the database's own foreign keys
+(`RecycleBin.cs`), so a table a later migration hangs off `items` is kept without anyone
+updating a list.
+
+**Restore** writes the rows back in foreign-key order and puts the item under the folders it
+was in; if they are gone, the server answers 409 `needsFolder` and the dialog asks for a folder
+or project. A row whose other end has gone meanwhile is dropped, as the cascade would have
+done. The bin lists everything to an administrator and only their own deletions to anyone
+else; restore is for an administrator or whoever deleted it. **Purge** (one entry, or Empty
+bin) is administrator-only and is what removes the stored files for good; "Clear database"
+empties the bin too.
 
 A Part/Assembly can also be **duplicated** (the copy
 gets a new number, a fresh status and owner) — from the tree, the copy lands right

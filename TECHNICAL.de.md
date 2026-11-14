@@ -150,8 +150,8 @@ Was darf unter was hinzugefügt werden (sowohl im Backend als auch im Frontend e
 | Teil / Datei | nichts — das sind Blätter der Struktur |
 
 Das Löschen eines Elements hat zwei Modi: **„Aus Struktur entfernen"** (löst die
-Beziehung / verbirgt die Wurzel, der Datensatz bleibt bestehen) und **„Vollständig
-löschen"** (nur Administrator). Letzteres steigt **ausschließlich über Ordner** ab — ein
+Beziehung / verbirgt die Wurzel, der Datensatz bleibt bestehen) und **„Löschen"**
+(nur Administrator). Letzteres steigt **ausschließlich über Ordner** ab — ein
 Ordner *besitzt* seinen Inhalt und nimmt ihn beim Löschen mit, während eine Baugruppe ihre
 Komponenten nur *verwendet* (die Stücklistenbeziehung bedeutet „ist Teil von", nicht
 „gehört zu"). Das Löschen einer Baugruppe entfernt daher nur diesen einen Datensatz; alle
@@ -162,15 +162,23 @@ Nebeneffekt gelöscht. Innerhalb eines gelöschten Ordner-Teilbaums überlebt zu
 alles, was auch einen Elternteil außerhalb davon hat (siehe `survivors` in
 `ItemEndpoints.cs`).
 
-Das vollständige Löschen entfernt auch die **Dateien des Elements aus dem Speicher**, nicht nur
-seine Zeilen. `ON DELETE CASCADE` räumt die Datenbank auf, rührt die Festplatte aber nie an,
-deshalb sammelt der Endpunkt alle Pfade *vor* dem `DELETE`: die eigene Datei des Elements, den
-gesamten Inhalt von `item_attachments` (CAD-Datei, Zeichnung, PDF, STEP, Vorschaubild, gewöhnliche
-Anhänge) sowie die Anhänge an seinen Kundenprüfungen — diese liegen in einer eigenen Tabelle, die
-nach Prüfung und nicht nach Element verschlüsselt ist, und wurden genau deshalb zunächst übersehen
-und blieben ohne jede Zeile zurück, über die man sie hätte finden können. Das Löschen eines
-Projekts tut dasselbe mit `project_attachments`, und zwar nach dem Commit der Transaktion, damit
-ein fehlgeschlagenes Löschen nicht die Dateien eines weiterhin bestehenden Projekts mitnimmt.
+Löschen legt das Element in den **Papierkorb** (Einstellungen → Papierkorb), statt es zu
+vernichten. In einer Transaktion wird jede Zeile, die das `ON DELETE CASCADE` entfernen würde —
+das Element und was mit ihm geht, Beziehungen, Anhänge, Verlauf, Revisionen, Kundenprüfungen —
+als JSON in eine Zeile von `recycle_bin` geschrieben und erst dann aus den Tabellen entfernt,
+sodass ein gelöschtes Element überall 404 liefert, ohne Filter „gelöscht" in irgendeiner Abfrage.
+Die gespeicherten Dateien bleiben auf der Festplatte. Welche Tabellen mitgehen, ergibt sich aus
+den Fremdschlüsseln der Datenbank (`RecycleBin.cs`), sodass eine Tabelle, die eine spätere
+Migration an `items` hängt, ohne Pflege einer Liste erhalten bleibt.
+
+**Wiederherstellen** schreibt die Zeilen in Fremdschlüssel-Reihenfolge zurück und legt das
+Element unter die Ordner, in denen es war; gibt es sie nicht mehr, antwortet der Server mit 409
+`needsFolder` und der Dialog fragt nach einem Ordner oder Projekt. Eine Zeile, deren anderes
+Ende inzwischen verschwunden ist, entfällt, wie es die Kaskade getan hätte. Der Papierkorb zeigt
+einem Administrator alles und anderen nur ihre eigenen Löschungen; wiederherstellen darf ein
+Administrator oder wer gelöscht hat. **Endgültig löschen** (ein Eintrag oder Papierkorb leeren)
+ist nur für Administratoren und entfernt erst dann die Dateien; „Datenbank leeren" leert auch den
+Papierkorb.
 
 Ein Teil/eine Baugruppe kann auch **dupliziert** werden (die Kopie
 erhält eine neue Nummer, einen frischen Status und Eigentümer) — im Baum landet die Kopie

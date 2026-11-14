@@ -16,6 +16,7 @@ import type {
   ItemStatus,
   ItemType,
   LogContent,
+  BinEntry,
   LogFile,
   ManagedUser,
   Manufacturer,
@@ -257,7 +258,7 @@ export const api = {
 
   deleteItem: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}`, { method: "DELETE" }).then((r) =>
-      handleResponse<{ deletedCount: number }>(r)
+      handleResponse<{ deletedCount: number; binId: string }>(r)
     ),
 
   duplicateItem: (
@@ -996,6 +997,18 @@ export const api = {
 
   deleteUser: (id: string) =>
     fetch(`${BASE}/users/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  getBin: () => fetch(`${BASE}/bin`).then((r) => handleResponse<BinEntry[]>(r)),
+
+  restoreBinEntry: (id: string, place?: { folderId?: string; projectId?: string }) =>
+    fetch(`${BASE}/bin/${id}/restore`, json(place ?? {})).then((r) =>
+      handleResponse<{ itemId: string; restoredCount: number }>(r)
+    ),
+
+  purgeBinEntry: (id: string) =>
+    fetch(`${BASE}/bin/${id}`, { method: "DELETE" }).then((r) => handleResponse<{ purgedCount: number }>(r)),
+
+  emptyBin: () => fetch(`${BASE}/bin`, { method: "DELETE" }).then((r) => handleResponse<{ purgedCount: number }>(r)),
 
   getLogFiles: () => fetch(`${BASE}/settings/logs`).then((r) => handleResponse<LogFile[]>(r)),
 

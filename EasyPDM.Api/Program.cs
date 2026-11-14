@@ -156,6 +156,7 @@ app.MapManufacturerEndpoints(connectionString);
 app.MapClientEndpoints(connectionString, storage);
 app.MapSavedFilterEndpoints(connectionString);
 app.MapAttachmentEndpoints(connectionString, storage);
+app.MapBinEndpoints(connectionString, storage);
 app.MapClientVerificationEndpoints(connectionString, storage);
 app.MapProjectAttachmentEndpoints(connectionString, storage);
 app.MapConfigEndpoints(storage);

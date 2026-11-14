@@ -17,6 +17,7 @@ const SETTINGS_OPTIONS: SettingsOption[] = [
   { id: "naming", labelKey: "settings.naming", adminOnly: true },
   { id: "tags", labelKey: "settings.tags", adminOnly: true },
   { id: "company", labelKey: "settings.company", adminOnly: true },
+  { id: "bin", labelKey: "settings.bin" },
   { id: "notifications", labelKey: "settings.notifications" },
   { id: "appearance", labelKey: "settings.appearance" },
   { id: "language", labelKey: "settings.language" },

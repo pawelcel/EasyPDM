@@ -674,6 +674,24 @@ export interface StorageInfo {
   totalSizeBytes: number
 }
 
+// One entry in the recycle bin (BinEndpoints.cs): a deleted item and what went with it.
+export interface BinEntry {
+  id: string
+  itemId: string
+  itemType: string
+  label: string
+  itemCount: number
+  projectId: string | null
+  projectName: string | null
+  projectGone: boolean
+  location: string | null
+  deletedById: string | null
+  deletedByName: string
+  deletedAt: string
+  needsFolder: boolean
+  canPurge: boolean
+}
+
 export interface LogFile {
   date: string
   sizeBytes: number
