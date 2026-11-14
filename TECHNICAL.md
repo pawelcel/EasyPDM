@@ -805,21 +805,26 @@ every logged-in user, so the status buttons can grey "Released" out with an expl
 instead of failing on click; only `PATCH` is admin-only. Items already released are left
 alone.
 
-**Approval stamp on release** (`DrawingStamp.cs`). A drawing sent before release has an
-empty "approved by", and a released item cannot be uploaded again, so neither CAD program
-can put the approval on the PDF itself. When `PATCH /status` moves an item (and any
-components promoted with it) to `wydany`, the server writes the releasing user's first and
-last name and the date into the item's latest `pdf` attachment, at the APPROVED BY field of
-the EasyPDM title block, in osifont embedded in the assembly (PDFsharp, no system fonts
-needed). Only a PDF the macros marked as exported from an EasyPDM sheet is touched:
+**People stamped into the drawing PDF** (`DrawingStamp.cs`). "Drawn by" is whoever sends
+the current revision for review and "approved by" whoever releases it
+(`TitleBlockEndpoints.SignaturesAsync`, the same data the macros get) — the person who
+finished a drawing and sent it on answers for it. Neither is known when the drawing is
+exported, and a released item cannot be uploaded again, so the Upload macros leave DRAWN BY
+empty and the server fills both in: when `PATCH /status` moves an item (and any components
+promoted with it) to `sprawdzany` or `wydany`, it writes the names and dates it knows into
+the item's latest `pdf` attachment at the EasyPDM title block's fields, in osifont embedded in
+the assembly (PDFsharp, no system fonts needed). Whatever the fields showed is painted white
+first, so a second review or an older macro's value is replaced, not overprinted. Only a PDF
+the macros marked as exported from an EasyPDM sheet is touched:
 `item_attachments.sheet_layout` (`easypdm-A3` / `-A2` / `-A1`, migration 080), sent as the
-`sheetLayout` form field next to `role=pdf` and ignored for any other role or value. Every
-page of that sheet size is stamped (one title block per sheet); a rotated page or one of
-another size is left alone. The stamped file **replaces** the original (no unstamped copy is
-kept) and `file_size` / `file_hash` follow it. It runs after the status change is committed
-and is best effort: a PDF that cannot be stamped is logged and left as it is, and the
-release stands. The CAD file itself is not changed — FreeCAD's Download macro still fills
-the sheet when the file is opened.
+`sheetLayout` form field next to `role=pdf` and ignored for any other role or value; the mark
+is cleared after the release stamp, so a released file is never stamped again. Every page of
+that sheet size is stamped (one title block per sheet); a rotated page or one of another size
+is left alone. The stamped file **replaces** the original (no unstamped copy is kept) and
+`file_size` / `file_hash` follow it. It runs after the status change is committed and is best
+effort: a PDF that cannot be stamped is logged and left as it is, and the change stands. The
+CAD file itself is not changed — FreeCAD's Download macro still fills the sheet when the file
+is opened.
 
 `users.first_name`/`last_name` (migration 066) are kept apart from `display_name` for the
 drawing title block. `POST /api/users` requires them; accounts from before 066 and the

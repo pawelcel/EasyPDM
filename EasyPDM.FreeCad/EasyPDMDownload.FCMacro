@@ -673,11 +673,15 @@ def _sh_refresh_page(doc, page, tb, sheet_no, sheet_count, logo_href, measure):
     return True
 
 
-def refresh_sheets(doc, item_id, ask_existing_page=None):
+def refresh_sheets(doc, item_id, ask_existing_page=None, drawn_by=True):
     """Fills every TechDraw page of `doc` that uses the EasyPDM sheet (pdm_* fields) with the
     item's title block data. When the document has pages but none with the sheet,
     `ask_existing_page(page)` -- if given -- decides whether the sheet goes on the first of
-    them (its views stay). Never creates a page. Returns the pages that changed."""
+    them (its views stay). Never creates a page. Returns the pages that changed.
+
+    `drawn_by=False` (Upload) leaves DRAWN BY empty: it is whoever sends the revision for
+    review, and the server writes it into the PDF at that moment (DrawingStamp.cs) -- filled
+    in at upload it named whoever happened to export the drawing."""
     pages = [o for o in doc.Objects if o.TypeId == "TechDraw::DrawPage"]
     targets = [p for p in pages if is_pdm_template(p.Template)]
     if not pages or (not targets and ask_existing_page is None):
@@ -685,6 +689,8 @@ def refresh_sheets(doc, item_id, ask_existing_page=None):
     # Data first, changes after: a server without this endpoint (older than 0.8.1) fails
     # here, before an ordinary page has had its template swapped for an empty one.
     tb = api_get("/items/%s/title-block" % item_id)
+    if not drawn_by:
+        tb = dict(tb, drawnBy=None)
     if not targets and ask_existing_page(pages[0]):
         old = pages[0].Template
         tpl = doc.addObject("TechDraw::DrawSVGTemplate", "EasyPDMTemplate")

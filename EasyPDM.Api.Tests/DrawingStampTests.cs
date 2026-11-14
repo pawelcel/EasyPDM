@@ -6,9 +6,9 @@ using PdfSharp.Pdf.IO;
 
 namespace EasyPDM.Api.Tests;
 
-// Releasing an item stamps "approved by" and the date into its drawing PDF -- but only a PDF the
-// macros marked as exported from an EasyPDM sheet (sheetLayout), and the stamped file replaces
-// the original.
+// Sending an item for review stamps "drawn by" into its drawing PDF and releasing it stamps
+// "approved by" -- but only a PDF the macros marked as exported from an EasyPDM sheet
+// (sheetLayout), and the stamped file replaces the original.
 [Collection("EasyPDM database")]
 public class DrawingStampTests
 {
@@ -61,10 +61,16 @@ public class DrawingStampTests
         var (client, itemId) = await PartWithPdfAsync(factory, original, "easypdm-A3");
 
         Assert.Equal(original, await DownloadPdfAsync(client, itemId));
-        await ReleaseAsync(client, itemId);
 
+        // In review: "drawn by" goes in.
+        (await client.PatchAsJsonAsync($"/api/items/{itemId}/status", new { status = "sprawdzany" })).EnsureSuccessStatusCode();
+        var reviewed = await DownloadPdfAsync(client, itemId);
+        Assert.NotEqual(original, reviewed);
+
+        // Released: "approved by" joins it.
+        (await client.PatchAsJsonAsync($"/api/items/{itemId}/status", new { status = "wydany" })).EnsureSuccessStatusCode();
         var stamped = await DownloadPdfAsync(client, itemId);
-        Assert.NotEqual(original, stamped);
+        Assert.NotEqual(reviewed, stamped);
         // The sheet's lettering is embedded for the stamp, and the file still opens as one page.
         Assert.Contains("osifont", Encoding.Latin1.GetString(stamped));
         using var doc = PdfReader.Open(new MemoryStream(stamped), PdfDocumentOpenMode.Import);

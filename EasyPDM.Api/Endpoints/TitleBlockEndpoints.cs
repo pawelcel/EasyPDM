@@ -20,6 +20,36 @@ using Npgsql;
 // Open to every logged-in user, like GET /api/items/{id}.
 static class TitleBlockEndpoints
 {
+    public readonly record struct Signature(string? Name, DateTime At);
+
+    // "Drawn by" and "approved by" of the current revision (see the top of the file). Shared
+    // with DrawingStamp, so the stamped PDF and the macros' title block can never disagree.
+    public static async Task<(Signature? Drawn, Signature? Approved)> SignaturesAsync(NpgsqlConnection conn, Guid itemId)
+    {
+        Signature? drawn = null, approved = null;
+        await using var cmd = new NpgsqlCommand($"""
+            WITH rev_start AS (
+                SELECT COALESCE(MAX(changed_at), '-infinity'::timestamptz) AS at
+                FROM item_status_history
+                WHERE item_id = @id AND to_status = 'w_pracy' AND from_status IN ('wydany', 'anulowana')
+            )
+            SELECT DISTINCT ON (sh.to_status) sh.to_status, sh.changed_at, {UserNames.FullNameSql("u")}
+            FROM item_status_history sh
+            LEFT JOIN users u ON u.id = sh.changed_by
+            WHERE sh.item_id = @id AND sh.to_status IN ('sprawdzany', 'wydany')
+              AND sh.changed_at >= (SELECT at FROM rev_start)
+            ORDER BY sh.to_status, sh.changed_at DESC;
+            """, conn);
+        cmd.Parameters.AddWithValue("id", itemId);
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+        {
+            var who = new Signature(r.IsDBNull(2) ? null : r.GetString(2), r.GetDateTime(1));
+            if (r.GetString(0) == "sprawdzany") drawn = who; else approved = who;
+        }
+        return (drawn, approved);
+    }
+
     public static void MapTitleBlockEndpoints(this WebApplication app, string connectionString)
     {
         app.MapGet("/api/items/{id:guid}/title-block", async (Guid id) =>
@@ -129,29 +159,9 @@ static class TitleBlockEndpoints
             }
 
             // --- who drew / approved the current revision ---
-            object? drawnBy = null, approvedBy = null;
-            await using (var cmd = new NpgsqlCommand($"""
-                WITH rev_start AS (
-                    SELECT COALESCE(MAX(changed_at), '-infinity'::timestamptz) AS at
-                    FROM item_status_history
-                    WHERE item_id = @id AND to_status = 'w_pracy' AND from_status IN ('wydany', 'anulowana')
-                )
-                SELECT DISTINCT ON (sh.to_status) sh.to_status, sh.changed_at, {UserNames.FullNameSql("u")}
-                FROM item_status_history sh
-                LEFT JOIN users u ON u.id = sh.changed_by
-                WHERE sh.item_id = @id AND sh.to_status IN ('sprawdzany', 'wydany')
-                  AND sh.changed_at >= (SELECT at FROM rev_start)
-                ORDER BY sh.to_status, sh.changed_at DESC;
-                """, conn))
-            {
-                cmd.Parameters.AddWithValue("id", id);
-                await using var r = await cmd.ExecuteReaderAsync();
-                while (await r.ReadAsync())
-                {
-                    var who = new { name = r.IsDBNull(2) ? null : r.GetString(2), at = r.GetDateTime(1) };
-                    if (r.GetString(0) == "sprawdzany") drawnBy = who; else approvedBy = who;
-                }
-            }
+            var (drawn, approved) = await SignaturesAsync(conn, id);
+            object? drawnBy = drawn is { } d ? new { name = d.Name, at = d.At } : null;
+            object? approvedBy = approved is { } a ? new { name = a.Name, at = a.At } : null;
 
             // --- revision table (B, C, ...) ---
             var revisions = new List<object>();

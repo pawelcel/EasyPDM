@@ -353,7 +353,7 @@ names the macro revision.
 When you upload a drawing that uses the EasyPDM sheet, Upload — before it saves the drawing and
 exports its PDF — reads the item's title block data from EasyPDM and:
 
-- writes the `pdm_*` properties: drawn by / approved by with dates (current revision only),
+- writes the `pdm_*` properties: approved by with its date (current revision only),
   name with its translations (multilingual projects), drawing number, revision, material,
   mass, company, and every label in the project's main language;
 - builds a **processes table** above the title block (anchored to its top edge, growing
@@ -366,8 +366,9 @@ processes", "EasyPDM revisions" and "EasyPDM logo" in the FeatureManager tree; t
 pictures you placed yourself stay. (Don't rename those three.) A drawing with any other sheet format is left alone. A part or
 assembly upload never exports a PDF — the item's PDF is its drawing.
 
-The PDF of a drawing on an EasyPDM A3, A2 or A1 sheet is marked as such when it is sent, and
-when the item is released the server writes the approver's name and the date into its
-APPROVED BY field — so the PDF in EasyPDM shows the approval even though a released item
-cannot be uploaded again. The `.slddrw` itself still shows an empty approval until the
-next revision is uploaded.
+DRAWN BY is left empty: it is whoever sends the revision for review, not whoever exports the
+drawing. The PDF of a drawing on an EasyPDM A3, A2 or A1 sheet is marked as such when it is
+sent; when the item is sent for review the server writes the sender's name and the date into
+its DRAWN BY field, and when it is released the approver's into APPROVED BY — so the PDF in
+EasyPDM carries both even though a released item cannot be uploaded again. The `.slddrw`
+itself keeps those fields empty.

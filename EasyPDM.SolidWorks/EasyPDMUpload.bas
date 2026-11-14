@@ -154,7 +154,7 @@ Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 ' Bumped by hand on every change and written into the first log line, so a log shows at once
 ' whether the latest macro was imported or an older copy ran (happened twice in testing).
-Private Const MACRO_REVISION As String = "2026-11-14.7"
+Private Const MACRO_REVISION As String = "2026-11-15.1"
 Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
                                                              ' live SolidWorks install, confirm on first real test (see
                                                              ' UploadStepAttachment).
@@ -2925,9 +2925,11 @@ Sub FillDrawingSheet(ByVal swModel As Object, ByVal itemId As String)
     SetDwgProp mgr, "pdm_label_format", LabelOf(labels, "format", "Format")
 
     ' Dates come as ISO timestamps; the first ten characters are the date.
-    Set who = JsonChild(tb, "drawnBy")
-    SetDwgProp mgr, "pdm_drawn_by", JsonGetString(who, "name", "")
-    SetDwgProp mgr, "pdm_drawn_date", Left(JsonGetString(who, "at", ""), 10)
+    ' DRAWN BY stays empty: it is whoever sends the revision for review, and the server writes
+    ' it into the PDF at that moment (DrawingStamp.cs). Filled in here it named whoever
+    ' happened to export the drawing. Cleared, so a value from an older run does not linger.
+    SetDwgProp mgr, "pdm_drawn_by", ""
+    SetDwgProp mgr, "pdm_drawn_date", ""
     Set who = JsonChild(tb, "approvedBy")
     SetDwgProp mgr, "pdm_approved_by", JsonGetString(who, "name", "")
     SetDwgProp mgr, "pdm_approved_date", Left(JsonGetString(who, "at", ""), 10)

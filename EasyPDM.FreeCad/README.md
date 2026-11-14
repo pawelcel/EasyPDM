@@ -494,17 +494,19 @@ separate macro for it.
 - **Download**, after opening the file: pages with the EasyPDM sheet are refreshed — this is
   how "approved by" reaches a drawing sent before the item was released (a released item
   cannot be uploaded again). Nothing is added or asked here.
-- **Release**: the PDF Upload exports from a page with the EasyPDM sheet is marked as such,
-  and when the item is released the server writes the approver's name and the date into
-  that PDF's APPROVED BY field — the PDF in EasyPDM carries the approval without anyone
-  opening the drawing again. A PDF from any other page is left alone.
+- **Review and release**: Upload leaves DRAWN BY empty and marks the PDF it exports from a
+  page with the EasyPDM sheet. When the item is sent for review, the server writes the
+  sender's name and the date into that PDF's DRAWN BY field; when it is released, the
+  approver's into APPROVED BY — whoever sends a drawing on answers for it, and the PDF in
+  EasyPDM carries both without anyone opening the drawing again. A PDF from any other page
+  is left alone.
 - To start a drawing with the sheet: TechDraw → Insert page using template →
   `EasyPDM_A3_Landscape.svg` (or A2 / A1); the next upload fills it in.
 
 ## What it shows
 
-Drawn by / approved by with dates (current revision only — empty until the item is reviewed
-and released), name with its translations (multilingual projects), drawing number, revision,
+Drawn by / approved by with dates (current revision only: whoever sent it for review and
+whoever released it; Upload leaves both empty and the server stamps them into the PDF), name with its translations (multilingual projects), drawing number, revision,
 material, mass, company and logo, the page scale and the sheet number; a processes table above
 the title block (header at the bottom, rows growing upward, long descriptions and translations
 wrap) and a revision table in the top-right corner (B, C, …; revision A is the first release
