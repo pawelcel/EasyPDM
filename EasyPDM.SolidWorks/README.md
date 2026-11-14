@@ -365,3 +365,9 @@ Running Upload again replaces only its own tables and logo — features named "E
 processes", "EasyPDM revisions" and "EasyPDM logo" in the FeatureManager tree; tables and
 pictures you placed yourself stay. (Don't rename those three.) A drawing with any other sheet format is left alone. A part or
 assembly upload never exports a PDF — the item's PDF is its drawing.
+
+The PDF of a drawing on an EasyPDM A3, A2 or A1 sheet is marked as such when it is sent, and
+when the item is released the server writes the approver's name and the date into its
+APPROVED BY field — so the PDF in EasyPDM shows the approval even though a released item
+cannot be uploaded again. The `.slddrw` itself still shows an empty approval until the
+next revision is uploaded.

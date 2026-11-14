@@ -1253,6 +1253,16 @@ static class ItemEndpoints
 
             await tx.CommitAsync();
 
+            // "Approved by" onto the drawing PDF of everything released just now -- the item and
+            // the components pulled along with it (DrawingStamp.cs). After the commit and never
+            // failing: the release stands even if a PDF cannot be stamped.
+            if (body.Status == "wydany" && body.Status != currentStatus)
+            {
+                await DrawingStamp.StampApprovalAsync(conn, app.Logger, id, user.Id);
+                foreach (var child in childrenToPromote)
+                    await DrawingStamp.StampApprovalAsync(conn, app.Logger, child.Id, user.Id);
+            }
+
             // Komponenty pociągnięte razem ze złożeniem dostają dokładnie takie same
             // powiadomienia, jak gdyby ktoś przestawił je pojedynczo — dla ich autora to
             // ta sama informacja ("Twoja część jest już wydana"), niezależnie od tego, czy

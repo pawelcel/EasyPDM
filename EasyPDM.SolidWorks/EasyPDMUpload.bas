@@ -154,7 +154,7 @@ Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 ' Bumped by hand on every change and written into the first log line, so a log shows at once
 ' whether the latest macro was imported or an older copy ran (happened twice in testing).
-Private Const MACRO_REVISION As String = "2026-11-14.6"
+Private Const MACRO_REVISION As String = "2026-11-14.7"
 Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
                                                              ' live SolidWorks install, confirm on first real test (see
                                                              ' UploadStepAttachment).
@@ -1023,7 +1023,7 @@ End Sub
 ' Plain HTTP upload (multipart/form-data), used as a fallback when the PDM storage is not
 ' visible in this machine's file system -- the same mechanism as attaching CAD files from
 ' the properties panel in the web app.
-Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional ByVal overrideFilename As String = "", Optional ByVal extraFieldName As String = "", Optional ByVal extraFieldValue As String = "") As Object
+Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional ByVal overrideFilename As String = "", Optional ByVal extraFieldName As String = "", Optional ByVal extraFieldValue As String = "", Optional ByVal extraFieldName2 As String = "", Optional ByVal extraFieldValue2 As String = "") As Object
     Dim boundary As String
     boundary = "----EasyPDMBoundary" & Format(Now, "yyyymmddhhnnss") & CStr(Int(Rnd * 100000))
 
@@ -1043,6 +1043,12 @@ Function ApiUploadFile(ByVal path As String, ByVal filePath As String, Optional 
         head = head & "--" & boundary & vbCrLf & _
                "Content-Disposition: form-data; name=""" & extraFieldName & """" & vbCrLf & vbCrLf & _
                extraFieldValue & vbCrLf
+    End If
+    ' A second field: "sheetLayout" next to "role=pdf" (see UploadPdfAttachment).
+    If extraFieldName2 <> "" Then
+        head = head & "--" & boundary & vbCrLf & _
+               "Content-Disposition: form-data; name=""" & extraFieldName2 & """" & vbCrLf & vbCrLf & _
+               extraFieldValue2 & vbCrLf
     End If
     head = head & "--" & boundary & vbCrLf & _
            "Content-Disposition: form-data; name=""file""; filename=""" & fileName & """" & vbCrLf & _
@@ -3168,6 +3174,24 @@ End Sub
 '
 ' UNVERIFIED against a live SolidWorks install, same caveat as UploadStepAttachment above --
 ' confirm on the first real run.
+' "easypdm-A3" / "-A2" / "-A1" when the current sheet is an EasyPDM sheet of that size, else "".
+' The server stamps the approval only into a PDF marked this way, at the title block position
+' the layout implies -- so a sheet of another size, or someone else's format, is not marked.
+Function EasyPdmSheetLayout(ByVal swModel As Object) As String
+    On Error Resume Next
+    EasyPdmSheetLayout = ""
+    If Not IsEasyPdmDrawing(swModel) Then Exit Function
+    Dim sheet As Object, w As Double, h As Double
+    Set sheet = swModel.GetCurrentSheet
+    If sheet Is Nothing Then Exit Function
+    sheet.GetSize w, h
+    w = w * 1000
+    h = h * 1000
+    If Abs(w - 420) <= 3 And Abs(h - 297) <= 3 Then EasyPdmSheetLayout = "easypdm-A3"
+    If Abs(w - 594) <= 3 And Abs(h - 420) <= 3 Then EasyPdmSheetLayout = "easypdm-A2"
+    If Abs(w - 841) <= 3 And Abs(h - 594) <= 3 Then EasyPdmSheetLayout = "easypdm-A1"
+End Function
+
 Sub UploadPdfAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long)
     ' The item's "pdf" slot is its DRAWING. A part or assembly saved as PDF is only a picture
     ' of the 3D view, and uploading it replaced the real drawing PDF (reported from practice),
@@ -3195,8 +3219,16 @@ Sub UploadPdfAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal i
     Dim pdfDisplayName As String
     pdfDisplayName = RecordNameFor(itemId, itemNumber, name) & "." & RevisionLabel(revision) & ".pdf"
 
-    ApiUploadFile "/items/" & itemId & "/attachments", tempPath, pdfDisplayName, "role", "pdf"
-    LogLine "Uploaded PDF attachment for item " & itemId & " as """ & pdfDisplayName & """ (from " & tempPath & ")."
+    ' On an EasyPDM sheet the PDF is marked with its layout, so the server can write
+    ' "approved by" and the date into it when the item is released (DrawingStamp.cs).
+    Dim layout As String
+    layout = EasyPdmSheetLayout(swModel)
+    If layout <> "" Then
+        ApiUploadFile "/items/" & itemId & "/attachments", tempPath, pdfDisplayName, "role", "pdf", "sheetLayout", layout
+    Else
+        ApiUploadFile "/items/" & itemId & "/attachments", tempPath, pdfDisplayName, "role", "pdf"
+    End If
+    LogLine "Uploaded PDF attachment for item " & itemId & " as """ & pdfDisplayName & """ (from " & tempPath & ", sheet layout """ & layout & """)."
 
     Kill tempPath
     On Error GoTo 0

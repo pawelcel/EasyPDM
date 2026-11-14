@@ -2779,6 +2779,21 @@ def _three_d_view_of(gui_doc):
     return None
 
 
+def _pdf_sheet_layout(page):
+    """"easypdm-A3" / "-A2" / "-A1" when the page is on an EasyPDM sheet, else None.
+
+    Sent with the PDF so the server knows where the title block is: when the item is
+    released, it writes "approved by" and the date into this PDF (DrawingStamp.cs). A page
+    on any other template is not marked and the server leaves its PDF alone."""
+    try:
+        m = re.search(re.escape(SHEET_TITLE_PREFIX) + r" (\w+)", _sh_template_text(page.Template))
+        if m and m.group(1) in SHEET_FORMATS:
+            return "easypdm-" + m.group(1)
+    except Exception:
+        pass
+    return None
+
+
 def _upload_pdf_attachment(doc, item_id):
     """Eksportuje `doc` do PDF i wgrywa jako załącznik z rolą "pdf" — analogicznie do
     _upload_step_attachment, ale niezależny wybór (checkbox w przeglądarce), nie powiązany
@@ -2836,10 +2851,14 @@ def _upload_pdf_attachment(doc, item_id):
             if not os.path.exists(pdf_path):
                 return
 
+            fields = {"role": "pdf"}
+            layout = _pdf_sheet_layout(techdraw_pages[0]) if techdraw_pages else None
+            if layout:
+                fields["sheetLayout"] = layout
             api_upload_file(
                 f"/items/{item_id}/attachments", pdf_path,
                 override_filename=os.path.basename(pdf_path),
-                extra_fields={"role": "pdf"},
+                extra_fields=fields,
             )
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)

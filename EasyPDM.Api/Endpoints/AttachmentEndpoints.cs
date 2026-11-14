@@ -72,6 +72,13 @@ static class AttachmentEndpoints
             if (role is not null && role is not ("pdf" or "step" or "cad" or "drawing" or "image"))
                 return Results.BadRequest("Field 'role' must be 'pdf', 'step', 'cad', 'drawing', 'image' or empty.");
 
+            // Which EasyPDM sheet a drawing PDF was exported from (sent by the CAD macros); the
+            // release stamp needs it to find the APPROVED BY field (DrawingStamp.cs). Anything
+            // else -- another value, or on a non-PDF -- is simply not recorded.
+            var sheetLayout = form["sheetLayout"].ToString();
+            if (role != "pdf" || !DrawingStamp.IsKnownLayout(sheetLayout))
+                sheetLayout = null;
+
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
                 return Results.NotFound("The item does not exist.");
@@ -109,8 +116,8 @@ static class AttachmentEndpoints
             }
 
             const string insertSql = """
-                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, uploaded_by, preview_role, revision_number)
-                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @uploadedBy, @role, @revisionNumber);
+                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, uploaded_by, preview_role, revision_number, sheet_layout)
+                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @uploadedBy, @role, @revisionNumber, @sheetLayout);
                 """;
             try
             {
@@ -126,6 +133,7 @@ static class AttachmentEndpoints
                 insertCmd.Parameters.AddWithValue("size", file.Length);
                 insertCmd.Parameters.AddWithValue("role", (object?)role ?? DBNull.Value);
                 insertCmd.Parameters.AddWithValue("revisionNumber", (object?)info.Value.RevisionNumber ?? DBNull.Value);
+                insertCmd.Parameters.AddWithValue("sheetLayout", (object?)sheetLayout ?? DBNull.Value);
                 await insertCmd.ExecuteNonQueryAsync();
             }
             catch

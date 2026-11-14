@@ -21,6 +21,10 @@
          wyłącznie dla instalatora Windows (zob. packaging/windows/), nie zmienia niczego przy
          zwykłym "dotnet run"/systemd/Dockerze. -->
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
+    <!-- Stamps "approved by" into the drawing PDF on release (DrawingStamp.cs). MIT. -->
+    <PackageReference Include="PDFsharp" Version="6.2.4" />
+    <!-- PDFsharp pulls in Pkcs 8.0.1 (CVE-2026-84008); pinned to a patched version. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
   </ItemGroup>
 
   <!-- Migracje wbudowane w sam plik wykonywalny (embedded resource) — działa identycznie
@@ -29,6 +33,9 @@
        skądś skopiowany obok. Zob. MigrationRunner.cs. -->
   <ItemGroup>
     <EmbeddedResource Include="..\db\migrations\*.sql" LinkBase="Migrations" />
+    <!-- osifont (GPL/LGPL with the font exception, see Fonts/osifont.license): the lettering of the
+         EasyPDM drawing sheets, embedded in the "approved by" stamp (DrawingStamp.cs). -->
+    <EmbeddedResource Include="Fonts\osifont-lgpl3fe.ttf" LogicalName="EasyPDM.Api.Fonts.osifont.ttf" />
   </ItemGroup>
 
 </Project>

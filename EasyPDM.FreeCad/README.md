@@ -494,6 +494,10 @@ separate macro for it.
 - **Download**, after opening the file: pages with the EasyPDM sheet are refreshed — this is
   how "approved by" reaches a drawing sent before the item was released (a released item
   cannot be uploaded again). Nothing is added or asked here.
+- **Release**: the PDF Upload exports from a page with the EasyPDM sheet is marked as such,
+  and when the item is released the server writes the approver's name and the date into
+  that PDF's APPROVED BY field — the PDF in EasyPDM carries the approval without anyone
+  opening the drawing again. A PDF from any other page is left alone.
 - To start a drawing with the sheet: TechDraw → Insert page using template →
   `EasyPDM_A3_Landscape.svg` (or A2 / A1); the next upload fills it in.
 

@@ -431,6 +431,7 @@ CREATE TABLE item_attachments (
     file_size    BIGINT,
     uploaded_at  TIMESTAMPTZ DEFAULT now(),
     uploaded_by  UUID REFERENCES users(id) ON DELETE SET NULL,  -- who uploaded it (migration 072)
+    sheet_layout TEXT,  -- EasyPDM sheet a PDF came from, e.g. 'easypdm-A3' (migration 080, DrawingStamp.cs)
     -- Opcjonalna "rola" załącznika:
     --   pdf/step — wskazuje, KTÓRY załącznik zasila stały podgląd (2D/3D) w panelu
     --     właściwości elementu (jeden na rolę, nowy zastępuje poprzedni).
