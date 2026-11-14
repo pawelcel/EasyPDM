@@ -2610,6 +2610,250 @@ Private Function LabelOf(ByVal labels As Object, ByVal key As String, ByVal engl
     LabelOf = UCase(v)
 End Function
 
+' ----------------------------------------------------------------------------
+' Processes and revision tables and the logo, on the drawing's current sheet. General
+' tables anchored to the EasyPDM sheet: the processes table with its bottom-left corner on
+' the top edge of the title block (so it grows upward, header in its last row), the revision
+' table with its top-right corner in the frame's top-right corner (grows downward, header on
+' top, revision A not listed). Each table carries a hidden title ("EasyPDM processes",
+' "EasyPDM revisions"); the next upload finds its own tables by that title, deletes them and
+' builds them again, and leaves every other table alone. The logo is a picture in the square
+' at the right end of the NAME row; only a picture inside that square is replaced.
+' Every step is logged -- first written without a live SolidWorks to check the table API on.
+' ----------------------------------------------------------------------------
+Private Function WrapForCell(ByVal text As String, ByVal widthMm As Double, ByVal sizeMm As Double) As String
+    Dim words() As String, i As Long, line As String, result As String, maxChars As Long
+    If Trim(text) = "" Then Exit Function
+    maxChars = Int(widthMm / (sizeMm * 0.55))
+    If maxChars < 8 Then maxChars = 8
+    words = Split(text, " ")
+    For i = LBound(words) To UBound(words)
+        If line = "" Then
+            line = words(i)
+        ElseIf Len(line) + 1 + Len(words(i)) > maxChars Then
+            If result <> "" Then result = result & vbLf
+            result = result & line
+            line = words(i)
+        Else
+            line = line & " " & words(i)
+        End If
+    Next i
+    If result <> "" Then result = result & vbLf
+    WrapForCell = result & line
+End Function
+
+Private Function AddLines(ByVal cell As String, ByVal more As String) As String
+    If more = "" Then
+        AddLines = cell
+    ElseIf cell = "" Then
+        AddLines = more
+    Else
+        AddLines = cell & vbLf & more
+    End If
+End Function
+
+Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As Double)
+    On Error Resume Next
+    Dim v As Object, tables As Variant, i As Long, n As Long, title As String
+    Set v = swModel.GetFirstView
+    swModel.ClearSelection2 True
+    tables = v.GetTableAnnotations
+    If IsArray(tables) Then
+        For i = LBound(tables) To UBound(tables)
+            title = ""
+            title = tables(i).Title
+            If Left(title, 8) = "EasyPDM " Then
+                If tables(i).GetAnnotation.Select3(True, Nothing) Then n = n + 1
+            End If
+        Next i
+    End If
+    LogLine "Sheet tables: " & n & " EasyPDM table(s) selected for removal"
+    ' A picture whose origin lies in the logo square (right end of the NAME row).
+    Dim sk As Object, pics As Variant, px As Double, py As Double, removedPics As Long
+    Set sk = v.GetSketch
+    If Not sk Is Nothing Then
+        pics = sk.GetSketchPictures
+        If IsArray(pics) Then
+            For i = LBound(pics) To UBound(pics)
+                pics(i).GetOrigin px, py
+                If px > sheetW - 0.03 And px < sheetW - 0.009 And py > 0.024 And py < 0.045 Then
+                    If pics(i).GetFeature.Select2(True, 0) Then removedPics = removedPics + 1
+                End If
+            Next i
+        End If
+    End If
+    LogLine "Logo: " & removedPics & " old picture(s) selected for removal"
+    If n + removedPics > 0 Then swModel.EditDelete
+    swModel.ClearSelection2 True
+    If Err.Number <> 0 Then LogLine "Sheet objects: removal error " & Err.Number & ": " & Err.Description
+End Sub
+
+Private Function NewSheetTable(ByVal swModel As Object, ByVal x As Double, ByVal y As Double, ByVal anchorType As Long, ByVal rows As Long, ByVal cols As Long, ByVal title As String) As Object
+    On Error Resume Next
+    Dim t As Object
+    Set t = swModel.InsertTableAnnotation2(False, x, y, anchorType, "", rows, cols)
+    If t Is Nothing Or Err.Number <> 0 Then
+        LogLine "Sheet tables: InsertTableAnnotation2 failed for " & title & " (" & Err.Description & ")"
+        Set NewSheetTable = Nothing
+        Exit Function
+    End If
+    LogLine "Sheet tables: inserted " & title & ", " & t.RowCount & " rows x " & t.ColumnCount & " columns"
+    t.Title = title
+    t.TitleVisible = False
+    Dim tf As Object
+    Set tf = t.GetTextFormat
+    tf.CharHeight = 0.0026
+    t.SetTextFormat False, tf
+    If Err.Number <> 0 Then LogLine "Sheet tables: formatting " & title & " error " & Err.Number & ": " & Err.Description
+    Err.Clear
+    Set NewSheetTable = t
+End Function
+
+Private Sub SetCell(ByVal t As Object, ByVal r As Long, ByVal c As Long, ByVal text As String, Optional ByVal bold As Boolean = False)
+    On Error Resume Next
+    t.Text(r, c) = text
+    If bold Then
+        Dim tf As Object
+        Set tf = t.GetTextFormat
+        tf.Bold = True
+        t.SetCellTextFormat r, c, False, tf
+    End If
+    If Err.Number <> 0 Then
+        LogLine "Sheet tables: cell " & r & "," & c & " error " & Err.Number & ": " & Err.Description
+        Err.Clear
+    End If
+End Sub
+
+Private Function DownloadLogo() As String
+    On Error GoTo Failed
+    Dim http As Object, st As Object, ctype As String, ext As String, f As String, cookie As String
+    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+    http.Open "GET", GetBaseUrl() & "/settings/company/logo", False
+    cookie = AuthCookieHeader()
+    If cookie <> "" Then http.SetRequestHeader "Cookie", cookie
+    http.Send
+    LogLine "GET /settings/company/logo -> " & http.Status
+    If http.Status <> 200 Then Exit Function
+    ctype = LCase(http.GetResponseHeader("Content-Type"))
+    ext = IIf(InStr(ctype, "png") > 0, ".png", ".jpg")
+    f = Environ$("TEMP") & "\EasyPDM_logo" & ext
+    Set st = CreateObject("ADODB.Stream")
+    st.Type = 1
+    st.Open
+    st.Write http.ResponseBody
+    st.SaveToFile f, 2
+    st.Close
+    DownloadLogo = f
+    Exit Function
+Failed:
+    LogLine "Logo: download failed (" & Err.Number & "): " & Err.Description
+End Function
+
+Sub BuildSheetTables(ByVal swModel As Object, ByVal tb As Object)
+    On Error Resume Next
+    Dim sheet As Object, w As Double, h As Double
+    Set sheet = swModel.GetCurrentSheet
+    sheet.GetSize w, h
+    LogLine "Sheet tables: sheet " & Format(w * 1000, "0") & " x " & Format(h * 1000, "0") & " mm"
+    DeleteEasyPdmSheetObjects swModel, w
+
+    Dim labels As Object
+    Set labels = JsonChild(tb, "labels")
+
+    ' --- processes: rows top to bottom are process N .. 1, then the header ---
+    Dim procs As Object, n As Long, t As Object, r As Long, k As Long, p As Object
+    Dim trs As Object, tr As Object, names As String, descs As String, line As String
+    Set procs = JsonChild(tb, "processes")
+    If Not procs Is Nothing Then n = procs.Count
+    If n > 0 Then
+        ' Anchor type 3 = bottom-left (swBOMConfigurationAnchor_BottomLeft).
+        Set t = NewSheetTable(swModel, w - 0.19, 0.054, 3, n + 1, 3, "EasyPDM processes")
+        If Not t Is Nothing Then
+            t.SetColumnWidth 0, 0.01, 0
+            t.SetColumnWidth 1, 0.06, 0
+            t.SetColumnWidth 2, 0.11, 0
+            For r = 0 To n - 1
+                k = n - r
+                Set p = procs(k)
+                names = WrapForCell(JsonGetString(p, "name", ""), 57, 2.6)
+                descs = WrapForCell(JsonGetString(p, "description", ""), 107, 2.6)
+                Set trs = JsonChild(p, "translations")
+                line = ""
+                If Not trs Is Nothing Then
+                    For Each tr In trs
+                        If JsonGetString(tr, "name", "") <> "" Then
+                            If line <> "" Then line = line & " " & ChrW(183) & " "
+                            line = line & JsonGetString(tr, "languageCode", "") & ": " & JsonGetString(tr, "name", "")
+                        End If
+                        If JsonGetString(tr, "description", "") <> "" Then
+                            descs = AddLines(descs, WrapForCell(JsonGetString(tr, "languageCode", "") & ": " & JsonGetString(tr, "description", ""), 107, 2.6))
+                        End If
+                    Next tr
+                End If
+                names = AddLines(names, WrapForCell(line, 57, 2.6))
+                SetCell t, r, 0, CStr(k)
+                SetCell t, r, 1, names
+                SetCell t, r, 2, descs
+            Next r
+            SetCell t, n, 0, LabelOf(labels, "processNo", "No."), True
+            SetCell t, n, 1, LabelOf(labels, "process", "Process"), True
+            SetCell t, n, 2, LabelOf(labels, "processDescription", "Description"), True
+        End If
+    End If
+
+    ' --- revisions: header on top, then B, C, ... ---
+    Dim revs As Object, rv As Object
+    Set revs = JsonChild(tb, "revisions")
+    n = 0
+    If Not revs Is Nothing Then n = revs.Count
+    If n > 0 Then
+        ' Anchor type 2 = top-right (swBOMConfigurationAnchor_TopRight).
+        Set t = NewSheetTable(swModel, w - 0.01, h - 0.01, 2, n + 1, 4, "EasyPDM revisions")
+        If Not t Is Nothing Then
+            t.SetColumnWidth 0, 0.012, 0
+            t.SetColumnWidth 1, 0.022, 0
+            t.SetColumnWidth 2, 0.1, 0
+            t.SetColumnWidth 3, 0.026, 0
+            SetCell t, 0, 0, LabelOf(labels, "revisionLetter", "Rev."), True
+            SetCell t, 0, 1, LabelOf(labels, "revisionDate", "Date"), True
+            SetCell t, 0, 2, LabelOf(labels, "revisionDescription", "Change description"), True
+            SetCell t, 0, 3, LabelOf(labels, "revisionBy", "By"), True
+            For r = 1 To n
+                Set rv = revs(r)
+                SetCell t, r, 0, JsonGetString(rv, "revisionLabel", "")
+                SetCell t, r, 1, Left(JsonGetString(rv, "at", ""), 10)
+                SetCell t, r, 2, WrapForCell(JsonGetString(rv, "description", ""), 97, 2.6)
+                SetCell t, r, 3, WrapForCell(JsonGetString(rv, "by", ""), 23, 2.6)
+            Next r
+        End If
+    End If
+
+    ' --- logo in the 17 mm square at the right end of the NAME row ---
+    ' hasLogo is a JSON boolean; read it as one -- CStr(True) is "Prawda" on a Polish Windows.
+    Dim company As Object, logoFile As String, pic As Object, hasLogo As Boolean
+    Set company = JsonChild(tb, "company")
+    If Not company Is Nothing Then
+        If company.Exists("hasLogo") Then
+            If Not IsNull(company.Item("hasLogo")) Then hasLogo = CBool(company.Item("hasLogo"))
+        End If
+    End If
+    If hasLogo Then
+        logoFile = DownloadLogo()
+        If logoFile <> "" Then
+            Set pic = swModel.SketchManager.InsertSketchPicture(logoFile)
+            If pic Is Nothing Then
+                LogLine "Logo: InsertSketchPicture failed (" & Err.Description & ")"
+            Else
+                pic.SetSize 0.014, 0.014, True
+                pic.SetOrigin w - 0.0255, 0.0275
+                LogLine "Logo: inserted from " & logoFile
+            End If
+            Kill logoFile
+        End If
+    End If
+    If Err.Number <> 0 Then LogLine "Sheet tables: error " & Err.Number & ": " & Err.Description
+End Sub
+
 Sub FillDrawingSheet(ByVal swModel As Object, ByVal itemId As String)
     On Error GoTo Failed
     If Not IsEasyPdmDrawing(swModel) Then
@@ -2669,6 +2913,7 @@ Sub FillDrawingSheet(ByVal swModel As Object, ByVal itemId As String)
     End If
     SetDwgProp mgr, "pdm_name_translations", joined
 
+    BuildSheetTables swModel, tb
     swModel.ForceRebuild3 False
     LogLine "Title block: filled from EasyPDM for item " & itemId & "."
     Exit Sub
