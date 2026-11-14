@@ -434,6 +434,23 @@ pasowało więcej; bez niego lista jest pełna, czego oczekują makra i listy wy
 070 dopisuje `texts` z katalogu do obróbek elementów w `w_pracy`, które ich nie miały;
 panel elementu pozwala ręcznie odświeżyć obróbkę różniącą się od katalogu.
 
+**Wydane zestawienie zostaje takie, jak je wydano** (`Release.cs`, migracja 078). Sama blokada
+listy dzieci nie wystarcza: `item_relations` wskazuje dziecko, a nie jego rewizję, więc wydana
+część cofnięta do pracy (nowa rewizja, potem nowa nazwa czy materiał) zmieniała każde wydane
+zestawienie, które ją wymieniało. Dlatego przejście Części lub Złożenia na `wydany` kopiuje jego
+nazwę, numer i właściwości do `item_releases`, a listę do `item_release_lines` z rewizją każdego
+dziecka, w transakcji zmiany statusu; reguła BOM wyżej gwarantuje, że wszystkie dzieci są wtedy
+wydane, a dziecko wydane przed tą zmianą jest kopiowane po drodze. Na każdym poziomie obowiązuje
+jedna reguła: wydana rewizja czyta swoją kopię, każda inna — `item_relations`. Korzystają z niej
+`GET /bom`, oba eksporty CSV i `GET /released-list` (całe zamrożone zestawienie, które panel elementu
+pokazuje dla wydanego złożenia), więc wydane podzłożenie zachowuje własną listę wewnątrz wydanego
+złożenia, a nowa rewizja rodzica widzi nowe części. Samo `item_relations` zostaje bez zmian;
+drzewo i makra dalej je czytają. Elementu wymienionego w wydanym zestawieniu nie można usunąć
+(409), bo `child_id` celowo nie ma klucza obcego. Pliki CAD i rysunku są przypięte przez
+`item_attachments.revision_number`; PDF i STEP mają jeden bieżący plik na rolę i przypięte nie są.
+Migracja 078 kopiuje dzisiejsze wydane elementy, gdy wszystkie części pod nimi są nadal wydane;
+pozostałe czytają się na żywo, bo ich wydana lista nie jest już znana.
+
 ### Zaznaczanie wielu elementów w drzewie
 
 Wiersze zaznacza się Ctrl (Cmd) + klikiem, obok starszego przycisku „Zaznacz wiele" i jego checkboxów — przycisk zostaje, bo na tablecie nie ma klawisza Ctrl. Ctrl+klik sam włącza tryb zaznaczania: checkboxy i belka akcji istnieją tylko w nim, więc pierwszy taki klik zaznaczałby inaczej coś, czego nie widać.

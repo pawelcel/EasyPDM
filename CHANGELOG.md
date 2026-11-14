@@ -2,6 +2,11 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **A released parts list stays as it was released.** The BOM was read from the live structure, which names a child but not its revision, so sending a released part back to work and changing its name or material changed every released assembly that used it. Releasing a part or assembly now keeps a copy of its name, properties and list with each child's revision; a released revision reads that copy at every level (the BOM table, both CSV exports and the new `GET /api/items/{id}/released-list`), any other reads the live structure. The item panel shows a released assembly's list as released, read-only. An item a released list names can no longer be deleted. Items released today are copied by migration 078 when every part under them is still released.
+
 ## [0.8.1]
 
 ### Added
