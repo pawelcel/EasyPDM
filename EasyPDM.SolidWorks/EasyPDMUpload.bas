@@ -154,7 +154,7 @@ Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 ' Bumped by hand on every change and written into the first log line, so a log shows at once
 ' whether the latest macro was imported or an older copy ran (happened twice in testing).
-Private Const MACRO_REVISION As String = "2026-11-14.2"
+Private Const MACRO_REVISION As String = "2026-11-14.3"
 Private Const SW_SAVE_AS_SILENT As Long = 1                 ' swSaveAsOptions_e.swSaveAsOptions_Silent -- UNVERIFIED against a
                                                              ' live SolidWorks install, confirm on first real test (see
                                                              ' UploadStepAttachment).
@@ -2656,39 +2656,57 @@ Private Function AddLines(ByVal cell As String, ByVal more As String) As String
 End Function
 
 Private Sub DeleteEasyPdmSheetObjects(ByVal swModel As Object, ByVal sheetW As Double, ByVal scl As Double)
+    ' Walks the drawing's feature tree: every general table and every sketch picture is a
+    ' feature there. The sheet view's GetTableAnnotations returned nothing on SolidWorks 2024
+    ' (a rerun found "0 EasyPDM tables" and stacked new tables on the old ones), so tables are
+    ' recognised through their feature: GetSpecificFeature2 gives the table feature, and its
+    ' tables carry the hidden "EasyPDM ..." title. A picture is ours only when its origin lies
+    ' in the logo square.
     On Error Resume Next
-    Dim v As Object, tables As Variant, i As Long, n As Long, title As String
-    Set v = swModel.GetFirstView
+    Dim feat As Object, featType As String, nTables As Long, nPics As Long
+    Dim spec As Object, tables As Variant, i As Long, title As String, px As Double, py As Double
     swModel.ClearSelection2 True
-    tables = v.GetTableAnnotations
-    If IsArray(tables) Then
-        For i = LBound(tables) To UBound(tables)
-            title = ""
-            title = tables(i).Title
-            If Left(title, 8) = "EasyPDM " Then
-                If tables(i).GetAnnotation.Select3(True, Nothing) Then n = n + 1
+    Set feat = swModel.FirstFeature
+    Do While Not feat Is Nothing
+        featType = ""
+        featType = feat.GetTypeName2
+        If InStr(1, featType, "Table", vbTextCompare) > 0 Then
+            Set spec = Nothing
+            Set spec = feat.GetSpecificFeature2
+            tables = Empty
+            If Not spec Is Nothing Then tables = spec.GetTableAnnotations
+            If IsArray(tables) Then
+                For i = LBound(tables) To UBound(tables)
+                    title = ""
+                    title = tables(i).Title
+                    LogLine "Sheet tables: found " & featType & " """ & feat.Name & """ titled """ & title & """"
+                    If Left(title, 8) = "EasyPDM " Then
+                        If feat.Select2(True, 0) Then nTables = nTables + 1
+                        Exit For
+                    End If
+                Next i
+            Else
+                LogLine "Sheet tables: found " & featType & " """ & feat.Name & """ without readable tables"
             End If
-        Next i
-    End If
-    LogLine "Sheet tables: " & n & " EasyPDM table(s) selected for removal"
-    ' A picture whose origin lies in the logo square (right end of the NAME row).
-    Dim sk As Object, pics As Variant, px As Double, py As Double, removedPics As Long
-    Set sk = v.GetSketch
-    If Not sk Is Nothing Then
-        pics = sk.GetSketchPictures
-        If IsArray(pics) Then
-            For i = LBound(pics) To UBound(pics)
-                pics(i).GetOrigin px, py
-                px = px * scl
-                py = py * scl
-                If px > sheetW - 0.03 And px < sheetW - 0.009 And py > 0.024 And py < 0.045 Then
-                    If pics(i).GetFeature.Select2(True, 0) Then removedPics = removedPics + 1
-                End If
-            Next i
+        ElseIf InStr(1, featType, "Bitmap", vbTextCompare) > 0 Or InStr(1, featType, "Picture", vbTextCompare) > 0 Then
+            Set spec = Nothing
+            Set spec = feat.GetSpecificFeature2
+            px = 0
+            py = 0
+            If Not spec Is Nothing Then spec.GetOrigin px, py
+            px = px * scl
+            py = py * scl
+            LogLine "Logo: found " & featType & " """ & feat.Name & """ at " & Format(px * 1000, "0") & "," & Format(py * 1000, "0") & " mm"
+            If px > sheetW - 0.03 And px < sheetW - 0.009 And py > 0.024 And py < 0.045 Then
+                If feat.Select2(True, 0) Then nPics = nPics + 1
+            End If
         End If
-    End If
-    LogLine "Logo: " & removedPics & " old picture(s) selected for removal"
-    If n + removedPics > 0 Then swModel.EditDelete
+        Err.Clear
+        Set feat = feat.GetNextFeature
+    Loop
+    LogLine "Sheet tables: " & nTables & " EasyPDM table(s) selected for removal"
+    LogLine "Logo: " & nPics & " old picture(s) selected for removal"
+    If nTables + nPics > 0 Then swModel.EditDelete
     swModel.ClearSelection2 True
     If Err.Number <> 0 Then LogLine "Sheet objects: removal error " & Err.Number & ": " & Err.Description
 End Sub
