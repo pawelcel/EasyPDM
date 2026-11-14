@@ -4,7 +4,7 @@ using Npgsql;
 
 static class ItemEndpoints
 {
-    public static void MapItemEndpoints(this WebApplication app, string connectionString, StorageSettings storage, CreateTicketStore createTicketStore, DrawingTicketStore drawingTicketStore)
+    public static void MapItemEndpoints(this WebApplication app, string connectionString, StorageSettings storage, CreateTicketStore createTicketStore, DrawingTicketStore drawingTicketStore, UploadPolicy uploads)
     {
         // GET /api/create-tickets/{ticket} — odpytywane przez makro CAD po otwarciu
         // przeglądarki (zob. Ticket w POST /nodes poniżej): "pending" dopóki przeglądarka nie
@@ -120,6 +120,8 @@ static class ItemEndpoints
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
                 return Results.BadRequest("No file in the 'file' field.");
+            if (uploads.Check(file) is { } refused)
+                return refused;
 
             Guid? parentId = null;
             if (form.TryGetValue("parentId", out var parentIdValue) && !string.IsNullOrWhiteSpace(parentIdValue))

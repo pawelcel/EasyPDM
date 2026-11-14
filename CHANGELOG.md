@@ -2,6 +2,11 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Optional limits on uploaded file types and sizes.** `Uploads:AllowedExtensions` (a comma-separated list) and `Uploads:MaxFileSizeMb` let an administrator refuse other file types (415) and files over a size (413) on every endpoint that stores a file: items, item and project attachments, client files and client-check evidence. A request body over the size limit is refused before it is read, so an oversized upload is never written to a temporary file first. Both are off unless set, so existing installations behave as before; the backup restore is exempt.
+
 ## [0.8.1]
 
 ### Added

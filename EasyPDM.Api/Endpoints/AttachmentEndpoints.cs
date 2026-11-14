@@ -11,7 +11,7 @@ static class AttachmentEndpoints
     // (podpięcie pliku jako elementu podrzędnego w strukturze).
     private static bool AcceptsAttachments(string itemType) => itemType != "folder";
 
-    public static void MapAttachmentEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
+    public static void MapAttachmentEndpoints(this WebApplication app, string connectionString, StorageSettings storage, UploadPolicy uploads)
     {
         // GET /api/items/{itemId}/attachments — odczyt, świadomie otwarty dla KAŻDEGO
         // zalogowanego użytkownika (zob. GET /api/items), bez sprawdzenia dostępu do projektu.
@@ -64,6 +64,8 @@ static class AttachmentEndpoints
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
                 return Results.BadRequest("No file in the 'file' field.");
+            if (uploads.Check(file) is { } refused)
+                return refused;
 
             var role = form["role"].ToString();
             if (role == "") role = null;

@@ -797,6 +797,23 @@ Für die Bereitstellung: `npm run build` in `EasyPDM.Web/` überschreibt
 `EasyPDM.Api/wwwroot/` — `dotnet run` liefert das Ergebnis unter
 `http://localhost:5000` ohne zusätzliche Konfiguration aus.
 
+### Upload-Grenzen (optional)
+
+Standardmäßig nimmt der Server Dateien jedes Typs und jeder Größe an. Zwei Einstellungen (in
+`appsettings.Local.json` oder als Umgebungsvariablen `Uploads__AllowedExtensions` und
+`Uploads__MaxFileSizeMb`) schalten Grenzen für jeden Endpunkt ein, der eine Datei speichert —
+Elemente, Anhänge von Elementen und Projekten, Kundendateien und Nachweise der Kundenprüfung:
+
+- `Uploads:AllowedExtensions` — durch Kommas getrennte Liste, z. B. `.sldprt,.sldasm,.step,.pdf`
+  (Groß-/Kleinschreibung egal, Punkt optional). Jeder andere Typ und eine Datei ohne Endung
+  werden mit 415 abgelehnt.
+- `Uploads:MaxFileSizeMb` — größte einzelne Datei in MB; eine größere wird mit 413 abgelehnt.
+  Ein Anfragekörper über der Grenze (plus 16 MB für das umgebende Formular) wird vor dem Lesen
+  abgelehnt, sodass eine zu große Datei nie zuerst in eine temporäre Datei geschrieben wird.
+
+Die Wiederherstellung einer Sicherung ist von beiden ausgenommen: nur für Administratoren und
+sie enthält den gesamten Dateispeicher.
+
 ### Docker (empfohlen für die Server-Bereitstellung)
 
 **Am einfachsten**: `./install-easypdm-docker.sh` — legt `.env` an (generiert ein

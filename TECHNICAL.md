@@ -964,6 +964,22 @@ npm run dev      # http://localhost:5173
 For deployment: `npm run build` in `EasyPDM.Web/` overwrites `EasyPDM.Api/wwwroot/` —
 `dotnet run` serves the result at `http://localhost:5000` with no extra configuration.
 
+### Upload limits (optional)
+
+By default the server accepts every file type and size. Two settings (in
+`appsettings.Local.json`, or as environment variables `Uploads__AllowedExtensions` and
+`Uploads__MaxFileSizeMb`) turn limits on for every endpoint that stores a file — items,
+item and project attachments, client files and client-check evidence:
+
+- `Uploads:AllowedExtensions` — comma-separated list such as `.sldprt,.sldasm,.step,.pdf`
+  (case does not matter, the dot is optional). Any other type, and a file with no
+  extension, is refused with 415.
+- `Uploads:MaxFileSizeMb` — largest single file in MB; a larger file is refused with 413.
+  A request body over the limit (plus 16 MB for the form around it) is refused before it is
+  read, so an oversized upload is never written to a temporary file first.
+
+The backup restore is exempt from both: it is admin-only and holds the whole file store.
+
 ### Docker (recommended for server deployment)
 
 **Simplest**: `./install-easypdm-docker.sh` — creates `.env` (generates a random
