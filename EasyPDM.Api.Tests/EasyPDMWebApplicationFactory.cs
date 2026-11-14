@@ -25,18 +25,24 @@ public sealed class EasyPDMWebApplicationFactory : WebApplicationFactory<Program
     public string BackupRoot { get; } = Path.Combine(Path.GetTempPath(), "easypdm-tests-backups-" + Guid.NewGuid().ToString("N"));
     public string LogRoot { get; } = Path.Combine(Path.GetTempPath(), "easypdm-tests-logs-" + Guid.NewGuid().ToString("N"));
 
+    // Dodatkowe ustawienia dla jednego testu (np. mały Uploads:MaxFileSizeMb), ponad powyższe.
+    public Dictionary<string, string?> ExtraSettings { get; init; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.ConfigureAppConfiguration((_, config) =>
         {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
+            var settings = new Dictionary<string, string?>
             {
                 ["ConnectionString"] = ConnectionString,
                 ["StorageRoot"] = StorageRoot,
                 ["BackupRoot"] = BackupRoot,
                 ["LogRoot"] = LogRoot,
-            });
+            };
+            foreach (var (key, value) in ExtraSettings)
+                settings[key] = value;
+            config.AddInMemoryCollection(settings);
         });
     }
 

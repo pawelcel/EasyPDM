@@ -23,6 +23,7 @@ builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 
 // Kestrel's limit: no sane fixed cap for arbitrary CAD files, so it's removed too.
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = long.MaxValue);
 var app = builder.Build();
+var uploadPolicy = UploadPolicy.FromConfiguration(app.Configuration);
 
 string connectionString = app.Configuration["ConnectionString"]
     ?? throw new InvalidOperationException("ConnectionString is missing from appsettings.json");
@@ -83,6 +84,40 @@ app.Use(async (context, next) =>
     await next();
 });
 
+// Limit rozmiaru całego ciała żądania (zob. UploadPolicy), tylko gdy ustawiono
+// Uploads:MaxFileSizeMb. Zadeklarowany Content-Length ponad limit jest odrzucany przed odczytem;
+// ciało chunked zatrzymuje Kestrel po przekroczeniu limitu, a jego błąd zamieniamy na tę samą 413.
+if (uploadPolicy.MaxRequestBodyBytes is long maxRequestBody)
+{
+    app.Use(async (context, next) =>
+    {
+        if (!context.Request.Path.StartsWithSegments("/api") || UploadPolicy.IsExempt(context.Request.Path))
+        {
+            await next();
+            return;
+        }
+
+        if (context.Request.ContentLength > maxRequestBody)
+        {
+            await uploadPolicy.TooLarge().ExecuteAsync(context);
+            return;
+        }
+
+        var sizeFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+        if (sizeFeature is { IsReadOnly: false })
+            sizeFeature.MaxRequestBodySize = maxRequestBody;
+
+        try
+        {
+            await next();
+        }
+        catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge && !context.Response.HasStarted)
+        {
+            await uploadPolicy.TooLarge().ExecuteAsync(context);
+        }
+    });
+}
+
 // Serwuje wwwroot/index.html pod adresem "/" oraz zbudowany frontend.
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -137,7 +172,7 @@ app.MapAuthEndpoints(connectionString, browserBridgeTicketStore);
 app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
 app.MapProjectAccessEndpoints(connectionString);
-app.MapItemEndpoints(connectionString, storage, createTicketStore, drawingTicketStore);
+app.MapItemEndpoints(connectionString, storage, createTicketStore, drawingTicketStore, uploadPolicy);
 app.MapTagEndpoints(connectionString);
 app.MapPropertyEndpoints(connectionString);
 app.MapStructureEndpoints(connectionString);
@@ -153,11 +188,11 @@ app.MapTitleBlockEndpoints(connectionString);
 app.MapDocumentLabelEndpoints(connectionString);
 app.MapMacroTokenEndpoints(connectionString);
 app.MapManufacturerEndpoints(connectionString);
-app.MapClientEndpoints(connectionString, storage);
+app.MapClientEndpoints(connectionString, storage, uploadPolicy);
 app.MapSavedFilterEndpoints(connectionString);
-app.MapAttachmentEndpoints(connectionString, storage);
-app.MapClientVerificationEndpoints(connectionString, storage);
-app.MapProjectAttachmentEndpoints(connectionString, storage);
+app.MapAttachmentEndpoints(connectionString, storage, uploadPolicy);
+app.MapClientVerificationEndpoints(connectionString, storage, uploadPolicy);
+app.MapProjectAttachmentEndpoints(connectionString, storage, uploadPolicy);
 app.MapConfigEndpoints(storage);
 app.MapSettingsEndpoints(connectionString, storage, appSettingsPath);
 app.MapLogEndpoints(logRoot);

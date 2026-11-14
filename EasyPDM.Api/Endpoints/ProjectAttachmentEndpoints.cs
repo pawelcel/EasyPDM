@@ -12,7 +12,7 @@ static class ProjectAttachmentEndpoints
 {
     private static readonly string[] Roles = ["oferta", "zlecenie"];
 
-    public static void MapProjectAttachmentEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
+    public static void MapProjectAttachmentEndpoints(this WebApplication app, string connectionString, StorageSettings storage, UploadPolicy uploads)
     {
         // GET /api/projects/{projectId}/attachments
         app.MapGet("/api/projects/{projectId:guid}/attachments", async (Guid projectId, HttpContext ctx) =>
@@ -60,6 +60,8 @@ static class ProjectAttachmentEndpoints
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
                 return Results.BadRequest("No file in the 'file' field.");
+            if (uploads.Check(file) is { } refused)
+                return refused;
 
             // Brak roli = zwykły załącznik (trzecia, nieograniczona kategoria obok oferty
             // i potwierdzenia zlecenia).
