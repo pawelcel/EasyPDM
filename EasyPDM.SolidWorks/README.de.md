@@ -367,3 +367,24 @@ oder Speichern schiefgeht.
   kein System-Dateibrowser.
 - Das Kopieren/Registrieren/Herunterladen einer Datei über `storage/` setzt voraus, dass
   dieser Ordner im Dateisystem dieser Maschine sichtbar ist.
+
+## `EasyPDMSheetFormat.bas` — das EasyPDM-Blattformat (in Arbeit)
+
+Ein Einrichtungsmakro für einmalige Nutzung: Es zeichnet das EasyPDM-Blattformat — denselben
+Rahmen, dieselbe Feldeinteilung nach ISO 5457 und dasselbe Schriftfeld wie die FreeCAD-
+Vorlagen — auf das aktuelle Blatt einer leeren Zeichnung und speichert es als Blattformat
+(`.slddrt`) und Zeichnungsvorlage (`.drwdot`) in `Dokumente\EasyPDM\SolidWorks`.
+
+1. Datei → Neu → Zeichnung; in den Blatteigenschaften A3, A2 oder A1 (quer) ohne Blattformat
+   wählen.
+2. `EasyPDMSheetFormat.bas` (`main`) ausführen.
+3. Extras → Optionen → Dateipfade: diesen Ordner unter Blattformate und Dokumentvorlagen
+   hinzufügen.
+
+Die Schriftfeldfelder sind Notizen, die mit den benutzerdefinierten Eigenschaften der
+Zeichnung verknüpft sind (`$PRP:"pdm_drawn_by"`, `$PRP:"pdm_label_drawn_by"`, …); Maßstab und
+Blattnummer nutzen die eigenen Blatteigenschaften von SolidWorks. Das Ausfüllen dieser
+Eigenschaften aus EasyPDM in den Upload-/Download-Makros sowie die Bearbeitungs- und
+Revisionstabellen folgen. Das Makro wird von `EasyPDM.FreeCad/templates/build_templates.py`
+erzeugt — ändern Sie das Skript, nicht die `.bas`. Jeder Lauf schreibt ein Protokoll nach
+`%TEMP%\EasyPDM_sheetformat.log`.

@@ -4,6 +4,9 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **The start-up migration lock is released by hand.** `pg_advisory_lock` belongs to the database session, and a pooled connection keeps its session when it is closed: Npgsql resets it only when that connection is next rented. The lock therefore stayed held on an idle pooled connection, and the next start in the same process (or a second instance beside a running one) waited on it until the command timeout and failed.
+
 ### Security
 - **Browser sessions are stored as a SHA-256 of their token, like CAD macro tokens.** The `sessions` table held the cookie's token as it is, so anyone who could read the table — a backup copy, read-only database access, a dump — could sign in as every logged-in user. Migration 073 hashes existing sessions in place, so nobody is signed out.
 
