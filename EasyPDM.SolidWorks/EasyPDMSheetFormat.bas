@@ -43,7 +43,6 @@ Private gH As Double
 Private gLog As String
 Private gThick As Collection
 Private gThin As Collection
-Private gOffsets As Object
 Private gLang As String
 Private gLines As Long
 Private gNotes As Long
@@ -133,48 +132,6 @@ Sub EnsureFolder(ByVal path As String)
     Next i
 End Sub
 
-' Offset between a note's position and the bottom-left of its text, measured once per text
-' height on a probe note "H" (no descender): SolidWorks positions a note by its own anchor,
-' not by the baseline, so the probe tells where the baseline lands.
-Function NoteOffset(ByVal sizeMm As Double) As Variant
-    Dim key As String, nt As Object, ann As Object, tf As Object, ext As Variant, pos As Variant
-    key = CStr(sizeMm)
-    If gOffsets.Exists(key) Then
-        NoteOffset = gOffsets(key)
-        Exit Function
-    End If
-    Dim res(1) As Double
-    res(0) = 0#
-    res(1) = sizeMm / 1000#
-    On Error Resume Next
-    swModel.ClearSelection2 True
-    Set nt = swModel.InsertNote("H")
-    If Not nt Is Nothing Then
-        Set ann = nt.GetAnnotation
-        Set tf = ann.GetTextFormat(0)
-        tf.CharHeight = sizeMm / 1000#
-        ann.SetTextFormat 0, False, tf
-        ann.SetPosition2 0.1, 0.1, 0
-        ext = nt.GetExtent
-        pos = ann.GetPosition
-        If IsArray(ext) And IsArray(pos) Then
-            res(0) = pos(0) - ext(0)
-            res(1) = pos(1) - ext(1)
-            LogLine "probe " & key & " mm: offset x=" & Format(res(0) * 1000, "0.00") & " y=" & Format(res(1) * 1000, "0.00") & " mm"
-        Else
-            LogLine "probe " & key & " mm: no extent, using defaults"
-        End If
-        ann.Select3 False, Nothing
-        swModel.EditDelete
-    Else
-        LogLine "probe " & key & " mm: InsertNote failed"
-    End If
-    If Err.Number <> 0 Then LogLine "probe error " & Err.Number & ": " & Err.Description
-    On Error GoTo 0
-    gOffsets.Add key, res
-    NoteOffset = res
-End Function
-
 ' A line in sheet millimetres, y measured down from the top edge (as in the SVG templates).
 Sub L(ByVal x1 As Double, ByVal y1 As Double, ByVal x2 As Double, ByVal y2 As Double, ByVal widthMm As Double)
     Dim seg As Object
@@ -193,8 +150,7 @@ End Sub
 
 ' A note whose text starts at x (or is centred on it) with its baseline at y, in mm.
 Sub N(ByVal x As Double, ByVal y As Double, ByVal txt As String, ByVal sizeMm As Double, ByVal bold As Boolean, ByVal centre As Boolean, ByVal typicalLen As Integer)
-    Dim nt As Object, ann As Object, tf As Object, off As Variant, xLeft As Double
-    off = NoteOffset(sizeMm)
+    Dim nt As Object, ann As Object, tf As Object, xLeft As Double
     On Error Resume Next
     swModel.ClearSelection2 True
     Set nt = swModel.InsertNote(txt)
@@ -213,7 +169,11 @@ Sub N(ByVal x As Double, ByVal y As Double, ByVal txt As String, ByVal sizeMm As
     ' Centred texts are placed by their typical width -- a linked value's real length is
     ' not known until the property is filled in.
     If centre Then xLeft = x - typicalLen * sizeMm * 0.33
-    ann.SetPosition2 xLeft / 1000# + off(0), gH - y / 1000# + off(1), 0
+    ' A note's position is the top-left corner of its text (confirmed on SolidWorks 2024: the
+    ' top of a capital letter sits on the point). The layout gives the baseline, so the top is
+    ' one text height above it. Measuring the note's extent instead (GetExtent) returned
+    ' values that shifted every note far up and left, so it is not used.
+    ann.SetPosition2 xLeft / 1000#, gH - (y - sizeMm) / 1000#, 0
     If Err.Number <> 0 Then
         gFailed = gFailed + 1
         LogLine "note position failed: " & txt & " (" & Err.Description & ")"
@@ -329,7 +289,6 @@ Sub main()
     gH = h
     Set gThick = New Collection
     Set gThin = New Collection
-    Set gOffsets = CreateObject("Scripting.Dictionary")
     swModel.EditTemplate
     LogLine "editing sheet format"
     If clearFirst Then ClearSheetFormat
