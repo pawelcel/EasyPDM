@@ -2889,6 +2889,13 @@ End Sub
 ' UNVERIFIED against a live SolidWorks install, same caveat as UploadStepAttachment above --
 ' confirm on the first real run.
 Sub UploadPdfAttachment(ByVal swModel As Object, ByVal itemId As String, ByVal itemNumber As Long, ByVal name As String, ByVal revision As Long)
+    ' The item's "pdf" slot is its DRAWING. A part or assembly saved as PDF is only a picture
+    ' of the 3D view, and uploading it replaced the real drawing PDF (reported from practice),
+    ' so a PDF is exported only from a drawing document -- whatever asked for it.
+    If swModel.GetType <> SW_DOC_DRAWING Then
+        LogLine "PDF skipped for item " & itemId & ": a PDF is exported only from a drawing."
+        Exit Sub
+    End If
     On Error Resume Next
 
     Dim tempPath As String
@@ -3504,7 +3511,9 @@ Function ProcessAssemblyTree(ByVal topModel As Object, ByRef edgesForTop As Coll
     updateExisting = (sendNewComponents And anyUpdatable)
     If updateExisting Then
         updateStep = (MsgBoxFront(T("UpdateExistingStepPrompt"), vbYesNo + vbQuestion + vbDefaultButton1, T("AppTitle")) = vbYes)
-        updatePdf = (MsgBoxFront(T("UpdateExistingPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
+        ' No PDF question: components are parts/assemblies, and their PDF slot holds the
+        ' drawing (see UploadPdfAttachment).
+        updatePdf = False
         If topUpdatable Then
             gTopPresetItemId = topLinkedId
             gTopPresetStep = updateStep
@@ -4327,12 +4336,10 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
             Else
                 nativeExportStep = (MsgBoxFront(T("ExportStepPrompt"), vbYesNo + vbQuestion + vbDefaultButton1, T("AppTitle")) = vbYes)
             End If
+            ' No PDF question for a part or assembly: the PDF slot holds the drawing, which
+            ' is uploaded from the drawing document itself (see UploadPdfAttachment).
             Dim nativeExportPdf As Boolean
-            If usePreset Then
-                nativeExportPdf = gTopPresetPdf
-            Else
-                nativeExportPdf = (MsgBoxFront(T("ExportPdfPrompt"), vbYesNo + vbQuestion + vbDefaultButton2, T("AppTitle")) = vbYes)
-            End If
+            nativeExportPdf = False
 
             If nativeExportStep Then UploadStepAttachment swModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)
             If nativeExportPdf Then UploadPdfAttachment swModel, linkedItemId, JsonGetLong(resultInfo, "itemNumber", 0), JsonGetString(resultInfo, "name", ""), JsonGetLong(resultInfo, "revision", 1)

@@ -12,6 +12,7 @@ All notable changes to EasyPDM are documented in this file.
 - **Settings → File storage is split into separate panels.** Location, allowed file types, backup and restore, automatic backup and the danger zone each get their own panel instead of one long box, and the danger zone has a red outline; its description now names every category it can clear, processes and company included.
 
 ### Fixed
+- **Uploading a part or assembly from SolidWorks or Inventor no longer replaces the drawing PDF.** The macros asked whether to export a PDF for a part or assembly too, and a yes saved a picture of the 3D view into the item's PDF slot — the one that holds the drawing. A PDF is now exported only when a drawing is uploaded; the question is gone for parts and assemblies, and a PDF ticked in the browser form for them is skipped.
 - **The start-up migration lock is released by hand.** `pg_advisory_lock` belongs to the database session, and a pooled connection keeps its session when it is closed: Npgsql resets it only when that connection is next rented. The lock therefore stayed held on an idle pooled connection, and the next start in the same process (or a second instance beside a running one) waited on it until the command timeout and failed.
 
 ### Security
