@@ -2,6 +2,11 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Log in as: an administrator can work as another user, and nothing done that way is silent.** A person icon in the top bar opens a dialog to pick a user (never another administrator); the page reloads as that user with exactly their rights, an amber Back button returns to the administrator and to the page where the switch started. The session itself switches, so Log out ends both and deleting either account ends it. Changing the password and starting another switch stay refused while switched. Every start, every change made while switched (refused ones too) and every end is written to a log the administrator reads from the same dialog; a switch ends on its own when the administrator loses the role or the user becomes an administrator. The item's History and other records name the user, not the administrator: the log is where a switched change shows.
+
 ## [0.8.1]
 
 ### Added

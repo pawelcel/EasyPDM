@@ -7,7 +7,7 @@ using Npgsql;
 // API jest automatycznie chroniony, bez potrzeby dopisywania sprawdzenia w każdym z osobna.
 static class AuthEndpoints
 {
-    private const string CookieName = "pdm_session";
+    internal const string CookieName = "pdm_session";
     private static readonly TimeSpan SessionLifetime = TimeSpan.FromDays(30);
 
     // Prosta ochrona przed brute-force na /auth/login: w pamięci procesu (jeden node
@@ -63,12 +63,13 @@ static class AuthEndpoints
     }
 
     // Unieważnia sesje użytkownika po zmianie hasła, poza sesją, z której zmieniono hasło
-    // (exceptToken; null = wszystkie). Bez tego przejęta sesja działała jeszcze do 30 dni mimo
+    // (exceptToken; null = wszystkie), razem z sesjami, w których ten użytkownik (administrator)
+    // pracuje jako ktoś inny ("Zaloguj jako", LoginAsEndpoints.cs). Bez tego przejęta sesja działała jeszcze do 30 dni mimo
     // zmiany hasła — a zmiana hasła to zwykle właśnie reakcja na podejrzenie przejęcia konta.
     public static async Task RevokeSessionsAsync(NpgsqlConnection conn, Guid userId, string? exceptToken)
     {
         await using var cmd = new NpgsqlCommand(
-            "DELETE FROM sessions WHERE user_id = @userId AND token IS DISTINCT FROM @except;", conn);
+            "DELETE FROM sessions WHERE (user_id = @userId OR impersonator_id = @userId) AND token IS DISTINCT FROM @except;", conn);
         cmd.Parameters.AddWithValue("userId", userId);
         cmd.Parameters.Add(new NpgsqlParameter("except", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object?)exceptToken ?? DBNull.Value });
         await cmd.ExecuteNonQueryAsync();
@@ -275,6 +276,8 @@ static class AuthEndpoints
             {
                 await using var conn = new NpgsqlConnection(connectionString);
                 await conn.OpenAsync();
+                // Wylogowanie w trakcie "Zaloguj jako" kończy całą sesję i zostawia wpis w dzienniku.
+                await LoginAsEndpoints.EndSessionAsync(conn, token, LoginAsEndpoints.EndLoggedOut, LoginAsEndpoints.ClientAddress(ctx));
                 await using var cmd = new NpgsqlCommand("DELETE FROM sessions WHERE token = @token;", conn);
                 cmd.Parameters.AddWithValue("token", token);
                 await cmd.ExecuteNonQueryAsync();
@@ -371,6 +374,9 @@ static class AuthEndpoints
         app.MapPatch("/api/auth/password", async (HttpContext ctx, ChangePasswordRequest body) =>
         {
             var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            // Hasło zmienia tylko sam właściciel konta, nie administrator pracujący jako on.
+            if (user.LoginAs is not null)
+                return LoginAsEndpoints.SwitchedRefused();
 
             if (string.IsNullOrWhiteSpace(body.NewPassword))
                 return Results.BadRequest("The new password cannot be empty.");
@@ -411,6 +417,8 @@ static class AuthEndpoints
         username = user.Username,
         displayName = user.DisplayName,
         role = user.Role,
+        // W trakcie "Zaloguj jako": kto naprawdę pracuje, żeby interfejs pokazał drogę powrotu.
+        loginAs = user.LoginAs is { } loginAs ? new { adminId = loginAs.AdminId, adminName = loginAs.AdminName } : null,
     };
 
     // Wywoływane przez middleware w Program.cs dla każdego żądania /api/* (poza login) —
@@ -437,20 +445,33 @@ static class AuthEndpoints
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync();
 
-        const string sql = """
-            SELECT u.id, u.username, u.display_name, u.role, s.expires_at
+        // "Zaloguj jako" (LoginAsEndpoints.cs) trzyma się tylko, dopóki administrator jest
+        // administratorem, a osoba, jako którą pracuje, zwykłym użytkownikiem.
+        var sql = $"""
+            SELECT u.id, u.username, u.display_name, u.role, s.expires_at,
+                   a.id, {UserNames.FullNameSql("a")}, {UserNames.FullNameSql("u")}
             FROM sessions s
             JOIN users u ON u.id = s.user_id
-            WHERE s.token = @token AND s.expires_at > now();
+            LEFT JOIN users a ON a.id = s.impersonator_id
+            WHERE s.token = @token AND s.expires_at > now()
+              AND (s.impersonator_id IS NULL OR (a.role = 'admin' AND u.role = 'user'));
             """;
         await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("token", token);
 
         await using var reader = await cmd.ExecuteReaderAsync();
         if (!await reader.ReadAsync())
+        {
+            await reader.DisposeAsync();
+            // Sesja "Zaloguj jako", która już się nie trzyma, kończy się tu z wpisem w dzienniku,
+            // zamiast czekać, aż ożyje po przywróceniu roli.
+            if (!token.StartsWith("pdmm_", StringComparison.Ordinal))
+                await LoginAsEndpoints.EndSessionAsync(conn, token, LoginAsEndpoints.EndExpired, null);
             return null;
+        }
 
-        var user = new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3));
+        LoginAsState? loginAs = reader.IsDBNull(5) ? null : new LoginAsState(reader.GetGuid(5), reader.GetString(6), reader.GetString(7));
+        var user = new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), loginAs);
         return (user, reader.GetDateTime(4));
     }
 
@@ -476,7 +497,9 @@ static class AuthEndpoints
     public static bool IsAdmin(HttpContext ctx) => (ctx.Items["CurrentUser"] as CurrentUser)?.Role == "admin";
 }
 
-record CurrentUser(Guid Id, string Username, string DisplayName, string Role);
+// LoginAs: ustawione, gdy administrator pracuje jako ten użytkownik (LoginAsEndpoints.cs).
+record CurrentUser(Guid Id, string Username, string DisplayName, string Role, LoginAsState? LoginAs = null);
+record LoginAsState(Guid AdminId, string AdminName, string TargetName);
 record LoginRequest(string Username, string Password);
 record MacroLoginRequest(string? Username, string? Password, string? Client);
 record ChangePasswordRequest(string CurrentPassword, string NewPassword);

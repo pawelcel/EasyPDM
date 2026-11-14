@@ -30,11 +30,29 @@ CREATE TABLE sessions (
     token      TEXT PRIMARY KEY,
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT now(),
-    expires_at TIMESTAMPTZ NOT NULL
+    expires_at TIMESTAMPTZ NOT NULL,
+    -- "Zaloguj jako" (migracja 076): administrator pracujący w tej sesji jako user_id.
+    impersonator_id UUID REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_sessions_user ON sessions (user_id);
 GRANT SELECT, INSERT, UPDATE, DELETE ON sessions TO CURRENT_USER;
+
+-- Zapis każdego "Zaloguj jako": start, każda zmiana w tym czasie, koniec (migracja 076).
+CREATE TABLE login_as_log (
+    id             BIGSERIAL PRIMARY KEY,
+    at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    kind           TEXT NOT NULL CHECK (kind IN ('start', 'change', 'end')),
+    admin_id       UUID NOT NULL,
+    admin_name     TEXT NOT NULL,
+    target_id      UUID NOT NULL,
+    target_name    TEXT NOT NULL,
+    detail         TEXT,
+    client_address TEXT
+);
+CREATE INDEX idx_login_as_log_at ON login_as_log (at DESC, id DESC);
+GRANT SELECT, INSERT ON login_as_log TO CURRENT_USER;
+GRANT USAGE, SELECT ON SEQUENCE login_as_log_id_seq TO CURRENT_USER;
 
 -- ============================================================
 -- Projekty (kontener grupujący elementy)

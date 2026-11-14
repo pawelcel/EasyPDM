@@ -833,6 +833,22 @@ If the `users` table is empty when the API starts, it sets up a default
 password right after logging in (`PATCH /api/auth/password`, or from within the web
 application).
 
+**Log in as** (`LoginAsEndpoints.cs`, migration 076): a person icon in the top bar lets an
+administrator pick a user with the role "user" and work as them, to see exactly what they see
+without asking for their password. The session row itself switches — `user_id` becomes the user
+and `impersonator_id` keeps the administrator — so there is no second token, and Back
+(`POST /api/auth/login-as/back`) or Log out ends it. The session then has exactly the user's
+rights, because its user *is* that user: every `role == "admin"` check refuses on its own, and
+changing the password or starting another switch is refused too. Another administrator cannot be
+picked. `login_as_log` records the start, every non-GET request made while switched (method,
+path and the answer, refused ones too, written in the middleware) and the end (back, logged out,
+or expired); administrators read it from the same dialog. A switch whose administrator lost the
+role, or whose user became an administrator, ends at the next request with an "expired" line;
+deleting either account deletes the session, and an administrator's password change ends the
+sessions in which they work as someone else. Records store who did something by user id, so the
+item's History, status changes, uploads and the price signature name the *user*, with no mark;
+only `login_as_log` shows that an administrator made the change.
+
 ### Notifications
 
 Notifications (`notifications`/`notification_preferences` tables) are addressed to a

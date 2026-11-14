@@ -659,6 +659,24 @@ Wenn die Tabelle `users` beim Start der API leer ist, legt sie selbst ein Standa
 **`admin` / `admin`** an (siehe Konsole beim ersten Start) — ändern Sie dieses Passwort
 sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwendung).
 
+**Anmelden als** (`LoginAsEndpoints.cs`, Migration 076): Über ein Personensymbol in der oberen
+Leiste wählt ein Administrator einen Benutzer mit der Rolle „Benutzer“ und arbeitet als dieser —
+er sieht genau, was der Benutzer sieht, ohne nach dessen Passwort zu fragen. Umgeschaltet wird die
+Sitzungszeile selbst: `user_id` wird zum Benutzer, `impersonator_id` behält den Administrator, es
+gibt also kein zweites Token, und Zurück (`POST /api/auth/login-as/back`) oder Abmelden beendet
+den Wechsel. Die Sitzung hat dann genau die Rechte des Benutzers, denn ihr Benutzer *ist* dieser
+Benutzer: Jede Prüfung `role == "admin"` lehnt von selbst ab, Passwortänderung und ein weiterer
+Wechsel sind gesperrt. Ein anderer Administrator kann nicht gewählt werden. `login_as_log`
+protokolliert den Start, jede Nicht-GET-Anfrage während des Wechsels (Methode, Pfad und Antwort,
+auch abgelehnte — geschrieben in der Middleware) und das Ende (zurück, abgemeldet, abgelaufen);
+Administratoren lesen es im selben Dialog. Ein Wechsel, dessen Administrator die Rolle verloren hat
+oder dessen Benutzer Administrator wurde, endet bei der nächsten Anfrage mit einer Zeile „expired“;
+das Löschen eines der beiden Konten löscht die Sitzung, und eine Passwortänderung des
+Administrators beendet die Sitzungen, in denen er als jemand anderes arbeitet. Einträge speichern
+den Urheber als Benutzer-ID, daher nennen Historie, Statusänderungen, Uploads und die Preissignatur
+den *Benutzer* ohne Kennzeichnung; nur `login_as_log` zeigt, dass ein Administrator die Änderung
+vorgenommen hat.
+
 ### Benachrichtigungen
 
 Benachrichtigungen (Tabellen `notifications`/`notification_preferences`) sind an einen

@@ -109,18 +109,49 @@ app.Use(async (context, next) =>
 
         context.Items["CurrentUser"] = user;
 
-        // Katalogi tylko dla administratora (zob. CatalogPolicy) -- zapytanie o ustawienie idzie
-        // wyłącznie przy zapisie do katalogu przez zwykłego użytkownika, nie przy każdym żądaniu.
-        if (user.Role != "admin" && CatalogPolicy.IsCatalogWrite(context.Request))
+        // W trakcie "Zaloguj jako" każde żądanie, które może coś zmienić, trafia do dziennika
+        // razem z odpowiedzią, także odrzucone (LoginAsEndpoints.cs).
+        if (user.LoginAs is null || HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)
+            || HttpMethods.IsOptions(context.Request.Method) || LoginAsEndpoints.WritesOwnEnd(context))
         {
-            await using var conn = new NpgsqlConnection(connectionString);
-            await conn.OpenAsync();
-            if (await CatalogPolicy.GetAdminOnlyAsync(conn))
+            await CheckAndRunAsync();
+            return;
+        }
+
+        var failed = false;
+        try
+        {
+            await CheckAndRunAsync();
+        }
+        catch
+        {
+            failed = true;
+            throw;
+        }
+        finally
+        {
+            var status = failed && !context.Response.HasStarted ? StatusCodes.Status500InternalServerError : context.Response.StatusCode;
+            await LoginAsEndpoints.RecordChangeAsync(connectionString, context, user, status, app.Logger);
+        }
+        return;
+
+        async Task CheckAndRunAsync()
+        {
+            // Katalogi tylko dla administratora (zob. CatalogPolicy) -- zapytanie o ustawienie idzie
+            // wyłącznie przy zapisie do katalogu przez zwykłego użytkownika, nie przy każdym żądaniu.
+            if (user.Role != "admin" && CatalogPolicy.IsCatalogWrite(context.Request))
             {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsync("Only an administrator can change the catalogs.");
-                return;
+                await using var conn = new NpgsqlConnection(connectionString);
+                await conn.OpenAsync();
+                if (await CatalogPolicy.GetAdminOnlyAsync(conn))
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    await context.Response.WriteAsync("Only an administrator can change the catalogs.");
+                    return;
+                }
             }
+
+            await next();
         }
     }
 
@@ -134,6 +165,7 @@ var transferProgressStore = new TransferProgressStore();
 var cadRequestStore = new CadRequestStore();
 
 app.MapAuthEndpoints(connectionString, browserBridgeTicketStore);
+app.MapLoginAsEndpoints(connectionString);
 app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
 app.MapProjectAccessEndpoints(connectionString);
