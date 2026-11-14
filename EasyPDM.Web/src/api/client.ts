@@ -1,4 +1,7 @@
 import type {
+  LoginAsAccess,
+  LoginAsLogLine,
+  LoginAsPerson,
   Attachment,
   BackupSchedule,
   BomEntry,
@@ -957,6 +960,22 @@ export const api = {
     fetch(`${BASE}/auth/logout`, { method: "POST" }).then((r) => handleResponse<void>(r)),
 
   getMe: () => fetch(`${BASE}/auth/me`).then((r) => handleResponse<CurrentUser>(r)),
+
+  // "Zaloguj jako" (LoginAsEndpoints.cs): administrator pracuje w tej sesji jako inny użytkownik.
+  getLoginAsPeople: () =>
+    fetch(`${BASE}/auth/login-as/people`).then((r) => handleResponse<LoginAsPerson[]>(r)),
+
+  getLoginAsAccess: (id: string) =>
+    fetch(`${BASE}/auth/login-as/people/${id}`).then((r) => handleResponse<LoginAsAccess>(r)),
+
+  loginAs: (userId: string) =>
+    fetch(`${BASE}/auth/login-as`, json({ userId })).then((r) => handleResponse<void>(r)),
+
+  loginAsBack: () =>
+    fetch(`${BASE}/auth/login-as/back`, { method: "POST" }).then((r) => handleResponse<void>(r)),
+
+  getLoginAsLog: () =>
+    fetch(`${BASE}/auth/login-as/log?limit=200`).then((r) => handleResponse<LoginAsLogLine[]>(r)),
 
   changePassword: (currentPassword: string, newPassword: string) =>
     fetch(`${BASE}/auth/password`, {

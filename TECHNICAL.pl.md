@@ -597,6 +597,22 @@ Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
 **`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
 po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
 
+**Zaloguj jako** (`LoginAsEndpoints.cs`, migracja 076): ikona osoby na górnym pasku pozwala
+administratorowi wybrać użytkownika z rolą „użytkownik” i pracować jako on — zobaczyć dokładnie
+to, co on widzi, bez pytania o hasło. Przełącza się sam wiersz sesji: `user_id` staje się tym
+użytkownikiem, a `impersonator_id` trzyma administratora, więc nie powstaje drugi token, a Wróć
+(`POST /api/auth/login-as/back`) albo Wyloguj kończy przełączenie. Sesja ma wtedy dokładnie
+uprawnienia użytkownika, bo jej użytkownikiem *jest* ten użytkownik: każde sprawdzenie
+`role == "admin"` odmawia samo, a zmiana hasła i kolejne przełączenie są zablokowane. Innego
+administratora nie da się wybrać. `login_as_log` zapisuje start, każde żądanie inne niż GET
+w trakcie (metoda, ścieżka i odpowiedź, także odrzucone — zapis w middleware) i koniec (powrót,
+wylogowanie, utrata ważności); administratorzy czytają go w tym samym oknie. Przełączenie,
+którego administrator stracił rolę albo którego użytkownik został administratorem, kończy się
+przy następnym żądaniu wpisem „expired”; usunięcie któregokolwiek konta usuwa sesję, a zmiana
+hasła administratora kończy sesje, w których pracuje jako ktoś inny. Zapisy trzymają autora jako
+identyfikator użytkownika, więc Historia elementu, zmiany statusu, wgrane pliki i podpis ceny
+pokazują *użytkownika*, bez oznaczenia; tylko `login_as_log` mówi, że zmiany dokonał administrator.
+
 ### Powiadomienia
 
 Powiadomienia (tabele `notifications`/`notification_preferences`) są adresowane do

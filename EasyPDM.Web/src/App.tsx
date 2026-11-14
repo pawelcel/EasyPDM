@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useAuth } from "@/features/auth/use-auth"
 import { LoginView } from "@/features/auth/login-view"
+import { LoginAsControl } from "@/features/auth/login-as"
 import { NewProjectDialog } from "@/features/projects/new-project-dialog"
 import { ProjectSelect } from "@/features/projects/project-select"
 import { useProjects } from "@/features/projects/use-projects"
@@ -200,7 +201,8 @@ function App() {
               <span className="text-[12.5px] text-muted-foreground/60">v{APP_VERSION}</span>
             </div>
             <div className="flex items-center gap-2.5 text-[13px] text-muted-foreground">
-              <span>
+              <LoginAsControl user={user} />
+              <span className={user.loginAs ? "rounded-md bg-amber-100 px-1.5 text-amber-950 dark:bg-amber-400/20 dark:text-amber-100" : undefined}>
                 {user.displayName} ({t(user.role === "admin" ? "app.role.admin" : "app.role.user")})
               </span>
               <NotificationBell

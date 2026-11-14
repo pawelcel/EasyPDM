@@ -13,6 +13,36 @@ export interface CurrentUser {
   username: string
   displayName: string
   role: UserRole
+  // Ustawione, gdy administrator pracuje jako ten użytkownik ("Zaloguj jako").
+  loginAs?: { adminId: string; adminName: string } | null
+}
+
+// GET /api/auth/login-as/people — jako kogo administrator może się zalogować.
+export interface LoginAsPerson {
+  id: string
+  username: string
+  displayName: string
+}
+
+// GET /api/auth/login-as/people/{id} — projekty, do których ta osoba ma dostęp.
+export interface LoginAsAccess {
+  id: string
+  displayName: string
+  projects: string[]
+  projectCount: number
+}
+
+// GET /api/auth/login-as/log — jeden wpis dziennika "Zaloguj jako".
+export interface LoginAsLogLine {
+  id: number
+  at: string
+  kind: "start" | "change" | "end"
+  adminId: string
+  adminName: string
+  targetId: string
+  targetName: string
+  detail: string | null
+  clientAddress: string | null
 }
 
 // Zwracane przez GET /api/users — konta zarządzane przez administratora.
