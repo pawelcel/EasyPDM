@@ -326,22 +326,43 @@ zawiodło przy eksporcie albo zapisie.
 - Kopiowanie/rejestrowanie/pobieranie pliku przez `storage/` zakłada, że ten folder jest
   widoczny w systemie plików tej maszyny.
 
-## `EasyPDMSheetFormat.bas` — format arkusza EasyPDM (w przygotowaniu)
+## Arkusz rysunkowy z tabelką
 
-Makro do jednorazowego przygotowania: rysuje format arkusza EasyPDM — tę samą ramkę, strefy
-wg ISO 5457 i tabelkę co szablony FreeCAD — na bieżącym arkuszu pustego rysunku i zapisuje go
-jako format arkusza (`.slddrt`) i szablon rysunku (`.drwdot`) w `Dokumenty\EasyPDM\SolidWorks`.
+Dwie części: makro do jednorazowego przygotowania, które rysuje format arkusza EasyPDM, oraz
+makro Upload, które wypełnia go przy każdej wysyłce rysunku.
 
-1. Plik → Nowy → Rysunek w rozmiarze A3, A2 albo A1 (poziomo). Jeśli arkusz ma już format
-   arkusza (np. standardowy „a3 - iso”), makro zaproponuje najpierw jego wyczyszczenie — widoki
-   rysunku nie należą do formatu i zostają.
-2. Uruchom `EasyPDMSheetFormat.bas` (`main`).
+### `EasyPDMSheetFormat.bas` — tworzenie formatu arkusza (raz)
+
+Rysuje format arkusza EasyPDM — tę samą ramkę, strefy wg ISO 5457 i tabelkę co szablony
+FreeCAD — na bieżącym arkuszu rysunku i zapisuje go jako format arkusza (`.slddrt`) i szablon
+rysunku (`.drwdot`) w `Dokumenty\EasyPDM\SolidWorks`.
+
+1. Plik → Nowy → Rysunek w rozmiarze A3, A2 albo A1 (poziomo), na arkuszu z **pustym**
+   formatem (najpierw usuń zawartość standardowego formatu „a3 - iso” albo zacznij od pustego).
+2. Uruchom `EasyPDMSheetFormat.bas` (`main`) i potwierdź.
 3. Narzędzia → Opcje → Lokalizacje plików: dodaj ten folder do Formatów arkuszy i Szablonów
-   dokumentów.
+   dokumentów, a nowe rysunki zakładaj z `EasyPDM_A3_Landscape.drwdot` (albo A2 / A1).
 
 Pola tabelki to notatki powiązane z właściwościami rysunku (`$PRP:"pdm_drawn_by"`,
 `$PRP:"pdm_label_drawn_by"`, …); skala i numer arkusza korzystają z właściwości arkusza
-SolidWorks. Makro Upload wypełnia te właściwości z EasyPDM, zanim zapisze i wyśle rysunek z
-arkuszem EasyPDM (podpisy w głównym języku projektu); tabele obróbek i rewizji to kolejny krok. Makro generuje `EasyPDM.FreeCad/templates/build_templates.py`
-— zmieniaj skrypt, nie `.bas`. Każde uruchomienie zapisuje log w
-`%TEMP%\EasyPDM_sheetformat.log`.
+SolidWorks. Makro generuje `EasyPDM.FreeCad/templates/build_templates.py` — zmieniaj skrypt,
+nie `.bas`. Każde uruchomienie zapisuje log w `%TEMP%\EasyPDM_sheetformat.log`; pierwsza linia
+podaje wersję makra.
+
+### Wypełnianie — makro Upload
+
+Przy wysyłce rysunku z arkuszem EasyPDM Upload — zanim zapisze rysunek i wyeksportuje PDF —
+pobiera z EasyPDM dane tabelki i:
+
+- zapisuje właściwości `pdm_*`: narysował / zatwierdził z datami (tylko bieżąca rewizja), nazwę
+  z tłumaczeniami (projekty wielojęzyczne), numer rysunku, rewizję, materiał, masę, firmę
+  i wszystkie podpisy w głównym języku projektu;
+- buduje **tabelę obróbek** nad tabelką (zakotwiczoną do jej górnej krawędzi, rosnącą w górę,
+  z nagłówkiem w ostatnim wierszu) i **tabelę rewizji** w prawym górnym rogu (B, C, …; rewizja A
+  nie jest wypisywana) — jako tabele ogólne SolidWorks;
+- wstawia **logo firmy** w kwadrat po prawej stronie wiersza NAZWA.
+
+Ponowny Upload wymienia tylko swoje tabele (rozpoznane po ukrytych tytułach „EasyPDM
+processes” / „EasyPDM revisions”) i obraz w kwadracie logo; tabele i obrazy dodane przez Ciebie
+zostają. Rysunek z innym formatem arkusza zostaje bez zmian. Wysyłka części lub złożenia nigdy
+nie eksportuje PDF — PDF elementu to jego rysunek.

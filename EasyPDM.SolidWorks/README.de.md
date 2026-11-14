@@ -368,25 +368,46 @@ oder Speichern schiefgeht.
 - Das Kopieren/Registrieren/Herunterladen einer Datei über `storage/` setzt voraus, dass
   dieser Ordner im Dateisystem dieser Maschine sichtbar ist.
 
-## `EasyPDMSheetFormat.bas` — das EasyPDM-Blattformat (in Arbeit)
+## Zeichnungsblatt mit Schriftfeld
 
-Ein Einrichtungsmakro für einmalige Nutzung: Es zeichnet das EasyPDM-Blattformat — denselben
-Rahmen, dieselbe Feldeinteilung nach ISO 5457 und dasselbe Schriftfeld wie die FreeCAD-
-Vorlagen — auf das aktuelle Blatt einer leeren Zeichnung und speichert es als Blattformat
-(`.slddrt`) und Zeichnungsvorlage (`.drwdot`) in `Dokumente\EasyPDM\SolidWorks`.
+Zwei Teile: ein Einrichtungsmakro, das das EasyPDM-Blattformat zeichnet, und das Upload-Makro,
+das es bei jedem Senden einer Zeichnung ausfüllt.
 
-1. Datei → Neu → Zeichnung in A3, A2 oder A1 (quer). Hat das Blatt bereits ein Blattformat
-   (z. B. das Standardformat „a3 - iso“), bietet das Makro an, es zuerst zu leeren — die
-   Zeichnungsansichten gehören nicht zum Format und bleiben.
-2. `EasyPDMSheetFormat.bas` (`main`) ausführen.
+### `EasyPDMSheetFormat.bas` — Blattformat erstellen (einmalig)
+
+Es zeichnet das EasyPDM-Blattformat — denselben Rahmen, dieselbe Feldeinteilung nach ISO 5457
+und dasselbe Schriftfeld wie die FreeCAD-Vorlagen — auf das aktuelle Blatt einer Zeichnung und
+speichert es als Blattformat (`.slddrt`) und Zeichnungsvorlage (`.drwdot`) in
+`Dokumente\EasyPDM\SolidWorks`.
+
+1. Datei → Neu → Zeichnung in A3, A2 oder A1 (quer), auf einem Blatt mit **leerem** Blattformat
+   (zuerst den Inhalt des Standardformats „a3 - iso“ löschen oder mit einem leeren beginnen).
+2. `EasyPDMSheetFormat.bas` (`main`) ausführen und bestätigen.
 3. Extras → Optionen → Dateipfade: diesen Ordner unter Blattformate und Dokumentvorlagen
-   hinzufügen.
+   hinzufügen und neue Zeichnungen aus `EasyPDM_A3_Landscape.drwdot` (oder A2 / A1) anlegen.
 
 Die Schriftfeldfelder sind Notizen, die mit den benutzerdefinierten Eigenschaften der
 Zeichnung verknüpft sind (`$PRP:"pdm_drawn_by"`, `$PRP:"pdm_label_drawn_by"`, …); Maßstab und
-Blattnummer nutzen die eigenen Blatteigenschaften von SolidWorks. Das Upload-Makro füllt diese
-Eigenschaften aus EasyPDM, bevor es eine Zeichnung mit dem EasyPDM-Blatt speichert und sendet
-(Beschriftungen in der Hauptsprache des Projekts); die Bearbeitungs- und Revisionstabellen
-folgen. Das Makro wird von `EasyPDM.FreeCad/templates/build_templates.py`
-erzeugt — ändern Sie das Skript, nicht die `.bas`. Jeder Lauf schreibt ein Protokoll nach
-`%TEMP%\EasyPDM_sheetformat.log`.
+Blattnummer nutzen die eigenen Blatteigenschaften von SolidWorks. Das Makro wird von
+`EasyPDM.FreeCad/templates/build_templates.py` erzeugt — ändern Sie das Skript, nicht die
+`.bas`. Jeder Lauf schreibt ein Protokoll nach `%TEMP%\EasyPDM_sheetformat.log`; die erste Zeile
+nennt die Makroversion.
+
+### Ausfüllen — das Upload-Makro
+
+Beim Senden einer Zeichnung mit dem EasyPDM-Blatt liest Upload — bevor es die Zeichnung
+speichert und ihr PDF exportiert — die Schriftfelddaten aus EasyPDM und:
+
+- schreibt die `pdm_*`-Eigenschaften: gezeichnet / freigegeben mit Datum (nur aktuelle
+  Revision), Benennung mit Übersetzungen (mehrsprachige Projekte), Zeichnungsnummer, Revision,
+  Werkstoff, Masse, Firma und alle Beschriftungen in der Hauptsprache des Projekts;
+- baut eine **Bearbeitungstabelle** über dem Schriftfeld (an dessen Oberkante verankert, wächst
+  nach oben, Kopfzeile in der letzten Zeile) und eine **Revisionstabelle** rechts oben (B, C, …;
+  Revision A wird nicht aufgeführt) — als allgemeine SolidWorks-Tabellen;
+- setzt das **Firmenlogo** in das Quadrat am rechten Ende der Zeile BENENNUNG.
+
+Ein erneuter Upload ersetzt nur seine eigenen Tabellen (erkannt an den versteckten Titeln
+„EasyPDM processes“ / „EasyPDM revisions“) und das Bild im Logo-Quadrat; selbst eingefügte
+Tabellen und Bilder bleiben. Eine Zeichnung mit einem anderen Blattformat bleibt unverändert.
+Das Senden eines Teils oder einer Baugruppe exportiert nie ein PDF — das PDF des Elements ist
+seine Zeichnung.
