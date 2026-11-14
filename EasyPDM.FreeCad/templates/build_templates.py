@@ -140,46 +140,69 @@ def _sh_line(x1, y1, x2, y2):
     return '<path d="M %s,%s L %s,%s"/>' % (_sh_f(x1), _sh_f(y1), _sh_f(x2), _sh_f(y2))
 
 
-def build_base_sheet(fmt_name):
+def build_base_sheet(fmt_name, rec=None):
     """The bare template for one format: frame, grid reference, title block with empty
-    pdm_* fields and the three empty groups."""
+    pdm_* fields and the three empty groups.
+
+    `rec`, when given ({"lines": [], "texts": [], "anchors": {}}), also receives every line
+    (x1, y1, x2, y2, width) and text (x, baseline_y, text, size, bold, anchor, field) in mm,
+    y down from the top edge -- what build_templates.py turns into the SolidWorks macro that
+    draws the same sheet format."""
     W, H, fields_x, fields_y = SHEET_FORMATS[fmt_name]
     o = []
     add = o.append
+
+    def ln(x1, y1, x2, y2, width):
+        if rec is not None:
+            rec["lines"].append((x1, y1, x2, y2, width))
+        return _sh_line(x1, y1, x2, y2)
+
+    def box(x, y, w, h, width):
+        if rec is not None:
+            for seg in ((x, y, x + w, y), (x + w, y, x + w, y + h), (x + w, y + h, x, y + h), (x, y + h, x, y)):
+                rec["lines"].append(seg + (width,))
+
+    def txt(x, y, text, size, bold=False, anchor="start", field=None):
+        if rec is not None:
+            rec["texts"].append((x, y, text, size, bold, anchor, field))
     add('<g id="sheet" style="font-family:%s">' % SHEET_FONT)
 
     FL, FT, FR, FB = 20, 10, W - 10, H - 10      # drawing frame
     OL, OT, OR, OB = 15, 5, W - 5, H - 5         # outer line of the grid strip
     cx, cy = W / 2.0, H / 2.0
+    box(FL, FT, FR - FL, FB - FT, 0.7)
     add('<rect id="drawing_frame" x="%s" y="%s" width="%s" height="%s" style="%s"/>'
         % (FL, FT, _sh_f(FR - FL), _sh_f(FB - FT), _THICK))
     xs = [cx + 50 * k for k in range(-(fields_x // 2 - 1), fields_x // 2)]
     ys = [cy + 50 * k for k in range(-(fields_y // 2 - 1), fields_y // 2)]
     add('<g id="grid_reference" style="%s">' % _THIN)
+    box(OL, OT, OR - OL, OB - OT, 0.35)
     add('<rect x="%s" y="%s" width="%s" height="%s"/>' % (OL, OT, _sh_f(OR - OL), _sh_f(OB - OT)))
     for x in xs:
-        add(_sh_line(x, OT, x, FT))
-        add(_sh_line(x, FB, x, OB))
+        add(ln(x, OT, x, FT, 0.35))
+        add(ln(x, FB, x, OB, 0.35))
     for y in ys:
-        add(_sh_line(OL, y, FL, y))
-        add(_sh_line(FR, y, OR, y))
+        add(ln(OL, y, FL, y, 0.35))
+        add(ln(FR, y, OR, y, 0.35))
     add("</g>")
     cols, rows = [FL] + xs + [FR], [FT] + ys + [FB]
     add('<g id="grid_reference_markers" style="font-size:3.5px;text-anchor:middle;fill:#000000;stroke:none">')
     for i in range(len(cols) - 1):
         m = (cols[i] + cols[i + 1]) / 2
         for y in (OT + 3.75, FB + 3.75):
+            txt(m, y, str(i + 1), 3.5, anchor="middle")
             add('<text x="%s" y="%s">%d</text>' % (_sh_f(m), _sh_f(y), i + 1))
     for i in range(len(rows) - 1):
         m = (rows[i] + rows[i + 1]) / 2 + 1.25
         for x in ((OL + FL) / 2.0, (FR + OR) / 2.0):
+            txt(x, m, ZONE_LETTERS[i], 3.5, anchor="middle")
             add('<text x="%s" y="%s">%s</text>' % (_sh_f(x), _sh_f(m), ZONE_LETTERS[i]))
     add("</g>")
     add('<g id="centring_marks" style="%s">' % _THICK)
-    add(_sh_line(cx, 0, cx, FT + 5))
-    add(_sh_line(cx, H, cx, FB - 5))
-    add(_sh_line(0, cy, FL + 5, cy))
-    add(_sh_line(W, cy, FR - 5, cy))
+    add(ln(cx, 0, cx, FT + 5, 0.7))
+    add(ln(cx, H, cx, FB - 5, 0.7))
+    add(ln(0, cy, FL + 5, cy, 0.7))
+    add(ln(W, cy, FR - 5, cy, 0.7))
     add("</g>")
 
     # Title block 180 x 44 mm in the bottom-right corner.
@@ -187,22 +210,24 @@ def build_base_sheet(fmt_name):
     X = lambda dx: x0 + dx
     Y = lambda dy: y0 + dy
     add('<g id="title_block_lines" style="%s">' % _THIN)
-    add(_sh_line(X(70), Y(0), X(70), Y(44)))
+    add(ln(X(70), Y(0), X(70), Y(44), 0.35))
     for dy in (11, 22, 33):
-        add(_sh_line(X(0), Y(dy), X(70), Y(dy)))
-    add(_sh_line(X(46), Y(0), X(46), Y(22)))
-    add(_sh_line(X(22), Y(33), X(22), Y(44)))
-    add(_sh_line(X(40), Y(33), X(40), Y(44)))
-    add(_sh_line(X(70), Y(11), X(180), Y(11)))
-    add(_sh_line(X(70), Y(28), X(180), Y(28)))
-    add(_sh_line(X(163), Y(11), X(163), Y(28)))
-    add(_sh_line(X(140), Y(28), X(140), Y(44)))
-    add(_sh_line(X(162), Y(28), X(162), Y(44)))
+        add(ln(X(0), Y(dy), X(70), Y(dy), 0.35))
+    add(ln(X(46), Y(0), X(46), Y(22), 0.35))
+    add(ln(X(22), Y(33), X(22), Y(44), 0.35))
+    add(ln(X(40), Y(33), X(40), Y(44), 0.35))
+    add(ln(X(70), Y(11), X(180), Y(11), 0.35))
+    add(ln(X(70), Y(28), X(180), Y(28), 0.35))
+    add(ln(X(163), Y(11), X(163), Y(28), 0.35))
+    add(ln(X(140), Y(28), X(140), Y(44), 0.35))
+    add(ln(X(162), Y(28), X(162), Y(44), 0.35))
     add("</g>")
+    box(x0, y0, 180, 44, 0.7)
     add('<rect id="title_block_frame" x="%s" y="%s" width="180" height="44" style="%s"/>'
         % (_sh_f(x0), _sh_f(y0), _THICK))
 
     def label(key, x, y):
+        txt(x, y, SHEET_LABELS[key][1], 2.0, field="pdm_label_" + key)
         add('<text freecad:editable="pdm_label_%s" x="%s" y="%s" style="font-size:2px;fill:#000000">'
             "<tspan>%s</tspan></text>" % (key, _sh_f(x), _sh_f(y), _sh_esc(SHEET_LABELS[key][1])))
 
@@ -212,6 +237,7 @@ def build_base_sheet(fmt_name):
             style += ";font-weight:bold"
         if anchor != "start":
             style += ";text-anchor:%s" % anchor
+        txt(x, y, text, size, bold, anchor, "pdm_" + key)
         extra = ' freecad:autofill="%s"' % autofill if autofill else ""
         add('<text freecad:editable="pdm_%s"%s x="%s" y="%s" style="%s"><tspan>%s</tspan></text>'
             % (key, extra, _sh_f(x), _sh_f(y), style, _sh_esc(text)))
@@ -233,6 +259,8 @@ def build_base_sheet(fmt_name):
     label("format", X(163.5), Y(31));       value("format", X(171), Y(40.5), text=fmt_name, anchor="middle")
     add("</g>")
 
+    if rec is not None:
+        rec["anchors"].update({"logo": (X(163), Y(11), 17.0), "processes": (x0, y0, 180.0), "revisions": (FR, FT, 160.0)})
     add('<g id="pdm_logo" data-x="%s" data-y="%s" data-size="17"/>' % (_sh_f(X(163)), _sh_f(Y(11))))
     add('<g id="pdm_processes" data-x="%s" data-bottom="%s" data-width="180"/>' % (_sh_f(x0), _sh_f(y0)))
     add('<g id="pdm_revisions" data-right="%s" data-top="%s" data-width="160"/>' % (_sh_f(FR), _sh_f(FT)))
@@ -645,6 +673,401 @@ def sync_macro(path):
         print("updated shared block in", path)
 
 
+
+# ---------------------------------------------------------------------------------------
+# SolidWorks: the same sheet drawn through the API by a one-time setup macro
+# ---------------------------------------------------------------------------------------
+SW_MACRO = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir,
+                        "EasyPDM.SolidWorks", "EasyPDMSheetFormat.bas")
+
+# Fields SolidWorks fills by itself; everything else links to the drawing's own custom
+# property of the same name ($PRP:"pdm_drawn_by"), which the Upload/Download macros write.
+_SW_NATIVE_FIELDS = {
+    "pdm_scale": '$PRP:""SW-Sheet Scale""',
+    "pdm_sheet": '$PRP:""SW-Current Sheet"" / $PRP:""SW-Total Sheets""',
+}
+
+_SW_HEADER = """Attribute VB_Name = "EasyPDMSheetFormat"
+Option Explicit
+
+' ============================================================================
+' EasyPDMSheetFormat -- one-time setup macro: draws the EasyPDM sheet format (A3, A2 or A1
+' landscape) on the current sheet of the active drawing and saves it as a sheet format
+' (.slddrt) and a drawing template (.drwdot) in Documents\\EasyPDM\\SolidWorks.
+'
+' GENERATED by EasyPDM.FreeCad/templates/build_templates.py from the same coordinates as the
+' FreeCAD templates -- edit the script, not this file, and rerun it.
+'
+' How to use:
+'   1. File > New > Drawing; in Sheet Properties pick paper size A3, A2 or A1 (ISO,
+'      landscape) and NO sheet format ("Display sheet format" off / custom size).
+'   2. Run this macro (Sub main). It draws the frame, grid references and title block in
+'      the sheet format, links the title block fields to custom properties and saves the
+'      two files.
+'   3. Tools > Options > File Locations: add Documents\\EasyPDM\\SolidWorks to "Sheet
+'      Formats" and "Document Templates", then start new drawings from the EasyPDM template.
+'
+' Field values are links to the drawing's own custom properties ($PRP:"pdm_drawn_by",
+' $PRP:"pdm_label_drawn_by", ...); the EasyPDM Upload/Download macros write those
+' properties from the server. Scale and sheet number use SolidWorks's own sheet properties.
+' A custom sheet format works with EasyPDM if its notes link to the same property names.
+'
+' ASCII only, and every module-level declaration before the first Sub/Function (both are
+' hard rules for VBA import in SolidWorks, see EasyPDMUpload.bas).
+' A log of every step goes to %TEMP%\\EasyPDM_sheetformat.log -- send it when something
+' looks wrong.
+' ============================================================================
+
+Private Const SW_DOC_DRAWING As Long = 3                    ' swDocumentTypes_e.swDocDRAWING
+Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e.swCustomInfoText
+Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
+Private Const SW_SAVEAS_SILENT_COPY As Long = 3             ' swSaveAsOptions_Silent + swSaveAsOptions_Copy
+Private Const THICK_MM As Double = 0.7
+Private Const THIN_MM As Double = 0.35
+
+Private swApp As Object
+Private swModel As Object
+Private gH As Double
+Private gLog As String
+Private gThick As Collection
+Private gThin As Collection
+Private gOffsets As Object
+Private gLang As String
+Private gLines As Long
+Private gNotes As Long
+Private gFailed As Long
+"""
+
+_SW_BODY = r"""
+Function T(ByVal key As String) As String
+    Select Case gLang
+        Case "pl"
+            Select Case key
+                Case "Title": T = "Arkusz EasyPDM"
+                Case "NotDrawing": T = "Otworz rysunek (nowy, pusty), na ktorym ma powstac format arkusza EasyPDM."
+                Case "WrongSize": T = "Ustaw w Wlasciwosciach arkusza rozmiar A3, A2 albo A1 (poziomo) i uruchom makro ponownie. Obecny rozmiar: "
+                Case "HasFormat": T = "Ten arkusz ma juz format arkusza: "
+                Case "HasFormat2": T = "Zacznij od nowego rysunku bez formatu arkusza (Wlasciwosci arkusza: bez wyswietlania formatu)."
+                Case "Confirm": T = "Narysowac format arkusza EasyPDM {f} na biezacym arkuszu i zapisac go jako format arkusza i szablon rysunku?"
+                Case "Done": T = "Gotowe. Zapisano:"
+                Case "Done2": T = "Dodaj ten folder w Narzedzia > Opcje > Lokalizacje plikow (Formaty arkuszy i Szablony dokumentow)."
+                Case "Problems": T = "Czesc elementow sie nie udala -- wyslij log: "
+                Case "Failed": T = "Nie udalo sie przygotowac formatu arkusza: "
+            End Select
+        Case "de"
+            Select Case key
+                Case "Title": T = "EasyPDM-Blatt"
+                Case "NotDrawing": T = "Oeffnen Sie eine (neue, leere) Zeichnung, auf der das EasyPDM-Blattformat entstehen soll."
+                Case "WrongSize": T = "Stellen Sie in den Blatteigenschaften A3, A2 oder A1 (quer) ein und starten Sie das Makro erneut. Aktuelle Groesse: "
+                Case "HasFormat": T = "Dieses Blatt hat bereits ein Blattformat: "
+                Case "HasFormat2": T = "Beginnen Sie mit einer neuen Zeichnung ohne Blattformat (Blatteigenschaften: Blattformat nicht anzeigen)."
+                Case "Confirm": T = "Das EasyPDM-Blattformat {f} auf dem aktuellen Blatt zeichnen und als Blattformat und Zeichnungsvorlage speichern?"
+                Case "Done": T = "Fertig. Gespeichert:"
+                Case "Done2": T = "Fuegen Sie diesen Ordner unter Extras > Optionen > Dateipfade hinzu (Blattformate und Dokumentvorlagen)."
+                Case "Problems": T = "Einige Elemente sind fehlgeschlagen -- senden Sie das Protokoll: "
+                Case "Failed": T = "Das Blattformat konnte nicht erstellt werden: "
+            End Select
+    End Select
+    If T <> "" Then Exit Function
+    Select Case key
+        Case "Title": T = "EasyPDM sheet"
+        Case "NotDrawing": T = "Open the (new, empty) drawing the EasyPDM sheet format should be drawn on."
+        Case "WrongSize": T = "Set the paper size to A3, A2 or A1 (landscape) in Sheet Properties and run the macro again. Current size: "
+        Case "HasFormat": T = "This sheet already has a sheet format: "
+        Case "HasFormat2": T = "Start from a new drawing with no sheet format (Sheet Properties: do not display a sheet format)."
+        Case "Confirm": T = "Draw the EasyPDM {f} sheet format on the current sheet and save it as a sheet format and a drawing template?"
+        Case "Done": T = "Done. Saved:"
+        Case "Done2": T = "Add this folder under Tools > Options > File Locations (Sheet Formats and Document Templates)."
+        Case "Problems": T = "Some elements failed -- please send the log: "
+        Case "Failed": T = "Could not prepare the sheet format: "
+    End Select
+End Function
+
+Sub LogLine(ByVal s As String)
+    gLog = gLog & Format(Now, "hh:nn:ss") & "  " & s & vbCrLf
+End Sub
+
+Function LogPath() As String
+    LogPath = Environ("TEMP") & "\EasyPDM_sheetformat.log"
+End Function
+
+Sub WriteLog()
+    Dim f As Integer
+    On Error Resume Next
+    f = FreeFile
+    Open LogPath() For Output As #f
+    Print #f, gLog;
+    Close #f
+End Sub
+
+Function NearlyEqual(ByVal a As Double, ByVal b As Double) As Boolean
+    NearlyEqual = Abs(a - b) < 0.002
+End Function
+
+Function DetectFormat(ByVal w As Double, ByVal h As Double) As String
+    DetectFormat = ""
+""" + "{detect}" + r"""
+End Function
+
+Sub EnsureFolder(ByVal path As String)
+    Dim parts() As String, cur As String, i As Integer
+    parts = Split(path, "\")
+    cur = parts(0)
+    For i = 1 To UBound(parts)
+        If parts(i) <> "" Then
+            cur = cur & "\" & parts(i)
+            If Dir(cur, vbDirectory) = "" Then MkDir cur
+        End If
+    Next i
+End Sub
+
+' Offset between a note's position and the bottom-left of its text, measured once per text
+' height on a probe note "H" (no descender): SolidWorks positions a note by its own anchor,
+' not by the baseline, so the probe tells where the baseline lands.
+Function NoteOffset(ByVal sizeMm As Double) As Variant
+    Dim key As String, nt As Object, ann As Object, tf As Object, ext As Variant, pos As Variant
+    key = CStr(sizeMm)
+    If gOffsets.Exists(key) Then
+        NoteOffset = gOffsets(key)
+        Exit Function
+    End If
+    Dim res(1) As Double
+    res(0) = 0#
+    res(1) = sizeMm / 1000#
+    On Error Resume Next
+    swModel.ClearSelection2 True
+    Set nt = swModel.InsertNote("H")
+    If Not nt Is Nothing Then
+        Set ann = nt.GetAnnotation
+        Set tf = ann.GetTextFormat(0)
+        tf.CharHeight = sizeMm / 1000#
+        ann.SetTextFormat 0, False, tf
+        ann.SetPosition2 0.1, 0.1, 0
+        ext = nt.GetExtent
+        pos = ann.GetPosition
+        If IsArray(ext) And IsArray(pos) Then
+            res(0) = pos(0) - ext(0)
+            res(1) = pos(1) - ext(1)
+            LogLine "probe " & key & " mm: offset x=" & Format(res(0) * 1000, "0.00") & " y=" & Format(res(1) * 1000, "0.00") & " mm"
+        Else
+            LogLine "probe " & key & " mm: no extent, using defaults"
+        End If
+        ann.Select3 False, Nothing
+        swModel.EditDelete
+    Else
+        LogLine "probe " & key & " mm: InsertNote failed"
+    End If
+    If Err.Number <> 0 Then LogLine "probe error " & Err.Number & ": " & Err.Description
+    On Error GoTo 0
+    gOffsets.Add key, res
+    NoteOffset = res
+End Function
+
+' A line in sheet millimetres, y measured down from the top edge (as in the SVG templates).
+Sub L(ByVal x1 As Double, ByVal y1 As Double, ByVal x2 As Double, ByVal y2 As Double, ByVal widthMm As Double)
+    Dim seg As Object
+    On Error Resume Next
+    Set seg = swModel.SketchManager.CreateLine(x1 / 1000#, gH - y1 / 1000#, 0, x2 / 1000#, gH - y2 / 1000#, 0)
+    If seg Is Nothing Or Err.Number <> 0 Then
+        gFailed = gFailed + 1
+        LogLine "line failed " & x1 & "," & y1 & " -> " & x2 & "," & y2 & " (" & Err.Description & ")"
+        Err.Clear
+        Exit Sub
+    End If
+    On Error GoTo 0
+    gLines = gLines + 1
+    If widthMm > 0.5 Then gThick.Add seg Else gThin.Add seg
+End Sub
+
+' A note whose text starts at x (or is centred on it) with its baseline at y, in mm.
+Sub N(ByVal x As Double, ByVal y As Double, ByVal txt As String, ByVal sizeMm As Double, ByVal bold As Boolean, ByVal centre As Boolean, ByVal typicalLen As Integer)
+    Dim nt As Object, ann As Object, tf As Object, off As Variant, xLeft As Double
+    off = NoteOffset(sizeMm)
+    On Error Resume Next
+    swModel.ClearSelection2 True
+    Set nt = swModel.InsertNote(txt)
+    If nt Is Nothing Or Err.Number <> 0 Then
+        gFailed = gFailed + 1
+        LogLine "note failed: " & txt & " (" & Err.Description & ")"
+        Err.Clear
+        Exit Sub
+    End If
+    Set ann = nt.GetAnnotation
+    Set tf = ann.GetTextFormat(0)
+    tf.CharHeight = sizeMm / 1000#
+    tf.Bold = bold
+    ann.SetTextFormat 0, False, tf
+    xLeft = x
+    ' Centred texts are placed by their typical width -- a linked value's real length is
+    ' not known until the property is filled in.
+    If centre Then xLeft = x - typicalLen * sizeMm * 0.33
+    ann.SetPosition2 xLeft / 1000# + off(0), gH - y / 1000# + off(1), 0
+    If Err.Number <> 0 Then
+        gFailed = gFailed + 1
+        LogLine "note position failed: " & txt & " (" & Err.Description & ")"
+        Err.Clear
+    Else
+        gNotes = gNotes + 1
+    End If
+    On Error GoTo 0
+End Sub
+
+Sub ApplyWidths(ByVal segs As Collection, ByVal widthMm As Double)
+    Dim seg As Object
+    On Error Resume Next
+    swModel.ClearSelection2 True
+    For Each seg In segs
+        seg.Select4 True, Nothing
+    Next seg
+    swModel.SetLineWidthCustom widthMm / 1000#
+    If Err.Number <> 0 Then LogLine "line width " & widthMm & " mm failed: " & Err.Description
+    swModel.ClearSelection2 True
+    On Error GoTo 0
+End Sub
+
+Sub SetProp(ByVal mgr As Object, ByVal name As String, ByVal value As String)
+    On Error Resume Next
+    mgr.Add3 name, SW_CUSTOM_INFO_TEXT, value, SW_CUSTOM_PROPERTY_REPLACE
+    If Err.Number <> 0 Then LogLine "property " & name & " failed: " & Err.Description
+    On Error GoTo 0
+End Sub
+
+Sub main()
+    Dim sheet As Object, w As Double, h As Double, fmt As String, folder As String
+    Dim fmtPath As String, tplPath As String, existing As String, errs As Long, warns As Long
+    On Error GoTo Fail
+    Set swApp = Application.SldWorks
+    gLang = "en"
+    Select Case LCase(swApp.GetCurrentLanguage)
+        Case "polish": gLang = "pl"
+        Case "german": gLang = "de"
+    End Select
+    LogLine "EasyPDMSheetFormat start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
+
+    Set swModel = swApp.ActiveDoc
+    If swModel Is Nothing Then
+        MsgBox T("NotDrawing"), vbExclamation, T("Title")
+        Exit Sub
+    End If
+    If swModel.GetType <> SW_DOC_DRAWING Then
+        MsgBox T("NotDrawing"), vbExclamation, T("Title")
+        Exit Sub
+    End If
+
+    Set sheet = swModel.GetCurrentSheet
+    sheet.GetSize w, h
+    fmt = DetectFormat(w, h)
+    LogLine "sheet " & sheet.GetName & ": " & Format(w * 1000, "0.0") & " x " & Format(h * 1000, "0.0") & " mm -> " & IIf(fmt = "", "?", fmt)
+    If fmt = "" Then
+        MsgBox T("WrongSize") & Format(w * 1000, "0") & " x " & Format(h * 1000, "0") & " mm", vbExclamation, T("Title")
+        WriteLog
+        Exit Sub
+    End If
+    existing = sheet.GetTemplateName
+    LogLine "current sheet format: '" & existing & "'"
+    If existing <> "" Then
+        MsgBox T("HasFormat") & existing & vbCrLf & vbCrLf & T("HasFormat2"), vbExclamation, T("Title")
+        WriteLog
+        Exit Sub
+    End If
+    If MsgBox(Replace(T("Confirm"), "{f}", fmt), vbYesNo + vbQuestion, T("Title")) <> vbYes Then Exit Sub
+
+    ' Label properties first, so the linked notes show text while they are being placed.
+    Dim mgr As Object
+    Set mgr = swModel.Extension.CustomPropertyManager("")
+""" + "{props}" + r"""
+    SetProp mgr, "pdm_sheet_format", "EasyPDM " & fmt
+
+    gH = h
+    Set gThick = New Collection
+    Set gThin = New Collection
+    Set gOffsets = CreateObject("Scripting.Dictionary")
+    swModel.EditTemplate
+    LogLine "editing sheet format"
+    swModel.SketchManager.AddToDB = True
+    Select Case fmt
+""" + "{dispatch}" + r"""
+    End Select
+    swModel.SketchManager.AddToDB = False
+    ApplyWidths gThick, THICK_MM
+    ApplyWidths gThin, THIN_MM
+    swModel.EditSheet
+    swModel.ForceRebuild3 False
+    LogLine "drawn: " & gLines & " lines, " & gNotes & " notes, " & gFailed & " failed"
+
+    folder = Environ("USERPROFILE") & "\Documents\EasyPDM\SolidWorks"
+    EnsureFolder folder
+    fmtPath = folder & "\EasyPDM_" & fmt & "_Landscape.slddrt"
+    tplPath = folder & "\EasyPDM_" & fmt & "_Landscape.drwdot"
+    sheet.SaveFormat fmtPath
+    LogLine "sheet format saved: " & fmtPath & " exists=" & (Dir(fmtPath) <> "")
+    swModel.Extension.SaveAs tplPath, 0, SW_SAVEAS_SILENT_COPY, Nothing, errs, warns
+    LogLine "drawing template saved: " & tplPath & " exists=" & (Dir(tplPath) <> "") & " errors=" & errs & " warnings=" & warns
+    WriteLog
+
+    Dim msg As String
+    msg = T("Done") & vbCrLf & fmtPath & vbCrLf & tplPath & vbCrLf & vbCrLf & T("Done2")
+    If gFailed > 0 Then msg = msg & vbCrLf & vbCrLf & T("Problems") & LogPath()
+    MsgBox msg, vbInformation, T("Title")
+    Exit Sub
+Fail:
+    LogLine "ERROR " & Err.Number & ": " & Err.Description
+    On Error Resume Next
+    swModel.SketchManager.AddToDB = False
+    swModel.EditSheet
+    WriteLog
+    MsgBox T("Failed") & Err.Description & vbCrLf & LogPath(), vbCritical, T("Title")
+End Sub
+"""
+
+
+def _vb_num(v):
+    return ("%.3f" % v).rstrip("0").rstrip(".") or "0"
+
+
+def _vb_str(text):
+    return '"' + text.replace('"', '""') + '"'
+
+
+def build_solidworks_macro():
+    detect, dispatch, subs = [], [], []
+    for name, (W, H, _fx, _fy) in SHEET_FORMATS.items():
+        detect.append('    If NearlyEqual(w, %s) And NearlyEqual(h, %s) Then DetectFormat = "%s"'
+                      % (_vb_num(W / 1000.0), _vb_num(H / 1000.0), name))
+        dispatch.append("        Case \"%s\": Draw%s" % (name, name))
+        rec = {"lines": [], "texts": [], "anchors": {}}
+        build_base_sheet(name, rec)
+        body = ["Sub Draw%s()" % name]
+        for x1, y1, x2, y2, wd in rec["lines"]:
+            body.append("    L %s, %s, %s, %s, %s" % tuple(_vb_num(v) for v in (x1, y1, x2, y2, wd)))
+        for x, y, text, size, bold, anchor, field in rec["texts"]:
+            if field is None:
+                content, typical = _vb_str(text), len(text)
+            elif field in _SW_NATIVE_FIELDS:
+                content, typical = '"' + _SW_NATIVE_FIELDS[field] + '"', 3
+            elif field == "pdm_format":
+                content, typical = _vb_str(name), len(name)
+            else:
+                content, typical = '"$PRP:""%s"""' % field, (1 if field == "pdm_revision" else len(text) or 1)
+            body.append("    N %s, %s, %s, %s, %s, %s, %d" % (
+                _vb_num(x), _vb_num(y), content, _vb_num(size), "True" if bold else "False",
+                "True" if anchor == "middle" else "False", typical))
+        body.append("End Sub")
+        subs.append("\n".join(body))
+    props = "\n".join('    SetProp mgr, "pdm_label_%s", %s' % (k, _vb_str(v[1])) for k, v in SHEET_LABELS.items())
+    text = (_SW_HEADER + _SW_BODY.replace("{detect}", "\n".join(detect))
+            .replace("{dispatch}", "\n".join(dispatch)).replace("{props}", props)
+            + "\n" + "\n\n".join(subs) + "\n")
+    text.encode("ascii")  # VBA import breaks on anything else
+    return text.replace("\r\n", "\n").replace("\n", "\r\n")
+
+
+def write_solidworks_macro():
+    path = os.path.abspath(SW_MACRO)
+    with open(path, "w", encoding="ascii", newline="") as f:
+        f.write(build_solidworks_macro())
+    print("wrote", path)
+
 if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))
     for name in SHEET_FORMATS:
@@ -654,3 +1077,4 @@ if __name__ == "__main__":
         print("wrote", path)
     for macro in MACROS:
         sync_macro(macro)
+    write_solidworks_macro()
