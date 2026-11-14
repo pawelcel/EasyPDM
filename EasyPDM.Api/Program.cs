@@ -26,6 +26,8 @@ var app = builder.Build();
 
 string connectionString = app.Configuration["ConnectionString"]
     ?? throw new InvalidOperationException("ConnectionString is missing from appsettings.json");
+// Dozwolone typy i limity przesyłanych plików (Ustawienia -> Magazyn plików, zob. UploadPolicy).
+var uploadPolicy = new UploadPolicy(connectionString);
 
 // Katalog, w którym API fizycznie trzyma wgrane pliki (ręczne dodawanie elementów).
 // Ścieżka względna liczona jest od katalogu aplikacji, żeby działało niezależnie od tego,
@@ -83,6 +85,39 @@ app.Use(async (context, next) =>
     await next();
 });
 
+// Limit rozmiaru całego ciała żądania (zob. UploadPolicy): największy limit z listy dozwolonych
+// typów. Zadeklarowany Content-Length ponad limit jest odrzucany przed odczytem; ciało chunked
+// zatrzymuje Kestrel po przekroczeniu limitu, a jego błąd zamieniamy na tę samą 413. Reguły czyta
+// się przy każdym żądaniu (z pamięci), bo administrator zmienia je w ustawieniach bez restartu.
+app.Use(async (context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/api") || UploadPolicy.IsExempt(context.Request.Path)
+        || HttpMethods.IsGet(context.Request.Method) || uploadPolicy.MaxRequestBodyBytes is not long maxRequestBody)
+    {
+        await next();
+        return;
+    }
+
+    if (context.Request.ContentLength > maxRequestBody)
+    {
+        await uploadPolicy.RequestTooLarge().ExecuteAsync(context);
+        return;
+    }
+
+    var sizeFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+    if (sizeFeature is { IsReadOnly: false })
+        sizeFeature.MaxRequestBodySize = maxRequestBody;
+
+    try
+    {
+        await next();
+    }
+    catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge && !context.Response.HasStarted)
+    {
+        await uploadPolicy.RequestTooLarge().ExecuteAsync(context);
+    }
+});
+
 // Serwuje wwwroot/index.html pod adresem "/" oraz zbudowany frontend.
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -137,7 +172,7 @@ app.MapAuthEndpoints(connectionString, browserBridgeTicketStore);
 app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
 app.MapProjectAccessEndpoints(connectionString);
-app.MapItemEndpoints(connectionString, storage, createTicketStore, drawingTicketStore);
+app.MapItemEndpoints(connectionString, storage, createTicketStore, drawingTicketStore, uploadPolicy);
 app.MapTagEndpoints(connectionString);
 app.MapPropertyEndpoints(connectionString);
 app.MapStructureEndpoints(connectionString);
@@ -153,13 +188,14 @@ app.MapTitleBlockEndpoints(connectionString);
 app.MapDocumentLabelEndpoints(connectionString);
 app.MapMacroTokenEndpoints(connectionString);
 app.MapManufacturerEndpoints(connectionString);
-app.MapClientEndpoints(connectionString, storage);
+app.MapClientEndpoints(connectionString, storage, uploadPolicy);
 app.MapSavedFilterEndpoints(connectionString);
-app.MapAttachmentEndpoints(connectionString, storage);
-app.MapClientVerificationEndpoints(connectionString, storage);
-app.MapProjectAttachmentEndpoints(connectionString, storage);
+app.MapAttachmentEndpoints(connectionString, storage, uploadPolicy);
+app.MapClientVerificationEndpoints(connectionString, storage, uploadPolicy);
+app.MapProjectAttachmentEndpoints(connectionString, storage, uploadPolicy);
 app.MapConfigEndpoints(storage);
 app.MapSettingsEndpoints(connectionString, storage, appSettingsPath);
+app.MapUploadRuleEndpoints(connectionString, uploadPolicy);
 app.MapLogEndpoints(logRoot);
 app.MapNotificationEndpoints(connectionString);
 app.MapTransferProgressEndpoints(transferProgressStore, connectionString);

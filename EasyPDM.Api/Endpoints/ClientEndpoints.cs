@@ -10,7 +10,7 @@ using Npgsql;
 // (otwarty, globalny katalog dostępny każdemu zalogowanemu użytkownikowi).
 static class ClientEndpoints
 {
-    public static void MapClientEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
+    public static void MapClientEndpoints(this WebApplication app, string connectionString, StorageSettings storage, UploadPolicy uploads)
     {
         // GET /api/clients?search=... — lista do wyszukiwarki po lewej stronie (pokazuje
         // Nazwę razem z KAŻDĄ Nazwą 2 jako osobny wiersz, więc musi nieść same nazwy 2, nie
@@ -572,6 +572,8 @@ static class ClientEndpoints
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
                 return Results.BadRequest("No file in the 'file' field.");
+            if (uploads.Check(file) is { } refused)
+                return refused;
 
             Guid? parentId = null;
             var parentIdRaw = form["parentId"].ToString();
@@ -836,6 +838,8 @@ static class ClientEndpoints
             var file = form.Files.GetFile("file");
             if (file is null || file.Length == 0)
                 return Results.BadRequest("No file in the 'file' field.");
+            if (uploads.Check(file) is { } refused)
+                return refused;
 
             Guid? parentId = null;
             var parentIdRaw = form["parentId"].ToString();

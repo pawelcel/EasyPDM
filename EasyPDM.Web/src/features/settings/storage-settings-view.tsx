@@ -1,8 +1,8 @@
-import { Loader2 } from "lucide-react"
+import { Loader2, Trash2 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 import { api } from "@/api/client"
-import type { BackupFrequency, BackupSchedule, StorageInfo } from "@/api/types"
+import type { BackupFrequency, BackupSchedule, StorageInfo, UploadRule } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import {
@@ -156,6 +156,8 @@ function StorageSettingsView() {
           {result && <Hint>{result}</Hint>}
         </div>
 
+        <UploadRulesSection />
+
         <SectionLabel>{t("storage.backupLabel")}</SectionLabel>
         <Hint>{t("storage.backupHint")}</Hint>
         <div className="mt-2">
@@ -193,6 +195,145 @@ function StorageSettingsView() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+// Dozwolone typy przesyłanych plików z limitem dla każdego (zob. UploadPolicy po stronie API).
+// Pusta lista = każdy typ. Limit to liczba MB albo puste pole (bez limitu).
+interface RuleRow {
+  key: number
+  extension: string
+  maxSizeMb: string
+}
+
+function UploadRulesSection() {
+  const { t } = useLanguage()
+  const [rows, setRows] = useState<RuleRow[] | null>(null)
+  const [cadExtensions, setCadExtensions] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState("")
+  const nextKey = useRef(0)
+
+  function toRows(rules: UploadRule[]): RuleRow[] {
+    return rules.map((r) => ({ key: nextKey.current++, extension: r.extension, maxSizeMb: r.maxSizeMb?.toString() ?? "" }))
+  }
+
+  useEffect(() => {
+    api
+      .getUploadRules()
+      .then((info) => {
+        setRows(toRows(info.rules))
+        setCadExtensions(info.cadMacroExtensions)
+      })
+      .catch(() => setError(t("database.loadError")))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  if (rows === null) return error ? <FormError>{error}</FormError> : null
+
+  const normalized = (ext: string) => {
+    const e = ext.trim().toLowerCase()
+    return e && !e.startsWith(".") ? "." + e : e
+  }
+  const listed = new Set(rows.map((r) => normalized(r.extension)))
+  const missingCad = rows.length > 0 ? cadExtensions.filter((e) => !listed.has(e)) : []
+
+  function update(key: number, patch: Partial<RuleRow>) {
+    setSaved(false)
+    setRows((rs) => rs!.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+  }
+
+  function addRow(extension = "") {
+    setSaved(false)
+    setRows((rs) => [...rs!, { key: nextKey.current++, extension, maxSizeMb: "" }])
+  }
+
+  function addCadTypes() {
+    setSaved(false)
+    setRows((rs) => [
+      ...rs!,
+      ...cadExtensions.filter((e) => !listed.has(e)).map((e) => ({ key: nextKey.current++, extension: e, maxSizeMb: "" })),
+    ])
+  }
+
+  async function save() {
+    setSaving(true)
+    setError("")
+    setSaved(false)
+    try {
+      const rules = rows!
+        .filter((r) => r.extension.trim() !== "")
+        .map((r) => ({ extension: r.extension, maxSizeMb: r.maxSizeMb.trim() === "" ? null : Number(r.maxSizeMb) }))
+      const result = await api.setUploadRules(rules)
+      setRows(toRows(result.rules))
+      setSaved(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("uploadRules.saveFailed"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <SectionLabel>{t("uploadRules.label")}</SectionLabel>
+      <Hint>{t("uploadRules.hint")}</Hint>
+      {rows.length > 0 && (
+        <div className="mt-2 flex flex-col gap-1.5">
+          <div className="grid grid-cols-[8rem_8rem_auto] gap-2 text-[11.5px] font-medium tracking-wide text-muted-foreground uppercase">
+            <span>{t("uploadRules.ext")}</span>
+            <span>{t("uploadRules.limit")}</span>
+            <span />
+          </div>
+          {rows.map((r) => (
+            <div key={r.key} className="grid grid-cols-[8rem_8rem_auto] items-center gap-2">
+              <Input
+                aria-label={t("uploadRules.ext")}
+                value={r.extension}
+                placeholder=".step"
+                onChange={(e) => update(r.key, { extension: e.target.value })}
+              />
+              <Input
+                aria-label={t("uploadRules.limit")}
+                type="number"
+                min={1}
+                value={r.maxSizeMb}
+                placeholder={t("uploadRules.nolimit")}
+                onChange={(e) => update(r.key, { maxSizeMb: e.target.value })}
+              />
+              <div>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  aria-label={t("uploadRules.remove")}
+                  onClick={() => {
+                    setSaved(false)
+                    setRows((rs) => rs!.filter((x) => x.key !== r.key))
+                  }}
+                >
+                  <Trash2 className="size-3.5 text-muted-foreground" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {missingCad.length > 0 && <Hint>{t("uploadRules.cadMissing", { list: missingCad.join(", ") })}</Hint>}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button variant="outline" onClick={() => addRow()}>
+          {t("uploadRules.add")}
+        </Button>
+        <Button variant="outline" onClick={addCadTypes} disabled={cadExtensions.every((e) => listed.has(e))}>
+          {t("uploadRules.addCad")}
+        </Button>
+        <Button onClick={save} disabled={saving}>
+          {t("common.save")}
+        </Button>
+        {saved && <Hint>{t("uploadRules.saved")}</Hint>}
+      </div>
+      <FormError>{error}</FormError>
+    </>
   )
 }
 

@@ -782,8 +782,9 @@ go up — and the file list cannot say so, because from its point of view nothin
 ### Login, roles, and project access
 
 Every request to `/api/*` (except `/api/auth/login`) requires being logged in — a
-session is a random token in an httpOnly cookie (`pdm_session`, 30-day validity), stored
-in the `sessions` table. Passwords are stored as PBKDF2 (a custom implementation in
+session is a random token in an httpOnly cookie (`pdm_session`, 30-day validity); the
+`sessions` table keeps only its SHA-256, so reading the table gives no working session.
+Passwords are stored as PBKDF2 (a custom implementation in
 `PasswordHasher.cs`, using only `System.Security.Cryptography` — no extra NuGet
 packages).
 
@@ -963,6 +964,25 @@ npm run dev      # http://localhost:5173
 
 For deployment: `npm run build` in `EasyPDM.Web/` overwrites `EasyPDM.Api/wwwroot/` —
 `dotnet run` serves the result at `http://localhost:5000` with no extra configuration.
+
+### Allowed file types (optional)
+
+By default the server accepts every file type and size. Settings → File storage → **Allowed
+file types** (administrators) turns limits on for every endpoint that stores a file — items,
+item and project attachments, client files and client-check evidence:
+
+- Once the list holds at least one extension, only those types are accepted; any other type,
+  and a file with no extension, is refused with 415.
+- Each extension has its own size limit in MB (empty = no limit); a larger file is refused
+  with 413. A request body over the largest limit on the list (plus 16 MB for the form around
+  it) is refused before it is read, so an oversized upload is never written to a temporary
+  file first. If any type has no limit, the request body has none either.
+- "Add the types the CAD macros use" adds the extensions the macros send (model and drawing
+  files, STEP, PDF, the preview image), so a list cannot cut the macros off by accident.
+
+The rules live in the `upload_rules` table (migration 079), behind `GET`/`PUT
+/api/settings/upload-rules`. The backup restore is exempt: it is admin-only and holds the
+whole file store.
 
 ### Docker (recommended for server deployment)
 

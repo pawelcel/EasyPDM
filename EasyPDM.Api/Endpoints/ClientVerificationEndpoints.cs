@@ -14,7 +14,7 @@ static class ClientVerificationEndpoints
     private const string ResultVerified = "zweryfikowany";
     private const string ResultNeedsWork = "do_poprawy";
 
-    public static void MapClientVerificationEndpoints(this WebApplication app, string connectionString, StorageSettings storage)
+    public static void MapClientVerificationEndpoints(this WebApplication app, string connectionString, StorageSettings storage, UploadPolicy uploads)
     {
         // GET /api/projects/{projectId}/items/{itemId}/client-verifications — pełna lista
         // wpisów dla tego elementu W TYM projekcie, najnowsze pierwsze, razem z załącznikami.
@@ -215,6 +215,12 @@ static class ClientVerificationEndpoints
             // Pliki przyjmujemy pod "file" ORAZ "files" — jeden wpis potrafi nieść kilka dowodów,
             // a różne klienty HTTP nazywają pole różnie.
             var files = form.Files.GetFiles("file").Concat(form.Files.GetFiles("files")).ToList();
+            // Sprawdzane przed zapisaniem czegokolwiek, żeby odrzucony plik nie zostawił pół wpisu.
+            foreach (var upload in files)
+            {
+                if (upload.Length > 0 && uploads.Check(upload) is { } refused)
+                    return refused;
+            }
             var storedPaths = new List<string>();
             try
             {

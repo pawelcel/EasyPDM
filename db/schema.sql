@@ -25,9 +25,10 @@ CREATE TABLE users (
     role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user'))
 );
 
--- Sesje logowania (ciasteczko httpOnly "pdm_session" trzyma losowy token z tej tabeli).
+-- Sesje logowania. Ciasteczko httpOnly "pdm_session" trzyma losowy token; tabela tylko jego
+-- skrót SHA-256 (zob. migracja 073), więc odczyt tabeli nie daje działających sesji.
 CREATE TABLE sessions (
-    token      TEXT PRIMARY KEY,
+    token_hash TEXT PRIMARY KEY,
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT now(),
     expires_at TIMESTAMPTZ NOT NULL
@@ -660,6 +661,17 @@ CREATE TABLE saved_filters (
 );
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON saved_filters TO CURRENT_USER;
+
+-- ============================================================
+-- Dozwolone typy przesyłanych plików (Ustawienia -> Magazyn plików, zob. UploadPolicy.cs i
+-- migracja 079). Pusta tabela = każdy typ i rozmiar; max_size_mb NULL = bez limitu.
+-- ============================================================
+CREATE TABLE upload_rules (
+    extension    TEXT PRIMARY KEY CHECK (extension ~ '^\.[a-z0-9][a-z0-9_-]{0,15}$'),
+    max_size_mb  INTEGER CHECK (max_size_mb IS NULL OR max_size_mb > 0)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON upload_rules TO CURRENT_USER;
 
 -- ============================================================
 -- Śledzenie zastosowanych migracji — od tej wersji EasyPDM.Api sam sprawdza tę tabelę

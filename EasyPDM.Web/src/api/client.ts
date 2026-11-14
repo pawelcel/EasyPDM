@@ -1,6 +1,8 @@
 import type {
   Attachment,
   BackupSchedule,
+  UploadRule,
+  UploadRulesInfo,
   BomEntry,
   Client,
   ClientDetail,
@@ -807,6 +809,16 @@ export const api = {
     ),
 
   backupUrl: () => `${BASE}/settings/backup`,
+
+  getUploadRules: () =>
+    fetch(`${BASE}/settings/upload-rules`).then((r) => handleResponse<UploadRulesInfo>(r)),
+
+  setUploadRules: (rules: UploadRule[]) =>
+    fetch(`${BASE}/settings/upload-rules`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules }),
+    }).then((r) => handleResponse<{ rules: UploadRule[] }>(r)),
 
   getBackupSchedule: () =>
     fetch(`${BASE}/settings/backup-schedule`).then((r) => handleResponse<BackupSchedule>(r)),
