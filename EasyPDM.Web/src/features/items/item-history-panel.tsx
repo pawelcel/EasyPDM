@@ -4,6 +4,8 @@ import { api } from "@/api/client"
 import { STATUS_LABEL_KEYS, type HistoryEntry, type ItemStatus } from "@/api/types"
 import { Hint } from "@/components/ui/hint"
 import { SectionLabel } from "@/components/ui/section-label"
+import { useProjectLanguages } from "@/features/project-languages/use-project-languages"
+import { describePropertyRemoved, describePropertySet } from "@/features/items/history-values"
 import { useLanguage } from "@/i18n/use-language"
 
 // Historia Części/Złożenia — połączona chronologicznie z kilku źródeł po stronie backendu
@@ -22,6 +24,8 @@ function ItemHistoryPanel({
 }) {
   const { t, language } = useLanguage()
   const [entries, setEntries] = useState<HistoryEntry[]>([])
+  const { languages } = useProjectLanguages()
+  const codeOf = (languageId: number) => languages.find((l) => l.id === languageId)?.code ?? `#${languageId}`
 
   useEffect(() => {
     // Dwie akcje wykonane szybko po sobie (np. blokada, zaraz potem zmiana właściwości)
@@ -45,7 +49,7 @@ function ItemHistoryPanel({
     return status ? t(STATUS_LABEL_KEYS[status]) : "—"
   }
 
-  // Wartości właściwości bywają długie (cały obiekt JSON): linia ma zostać czytelna.
+  // Nazwa elementu bywa długa: linia ma zostać czytelna.
   function value(text: string | null): string {
     if (text === null || text === "") return "—"
     return text.length > 60 ? `${text.slice(0, 57)}…` : text
@@ -77,13 +81,9 @@ function ItemHistoryPanel({
       case "name_changed":
         return t("history.nameChanged", { from: value(entry.oldValue), to: value(entry.newValue) })
       case "property_set":
-        return t("history.propertySet", {
-          key: entry.key ?? "",
-          from: value(entry.oldValue),
-          to: value(entry.newValue),
-        })
+        return describePropertySet(entry.key, entry.oldValue, entry.newValue, t, codeOf)
       case "property_removed":
-        return t("history.propertyRemoved", { key: entry.key ?? "", from: value(entry.oldValue) })
+        return describePropertyRemoved(entry.key, entry.oldValue, t, codeOf)
       case "tag_added":
         return t("history.tagAdded", { tag: entry.newValue ?? "" })
       case "tag_removed":
