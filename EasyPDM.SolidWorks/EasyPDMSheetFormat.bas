@@ -36,6 +36,11 @@ Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAd
 Private Const SW_SAVEAS_SILENT_COPY As Long = 3             ' swSaveAsOptions_Silent + swSaveAsOptions_Copy
 Private Const THICK_MM As Double = 0.7
 Private Const THIN_MM As Double = 0.35
+' Text sizes in the layout are osifont's (em) sizes, as in the FreeCAD SVG. SolidWorks's note
+' font set to the same height came out about 1.4x larger -- confirmed on a stamped PDF, where
+' a 3.5 mm "drawn by" date ran past its 22 mm cell while the server's osifont stamp of the
+' same text below it fitted -- so every note is set this much smaller to look the same.
+Private Const TEXT_SCALE As Double = 0.7
 
 Private swApp As Object
 Private swModel As Object
@@ -162,6 +167,7 @@ Sub N(ByVal x As Double, ByVal y As Double, ByVal txt As String, ByVal sizeMm As
     End If
     Set ann = nt.GetAnnotation
     Set tf = ann.GetTextFormat(0)
+    sizeMm = sizeMm * TEXT_SCALE
     tf.CharHeight = sizeMm / 1000#
     tf.Bold = bold
     ann.SetTextFormat 0, False, tf
@@ -278,7 +284,7 @@ Sub main()
         Case "polish": gLang = "pl"
         Case "german": gLang = "de"
     End Select
-    LogLine "EasyPDMSheetFormat revision 5 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
+    LogLine "EasyPDMSheetFormat revision 6 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
 
     Set swModel = swApp.ActiveDoc
     If swModel Is Nothing Then

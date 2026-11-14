@@ -684,7 +684,7 @@ SW_MACRO = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, o
 # property of the same name ($PRP:"pdm_drawn_by"), which the Upload/Download macros write.
 # Bumped by hand on every change to the SolidWorks macro, and written into the first line of its
 # log -- so a log shows at once whether the latest macro was imported or an older copy ran.
-SW_MACRO_REVISION = 5
+SW_MACRO_REVISION = 6
 
 _SW_NATIVE_FIELDS = {
     "pdm_scale": '$PRP:""SW-Sheet Scale""',
@@ -729,6 +729,11 @@ Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAd
 Private Const SW_SAVEAS_SILENT_COPY As Long = 3             ' swSaveAsOptions_Silent + swSaveAsOptions_Copy
 Private Const THICK_MM As Double = 0.7
 Private Const THIN_MM As Double = 0.35
+' Text sizes in the layout are osifont's (em) sizes, as in the FreeCAD SVG. SolidWorks's note
+' font set to the same height came out about 1.4x larger -- confirmed on a stamped PDF, where
+' a 3.5 mm "drawn by" date ran past its 22 mm cell while the server's osifont stamp of the
+' same text below it fitted -- so every note is set this much smaller to look the same.
+Private Const TEXT_SCALE As Double = 0.7
 
 Private swApp As Object
 Private swModel As Object
@@ -855,6 +860,7 @@ Sub N(ByVal x As Double, ByVal y As Double, ByVal txt As String, ByVal sizeMm As
     End If
     Set ann = nt.GetAnnotation
     Set tf = ann.GetTextFormat(0)
+    sizeMm = sizeMm * TEXT_SCALE
     tf.CharHeight = sizeMm / 1000#
     tf.Bold = bold
     ann.SetTextFormat 0, False, tf
