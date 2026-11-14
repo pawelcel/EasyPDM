@@ -198,21 +198,48 @@ Sub ApplyWidths(ByVal segs As Collection, ByVal widthMm As Double)
 End Sub
 
 ' Deletes everything in the sheet format being edited (lines, notes, the old title block)
-' before the EasyPDM format is drawn. Called only inside EditTemplate, where Select All
-' reaches the format's own entities and not the drawing views.
+' before the EasyPDM format is drawn. Extension.SelectAll selects nothing while the format
+' is being edited (seen on SolidWorks 2024), so the entities are collected from the sheet's
+' own view instead: while editing the format, its sketch is the format sketch, and its notes
+' are the format's notes. The drawing's model views are separate views and are not touched.
 Sub ClearSheetFormat()
-    Dim n As Long
+    Dim sheetView As Object, sk As Object, segs As Variant, notes As Variant, i As Long, n As Long
     On Error Resume Next
     swModel.ClearSelection2 True
-    swModel.Extension.SelectAll
-    n = swModel.SelectionManager.GetSelectedObjectCount2(-1)
-    LogLine "clearing old sheet format: " & n & " selected"
+    Set sheetView = swModel.GetFirstView
+    If sheetView Is Nothing Then
+        LogLine "clear: no sheet view"
+        Exit Sub
+    End If
+    Set sk = sheetView.GetSketch
+    If Not sk Is Nothing Then
+        segs = sk.GetSketchSegments
+        If IsArray(segs) Then
+            For i = LBound(segs) To UBound(segs)
+                If segs(i).Select4(True, Nothing) Then n = n + 1
+            Next i
+        End If
+    End If
+    LogLine "clear: " & n & " sketch segments selected"
+    notes = sheetView.GetNotes
+    If IsArray(notes) Then
+        For i = LBound(notes) To UBound(notes)
+            If notes(i).GetAnnotation.Select3(True, Nothing) Then n = n + 1
+        Next i
+        LogLine "clear: " & (UBound(notes) - LBound(notes) + 1) & " notes found"
+    End If
+    LogLine "clear: " & swModel.SelectionManager.GetSelectedObjectCount2(-1) & " selected in total"
     If n > 0 Then swModel.EditDelete
-    n = 0
-    swModel.Extension.SelectAll
-    n = swModel.SelectionManager.GetSelectedObjectCount2(-1)
-    LogLine "left in the sheet format after delete: " & n
     swModel.ClearSelection2 True
+    n = 0
+    Set sk = sheetView.GetSketch
+    If Not sk Is Nothing Then
+        segs = sk.GetSketchSegments
+        If IsArray(segs) Then n = UBound(segs) - LBound(segs) + 1
+    End If
+    notes = sheetView.GetNotes
+    If IsArray(notes) Then n = n + UBound(notes) - LBound(notes) + 1
+    LogLine "clear: left after delete: " & n
     If Err.Number <> 0 Then LogLine "clear error " & Err.Number & ": " & Err.Description
     On Error GoTo 0
 End Sub
@@ -234,7 +261,7 @@ Sub main()
         Case "polish": gLang = "pl"
         Case "german": gLang = "de"
     End Select
-    LogLine "EasyPDMSheetFormat start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
+    LogLine "EasyPDMSheetFormat revision 4 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
 
     Set swModel = swApp.ActiveDoc
     If swModel Is Nothing Then

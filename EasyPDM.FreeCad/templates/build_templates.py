@@ -682,6 +682,10 @@ SW_MACRO = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, o
 
 # Fields SolidWorks fills by itself; everything else links to the drawing's own custom
 # property of the same name ($PRP:"pdm_drawn_by"), which the Upload/Download macros write.
+# Bumped by hand on every change to the SolidWorks macro, and written into the first line of its
+# log -- so a log shows at once whether the latest macro was imported or an older copy ran.
+SW_MACRO_REVISION = 4
+
 _SW_NATIVE_FIELDS = {
     "pdm_scale": '$PRP:""SW-Sheet Scale""',
     "pdm_sheet": '$PRP:""SW-Current Sheet"" / $PRP:""SW-Total Sheets""',
@@ -887,21 +891,48 @@ Sub ApplyWidths(ByVal segs As Collection, ByVal widthMm As Double)
 End Sub
 
 ' Deletes everything in the sheet format being edited (lines, notes, the old title block)
-' before the EasyPDM format is drawn. Called only inside EditTemplate, where Select All
-' reaches the format's own entities and not the drawing views.
+' before the EasyPDM format is drawn. Extension.SelectAll selects nothing while the format
+' is being edited (seen on SolidWorks 2024), so the entities are collected from the sheet's
+' own view instead: while editing the format, its sketch is the format sketch, and its notes
+' are the format's notes. The drawing's model views are separate views and are not touched.
 Sub ClearSheetFormat()
-    Dim n As Long
+    Dim sheetView As Object, sk As Object, segs As Variant, notes As Variant, i As Long, n As Long
     On Error Resume Next
     swModel.ClearSelection2 True
-    swModel.Extension.SelectAll
-    n = swModel.SelectionManager.GetSelectedObjectCount2(-1)
-    LogLine "clearing old sheet format: " & n & " selected"
+    Set sheetView = swModel.GetFirstView
+    If sheetView Is Nothing Then
+        LogLine "clear: no sheet view"
+        Exit Sub
+    End If
+    Set sk = sheetView.GetSketch
+    If Not sk Is Nothing Then
+        segs = sk.GetSketchSegments
+        If IsArray(segs) Then
+            For i = LBound(segs) To UBound(segs)
+                If segs(i).Select4(True, Nothing) Then n = n + 1
+            Next i
+        End If
+    End If
+    LogLine "clear: " & n & " sketch segments selected"
+    notes = sheetView.GetNotes
+    If IsArray(notes) Then
+        For i = LBound(notes) To UBound(notes)
+            If notes(i).GetAnnotation.Select3(True, Nothing) Then n = n + 1
+        Next i
+        LogLine "clear: " & (UBound(notes) - LBound(notes) + 1) & " notes found"
+    End If
+    LogLine "clear: " & swModel.SelectionManager.GetSelectedObjectCount2(-1) & " selected in total"
     If n > 0 Then swModel.EditDelete
-    n = 0
-    swModel.Extension.SelectAll
-    n = swModel.SelectionManager.GetSelectedObjectCount2(-1)
-    LogLine "left in the sheet format after delete: " & n
     swModel.ClearSelection2 True
+    n = 0
+    Set sk = sheetView.GetSketch
+    If Not sk Is Nothing Then
+        segs = sk.GetSketchSegments
+        If IsArray(segs) Then n = UBound(segs) - LBound(segs) + 1
+    End If
+    notes = sheetView.GetNotes
+    If IsArray(notes) Then n = n + UBound(notes) - LBound(notes) + 1
+    LogLine "clear: left after delete: " & n
     If Err.Number <> 0 Then LogLine "clear error " & Err.Number & ": " & Err.Description
     On Error GoTo 0
 End Sub
@@ -923,7 +954,7 @@ Sub main()
         Case "polish": gLang = "pl"
         Case "german": gLang = "de"
     End Select
-    LogLine "EasyPDMSheetFormat start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
+    LogLine "EasyPDMSheetFormat revision {rev} start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
 
     Set swModel = swApp.ActiveDoc
     If swModel Is Nothing Then
@@ -1042,6 +1073,7 @@ def build_solidworks_macro():
     props = "\n".join('    SetProp mgr, "pdm_label_%s", %s' % (k, _vb_str(v[1])) for k, v in SHEET_LABELS.items())
     text = (_SW_HEADER + _SW_BODY.replace("{detect}", "\n".join(detect))
             .replace("{dispatch}", "\n".join(dispatch)).replace("{props}", props)
+            .replace("{rev}", str(SW_MACRO_REVISION))
             + "\n" + "\n\n".join(subs) + "\n")
     text.encode("ascii")  # VBA import breaks on anything else
     return text.replace("\r\n", "\n").replace("\n", "\r\n")
