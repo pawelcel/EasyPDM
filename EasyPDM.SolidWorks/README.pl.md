@@ -341,7 +341,7 @@ jako format arkusza (`.slddrt`) i szablon rysunku (`.drwdot`) w `Dokumenty\EasyP
 
 Pola tabelki to notatki powiązane z właściwościami rysunku (`$PRP:"pdm_drawn_by"`,
 `$PRP:"pdm_label_drawn_by"`, …); skala i numer arkusza korzystają z właściwości arkusza
-SolidWorks. Wypełnianie tych właściwości z EasyPDM w makrach Upload/Download oraz tabele
-obróbek i rewizji to kolejne kroki. Makro generuje `EasyPDM.FreeCad/templates/build_templates.py`
+SolidWorks. Makro Upload wypełnia te właściwości z EasyPDM, zanim zapisze i wyśle rysunek z
+arkuszem EasyPDM (podpisy w głównym języku projektu); tabele obróbek i rewizji to kolejny krok. Makro generuje `EasyPDM.FreeCad/templates/build_templates.py`
 — zmieniaj skrypt, nie `.bas`. Każde uruchomienie zapisuje log w
 `%TEMP%\EasyPDM_sheetformat.log`.

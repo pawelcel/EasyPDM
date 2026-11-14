@@ -2557,6 +2557,126 @@ End Sub
 ' RenameAndUpload(role="drawing"), and optionally the drawing's own PDF export via
 ' UploadPdfAttachment (replacing the item's single "pdf" slot with a real, print-quality
 ' drawing sheet instead of the rendered 3D-view snapshot it might hold today).
+' ============================================================================
+' Drawing title block -- the EasyPDM sheet format (EasyPDMSheetFormat.bas) has notes linked to
+' the drawing's own custom properties ($PRP:"pdm_drawn_by", $PRP:"pdm_label_drawn_by", ...).
+' FillDrawingSheet writes those properties from GET /items/{id}/title-block right before the
+' drawing is saved and sent, so the .SLDDRW and its PDF in EasyPDM carry the current title
+' block: drawn by / approved by with dates (current revision only), name with translations
+' (multilingual projects), drawing number, revision, material, mass, company, and the labels in
+' the project's main language. Scale and sheet number come from SolidWorks itself.
+'
+' Only drawings that use the EasyPDM sheet: a "pdm_sheet_format" property (set by the EasyPDM
+' drawing template) or a sheet format file named EasyPDM_*. Any other drawing is left alone.
+' A failure here is logged and never stops the upload.
+' ============================================================================
+Function IsEasyPdmDrawing(ByVal swModel As Object) As Boolean
+    On Error Resume Next
+    Dim mgr As Object, names As Variant, i As Long
+    Set mgr = swModel.Extension.CustomPropertyManager("")
+    names = mgr.GetNames
+    If IsArray(names) Then
+        For i = LBound(names) To UBound(names)
+            If LCase(CStr(names(i))) = "pdm_sheet_format" Then
+                IsEasyPdmDrawing = True
+                Exit Function
+            End If
+        Next i
+    End If
+    Dim sheet As Object
+    Set sheet = swModel.GetCurrentSheet
+    If Not sheet Is Nothing Then
+        If InStr(1, sheet.GetTemplateName, "EasyPDM_", vbTextCompare) > 0 Then IsEasyPdmDrawing = True
+    End If
+End Function
+
+Function JsonChild(ByVal obj As Object, ByVal key As String) As Object
+    Set JsonChild = Nothing
+    If obj Is Nothing Then Exit Function
+    If Not obj.Exists(key) Then Exit Function
+    If IsObject(obj.Item(key)) Then Set JsonChild = obj.Item(key)
+End Function
+
+Private Sub SetDwgProp(ByVal mgr As Object, ByVal name As String, ByVal value As String)
+    On Error Resume Next
+    mgr.Add3 name, SW_CUSTOM_INFO_TEXT, value, SW_CUSTOM_PROPERTY_REPLACE
+    If Err.Number <> 0 Then LogLine "Title block: property " & name & " failed: " & Err.Description
+End Sub
+
+Private Function LabelOf(ByVal labels As Object, ByVal key As String, ByVal english As String) As String
+    Dim v As String
+    v = JsonGetString(labels, key, "")
+    If v = "" Then v = english
+    LabelOf = UCase(v)
+End Function
+
+Sub FillDrawingSheet(ByVal swModel As Object, ByVal itemId As String)
+    On Error GoTo Failed
+    If Not IsEasyPdmDrawing(swModel) Then
+        LogLine "Title block: not an EasyPDM sheet -- left as it is."
+        Exit Sub
+    End If
+
+    Dim tb As Object
+    Set tb = ApiGet("/items/" & itemId & "/title-block")
+    If tb Is Nothing Then Exit Sub
+
+    Dim mgr As Object, labels As Object, who As Object, company As Object
+    Set mgr = swModel.Extension.CustomPropertyManager("")
+    Set labels = JsonChild(tb, "labels")
+
+    SetDwgProp mgr, "pdm_label_drawn_by", LabelOf(labels, "drawnBy", "Drawn by")
+    SetDwgProp mgr, "pdm_label_drawn_date", LabelOf(labels, "date", "Date")
+    SetDwgProp mgr, "pdm_label_approved_by", LabelOf(labels, "approvedBy", "Approved by")
+    SetDwgProp mgr, "pdm_label_approved_date", LabelOf(labels, "date", "Date")
+    SetDwgProp mgr, "pdm_label_material", LabelOf(labels, "material", "Material")
+    SetDwgProp mgr, "pdm_label_scale", LabelOf(labels, "scale", "Scale")
+    SetDwgProp mgr, "pdm_label_sheet", LabelOf(labels, "sheet", "Sheet")
+    SetDwgProp mgr, "pdm_label_mass", LabelOf(labels, "mass", "Mass")
+    SetDwgProp mgr, "pdm_label_company", LabelOf(labels, "company", "Company")
+    SetDwgProp mgr, "pdm_label_name", LabelOf(labels, "name", "Name")
+    SetDwgProp mgr, "pdm_label_drawing_number", LabelOf(labels, "drawingNumber", "Drawing number")
+    SetDwgProp mgr, "pdm_label_revision", LabelOf(labels, "revision", "Revision")
+    SetDwgProp mgr, "pdm_label_format", LabelOf(labels, "format", "Format")
+
+    ' Dates come as ISO timestamps; the first ten characters are the date.
+    Set who = JsonChild(tb, "drawnBy")
+    SetDwgProp mgr, "pdm_drawn_by", JsonGetString(who, "name", "")
+    SetDwgProp mgr, "pdm_drawn_date", Left(JsonGetString(who, "at", ""), 10)
+    Set who = JsonChild(tb, "approvedBy")
+    SetDwgProp mgr, "pdm_approved_by", JsonGetString(who, "name", "")
+    SetDwgProp mgr, "pdm_approved_date", Left(JsonGetString(who, "at", ""), 10)
+
+    SetDwgProp mgr, "pdm_material", JsonGetString(tb, "material", "")
+    Dim mass As String
+    mass = JsonGetString(tb, "mass", "")
+    If mass <> "" Then mass = mass & " kg"
+    SetDwgProp mgr, "pdm_mass", mass
+    Set company = JsonChild(tb, "company")
+    SetDwgProp mgr, "pdm_company", JsonGetString(company, "name", "")
+    SetDwgProp mgr, "pdm_name", JsonGetString(tb, "name", "")
+    SetDwgProp mgr, "pdm_drawing_number", JsonGetString(tb, "drawingNumber", "")
+    SetDwgProp mgr, "pdm_revision", JsonGetString(tb, "revisionLabel", "")
+
+    ' "EN: Cube - DE: Wuerfel" joined with a middle dot (ChrW, the source stays ASCII).
+    Dim translations As Object, tr As Object, joined As String
+    Set translations = JsonChild(tb, "nameTranslations")
+    If Not translations Is Nothing Then
+        For Each tr In translations
+            If joined <> "" Then joined = joined & " " & ChrW(183) & " "
+            joined = joined & JsonGetString(tr, "languageCode", "") & ": " & JsonGetString(tr, "name", "")
+        Next tr
+    End If
+    SetDwgProp mgr, "pdm_name_translations", joined
+
+    swModel.ForceRebuild3 False
+    LogLine "Title block: filled from EasyPDM for item " & itemId & "."
+    Exit Sub
+
+Failed:
+    LogLine "Title block: could not fill it (" & Err.Number & "): " & Err.Description
+End Sub
+
 Sub UploadDrawingToItem(ByVal swModel As Object, ByVal filePath As String, ByVal item As Object, ByVal exportPdf As Boolean)
     Dim itemNumber As Long
     itemNumber = JsonGetLong(item, "itemNumber", 0)
@@ -2575,6 +2695,9 @@ Sub UploadDrawingToItem(ByVal swModel As Object, ByVal filePath As String, ByVal
     revision = JsonGetLong(item, "revisionNumber", 1)
 
     LogLine "Drawing upload: matched item #" & itemNumber & " (" & name & "), uploading as role=drawing."
+
+    ' The title block first, so the saved .SLDDRW and its PDF carry it.
+    FillDrawingSheet swModel, itemId
 
     On Error GoTo Failed
     Dim uploadOk As Boolean

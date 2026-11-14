@@ -384,8 +384,9 @@ Vorlagen — auf das aktuelle Blatt einer leeren Zeichnung und speichert es als 
 
 Die Schriftfeldfelder sind Notizen, die mit den benutzerdefinierten Eigenschaften der
 Zeichnung verknüpft sind (`$PRP:"pdm_drawn_by"`, `$PRP:"pdm_label_drawn_by"`, …); Maßstab und
-Blattnummer nutzen die eigenen Blatteigenschaften von SolidWorks. Das Ausfüllen dieser
-Eigenschaften aus EasyPDM in den Upload-/Download-Makros sowie die Bearbeitungs- und
-Revisionstabellen folgen. Das Makro wird von `EasyPDM.FreeCad/templates/build_templates.py`
+Blattnummer nutzen die eigenen Blatteigenschaften von SolidWorks. Das Upload-Makro füllt diese
+Eigenschaften aus EasyPDM, bevor es eine Zeichnung mit dem EasyPDM-Blatt speichert und sendet
+(Beschriftungen in der Hauptsprache des Projekts); die Bearbeitungs- und Revisionstabellen
+folgen. Das Makro wird von `EasyPDM.FreeCad/templates/build_templates.py`
 erzeugt — ändern Sie das Skript, nicht die `.bas`. Jeder Lauf schreibt ein Protokoll nach
 `%TEMP%\EasyPDM_sheetformat.log`.
