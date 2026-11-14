@@ -730,22 +730,24 @@ npm run dev      # http://localhost:5173
 Do wdrożenia: `npm run build` w `EasyPDM.Web/` nadpisuje `EasyPDM.Api/wwwroot/` —
 `dotnet run` serwuje wynik pod `http://localhost:5000` bez dodatkowej konfiguracji.
 
-### Limity przesyłanych plików (opcjonalne)
+### Dozwolone typy plików (opcjonalnie)
 
-Domyślnie serwer przyjmuje pliki każdego typu i rozmiaru. Dwa ustawienia (w
-`appsettings.Local.json` albo jako zmienne środowiskowe `Uploads__AllowedExtensions` i
-`Uploads__MaxFileSizeMb`) włączają limity dla każdego endpointu, który zapisuje plik —
-elementów, załączników elementów i projektów, plików klientów i dowodów weryfikacji klienta:
+Domyślnie serwer przyjmuje każdy typ i rozmiar pliku. Ustawienia → Magazyn plików → **Dozwolone
+typy plików** (administratorzy) włącza limity dla każdego endpointu, który zapisuje plik —
+elementów, załączników elementów i projektów, plików klienta i dowodów weryfikacji klienta:
 
-- `Uploads:AllowedExtensions` — lista rozdzielona przecinkami, np. `.sldprt,.sldasm,.step,.pdf`
-  (wielkość liter bez znaczenia, kropka opcjonalna). Każdy inny typ oraz plik bez rozszerzenia
-  są odrzucane z kodem 415.
-- `Uploads:MaxFileSizeMb` — największy pojedynczy plik w MB; większy jest odrzucany z kodem 413.
-  Ciało żądania ponad limit (plus 16 MB na resztę formularza) jest odrzucane przed odczytem,
-  więc za duży plik nie trafia najpierw do pliku tymczasowego.
+- Gdy na liście jest choć jedno rozszerzenie, przyjmowane są tylko te typy; każdy inny typ
+  i plik bez rozszerzenia jest odrzucany z kodem 415.
+- Każde rozszerzenie ma własny limit w MB (puste = bez limitu); większy plik jest odrzucany
+  z kodem 413. Ciało żądania większe niż największy limit z listy (plus 16 MB na formularz)
+  jest odrzucane przed odczytem, więc za duży plik nie trafia najpierw do pliku tymczasowego.
+  Jeśli któryś typ nie ma limitu, ciało żądania też go nie ma.
+- „Dodaj typy używane przez makra CAD” dopisuje rozszerzenia wysyłane przez makra (pliki modeli
+  i rysunków, STEP, PDF, obraz podglądu), żeby lista nie odcięła makr przez przypadek.
 
-Odtwarzanie kopii zapasowej jest wyłączone z obu limitów: tylko dla administratora i zawiera
-cały magazyn plików.
+Reguły są w tabeli `upload_rules` (migracja 079), za `GET`/`PUT /api/settings/upload-rules`.
+Odtwarzanie kopii zapasowej jest wyłączone z limitów: tylko dla administratora i zawiera cały
+magazyn plików.
 
 ### Docker (zalecane do wdrożenia serwerowego)
 

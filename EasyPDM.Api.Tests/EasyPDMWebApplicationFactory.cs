@@ -25,7 +25,7 @@ public sealed class EasyPDMWebApplicationFactory : WebApplicationFactory<Program
     public string BackupRoot { get; } = Path.Combine(Path.GetTempPath(), "easypdm-tests-backups-" + Guid.NewGuid().ToString("N"));
     public string LogRoot { get; } = Path.Combine(Path.GetTempPath(), "easypdm-tests-logs-" + Guid.NewGuid().ToString("N"));
 
-    // Dodatkowe ustawienia dla jednego testu (np. mały Uploads:MaxFileSizeMb), ponad powyższe.
+    // Dodatkowe ustawienia dla jednego testu, ponad powyższe.
     public Dictionary<string, string?> ExtraSettings { get; init; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

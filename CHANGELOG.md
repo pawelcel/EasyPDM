@@ -5,7 +5,7 @@ All notable changes to EasyPDM are documented in this file.
 ## [Unreleased]
 
 ### Added
-- **Optional limits on uploaded file types and sizes.** `Uploads:AllowedExtensions` (a comma-separated list) and `Uploads:MaxFileSizeMb` let an administrator refuse other file types (415) and files over a size (413) on every endpoint that stores a file: items, item and project attachments, client files and client-check evidence. A request body over the size limit is refused before it is read, so an oversized upload is never written to a temporary file first. Both are off unless set, so existing installations behave as before; the backup restore is exempt.
+- **Allowed file types, each with its own size limit.** Settings → File storage → Allowed file types lets an administrator list the extensions the server accepts, each with a limit in MB or none; with an empty list every file is accepted as before. Any other type is refused, and so is a file over its type's limit, in every place that stores a file — CAD macro uploads, attachments, project and client documents — and an oversized upload is stopped before it is written to disk. A button adds the types the CAD macros send, and the page warns when one of them is missing. The backup restore is not limited.
 
 ### Fixed
 - **The start-up migration lock is released by hand.** `pg_advisory_lock` belongs to the database session, and a pooled connection keeps its session when it is closed: Npgsql resets it only when that connection is next rented. The lock therefore stayed held on an idle pooled connection, and the next start in the same process (or a second instance beside a running one) waited on it until the command timeout and failed.

@@ -771,3 +771,16 @@ export interface CadRequest {
   component?: boolean
   taken: boolean
 }
+
+// Dozwolony typ przesyłanego pliku (Ustawienia -> Magazyn plików): rozszerzenie z kropką, małymi
+// literami, i limit w MB (null = bez limitu). Pusta lista = każdy typ.
+export interface UploadRule {
+  extension: string
+  maxSizeMb: number | null
+}
+
+export interface UploadRulesInfo {
+  rules: UploadRule[]
+  // Rozszerzenia wysyłane przez makra CAD -- podpowiedź, żeby lista nie odcięła makr.
+  cadMacroExtensions: string[]
+}

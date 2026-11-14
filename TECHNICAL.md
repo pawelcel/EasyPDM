@@ -965,21 +965,24 @@ npm run dev      # http://localhost:5173
 For deployment: `npm run build` in `EasyPDM.Web/` overwrites `EasyPDM.Api/wwwroot/` —
 `dotnet run` serves the result at `http://localhost:5000` with no extra configuration.
 
-### Upload limits (optional)
+### Allowed file types (optional)
 
-By default the server accepts every file type and size. Two settings (in
-`appsettings.Local.json`, or as environment variables `Uploads__AllowedExtensions` and
-`Uploads__MaxFileSizeMb`) turn limits on for every endpoint that stores a file — items,
+By default the server accepts every file type and size. Settings → File storage → **Allowed
+file types** (administrators) turns limits on for every endpoint that stores a file — items,
 item and project attachments, client files and client-check evidence:
 
-- `Uploads:AllowedExtensions` — comma-separated list such as `.sldprt,.sldasm,.step,.pdf`
-  (case does not matter, the dot is optional). Any other type, and a file with no
-  extension, is refused with 415.
-- `Uploads:MaxFileSizeMb` — largest single file in MB; a larger file is refused with 413.
-  A request body over the limit (plus 16 MB for the form around it) is refused before it is
-  read, so an oversized upload is never written to a temporary file first.
+- Once the list holds at least one extension, only those types are accepted; any other type,
+  and a file with no extension, is refused with 415.
+- Each extension has its own size limit in MB (empty = no limit); a larger file is refused
+  with 413. A request body over the largest limit on the list (plus 16 MB for the form around
+  it) is refused before it is read, so an oversized upload is never written to a temporary
+  file first. If any type has no limit, the request body has none either.
+- "Add the types the CAD macros use" adds the extensions the macros send (model and drawing
+  files, STEP, PDF, the preview image), so a list cannot cut the macros off by accident.
 
-The backup restore is exempt from both: it is admin-only and holds the whole file store.
+The rules live in the `upload_rules` table (migration 079), behind `GET`/`PUT
+/api/settings/upload-rules`. The backup restore is exempt: it is admin-only and holds the
+whole file store.
 
 ### Docker (recommended for server deployment)
 

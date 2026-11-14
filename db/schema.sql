@@ -649,6 +649,17 @@ CREATE TABLE saved_filters (
 GRANT SELECT, INSERT, UPDATE, DELETE ON saved_filters TO CURRENT_USER;
 
 -- ============================================================
+-- Dozwolone typy przesyłanych plików (Ustawienia -> Magazyn plików, zob. UploadPolicy.cs i
+-- migracja 079). Pusta tabela = każdy typ i rozmiar; max_size_mb NULL = bez limitu.
+-- ============================================================
+CREATE TABLE upload_rules (
+    extension    TEXT PRIMARY KEY CHECK (extension ~ '^\.[a-z0-9][a-z0-9_-]{0,15}$'),
+    max_size_mb  INTEGER CHECK (max_size_mb IS NULL OR max_size_mb > 0)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON upload_rules TO CURRENT_USER;
+
+-- ============================================================
 -- Śledzenie zastosowanych migracji — od tej wersji EasyPDM.Api sam sprawdza tę tabelę
 -- przy starcie i automatycznie stosuje nowe pliki z db/migrations/ (zob. MigrationRunner.cs).
 -- Świeża instalacja (ten plik) jest już na bieżąco ze wszystkimi migracjami poniżej, więc

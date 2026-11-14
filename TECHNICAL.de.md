@@ -798,22 +798,26 @@ Für die Bereitstellung: `npm run build` in `EasyPDM.Web/` überschreibt
 `EasyPDM.Api/wwwroot/` — `dotnet run` liefert das Ergebnis unter
 `http://localhost:5000` ohne zusätzliche Konfiguration aus.
 
-### Upload-Grenzen (optional)
+### Erlaubte Dateitypen (optional)
 
-Standardmäßig nimmt der Server Dateien jedes Typs und jeder Größe an. Zwei Einstellungen (in
-`appsettings.Local.json` oder als Umgebungsvariablen `Uploads__AllowedExtensions` und
-`Uploads__MaxFileSizeMb`) schalten Grenzen für jeden Endpunkt ein, der eine Datei speichert —
-Elemente, Anhänge von Elementen und Projekten, Kundendateien und Nachweise der Kundenprüfung:
+Standardmäßig nimmt der Server jeden Dateityp und jede Größe an. Einstellungen → Dateispeicher →
+**Erlaubte Dateitypen** (Administratoren) schaltet Grenzen für jeden Endpunkt ein, der eine Datei
+speichert — Elemente, Element- und Projektanhänge, Kundendateien und Nachweise der
+Kundenprüfung:
 
-- `Uploads:AllowedExtensions` — durch Kommas getrennte Liste, z. B. `.sldprt,.sldasm,.step,.pdf`
-  (Groß-/Kleinschreibung egal, Punkt optional). Jeder andere Typ und eine Datei ohne Endung
-  werden mit 415 abgelehnt.
-- `Uploads:MaxFileSizeMb` — größte einzelne Datei in MB; eine größere wird mit 413 abgelehnt.
-  Ein Anfragekörper über der Grenze (plus 16 MB für das umgebende Formular) wird vor dem Lesen
-  abgelehnt, sodass eine zu große Datei nie zuerst in eine temporäre Datei geschrieben wird.
+- Sobald die Liste mindestens eine Erweiterung enthält, werden nur diese Typen angenommen; jeder
+  andere Typ und eine Datei ohne Erweiterung wird mit 415 abgelehnt.
+- Jede Erweiterung hat eine eigene Größengrenze in MB (leer = keine Grenze); eine größere Datei
+  wird mit 413 abgelehnt. Ein Request-Body über der größten Grenze der Liste (plus 16 MB für das
+  Formular) wird vor dem Lesen abgelehnt, sodass eine zu große Datei nie erst in eine temporäre
+  Datei geschrieben wird. Hat ein Typ keine Grenze, hat auch der Request-Body keine.
+- „Von den CAD-Makros genutzte Typen hinzufügen“ ergänzt die Erweiterungen, die die Makros
+  senden (Modell- und Zeichnungsdateien, STEP, PDF, Vorschaubild), damit die Liste die Makros
+  nicht versehentlich aussperrt.
 
-Die Wiederherstellung einer Sicherung ist von beiden ausgenommen: nur für Administratoren und
-sie enthält den gesamten Dateispeicher.
+Die Regeln liegen in der Tabelle `upload_rules` (Migration 079), hinter `GET`/`PUT
+/api/settings/upload-rules`. Die Wiederherstellung einer Sicherung ist ausgenommen: nur für
+Administratoren und enthält den ganzen Dateispeicher.
 
 ### Docker (empfohlen für die Server-Bereitstellung)
 
