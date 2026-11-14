@@ -797,6 +797,35 @@ Für die Bereitstellung: `npm run build` in `EasyPDM.Web/` überschreibt
 `EasyPDM.Api/wwwroot/` — `dotnet run` liefert das Ergebnis unter
 `http://localhost:5000` ohne zusätzliche Konfiguration aus.
 
+### Single Sign-on (optional)
+
+EasyPDM kann Benutzer über einen OpenID-Connect-Anbieter anmelden (Keycloak, Microsoft Entra ID,
+Authentik, Google Workspace und andere), neben der Anmeldung mit Passwort. Es ist aus, bis
+`Oidc:Authority` gesetzt ist. EasyPDM wird beim Anbieter als vertraulicher Client mit dem
+Authorization-Code-Flow und der Redirect-URI `https://<ihr-server>/api/auth/oidc/callback`
+registriert.
+
+| Einstellung | Bedeutung |
+|---|---|
+| `Oidc:Authority` | Aussteller-URL, z. B. `https://sso.example.com/realms/main` |
+| `Oidc:ClientId`, `Oidc:ClientSecret` | der beim Anbieter registrierte Client |
+| `Oidc:RolesClaim` | Claim mit den Rollen des Benutzers (Standard `roles`) |
+| `Oidc:RequiredRoles` | durch Kommas getrennte Rollen, von denen jede Zugang gibt; ohne sie meldet sich niemand per Single Sign-on an |
+| `Oidc:AllowAllUsers` | `true` lässt jeden Benutzer des Anbieters ohne Rolle herein (bei einem öffentlichen Anbieter wie Google-Konten: jeden) |
+| `Oidc:AdminRoles` | Rollen, die den Benutzer zum EasyPDM-Administrator machen (Standard keine) |
+| `Oidc:LocalOnlyUsers` | Benutzernamen, als die Single Sign-on nie anmeldet (Standard `admin`, das lokale Notfallkonto) |
+| `Oidc:AutoRedirect` | `true` schickt einen neuen Besuch direkt zum Anbieter (Standard `false`: eine Schaltfläche über dem Passwortformular) |
+
+Bei der ersten Anmeldung wird der Benutzer aus `preferred_username`, `name`, `given_name`,
+`family_name` und `email` des Anbieters angelegt, mit einem Passwort, das niemand kennt; bei jeder
+Anmeldung bestimmen die Rollen des Anbieters die EasyPDM-Rolle, und wen der Anbieter nicht mehr
+hereinlässt, verliert beim nächsten Versuch seine Sitzungen und Makro-Tokens. Benutzer sind an Aussteller und
+Kennung beim Anbieter gebunden (`users.oidc_subject`), sodass ein umbenanntes Konto beim Anbieter
+derselbe Benutzer bleibt. Ein lokales Konto mit demselben Benutzernamen wird nie übernommen: diese
+Anmeldung wird abgelehnt, und ein Administrator benennt das lokale Konto um oder verknüpft es,
+indem er dessen `oidc_subject` setzt. Mit `Oidc:AutoRedirect` zeigt `/?local=1` weiterhin das
+Passwortformular.
+
 ### Docker (empfohlen für die Server-Bereitstellung)
 
 **Am einfachsten**: `./install-easypdm-docker.sh` — legt `.env` an (generiert ein

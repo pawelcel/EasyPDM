@@ -964,6 +964,33 @@ npm run dev      # http://localhost:5173
 For deployment: `npm run build` in `EasyPDM.Web/` overwrites `EasyPDM.Api/wwwroot/` —
 `dotnet run` serves the result at `http://localhost:5000` with no extra configuration.
 
+### Single sign-on (optional)
+
+EasyPDM can sign users in through an OpenID Connect provider (Keycloak, Microsoft Entra ID,
+Authentik, Google Workspace and others), next to the password login. It is off until
+`Oidc:Authority` is set. Register EasyPDM at the provider as a confidential client using the
+authorization code flow, with the redirect URI `https://<your-server>/api/auth/oidc/callback`.
+
+| Setting | Meaning |
+|---|---|
+| `Oidc:Authority` | issuer URL, e.g. `https://sso.example.com/realms/main` |
+| `Oidc:ClientId`, `Oidc:ClientSecret` | the client registered at the provider |
+| `Oidc:RolesClaim` | claim that lists the user's roles (default `roles`) |
+| `Oidc:RequiredRoles` | comma-separated roles, any one of which lets a user in; without it nobody signs in through single sign-on |
+| `Oidc:AllowAllUsers` | `true` lets every user of the provider in without a role (with a public provider such as Google accounts, that is anyone) |
+| `Oidc:AdminRoles` | roles that make the user an EasyPDM administrator (default none) |
+| `Oidc:LocalOnlyUsers` | usernames single sign-on never signs in as (default `admin`, the local break-glass account) |
+| `Oidc:AutoRedirect` | `true` sends a fresh visit straight to the provider (default `false`: a button above the password form) |
+
+On first sign-in a user is created from the provider's `preferred_username`, `name`,
+`given_name`, `family_name` and `email`, with a password nobody knows; at every sign-in the
+provider's roles set the EasyPDM role, and a user the provider no longer lets in loses their
+sessions and macro tokens at their next attempt. Users are bound to the provider's issuer and subject
+(`users.oidc_subject`), so a renamed account at the provider stays the same user. A local
+account with the same username is never taken over: that sign-in is refused, and an
+administrator renames the local account or links it by setting its `oidc_subject`. With
+`Oidc:AutoRedirect`, `/?local=1` still shows the password form.
+
 ### Docker (recommended for server deployment)
 
 **Simplest**: `./install-easypdm-docker.sh` — creates `.env` (generates a random

@@ -729,6 +729,33 @@ npm run dev      # http://localhost:5173
 Do wdrożenia: `npm run build` w `EasyPDM.Web/` nadpisuje `EasyPDM.Api/wwwroot/` —
 `dotnet run` serwuje wynik pod `http://localhost:5000` bez dodatkowej konfiguracji.
 
+### Logowanie jednokrotne (opcjonalne)
+
+EasyPDM może logować użytkowników przez dostawcę OpenID Connect (Keycloak, Microsoft Entra ID,
+Authentik, Google Workspace i inne), obok logowania hasłem. Jest wyłączone, dopóki nie ustawiono
+`Oidc:Authority`. EasyPDM rejestruje się u dostawcy jako klient poufny z przepływem authorization
+code i adresem powrotu `https://<twój-serwer>/api/auth/oidc/callback`.
+
+| Ustawienie | Znaczenie |
+|---|---|
+| `Oidc:Authority` | adres wystawcy, np. `https://sso.example.com/realms/main` |
+| `Oidc:ClientId`, `Oidc:ClientSecret` | klient zarejestrowany u dostawcy |
+| `Oidc:RolesClaim` | claim z listą ról użytkownika (domyślnie `roles`) |
+| `Oidc:RequiredRoles` | role rozdzielone przecinkami, z których dowolna wpuszcza; bez nich nikt nie wejdzie przez SSO |
+| `Oidc:AllowAllUsers` | `true` wpuszcza każdego użytkownika dostawcy bez roli (przy dostawcy publicznym, np. kontach Google, to każdy) |
+| `Oidc:AdminRoles` | role dające rolę administratora EasyPDM (domyślnie żadna) |
+| `Oidc:LocalOnlyUsers` | loginy, na które SSO nigdy nie loguje (domyślnie `admin`, lokalne konto awaryjne) |
+| `Oidc:AutoRedirect` | `true` od razu przekierowuje świeżą wizytę do dostawcy (domyślnie `false`: przycisk nad formularzem hasła) |
+
+Przy pierwszym logowaniu użytkownik jest zakładany z `preferred_username`, `name`, `given_name`,
+`family_name` i `email` od dostawcy, z hasłem, którego nikt nie zna; przy każdym logowaniu role
+od dostawcy ustalają rolę w EasyPDM, a osoba, której dostawca już nie wpuszcza, przy kolejnej
+próbie traci sesje i tokeny makr. Użytkownik jest wiązany z wystawcą i identyfikatorem u
+dostawcy (`users.oidc_subject`), więc zmiana loginu u dostawcy nie tworzy nowego konta. Lokalne
+konto o tym samym loginie nigdy nie zostaje przejęte: takie logowanie jest odrzucane, a
+administrator zmienia login lokalnego konta albo łączy je, ustawiając mu `oidc_subject`. Przy
+`Oidc:AutoRedirect` adres `/?local=1` nadal pokazuje formularz hasła.
+
 ### Docker (zalecane do wdrożenia serwerowego)
 
 **Najprościej**: `./install-easypdm-docker.sh` — zakłada `.env` (generuje losowe hasło do

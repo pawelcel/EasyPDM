@@ -126,8 +126,19 @@ static class AuthEndpoints
         return (user, null);
     }
 
+    // Ciasteczko sesji przeglądarki — logowanie hasłem i logowanie jednokrotne (OidcSignIn).
+    internal static void AppendSessionCookie(HttpContext ctx, string token, DateTime expiresAt) =>
+        ctx.Response.Cookies.Append(CookieName, token, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = ctx.Request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            Expires = expiresAt,
+            Path = "/",
+        });
+
     // Nowa sesja przeglądarki dla użytkownika (logowanie i most z makra do przeglądarki).
-    private static async Task<(string Token, DateTime ExpiresAt)> CreateSessionAsync(NpgsqlConnection conn, Guid userId)
+    internal static async Task<(string Token, DateTime ExpiresAt)> CreateSessionAsync(NpgsqlConnection conn, Guid userId)
     {
         var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var expiresAt = DateTime.UtcNow.Add(SessionLifetime);
@@ -188,15 +199,7 @@ static class AuthEndpoints
             var user = verified;
 
             var (token, expiresAt) = await CreateSessionAsync(conn, user.Id);
-
-            ctx.Response.Cookies.Append(CookieName, token, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = ctx.Request.IsHttps,
-                SameSite = SameSiteMode.Lax,
-                Expires = expiresAt,
-                Path = "/",
-            });
+            AppendSessionCookie(ctx, token, expiresAt);
 
             // sessionToken w treści odpowiedzi (obok ciasteczka) — makro SolidWorks (VBA,
             // MSXML2.XMLHTTP.6.0) nie ma pewnego dostępu do nagłówka Set-Cookie przy
@@ -459,9 +462,13 @@ static class AuthEndpoints
     // przeglądarki traktują wsteczny ukośnik jak "/", czyniąc go protocol-relative) oraz
     // wszystko z ":" w pierwszym segmencie (np. "/javascript:..."). Nieprawidłowa wartość
     // -> fail closed do "/", nie błąd — logowanie ma się udać, tylko bez kontynuacji.
-    private static string SanitizeRedirect(string? redirect)
+    // Znaki sterujące, spacje i wsteczne ukośniki gdziekolwiek też dają "/": przeglądarki
+    // usuwają z adresu tabulatory i nowe linie, więc "/\t/evil.com" zamieniłoby się w "//evil.com".
+    internal static string SanitizeRedirect(string? redirect)
     {
         if (string.IsNullOrEmpty(redirect) || redirect[0] != '/')
+            return "/";
+        if (redirect.Any(c => char.IsControl(c) || char.IsWhiteSpace(c) || c == '\\'))
             return "/";
         if (redirect.Length > 1 && (redirect[1] == '/' || redirect[1] == '\\'))
             return "/";

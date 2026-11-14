@@ -2,6 +2,14 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Single sign-on with OpenID Connect, next to the password login.** Set `Oidc:Authority`, `Oidc:ClientId` and `Oidc:ClientSecret` and the login page offers "Sign in with single sign-on" through Keycloak, Microsoft Entra ID, Authentik, Google Workspace or any other OpenID Connect provider (authorization code flow with PKCE). Users are created on first sign-in with their first and last name, bound to the provider's issuer and subject, and get the administrator role from the provider's roles at every sign-in (`Oidc:AdminRoles`, none by default). Nobody signs in until `Oidc:RequiredRoles` names the roles that may (or `Oidc:AllowAllUsers` opens it to every user of the provider), and a user the provider no longer lets in loses their sessions and macro tokens at their next attempt. A local account with the same username is never taken over, the local `admin` stays password-only, and `Oidc:AutoRedirect` sends users straight to the provider. Off unless configured; see TECHNICAL.md.
+
+### Security
+- **The return address after sign-in refuses control characters, spaces and backslashes anywhere in it.** Browsers drop tabs and newlines from a URL, so `/<tab>/evil.com` would have become `//evil.com`; such a value now falls back to `/`.
+
 ## [0.8.1]
 
 ### Added
