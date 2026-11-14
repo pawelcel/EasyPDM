@@ -68,9 +68,9 @@ static class AuthEndpoints
     public static async Task RevokeSessionsAsync(NpgsqlConnection conn, Guid userId, string? exceptToken)
     {
         await using var cmd = new NpgsqlCommand(
-            "DELETE FROM sessions WHERE user_id = @userId AND token IS DISTINCT FROM @except;", conn);
+            "DELETE FROM sessions WHERE user_id = @userId AND token_hash IS DISTINCT FROM @except;", conn);
         cmd.Parameters.AddWithValue("userId", userId);
-        cmd.Parameters.Add(new NpgsqlParameter("except", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object?)exceptToken ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("except", NpgsqlTypes.NpgsqlDbType.Text) { Value = exceptToken is null ? DBNull.Value : HashToken(exceptToken) });
         await cmd.ExecuteNonQueryAsync();
         // Tokeny makr też — po zmianie hasła makra logują się nowym (zob. migracja 071).
         await using var macroCmd = new NpgsqlCommand("DELETE FROM macro_tokens WHERE user_id = @userId;", conn);
@@ -138,8 +138,8 @@ static class AuthEndpoints
             await cleanup.ExecuteNonQueryAsync();
 
         await using var cmd = new NpgsqlCommand(
-            "INSERT INTO sessions (token, user_id, expires_at) VALUES (@token, @userId, @expiresAt);", conn);
-        cmd.Parameters.AddWithValue("token", token);
+            "INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (@hash, @userId, @expiresAt);", conn);
+        cmd.Parameters.AddWithValue("hash", HashToken(token));
         cmd.Parameters.AddWithValue("userId", userId);
         cmd.Parameters.AddWithValue("expiresAt", expiresAt);
         await cmd.ExecuteNonQueryAsync();
@@ -148,8 +148,9 @@ static class AuthEndpoints
 
     private static readonly TimeSpan MacroTokenLifetime = TimeSpan.FromDays(365);
 
-    // Tokeny makr trzymane są w bazie tylko jako skrót SHA-256 (zob. migracja 071).
-    internal static string HashMacroToken(string token) =>
+    // Tokeny makr i sesji przeglądarki trzymane są w bazie tylko jako skrót SHA-256
+    // (zob. migracje 071 i 073).
+    internal static string HashToken(string token) =>
         Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
 
     // Użytkownik dla tokenu makra (null = nieznany albo wygasły). Znacznik ostatniego użycia
@@ -167,7 +168,7 @@ static class AuthEndpoints
             FROM macro_tokens m JOIN users u ON u.id = m.user_id
             WHERE m.token_hash = @hash AND m.expires_at > now();
             """, conn);
-        cmd.Parameters.AddWithValue("hash", HashMacroToken(token));
+        cmd.Parameters.AddWithValue("hash", HashToken(token));
         await using var reader = await cmd.ExecuteReaderAsync();
         return await reader.ReadAsync()
             ? new CurrentUser(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3))
@@ -243,7 +244,7 @@ static class AuthEndpoints
                 """, conn))
             {
                 cmd.Parameters.AddWithValue("userId", user.Id);
-                cmd.Parameters.AddWithValue("hash", HashMacroToken(token));
+                cmd.Parameters.AddWithValue("hash", HashToken(token));
                 cmd.Parameters.AddWithValue("client", client);
                 cmd.Parameters.AddWithValue("expiresAt", expiresAt);
                 await cmd.ExecuteNonQueryAsync();
@@ -275,12 +276,12 @@ static class AuthEndpoints
             {
                 await using var conn = new NpgsqlConnection(connectionString);
                 await conn.OpenAsync();
-                await using var cmd = new NpgsqlCommand("DELETE FROM sessions WHERE token = @token;", conn);
-                cmd.Parameters.AddWithValue("token", token);
+                await using var cmd = new NpgsqlCommand("DELETE FROM sessions WHERE token_hash = @hash;", conn);
+                cmd.Parameters.AddWithValue("hash", HashToken(token));
                 await cmd.ExecuteNonQueryAsync();
                 // Wylogowanie makra (ten sam endpoint, ten sam nośnik) odwołuje jego token.
                 await using var macroCmd = new NpgsqlCommand("DELETE FROM macro_tokens WHERE token_hash = @hash;", conn);
-                macroCmd.Parameters.AddWithValue("hash", HashMacroToken(token));
+                macroCmd.Parameters.AddWithValue("hash", HashToken(token));
                 await macroCmd.ExecuteNonQueryAsync();
             }
 
@@ -441,10 +442,10 @@ static class AuthEndpoints
             SELECT u.id, u.username, u.display_name, u.role, s.expires_at
             FROM sessions s
             JOIN users u ON u.id = s.user_id
-            WHERE s.token = @token AND s.expires_at > now();
+            WHERE s.token_hash = @hash AND s.expires_at > now();
             """;
         await using var cmd = new NpgsqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("token", token);
+        cmd.Parameters.AddWithValue("hash", HashToken(token));
 
         await using var reader = await cmd.ExecuteReaderAsync();
         if (!await reader.ReadAsync())

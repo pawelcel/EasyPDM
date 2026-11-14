@@ -2,6 +2,11 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [Unreleased]
+
+### Security
+- **Browser sessions are stored as a SHA-256 of their token, like CAD macro tokens.** The `sessions` table held the cookie's token as it is, so anyone who could read the table — a backup copy, read-only database access, a dump — could sign in as every logged-in user. Migration 073 hashes existing sessions in place, so nobody is signed out.
+
 ## [0.8.1]
 
 ### Added
