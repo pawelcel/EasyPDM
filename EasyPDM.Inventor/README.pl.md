@@ -248,6 +248,11 @@ w tej rundzie), oznaczone `UNVERIFIED` wprost w kodzie:
 
 ## Ograniczenia (celowo poza zakresem tej wersji)
 
+- **Brak arkusza EasyPDM.** Arkusz z tabelką wypełnianą z EasyPDM oraz pieczątka „narysował” /
+  „zatwierdził” w PDF rysunku są tylko dla FreeCAD i SolidWorks. Wersja dla Inventora nie jest
+  na razie planowana: nie ma licencji Inventora, na której dałoby się ją napisać i przetestować,
+  a te makra wychodzą dopiero po teście na żywo.
+
 - `EasyPDMDownload.bas`: nie próbuje pobrać KONKRETNEJ starszej rewizji — zawsze celuje w
   bieżącą. Wszystkie pliki (główny + komponenty) lądują płasko w jednym folderze, bez
   odtwarzania struktury BOM jako podfolderów.

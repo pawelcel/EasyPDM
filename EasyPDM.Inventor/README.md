@@ -242,6 +242,11 @@ round), marked `UNVERIFIED` inline in the source:
 
 ## Limitations (deliberately out of scope for this version)
 
+- **No EasyPDM drawing sheet.** The sheet with the title block filled in from EasyPDM, and the
+  "drawn by" / "approved by" stamp in the drawing PDF, exist for FreeCAD and SolidWorks only.
+  An Inventor version is not planned for now: there is no Inventor licence to develop and
+  test it on, and these macros are only released after a live test.
+
 - `EasyPDMDownload.bas`: does not try to download a SPECIFIC older revision — always
   targets the current one. All files (main + components) land flat in one folder,
   without recreating the BOM structure as subfolders.

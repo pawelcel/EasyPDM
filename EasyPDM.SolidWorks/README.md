@@ -331,6 +331,12 @@ which fills it in every time a drawing is sent.
 
 ### `EasyPDMSheetFormat.bas` — creating the sheet format (once)
 
+**Without the macro:** every release from 0.8.2 carries the finished files —
+`EasyPDM_A3/A2/A1_Landscape.slddrt` (sheet format) and `.drwdot` (drawing template). Put them
+in any folder, add it under Tools → Options → File Locations (Sheet Formats and Document
+Templates) and start drawings from the template; step 3 below is the same. The macro is for
+building them yourself, e.g. after changing `build_templates.py`.
+
 It draws the EasyPDM sheet format — the same frame, ISO 5457 grid references and title block
 as the FreeCAD templates — on the current sheet of a drawing and saves it as a sheet format
 (`.slddrt`) and a drawing template (`.drwdot`) in `Documents\EasyPDM\SolidWorks`.

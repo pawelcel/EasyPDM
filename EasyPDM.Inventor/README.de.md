@@ -263,6 +263,11 @@ in dieser Runde), im Quellcode direkt mit `UNVERIFIED` markiert:
 
 ## Einschränkungen (bewusst außerhalb des Umfangs dieser Version)
 
+- **Kein EasyPDM-Zeichnungsblatt.** Das Blatt mit dem aus EasyPDM gefüllten Schriftfeld und der
+  Stempel „gezeichnet“ / „freigegeben“ im Zeichnungs-PDF gibt es nur für FreeCAD und SolidWorks.
+  Eine Inventor-Version ist vorerst nicht geplant: Es gibt keine Inventor-Lizenz, auf der sie
+  entwickelt und getestet werden könnte, und diese Makros erscheinen erst nach einem Live-Test.
+
 - `EasyPDMDownload.bas`: versucht nicht, eine BESTIMMTE ältere Revision
   herunterzuladen — zielt immer auf die aktuelle. Alle Dateien (Haupt- + Komponenten)
   landen flach in einem Ordner, ohne die Stücklistenstruktur als Unterordner
