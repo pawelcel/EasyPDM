@@ -91,7 +91,7 @@ sealed class Options
     {
         var o = new Options();
         for (var i = 0; i < args.Length; i++)
-            if (args[i] is "--no-browser" or "--password" or "--off")
+            if (args[i] is "--no-browser" or "--password" or "--off" or "--background")
                 o.Values[args[i][2..]] = "1";
             else if (args[i].StartsWith("--") && i + 1 < args.Length)
                 o.Values[args[i][2..]] = args[++i];
@@ -285,7 +285,12 @@ static class Commands
     {
         var outbox = o["outbox"] ?? Outbox.DefaultPath();
         Directory.CreateDirectory(outbox);
-        var uploader = new Uploader(Api.FromConfig, new SolidCraftCli(o["solidcraft-cli"]), openBrowser: o.Values.ContainsKey("no-browser") is false);
+        var background = o.Values.ContainsKey("background");
+        if (background) Background.Start();
+        var uploader = new Uploader(Api.FromConfig, new SolidCraftCli(o["solidcraft-cli"]), openBrowser: o.Values.ContainsKey("no-browser") is false)
+        {
+            Notify = background ? Background.Notify : null,
+        };
         Console.WriteLine($"EasyPDM companion: outbox {outbox}");
         do
         {
@@ -500,6 +505,10 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
     // Read from the config on each request: a login or logout from the SolidCraft menu changes it
     // while `watch` runs.
     Api api = null!;
+
+    // Running in the background nobody sees the console, so each outcome is also shown as a
+    // desktop notification ("the item is released: add a comment" must reach the person).
+    public Action<bool, string>? Notify { get; init; }
     // One per run of this program, like the macros' runId: an EasyPDM tab this run opened takes
     // the next request itself instead of a new tab opening for every upload.
     readonly string _runId = Guid.NewGuid().ToString("N");
@@ -523,10 +532,12 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
                 _ => throw new CompanionException($"unknown request kind {kind}"),
             };
             Console.WriteLine($"[{id}] {result["message"]}");
+            Notify?.Invoke(true, result["message"]?.ToString() ?? "");
         }
         catch (CompanionException e)
         {
             Console.Error.WriteLine($"[{id}] failed: {e.Message}");
+            Notify?.Invoke(false, e.Message);
             result = new JsonObject { ["ok"] = false, ["message"] = e.Message };
         }
         result["id"] = id;
@@ -784,21 +795,28 @@ static class Setup
     {
         var exe = Environment.ProcessPath ?? throw new CompanionException("cannot tell where this program is");
         var dll = Path.Combine(AppContext.BaseDirectory, "easypdm-companion.dll");
-        var command = Path.GetFileNameWithoutExtension(exe) is "dotnet" ? $"\"{exe}\" \"{dll}\" watch" : $"\"{exe}\" watch";
-        string file;
-        string content;
+        var command = (Path.GetFileNameWithoutExtension(exe) is "dotnet" ? $"\"{exe}\" \"{dll}\" watch" : $"\"{exe}\" watch") + " --background";
         if (OperatingSystem.IsWindows())
         {
-            file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), "EasyPDM companion.cmd");
-            content = $"@echo off\r\nstart \"EasyPDM companion\" /min {command}\r\n";
+            // The per-user Run key starts the program directly, without a .cmd window; in the
+            // background it then lets go of its own console (Background.Start).
+            using var run = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+            if (o.Values.ContainsKey("off"))
+            {
+                run.DeleteValue("EasyPDM companion", false);
+                Console.WriteLine("Autostart removed.");
+            }
+            else
+            {
+                run.SetValue("EasyPDM companion", command);
+                Console.WriteLine("`easypdm-companion watch` starts in the background when you log in.");
+            }
+            return 0;
         }
-        else
-        {
-            var config = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-                ? x : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            file = Path.Combine(config, "autostart", "easypdm-companion.desktop");
-            content = $"[Desktop Entry]\nType=Application\nName=EasyPDM companion\nComment=Uploads and downloads for CAD programs\nExec={command}\nTerminal=false\nX-GNOME-Autostart-enabled=true\n";
-        }
+        var config = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
+            ? x : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+        var file = Path.Combine(config, "autostart", "easypdm-companion.desktop");
+        var content = $"[Desktop Entry]\nType=Application\nName=EasyPDM companion\nComment=Uploads and downloads for CAD programs\nExec={command}\nTerminal=false\nX-GNOME-Autostart-enabled=true\n";
         if (o.Values.ContainsKey("off"))
         {
             if (File.Exists(file)) File.Delete(file);
@@ -807,7 +825,68 @@ static class Setup
         }
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         File.WriteAllText(file, content);
-        Console.WriteLine($"`easypdm-companion watch` starts when you log in ({file}).");
+        Console.WriteLine($"`easypdm-companion watch` starts in the background when you log in ({file}).");
         return 0;
+    }
+}
+
+// `watch --background`: what autostart runs. No console to look at, so output goes to a log
+// file and each outcome to a desktop notification.
+static class Background
+{
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern bool FreeConsole();
+
+    public static string LogPath => OperatingSystem.IsWindows()
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EasyPDM", "companion.log")
+        : Path.Combine(Environment.GetEnvironmentVariable("XDG_STATE_HOME") is { Length: > 0 } x
+            ? x : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "state"), "EasyPDM", "companion.log");
+
+    public static void Start()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
+        // A fresh log each start, so it never grows without bound.
+        var log = new StreamWriter(new FileStream(LogPath, FileMode.Create, FileAccess.Write, FileShare.Read)) { AutoFlush = true };
+        var stamped = TextWriter.Synchronized(new StampedWriter(log));
+        Console.SetOut(stamped);
+        Console.SetError(stamped);
+        if (OperatingSystem.IsWindows()) FreeConsole();
+    }
+
+    public static void Notify(bool ok, string message)
+    {
+        var title = ok ? "EasyPDM" : "EasyPDM: not done";
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                // A balloon from a short-lived tray icon: needs nothing beyond Windows itself.
+                var script = "Add-Type -AssemblyName System.Windows.Forms; $n = New-Object System.Windows.Forms.NotifyIcon; "
+                    + "$n.Icon = [System.Drawing.SystemIcons]::Information; $n.Visible = $true; "
+                    + $"$n.ShowBalloonTip(8000, '{title.Replace("'", "''")}', '{message.Replace("'", "''")}', "
+                    + (ok ? "'Info'" : "'Warning'") + "); Start-Sleep -Seconds 9; $n.Dispose()";
+                var psi = new ProcessStartInfo("powershell", "-NoProfile -WindowStyle Hidden -Command -") { RedirectStandardInput = true, CreateNoWindow = true };
+                using var p = Process.Start(psi);
+                p?.StandardInput.Write(script);
+                p?.StandardInput.Close();
+            }
+            else
+            {
+                var psi = new ProcessStartInfo("notify-send") { UseShellExecute = false };
+                psi.ArgumentList.Add("--app-name=EasyPDM");
+                if (!ok) psi.ArgumentList.Add("--urgency=critical");
+                psi.ArgumentList.Add(title);
+                psi.ArgumentList.Add(message);
+                Process.Start(psi);
+            }
+        }
+        catch { /* no notifier on this desktop: the log still has it */ }
+    }
+
+    sealed class StampedWriter(TextWriter inner) : TextWriter
+    {
+        public override Encoding Encoding => inner.Encoding;
+        public override void Write(char value) => inner.Write(value);
+        public override void WriteLine(string? value) => inner.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {value}");
     }
 }

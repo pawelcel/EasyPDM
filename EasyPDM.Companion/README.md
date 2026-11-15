@@ -7,7 +7,7 @@ whose plugins have no network access.
 ```
 easypdm-companion login --server http://host:port   approve the sign-in in the browser
 easypdm-companion setup-solidcraft --plugin easypdm-solidcraft-plugin.zip
-easypdm-companion autostart                          start `watch` when you log in
+easypdm-companion autostart                          start `watch --background` when you log in
 easypdm-companion watch                              process what the SolidCraft plugin sends
 easypdm-companion status | logout | process | download
 ```
@@ -17,6 +17,10 @@ easypdm-companion status | logout | process | download
   its own macro token (client "EasyPDM companion"), listed and revocable in Settings → Users.
   `--password` signs in with the password instead. The token is kept in
   `~/.config/EasyPDM/companion.json` (`%APPDATA%\EasyPDM` on Windows), readable only by you.
+- **In the background** (`watch --background`, what `autostart` sets up — the per-user Run key on
+  Windows, `~/.config/autostart` on Linux): no console window; the output goes to
+  `%LOCALAPPDATA%\EasyPDM\companion.log` (`~/.local/state/EasyPDM/companion.log`), started afresh
+  each time, and every outcome — uploaded, or why not — appears as a desktop notification.
 - **Outbox**: `Documents/EasyPDM/outbox` (the language-specific Documents folder; the SolidCraft
   Flatpak sees only that folder). Each request is processed once; its files then move to
   `outbox/done` and its outcome is written as `<id>.result.json`.
