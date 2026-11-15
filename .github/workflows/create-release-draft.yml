@@ -71,6 +71,27 @@ jobs:
       # v0.2 (EasyPDM_FreeCad_Upload_v0.2.FCMacro / EasyPDM_FreeCad_Download_v0.2.FCMacro) --
       # tylko kod źródłowy makra, bez README (tak samo jak dotąd). Każdy plik to gotowy,
       # importowalny kod wprost z repo, bez żadnego kroku budowania.
+      # The EasyPDM companion (SolidCraft's network side) as single self-contained programs, and
+      # the SolidCraft plugin package it sets up (see EasyPDM.SolidCraft/README.md).
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+      - name: Build the SolidCraft plugin and the EasyPDM companion
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p artifacts/macros
+          rustup target add wasm32-unknown-unknown
+          curl -sSfL https://github.com/bytecodealliance/wasm-tools/releases/download/v1.263.0/wasm-tools-1.263.0-x86_64-linux.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP"
+          export PATH="$RUNNER_TEMP/wasm-tools-1.263.0-x86_64-linux:$PATH"
+          EasyPDM.SolidCraft/plugin/build.sh
+          for rid in win-x64 linux-x64; do
+            dotnet publish EasyPDM.Companion -c Release -r "$rid" --self-contained true \
+              -p:PublishSingleFile=true -p:DebugType=none -p:Version="$VERSION" -o "companion/$rid"
+            cp EasyPDM.SolidCraft/plugin/easypdm.zip "companion/$rid/easypdm-solidcraft-plugin.zip"
+            cp EasyPDM.Companion/README.md "companion/$rid/"
+            (cd "companion/$rid" && zip -q -r "../../artifacts/macros/EasyPDM_Companion_${rid}_v${VERSION}.zip" .)
+          done
       - name: Przygotuj makra CAD
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
