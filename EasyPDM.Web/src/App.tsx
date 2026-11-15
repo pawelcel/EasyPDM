@@ -55,11 +55,16 @@ const VIEWS: View[] = ["welcome", "projects", "database", "materials", "processe
 // do ekranu powitalnego. Odczytujemy początkowy widok/projekt/sekcję ustawień z query
 // stringa (ścieżka strony się nie zmienia, więc nie trzeba nic ruszać w serwowaniu SPA),
 // a efekt niżej trzyma URL zsynchronizowany przy każdej zmianie.
+// "?item=<id>" opens that item in the whole-database view, the way a notification does -- the
+// link the CAD add-ons use for "Open in browser". Read once at start, so it survives the login
+// screen; the URL sync below then drops it from the address.
 function readUrlState() {
   const params = new URLSearchParams(window.location.search)
   const view = params.get("view")
+  const itemId = params.get("item")
   return {
-    view: VIEWS.includes(view as View) ? (view as View) : "welcome",
+    view: itemId ? ("database" as View) : VIEWS.includes(view as View) ? (view as View) : "welcome",
+    itemId,
     projectId: params.get("projectId") ?? "",
     settingsSection: params.get("section") ?? "users",
   }
@@ -84,7 +89,7 @@ function App() {
   // Cel nawigacji z dzwonka powiadomień do konkretnego elementu w "Cała baza" — ItemList
   // konsumuje to raz (zob. jego własny useEffect) i zgłasza zużycie przez
   // onPendingItemSelectionConsumed, żeby nie zaznaczać tego samego elementu w kółko.
-  const [pendingItemSelection, setPendingItemSelection] = useState<string | null>(null)
+  const [pendingItemSelection, setPendingItemSelection] = useState<string | null>(initialUrlState.itemId)
 
   const { projects, refetch: refetchProjects } = useProjects()
   const { tags: allTags, refetch: refetchTags } = useTags()
