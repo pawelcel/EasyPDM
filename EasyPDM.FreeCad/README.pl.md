@@ -24,9 +24,10 @@ w jednym starcza dla drugiego.
 
 ### Jako dodatek (zalecane, od 0.9)
 
-**Przez Menedżer dodatków FreeCAD:** Przybory → Menedżer dodatków → ⚙ → Własne repozytoria,
-dodaj `https://github.com/pawelcel/EasyPDM-FreeCAD` (gałąź `main`), zainstaluj **EasyPDM** i
-uruchom FreeCAD ponownie; aktualizacje przychodzą tą samą drogą. To repozytorium powstaje z tego
+**Przez Menedżer dodatków FreeCAD:** Edycja → Preferencje → Menedżer dodatków → Własne
+repozytoria, dodaj `https://github.com/pawelcel/EasyPDM-FreeCAD` (gałąź `main`); potem Przybory →
+Menedżer dodatków, zainstaluj **EasyPDM** i uruchom FreeCAD ponownie; aktualizacje przychodzą tą
+samą drogą. To repozytorium powstaje z tego
 folderu przy każdym wydaniu (`build_addon.sh`, workflow `sync-freecad-addon.yml`).
 
 **Ręcznie:** Rozpakuj `EasyPDM_FreeCad_Addon_vX.zip` z wydania do folderu `Mod` FreeCAD (Linux zwykle

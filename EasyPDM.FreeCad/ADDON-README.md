@@ -13,9 +13,11 @@ revisions, statuses, BOM and drawing title blocks filled in from the PDM.
 
 ## Installing
 
-FreeCAD → **Tools → Addon manager** → ⚙ (preferences) → **Custom repositories**: add
-`https://github.com/pawelcel/EasyPDM-FreeCAD` with branch `main`, then install **EasyPDM** from
-the list and restart FreeCAD. Updates arrive the same way.
+1. FreeCAD → **Edit → Preferences → Addon Manager** → **Custom repositories**: add
+   `https://github.com/pawelcel/EasyPDM-FreeCAD` with branch `main`.
+2. **Tools → Addon manager**: install **EasyPDM** from the list and restart FreeCAD.
+
+Updates arrive the same way.
 
 Or unpack this repository into FreeCAD's `Mod` folder as `EasyPDM` (Linux usually
 `~/.local/share/FreeCAD/v1-1/Mod`, Windows `%APPDATA%\FreeCAD\v1-1\Mod`).

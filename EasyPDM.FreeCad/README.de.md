@@ -26,9 +26,10 @@ die Anmeldung bei einem reicht für das andere.
 
 ### Als Add-on (empfohlen, ab 0.9)
 
-**Über den Addon-Manager von FreeCAD:** Werkzeuge → Addon-Manager → ⚙ → Benutzerdefinierte
-Repositories, `https://github.com/pawelcel/EasyPDM-FreeCAD` (Branch `main`) hinzufügen, **EasyPDM**
-installieren und FreeCAD neu starten; Updates kommen auf demselben Weg. Dieses Repository wird bei
+**Über den Addon-Manager von FreeCAD:** Bearbeiten → Einstellungen → Addon-Manager →
+Benutzerdefinierte Repositories, `https://github.com/pawelcel/EasyPDM-FreeCAD` (Branch `main`)
+hinzufügen; dann Werkzeuge → Addon-Manager, **EasyPDM** installieren und FreeCAD neu starten;
+Updates kommen auf demselben Weg. Dieses Repository wird bei
 jedem Release aus diesem Ordner erzeugt (`build_addon.sh`, Workflow `sync-freecad-addon.yml`).
 
 **Von Hand:** `EasyPDM_FreeCad_Addon_vX.zip` aus dem Release in den `Mod`-Ordner von FreeCAD entpacken (Linux

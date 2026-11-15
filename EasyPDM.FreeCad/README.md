@@ -24,9 +24,9 @@ with one is enough for the other.
 
 ### As an add-on (recommended, from 0.9)
 
-**Through FreeCAD's Addon Manager:** Tools → Addon manager → ⚙ → Custom repositories, add
-`https://github.com/pawelcel/EasyPDM-FreeCAD` (branch `main`), install **EasyPDM** and restart
-FreeCAD; updates come the same way. That repository is generated from this folder on every
+**Through FreeCAD's Addon Manager:** Edit → Preferences → Addon Manager → Custom repositories,
+add `https://github.com/pawelcel/EasyPDM-FreeCAD` (branch `main`); then Tools → Addon manager,
+install **EasyPDM** and restart FreeCAD; updates come the same way. That repository is generated from this folder on every
 release (`build_addon.sh`, workflow `sync-freecad-addon.yml`).
 
 **By hand:** Unpack `EasyPDM_FreeCad_Addon_vX.zip` from the release into FreeCAD's `Mod` folder (FreeCAD
