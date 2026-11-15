@@ -8,7 +8,7 @@ Option Explicit
 ' does not reliably handle UTF-8, and Polish diacritics got corrupted (mojibake) both in
 ' the code editor and in dialogs shown to the actual user. Confirmed in practice.
 '
-' This is the COUNTERPART of EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMUpload.FCMacro, not a 1:1 port -- VBA
+' This is the COUNTERPART of EasyPDM-FreeCAD/freecad/EasyPDM/upload.py, not a 1:1 port -- VBA
 ' has no built-in JSON and no dialog windows without separate binary files (UserForm), so:
 '   - JSON: own minimal parser/builder (below), good enough for this specific API's
 '     response shapes -- NOT general purpose.
@@ -38,7 +38,7 @@ Option Explicit
 '     whether to attach the current version as a new revision, then uploads -- exactly
 '     like before. No browser involved: SolidWorks already knows the target with
 '     certainty, a browser round-trip would add nothing.
-'   - Document NOT yet linked: opens the SAME web browser flow as EasyPDMUpload.FCMacro
+'   - Document NOT yet linked: opens the SAME web browser flow as upload.py (FreeCAD)
 '     (already logged in via a one-time login-bridge ticket, see "Logowanie" below) on the
 '     "pending request from a CAD macro" popup -- "New item" / "Duplicate" / "Attach to
 '     existing" all decided THERE, not locally, exactly like the FreeCAD macro. The macro
@@ -75,7 +75,7 @@ Option Explicit
 '     download folder). Components are processed leaves-first (see "Assembly components"
 '     above), so by the time an assembly itself gets saved, its references to any
 '     just-processed component already point at the new path -- avoids the "Link broken"
-'     problem this exact ordering was designed to prevent in EasyPDMUpload.FCMacro.
+'     problem this exact ordering was designed to prevent in upload.py (FreeCAD).
 '
 ' Installation:
 '   SolidWorks -> Tools -> Macro -> New... (create any empty macro project),
@@ -1152,7 +1152,7 @@ End Sub
 ' ============================================================================
 ' Browser ticket flow -- lets the web app (already running, same backend) decide "new item
 ' vs duplicate vs attach to existing" instead of a native dialog, exactly like
-' EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMUpload.FCMacro's submit_via_browser. The macro: generates a GUID
+' EasyPDM-FreeCAD/freecad/EasyPDM/upload.py's submit_via_browser. The macro: generates a GUID
 ' ticket, opens the browser on the login bridge (GET /api/auth/browser-login) with
 ' a deep-link to "?ticket=...", waits (WaitForTicket) while the user resolves it in the
 ' "pending request from a CAD macro" popup, then reads back what happened via
@@ -1637,7 +1637,7 @@ End Function
 Function WaitForTicket(ByVal ticket As String, Optional ByVal endpointPath As String = "/create-tickets/") As Object
     Const TICK_MS As Long = 400
     Const POLL_EVERY_MS As Long = 2000
-    Const TIMEOUT_MS As Long = 600000 ' 10 minutes, same as EasyPDMUpload.FCMacro
+    Const TIMEOUT_MS As Long = 600000 ' 10 minutes, same as upload.py (FreeCAD)
 
     Dim elapsedMs As Long, sincePollMs As Long
     elapsedMs = 0
@@ -3021,7 +3021,7 @@ End Sub
 ' Exports swModel's visible geometry to a temporary .step file and uploads it as an
 ' attachment tagged role="step" (replacing any previous "step" attachment first) -- feeds
 ' the item's 2D/3D preview in the web app, same purpose as _upload_step_attachment in
-' EasyPDMUpload.FCMacro. Deliberately swallows ALL errors (On Error Resume Next for the
+' upload.py (FreeCAD). Deliberately swallows ALL errors (On Error Resume Next for the
 ' whole body): by the time this is called, the real upload (the .FCStd/.SLDPRT/.SLDASM
 ' file itself) has already succeeded, so a failed STEP export (e.g. no visible geometry --
 ' an empty assembly, a pure sketch) must not look like the whole operation failed.
@@ -3388,7 +3388,7 @@ End Function
 ' structure, no equivalent of FreeCAD's "App::Link vs native geometry" distinction needed:
 ' every SolidWorks assembly is inherently built from separate component documents) and
 ' offers to send any component not yet linked to a PDM item, leaves-first, exactly like
-' EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMUpload.FCMacro's discover_component_tree/process_assembly_tree --
+' EasyPDM-FreeCAD/freecad/EasyPDM/upload.py's discover_component_tree/process_assembly_tree --
 ' each new component gets the SAME browser ticket flow as the top-level document (one tab
 ' at a time, never several at once -- see file header and ProcessAssemblyTree below).
 ' Confirmed working on a live SolidWorks 2026 install (late-bound GetComponents/
@@ -4672,7 +4672,7 @@ Function UploadPartOrAssemblyDoc(ByVal swModel As Object, ByVal filePath As Stri
         End If
     Else
         ' Not yet linked -- "new item vs duplicate vs attach to existing" is decided in
-        ' the browser, not locally, exactly like EasyPDMUpload.FCMacro's
+        ' the browser, not locally, exactly like upload.py (FreeCAD)'s
         ' submit_via_browser. See BuildBrowserCreateUrl/WaitForTicket above.
         Dim ticket As String
         ticket = NewGuid()

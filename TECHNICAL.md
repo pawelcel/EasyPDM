@@ -61,10 +61,10 @@ PostgreSQL 18.
   `EASYPDM_TEST_CONNECTION_STRING` variable, same as in CI).
 - **FreeCAD** — lives in its own repository,
   [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9): an EasyPDM
-  workbench whose Upload and Download run two macros (`EasyPDMUpload.FCMacro`: browser-picked
-  item, upload with STEP/PDF/preview, record-name renaming, drawing sheet; `EasyPDMDownload.FCMacro`:
-  the item with its whole component tree, opened), plus Log in (approved in the browser) and Log
-  out. Its `tools/build_templates.py` is the single source of the drawing sheet and also writes
+  workbench with Upload (`upload.py`: browser-picked item, upload with STEP/PDF/preview,
+  record-name renaming, drawing sheet) and Download (`download.py`: the item with its whole
+  component tree, opened), the FreeCAD macros until 0.9, plus Log in (approved in the browser)
+  and Log out. Its `tools/build_templates.py` is the single source of the drawing sheet and also writes
   `EasyPDM.SolidWorks/EasyPDMSheetFormat.bas` here. Live-tested on FreeCAD 1.1.
 - **`EasyPDM.SolidWorks/`** — the SolidWorks counterpart (VBA macros
   `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, plus `EasyPDMSheetFormat.bas` for the drawing

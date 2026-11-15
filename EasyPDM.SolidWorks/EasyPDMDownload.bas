@@ -5,15 +5,15 @@ Option Explicit
 ' EasyPDMDownload -- SolidWorks macro that downloads a Part/Assembly from EasyPDM and
 ' opens it.
 '
-' This is the COUNTERPART of EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMDownload.FCMacro, not a 1:1 port -- see
+' This is the COUNTERPART of EasyPDM-FreeCAD/freecad/EasyPDM/download.py, not a 1:1 port -- see
 ' EasyPDMUpload.bas's header for the general reasons (own minimal JSON, no UserForm
 ' anywhere -- VBA UserForms are separate binary resources, not embeddable in a plain .bas
 ' text file).
 '
 ' This file is fully SELF-CONTAINED (does not depend on EasyPDMUpload.bas being present in
 ' the same VBA project) -- it duplicates the login/JSON/HTTP/browser-ticket helpers rather
-' than importing them, the same way EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMDownload.FCMacro duplicates
-' rather than imports from EasyPDMUpload.FCMacro. The API address, session token and
+' than importing them, the same way EasyPDM-FreeCAD/freecad/EasyPDM/download.py duplicates
+' rather than imports from upload.py (FreeCAD). The API address, session token and
 ' download folder are shared with EasyPDMUpload.bas through the SAME Windows registry keys
 ' (identical constants below) -- logging in from one macro is enough for both.
 '
@@ -25,7 +25,7 @@ Option Explicit
 '      home -- opens the system browser, already logged in (a one-time login-bridge ticket,
 '      not the macro's own session token, ends up in the URL), on the
 '      "pending request from a CAD macro" popup (mode=download), where a search box picks
-'      the Part/Assembly, exactly like EasyPDMDownload.FCMacro. The macro waits
+'      the Part/Assembly, exactly like download.py (FreeCAD). The macro waits
 '      (WaitForTicket, polling GET /create-tickets/{ticket}; Escape cancels, no UserForm
 '      needed) and then re-fetches the full item (GET /items/{id}) once resolved. Only the
 '      TARGET FOLDER stays a native InputBox (defaults to the last one used -- shared with
@@ -815,7 +815,7 @@ End Function
 
 ' ============================================================================
 ' Browser ticket flow -- lets the web app pick WHICH item to download instead of a native
-' number-entry InputBox, exactly like EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMDownload.FCMacro. Duplicated
+' number-entry InputBox, exactly like EasyPDM-FreeCAD/freecad/EasyPDM/download.py. Duplicated
 ' from EasyPDMUpload.bas (see file header for why this file does not import from it) --
 ' BuildBrowserDownloadUrl differs (mode=download, no "name" hint), WaitForTicket/NewGuid/
 ' UrlEncode/OpenUrlInBrowser are identical copies.
@@ -953,7 +953,7 @@ End Function
 Function WaitForTicket(ByVal ticket As String) As Object
     Const TICK_MS As Long = 400
     Const POLL_EVERY_MS As Long = 2000
-    Const TIMEOUT_MS As Long = 600000 ' 10 minutes, same as EasyPDMDownload.FCMacro
+    Const TIMEOUT_MS As Long = 600000 ' 10 minutes, same as download.py (FreeCAD)
 
     Dim elapsedMs As Long, sincePollMs As Long
     elapsedMs = 0
@@ -1653,7 +1653,7 @@ Sub main()
     End If
 
     ' Which item to download is picked in the browser, not a native InputBox -- exactly
-    ' like EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMDownload.FCMacro (see BuildBrowserDownloadUrl/
+    ' like EasyPDM-FreeCAD/freecad/EasyPDM/download.py (see BuildBrowserDownloadUrl/
     ' WaitForTicket above).
     Dim ticket As String
     ticket = NewGuid()

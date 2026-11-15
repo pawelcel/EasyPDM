@@ -25,7 +25,7 @@ type Screen = "choice" | "attach" | "duplicate"
 // pending-create-ticket.ts) — CAŁY przepływ dzieje się w jednym oknie modalnym, spójnie z
 // resztą aplikacji (ten sam wygląd co AddNodeDialog), bez żadnych swobodnie pływających
 // przycisków w nagłówku. Dwa tryby:
-//   "create" (EasyPDMUpload.FCMacro) — JAWNY wybór między trzema przyciskami:
+//   "create" (upload.py (FreeCAD)) — JAWNY wybór między trzema przyciskami:
 //     "Nowy element" zamyka ten popup i od razu otwiera AddNodeDialog (bez z góry ustalonego
 //       projektu — sam pyta o projekt i opcjonalnie rodzica jako pierwszy krok, więc NIE
 //       trzeba wcześniej nawigować w panelu po lewej) — bilet przekazywany JAWNIE jako prop,
@@ -35,7 +35,7 @@ type Screen = "choice" | "attach" | "duplicate"
 //       producent/numery/norma/masa) — BEZ kopiowania żadnych plików, dalej można je tu
 //       edytować przed zapisem. To zwykłe tworzenie nowego elementu, tylko podpowiedziane.
 //     "Dograj do istniejącego" — wyszukiwarka + checkbox STEP tutaj, w tym popupie.
-//   "download" (EasyPDMDownload.FCMacro) — jedyna możliwa akcja, więc wyszukiwarka widoczna
+//   "download" (download.py (FreeCAD)) — jedyna możliwa akcja, więc wyszukiwarka widoczna
 //     OD RAZU, bez checkboksa STEP (nieistotny przy pobieraniu) i bez wyboru trybu.
 // "Dograj do istniejącego" i "download" to backendowo ta sama operacja — POST
 // /create-tickets/{ticket}/attach-existing nic nie tworzy, tylko wskazuje makru, o który

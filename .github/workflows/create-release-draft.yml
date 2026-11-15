@@ -10,8 +10,8 @@ name: Create Release Draft
 # "Publish release" na GitHubie. Obraz Docker (":latest"/":vX.Y.Z") publikuje się
 # niezależnie, tym samym pushem taga, przez osobny publish-docker-release.yml.
 #
-# Makra SolidWorks świadomie NIE są tu dodawane -- w odróżnieniu od Inventora/FreeCAD,
-# których pliki źródłowe (.bas/.FCMacro) trafiają do release'u wprost z repo, poprzednie
+# Makra SolidWorks świadomie NIE są tu dodawane -- w odróżnieniu od Inventora,
+# którego pliki źródłowe (.bas) trafiają do release'u wprost z repo, poprzednie
 # release'e dołączały SolidWorks jako skompilowane .swp (zob. v0.1/v0.2 assets), co wymaga
 # ręcznej kompilacji na żywym SolidWorks -- dorzucane do szkicu ręcznie.
 on:

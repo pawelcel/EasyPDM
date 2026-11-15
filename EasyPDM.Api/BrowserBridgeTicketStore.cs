@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 // PRAWDZIWY token sesji (ważny 30 dni) wprost w query stringu URL-a, który system otwiera w
 // przeglądarce -- ten sam sekret ląduje więc w historii przeglądarki na maszynie użytkownika.
 // Ten magazyn zamienia to na krótkotrwały, jednorazowy bilet: makro (mające już sesję przez
-// nagłówek Cookie, zob. get_session_token()/EasyPDMUpload.FCMacro) najpierw woła
+// nagłówek Cookie, zob. get_session_token()/upload.py (FreeCAD)) najpierw woła
 // POST /api/auth/browser-bridge-ticket, dostaje bilet ważny MaxAge, i DOPIERO ten bilet ląduje
 // w URL-u otwieranym w przeglądarce. GET /browser-login zamienia bilet z powrotem na
 // prawdziwy token sesji I OD RAZU go zużywa (TryConsume usuwa wpis) -- powtórne otwarcie tego

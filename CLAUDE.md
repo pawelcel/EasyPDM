@@ -3,7 +3,7 @@
 Conventions that are easy to miss and have each been got wrong at least once. Everything
 here is about *how* to make a change land correctly — the *what* and *why* of the design
 lives in `TECHNICAL.md`, and the macros carry their own constraints in comments at the top
-of each `.bas` / `.FCMacro` file.
+of each `.bas` file.
 
 ## The built frontend is committed — rebuild it or your change ships nothing
 

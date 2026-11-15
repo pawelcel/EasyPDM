@@ -783,7 +783,7 @@ static class SettingsEndpoints
     }
 
     // Pierwsze 4 to rodzaje Części (properties.rodzaj) — te same wartości co w
-    // EasyPDMUpload.FCMacro i PartPropertyForm/add-node-dialog w aplikacji webowej.
+    // upload.py (FreeCAD) i PartPropertyForm/add-node-dialog w aplikacji webowej.
     // "Zlozenie" to sztuczny, dodatkowy klucz (NIE wartość properties.rodzaj): prefiks
     // złożenia WYKONYWANEGO, historycznie wspólny dla wszystkich złożeń. Złożenie ma dziś
     // własne trzy rodzaje (Wykonywane/Zakupowe/Klienta), ale tylko wykonywane numeruje się

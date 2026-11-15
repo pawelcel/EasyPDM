@@ -300,7 +300,7 @@ static class AuthEndpoints
 
         // POST /api/auth/browser-bridge-ticket — zamienia sesję, którą makro CAD trzyma
         // (nagłówek Cookie skonstruowany ręcznie, zob. get_session_token() w
-        // EasyPDMUpload.FCMacro) na jednorazowy, krótkotrwały bilet do otwarcia przeglądarki
+        // upload.py (FreeCAD)) na jednorazowy, krótkotrwały bilet do otwarcia przeglądarki
         // (GET /browser-login niżej), zamiast wysyłać tam wprost 30-dniowy token sesji.
         // Chronione zwykłym middleware sesji (NIE ma go na liście wyjątków w Program.cs) —
         // tylko już zalogowany klient (makro z ważnym tokenem) może sobie wystawić bilet.

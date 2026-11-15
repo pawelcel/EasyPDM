@@ -43,7 +43,7 @@ Option Explicit
 '     browser involved: Inventor already knows the target with certainty, a browser
 '     round-trip would add nothing.
 '   - Document NOT yet linked: opens the SAME web browser flow as
-'     EasyPDM.SolidWorks/EasyPDMUpload.bas and the FreeCAD/EasyPDMUpload.FCMacro (already
+'     EasyPDM.SolidWorks/EasyPDMUpload.bas and the FreeCAD upload.py (already
 '     logged in via a one-time login-bridge ticket, see "Logowanie"/"Login" below) on the
 '     "pending request from a CAD macro" popup -- "New item" / "Duplicate" / "Attach to
 '     existing" all decided THERE, not locally. The macro waits (WaitForTicket, polling

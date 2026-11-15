@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react"
 
-// Makro CAD (EasyPDMUpload.FCMacro ALBO EasyPDMDownload.FCMacro) otwiera przeglądarkę na
+// Makro CAD (upload.py (FreeCAD) ALBO download.py (FreeCAD)) otwiera przeglądarkę na
 // "?ticket=...&mode=create|download&name=..." zamiast pokazywać własny formularz/wyszukiwarkę
 // — CELOWO bez projektu/rodzica/typu/wyboru elementu w URL-u: to PendingTicketBanner (widoczny
 // na każdym ekranie, dopóki bilet czeka) pokazuje jawny wybór "Nowy element" / "Dodaj do
@@ -16,7 +16,7 @@ type PendingTicketMode = "create" | "download"
 type PendingTicket = {
   ticket: string
   // "create" (domyślny, brak parametru = wsteczna zgodność z istniejącymi linkami) — z
-  // EasyPDMUpload.FCMacro. "download" — z EasyPDMDownload.FCMacro: banner tylko wskazuje
+  // upload.py (FreeCAD). "download" — z download.py (FreeCAD): banner tylko wskazuje
   // element do pobrania, bez opcji tworzenia nowego.
   mode: PendingTicketMode
   name?: string

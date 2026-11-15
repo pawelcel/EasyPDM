@@ -22,7 +22,7 @@ class CreateTicketStore
     // niezależne od siebie wybory zaznaczone w formularzu w przeglądarce (checkboxy
     // widoczne tylko, gdy dodawanie ma przypięty bilet) — makro po stronie klienta używa
     // ich zamiast jakiegokolwiek lokalnego wyboru, zob. ItemEndpoints.cs i
-    // EasyPDMUpload.FCMacro/EasyPDMUpload.bas.
+    // upload.py (FreeCAD)/EasyPDMUpload.bas.
     public void Complete(Guid ticket, Guid itemId, int? itemNumber, string? itemNumberPrefix, int? itemNumberDigits, bool? itemNumberWithName, string name, bool? exportStep, bool? exportPdf, bool existing)
     {
         Sweep();
