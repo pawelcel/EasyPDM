@@ -1,0 +1,4 @@
+target/
+easypdm.wasm
+easypdm.zip
+pkg/easypdm/easypdm.wasm
