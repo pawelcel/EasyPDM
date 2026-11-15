@@ -67,10 +67,6 @@ jobs:
           name: ${{ needs.linux.outputs.artifact-name }}
           path: artifacts/linux
 
-      # Osobne pliki (nie zip), nazwane jak dotychczasowe ręcznie dorzucane assety FreeCAD w
-      # v0.2 (EasyPDM_FreeCad_Upload_v0.2.FCMacro / EasyPDM_FreeCad_Download_v0.2.FCMacro) --
-      # tylko kod źródłowy makra, bez README (tak samo jak dotąd). Każdy plik to gotowy,
-      # importowalny kod wprost z repo, bez żadnego kroku budowania.
       # The EasyPDM companion (SolidCraft's network side) as single self-contained programs, and
       # the SolidCraft plugin package it sets up (see EasyPDM.SolidCraft/README.md).
       - uses: actions/setup-dotnet@v6
@@ -99,26 +95,18 @@ jobs:
              EasyPDM.SolidWorks/Addin/install.cmd EasyPDM.SolidWorks/Addin/uninstall.cmd \
              EasyPDM.SolidWorks/Addin/README.md swaddin/
           (cd swaddin && zip -q -r "../artifacts/macros/EasyPDM_SolidWorks_Addin_v${VERSION}.zip" .)
+      # Inventor macros as plain files, ready to import. (FreeCAD's add-on and its macros are
+      # released from pawelcel/EasyPDM-FreeCAD, their own repository, since 0.9.)
       - name: Przygotuj makra CAD
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p artifacts/macros
           cp EasyPDM.Inventor/EasyPDMUpload.bas   "artifacts/macros/EasyPDM_Inventor_Upload_v${VERSION}.bas"
           cp EasyPDM.Inventor/EasyPDMDownload.bas "artifacts/macros/EasyPDM_Inventor_Download_v${VERSION}.bas"
-          cp EasyPDM.FreeCad/EasyPDMUpload.FCMacro   "artifacts/macros/EasyPDM_FreeCad_Upload_v${VERSION}.FCMacro"
-          cp EasyPDM.FreeCad/EasyPDMDownload.FCMacro "artifacts/macros/EasyPDM_FreeCad_Download_v${VERSION}.FCMacro"
-          # The Upload/Download macros build the drawing sheet themselves; the template is attached
-          # for inserting an empty EasyPDM page by hand.
-          for f in A3 A2 A1; do
-            cp "EasyPDM.FreeCad/templates/EasyPDM_${f}_Landscape.svg" "artifacts/macros/EasyPDM_FreeCad_${f}_Landscape_v${VERSION}.svg"
-          done
-          # The FreeCAD add-on: an "EasyPDM" folder to unpack into FreeCAD's Mod folder; its menu
-          # runs the same macros, which travel inside it.
-          EasyPDM.FreeCad/build_addon.sh addon/EasyPDM "$VERSION"
-          (cd addon && zip -q -r "../artifacts/macros/EasyPDM_FreeCad_Addon_v${VERSION}.zip" EasyPDM)
           # SolidWorks sheet formats and drawing templates: binary files only SolidWorks can write,
           # built by EasyPDMSheetFormat on a live SolidWorks and committed under
-          # EasyPDM.SolidWorks/templates -- rebuild and commit them when the sheet layout changes.
+          # EasyPDM.SolidWorks/templates -- rebuild and commit them when the sheet layout changes
+          # (the layout's source is tools/build_templates.py in pawelcel/EasyPDM-FreeCAD).
           for f in A3 A2 A1; do
             for ext in slddrt drwdot; do
               cp "EasyPDM.SolidWorks/templates/EasyPDM_${f}_Landscape.${ext}" "artifacts/macros/EasyPDM_SW_${f}_Landscape_v${VERSION}.${ext}"

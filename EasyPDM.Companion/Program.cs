@@ -3,7 +3,7 @@
 //
 // The SolidCraft plugin writes an upload into the outbox folder: the design (.sc), a STEP and
 // <id>.request.json. This program picks the request up and uploads it exactly the way the
-// FreeCAD and SolidWorks macros upload a document (EasyPDM.FreeCad/EasyPDMUpload.FCMacro):
+// FreeCAD and SolidWorks macros upload a document (EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMUpload.FCMacro):
 //
 //   - a design already linked to an item (request.easypdm.itemId) goes to that item; a released
 //     one gets a new revision only when the request carries a comment, as the macros ask for one;

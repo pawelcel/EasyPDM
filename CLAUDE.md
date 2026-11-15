@@ -45,7 +45,7 @@ live check and still broke CI, because a test asserted on a hard-coded CSV strin
 thought to look at.
 
 The suite covers the server only. A commit that touches nothing but the CAD macros
-(`.bas`, `.FCMacro`, `build_templates.py` and what it generates), documentation or the
+(`.bas`, the SolidCraft plugin, what `build_templates.py` generates here), documentation or the
 changelog can be pushed without it. Anything under `EasyPDM.Api/`, `db/` or the tests
 themselves cannot — and neither can a frontend change, whose bundle the server serves.
 
@@ -86,8 +86,13 @@ workflow refuses the build:
 
 The SolidWorks sheet formats and drawing templates in `EasyPDM.SolidWorks/templates/` are
 attached by CI, but they are binaries only SolidWorks can write: after a change to the sheet
-layout (`build_templates.py`), rebuild them with `EasyPDMSheetFormat` on a live SolidWorks and
-commit them, or the release ships the old sheet.
+layout, rebuild them with `EasyPDMSheetFormat` on a live SolidWorks and commit them, or the
+release ships the old sheet.
+
+The sheet layout itself, and the FreeCAD add-on with its macros, live in
+[pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9).
+`EasyPDM.SolidWorks/EasyPDMSheetFormat.bas` is generated there by `tools/build_templates.py
+--solidworks <path to this repository>`; never edit it here.
 
 SolidWorks `.swp` macros are deliberately **not** attached by CI — they need compiling on a
 live SolidWorks and are added to the draft by hand. When a release carries macro changes,

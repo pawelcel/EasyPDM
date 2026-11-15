@@ -2,7 +2,7 @@ using System.Text.Json;
 using Npgsql;
 
 // Everything a drawing title block needs for one Part/Assembly, in one call, so the CAD macros
-// (FreeCAD first, see EasyPDM.FreeCad/templates) fill the sheet the same way and none of them
+// (FreeCAD first, see pawelcel/EasyPDM-FreeCAD) fill the sheet the same way and none of them
 // re-derives "who approved it" from the raw history on its own.
 //
 // Language: the main language of the item's home project (items.project_id), or the default

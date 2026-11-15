@@ -9,7 +9,7 @@ Konstruieren benutzt) finden Sie in [README.de.md](README.de.md).
 ## Status
 
 Projekte und Elemente werden manuell über die Web-Anwendung erstellt (Datei-Upload direkt
-in den Speicher der API) oder über das FreeCAD- (`EasyPDM.FreeCad/`), SolidWorks-
+in den Speicher der API) oder über das FreeCAD-Add-on ([pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)), das SolidWorks-
 (`EasyPDM.SolidWorks/`) oder Autodesk-Inventor-Makro (`EasyPDM.Inventor/`), die dieselbe
 API aufrufen.
 Der frühere Ansatz mit Festplatten-Scan (`EasyPDM.Core`, `EasyPDM.Indexer`) wurde aus dem
@@ -65,7 +65,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   EasyPDM.Api.Tests` (die Connection-String zeigt standardmäßig auf ein lokales
   `pdm`/`pdm_user` — überschreibbar über die Variable
   `EASYPDM_TEST_CONNECTION_STRING`, genau wie in der CI).
-- **`EasyPDM.FreeCad/`** — zwei Makros: `EasyPDMUpload.FCMacro` (speichert das aktive Dokument, überlässt die Wahl von Projekt und „neu oder vorhanden“ dem Browser, legt Teil/Baugruppe an, lädt die Datei mit STEP/PDF/Vorschau hoch, benennt die lokale Datei nach dem Datensatz um, füllt das Zeichnungsblatt) und `EasyPDMDownload.FCMacro` (Element im Browser wählen, mit dem ganzen Komponentenbaum holen, damit `App::Link`-Verweise aufgehen, öffnen). Der Ordner ist auch ein FreeCAD-Add-on (`init_gui.py`, `easypdm_addon.py`, von `build_addon.sh` im Namensraum-Layout `freecad/EasyPDM/` zusammengestellt und in `pawelcel/EasyPDM-FreeCAD` veröffentlicht): ein EasyPDM-Arbeitsbereich und optional ein Menü in jedem Arbeitsbereich, dessen Upload und Download dieselben Makros ausführen, dazu Anmelden (im Browser bestätigt) und Abmelden. Auf FreeCAD 1.1 live getestet; siehe `EasyPDM.FreeCad/README.md`.
+- **FreeCAD** — seit 0.9 in einem eigenen Repository, [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD): ein EasyPDM-Arbeitsbereich, dessen Upload und Download zwei Makros ausführen (`EasyPDMUpload.FCMacro`: im Browser gewähltes Element, Upload mit STEP/PDF/Vorschau, Umbenennung nach dem Datensatz, Zeichnungsblatt; `EasyPDMDownload.FCMacro`: das Element mit seinem ganzen Komponentenbaum, geöffnet), dazu Anmelden (im Browser bestätigt) und Abmelden. Sein `tools/build_templates.py` ist die einzige Quelle des Zeichnungsblatts und schreibt auch hier `EasyPDM.SolidWorks/EasyPDMSheetFormat.bas`. Auf FreeCAD 1.1 live getestet.
 - **`EasyPDM.SolidWorks/`** — das Gegenstück für SolidWorks (VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas` und `EasyPDMSheetFormat.bas` für das Zeichnungsblatt), auf SolidWorks 2024 live getestet; `Addin/` ist ein .NET-Framework-COM-Add-in mit EasyPDM-Menü und -Symbolleiste, das die kompilierten Makros ausführt (noch nicht in SolidWorks gelaufen).
 - **`EasyPDM.Inventor/`** — das Gegenstück für Autodesk Inventor (VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), aus `EasyPDM.SolidWorks/` portiert; auf Inventor live getestet. Kein Zeichnungsblatt (keine Inventor-Lizenz, um eines zu bauen).
 - **`EasyPDM.SolidCraft/`** — das SolidCraft-Plugin (Rust → WebAssembly-Komponente). SolidCraft-Plugins haben kein Netzwerk, daher legen seine Einträge im Menü File (Upload, Download, Anmelden, Abmelden) nur Aufträge in einem Ausgangsordner unter Dokumente ab.
@@ -731,7 +731,7 @@ Meldung des Servers unverändert.
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | gespeicherte Filtersätze der Ansicht „Gesamte Datenbank" (privat pro Benutzer) |
 | GET/POST/DELETE | `/api/notifications[/{id}]`, `/{id}/read`, `/read-all` | Benachrichtigungsliste / als gelesen markieren (einzeln oder alle) / löschen — für den angemeldeten Benutzer |
 | GET/PATCH | `/api/notification-preferences` | Abschalten von Benachrichtigungen pro Typ für den angemeldeten Benutzer |
-| GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | Korrelation CAD-Makro ↔ Browser (siehe `EasyPDM.FreeCad/README.md`) |
+| GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | Korrelation CAD-Makro ↔ Browser (siehe `docs/README.md` des FreeCAD-Add-ons) |
 | GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | Korrelation SolidWorks-Makro ↔ Browser für "zu welchem Element gehört diese Zeichnung", wenn ihre Ansichten auf mehr als ein bereits verknüpftes Element verweisen |
 | GET | `/api/config` | Speicherort für Dateien (verwendet von den Makros für SolidWorks und Inventor) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | Speicherort/-statistiken, Verschieben, Sicherung (pg_dump + Dateien in einem ZIP), Wiederherstellung aus einer Sicherung — **nur Administrator** |

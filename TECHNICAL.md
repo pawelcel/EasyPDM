@@ -9,7 +9,7 @@ designing) is in [README.md](README.md).
 ## Status
 
 Projects and items are created manually through the web application (uploading a file
-straight into the API's storage) or through the FreeCAD (`EasyPDM.FreeCad/`), SolidWorks
+straight into the API's storage) or through the FreeCAD add-on ([pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)), SolidWorks
 (`EasyPDM.SolidWorks/`) or Autodesk Inventor (`EasyPDM.Inventor/`) macro, which call the
 same API.
 The earlier disk-scanning approach (`EasyPDM.Core`, `EasyPDM.Indexer`) has been removed
@@ -59,15 +59,13 @@ PostgreSQL 18.
   database, reset before every test class). Locally: `dotnet test EasyPDM.Api.Tests`
   (the connection string defaults to a local `pdm`/`pdm_user` — overridable via the
   `EASYPDM_TEST_CONNECTION_STRING` variable, same as in CI).
-- **`EasyPDM.FreeCad/`** — two macros, `EasyPDMUpload.FCMacro` (saves the active document,
-  lets the browser pick the project and new-versus-existing, creates the Part/Assembly,
-  uploads the file with STEP/PDF/preview, renames the local file to the record name, fills
-  the drawing sheet) and `EasyPDMDownload.FCMacro` (pick an item in the browser, fetch it
-  with its whole component tree so `App::Link` references resolve, open it). The folder is
-  also a FreeCAD add-on (`init_gui.py`, `easypdm_addon.py`, assembled by `build_addon.sh` in
-  FreeCAD's namespaced layout and published to `pawelcel/EasyPDM-FreeCAD`): an EasyPDM
-  workbench, and optionally a menu in every workbench, whose Upload and Download run those same
-  macros, plus Log in (approved in the browser) and Log out. Live-tested on FreeCAD 1.1; see `EasyPDM.FreeCad/README.md`.
+- **FreeCAD** — lives in its own repository,
+  [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9): an EasyPDM
+  workbench whose Upload and Download run two macros (`EasyPDMUpload.FCMacro`: browser-picked
+  item, upload with STEP/PDF/preview, record-name renaming, drawing sheet; `EasyPDMDownload.FCMacro`:
+  the item with its whole component tree, opened), plus Log in (approved in the browser) and Log
+  out. Its `tools/build_templates.py` is the single source of the drawing sheet and also writes
+  `EasyPDM.SolidWorks/EasyPDMSheetFormat.bas` here. Live-tested on FreeCAD 1.1.
 - **`EasyPDM.SolidWorks/`** — the SolidWorks counterpart (VBA macros
   `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, plus `EasyPDMSheetFormat.bas` for the drawing
   sheet), live-tested on SolidWorks 2024; `Addin/` is a .NET Framework COM add-in with an
@@ -951,7 +949,7 @@ and the server's message otherwise; the CAD macros show the server's message as 
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | saved filter sets for the "Whole database" view (private per user) |
 | GET/POST/DELETE | `/api/notifications[/{id}]`, `/{id}/read`, `/read-all` | notification list / mark read (one or all) / delete — for the logged-in user |
 | GET/PATCH | `/api/notification-preferences` | per-type notification opt-out for the logged-in user |
-| GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | CAD macro ↔ browser correlation (see `EasyPDM.FreeCad/README.md`) |
+| GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | CAD macro ↔ browser correlation (see the FreeCAD add-on's `docs/README.md`) |
 | GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | SolidWorks macro ↔ browser correlation for "which item does this Drawing belong to" when its views reference more than one already-linked item |
 | GET | `/api/config` | file storage location (used by the SolidWorks and Inventor macros) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | storage location/stats, moving it, backup (pg_dump + files in a ZIP), restore from backup — **administrator only** |

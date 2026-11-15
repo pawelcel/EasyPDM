@@ -110,7 +110,7 @@ them in an **EasyPDM menu**, with **Log in** (approved in the browser, so the CA
 sees your password) and **Log out**.
 
 Installation and details:
-- FreeCAD (add-on or macros): [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
+- FreeCAD (add-on, in its own repository): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)
 - SolidWorks (macros, add-in in [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (plugin + the EasyPDM companion, since SolidCraft plugins have no network):

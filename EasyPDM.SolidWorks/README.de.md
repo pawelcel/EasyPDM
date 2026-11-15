@@ -423,7 +423,7 @@ speichert es als Blattformat (`.slddrt`) und Zeichnungsvorlage (`.drwdot`) in
 Die Schriftfeldfelder sind Notizen, die mit den benutzerdefinierten Eigenschaften der
 Zeichnung verknüpft sind (`$PRP:"pdm_drawn_by"`, `$PRP:"pdm_label_drawn_by"`, …); Maßstab und
 Blattnummer nutzen die eigenen Blatteigenschaften von SolidWorks. Das Makro wird von
-`EasyPDM.FreeCad/templates/build_templates.py` erzeugt — ändern Sie das Skript, nicht die
+`tools/build_templates.py` in [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) erzeugt (`--solidworks PFAD-ZU-DIESEM-REPOSITORY`) — ändern Sie das Skript, nicht die
 `.bas`. Jeder Lauf schreibt ein Protokoll nach `%TEMP%\EasyPDM_sheetformat.log`; die erste Zeile
 nennt die Makroversion.
 

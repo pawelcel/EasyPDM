@@ -1639,7 +1639,7 @@ Sub main()
     End If
 
     ' Which item to download is picked in the browser, not a native InputBox -- exactly
-    ' like EasyPDM.FreeCad/EasyPDMDownload.FCMacro and EasyPDM.SolidWorks/
+    ' like EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMDownload.FCMacro and EasyPDM.SolidWorks/
     ' EasyPDMDownload.bas (see BuildBrowserDownloadUrl/WaitForTicket above).
     Dim ticket As String
     ticket = NewGuid()

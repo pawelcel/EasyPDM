@@ -119,20 +119,11 @@ ein Add-on sie in ein **EasyPDM-Menü**, mit **Anmelden** (im Browser bestätigt
 sieht Ihr Passwort nie) und **Abmelden**.
 
 Installation und Details:
-- FreeCAD (Add-on oder Makros): [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
+- FreeCAD (Add-on, eigenes Repository): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)
 - SolidWorks (Makros, Add-in in [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (Plugin + EasyPDM-Begleitprogramm, da SolidCraft-Plugins kein Netzwerk haben):
   [`EasyPDM.SolidCraft/README.md`](EasyPDM.SolidCraft/README.md)
-
-**Upload** (aktives
-Dokument an das PDM senden) und **Download** (Teil/Baugruppe aus dem PDM abrufen,
-zusammen mit der gesamten Baugruppe, und im Programm öffnen).
-
-Installation und Details:
-- FreeCAD: [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
-- SolidWorks: [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
-- Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 
 **Upload** — Sie haben eine gespeicherte Datei geöffnet und klicken auf Upload. Der
 Browser öffnet sich (automatisch angemeldet) mit der Frage: neues Element, Duplikat

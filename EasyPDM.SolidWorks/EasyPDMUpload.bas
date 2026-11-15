@@ -8,7 +8,7 @@ Option Explicit
 ' does not reliably handle UTF-8, and Polish diacritics got corrupted (mojibake) both in
 ' the code editor and in dialogs shown to the actual user. Confirmed in practice.
 '
-' This is the COUNTERPART of EasyPDM.FreeCad/EasyPDMUpload.FCMacro, not a 1:1 port -- VBA
+' This is the COUNTERPART of EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMUpload.FCMacro, not a 1:1 port -- VBA
 ' has no built-in JSON and no dialog windows without separate binary files (UserForm), so:
 '   - JSON: own minimal parser/builder (below), good enough for this specific API's
 '     response shapes -- NOT general purpose.
@@ -1152,7 +1152,7 @@ End Sub
 ' ============================================================================
 ' Browser ticket flow -- lets the web app (already running, same backend) decide "new item
 ' vs duplicate vs attach to existing" instead of a native dialog, exactly like
-' EasyPDM.FreeCad/EasyPDMUpload.FCMacro's submit_via_browser. The macro: generates a GUID
+' EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMUpload.FCMacro's submit_via_browser. The macro: generates a GUID
 ' ticket, opens the browser on the login bridge (GET /api/auth/browser-login) with
 ' a deep-link to "?ticket=...", waits (WaitForTicket) while the user resolves it in the
 ' "pending request from a CAD macro" popup, then reads back what happened via
@@ -3388,7 +3388,7 @@ End Function
 ' structure, no equivalent of FreeCAD's "App::Link vs native geometry" distinction needed:
 ' every SolidWorks assembly is inherently built from separate component documents) and
 ' offers to send any component not yet linked to a PDM item, leaves-first, exactly like
-' EasyPDM.FreeCad/EasyPDMUpload.FCMacro's discover_component_tree/process_assembly_tree --
+' EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMUpload.FCMacro's discover_component_tree/process_assembly_tree --
 ' each new component gets the SAME browser ticket flow as the top-level document (one tab
 ' at a time, never several at once -- see file header and ProcessAssemblyTree below).
 ' Confirmed working on a live SolidWorks 2026 install (late-bound GetComponents/

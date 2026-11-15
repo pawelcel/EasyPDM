@@ -377,7 +377,7 @@ rysunku (`.drwdot`) w `Dokumenty\EasyPDM\SolidWorks`.
 
 Pola tabelki to notatki powiązane z właściwościami rysunku (`$PRP:"pdm_drawn_by"`,
 `$PRP:"pdm_label_drawn_by"`, …); skala i numer arkusza korzystają z właściwości arkusza
-SolidWorks. Makro generuje `EasyPDM.FreeCad/templates/build_templates.py` — zmieniaj skrypt,
+SolidWorks. Makro generuje `tools/build_templates.py` w [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (`--solidworks ŚCIEŻKA-DO-TEGO-REPOZYTORIUM`) — zmieniaj skrypt,
 nie `.bas`. Każde uruchomienie zapisuje log w `%TEMP%\EasyPDM_sheetformat.log`; pierwsza linia
 podaje wersję makra.
 

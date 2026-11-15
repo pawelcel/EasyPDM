@@ -9,7 +9,7 @@ projektowaniu) jest w [README.pl.md](README.pl.md).
 ## Status
 
 Ręczne tworzenie projektów i elementów przez aplikację webową (upload pliku wprost do
-magazynu API) albo przez makro FreeCAD (`EasyPDM.FreeCad/`), SolidWorks
+magazynu API) albo przez dodatek FreeCAD ([pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)), makro SolidWorks
 (`EasyPDM.SolidWorks/`) lub Autodesk Inventor (`EasyPDM.Inventor/`), które wołają to samo
 API.
 Wcześniejsze podejście ze skanowaniem dysku (`EasyPDM.Core`, `EasyPDM.Indexer`) zostało
@@ -56,7 +56,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   tej samej bazie, zerowany przed każdą klasą testową). Lokalnie: `dotnet test
   EasyPDM.Api.Tests` (connection string domyślnie wskazuje na lokalny `pdm`/`pdm_user` —
   nadpisywalny zmienną `EASYPDM_TEST_CONNECTION_STRING`, tak jak w CI).
-- **`EasyPDM.FreeCad/`** — dwa makra: `EasyPDMUpload.FCMacro` (zapisuje aktywny dokument, wybór projektu i „nowy czy istniejący” zostawia przeglądarce, tworzy Część/Złożenie, wgrywa plik ze STEP/PDF/podglądem, zmienia nazwę lokalnego pliku na nazwę rekordu, wypełnia arkusz rysunku) i `EasyPDMDownload.FCMacro` (wybór elementu w przeglądarce, pobranie z całym drzewem komponentów, żeby odnośniki `App::Link` się rozwiązały, otwarcie). Folder jest też dodatkiem do FreeCAD (`init_gui.py`, `easypdm_addon.py`, składanym przez `build_addon.sh` w przestrzeni nazw `freecad/EasyPDM/` i publikowanym w `pawelcel/EasyPDM-FreeCAD`): środowisko pracy EasyPDM i opcjonalnie menu w każdym środowisku, którego Upload i Download uruchamiają te same makra, plus Zaloguj (zatwierdzane w przeglądarce) i Wyloguj. Sprawdzone na żywym FreeCAD 1.1; zob. `EasyPDM.FreeCad/README.md`.
+- **FreeCAD** — od 0.9 we własnym repozytorium, [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD): środowisko pracy EasyPDM, którego Upload i Download uruchamiają dwa makra (`EasyPDMUpload.FCMacro`: element wybrany w przeglądarce, wysyłka ze STEP/PDF/podglądem, zmiana nazwy na nazwę rekordu, arkusz rysunku; `EasyPDMDownload.FCMacro`: element z całym drzewem komponentów, otwarty), plus Zaloguj (zatwierdzane w przeglądarce) i Wyloguj. Jego `tools/build_templates.py` to jedyne źródło arkusza rysunku i zapisuje też tutaj `EasyPDM.SolidWorks/EasyPDMSheetFormat.bas`. Sprawdzone na żywym FreeCAD 1.1.
 - **`EasyPDM.SolidWorks/`** — odpowiednik dla SolidWorks (makra VBA `EasyPDMUpload.bas`/`EasyPDMDownload.bas` oraz `EasyPDMSheetFormat.bas` do arkusza rysunku), sprawdzony na żywym SolidWorks 2024; `Addin/` to dodatek COM dla .NET Framework z menu i paskiem EasyPDM, który uruchamia skompilowane makra (jeszcze nieuruchomiony w SolidWorks).
 - **`EasyPDM.Inventor/`** — odpowiednik dla Autodesk Inventor (makra VBA `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), port z `EasyPDM.SolidWorks/`; sprawdzony na żywym Inventorze. Bez arkusza rysunku (brak licencji Inventora, na której dałoby się go zrobić).
 - **`EasyPDM.SolidCraft/`** — wtyczka SolidCraft (Rust → komponent WebAssembly). Wtyczki SolidCraft nie mają sieci, więc jej pozycje w menu File (Upload, Download, Zaloguj, Wyloguj) tylko zapisują zlecenia do folderu wymiany w Dokumentach.
@@ -670,7 +670,7 @@ zmian.
 | GET/POST/DELETE | `/api/saved-filters[/{id}]` | zapisane zestawy filtrów widoku „Cała baza” (prywatne per użytkownik) |
 | GET/POST/DELETE | `/api/notifications[/{id}]`, `/{id}/read`, `/read-all` | lista powiadomień / oznaczenie jako przeczytane (jedno lub wszystkie) / usunięcie — dla zalogowanego użytkownika |
 | GET/PATCH | `/api/notification-preferences` | wyłączenie powiadomień per typ dla zalogowanego użytkownika |
-| GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | korelacja makro CAD ↔ przeglądarka (zob. `EasyPDM.FreeCad/README.md`) |
+| GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | korelacja makro CAD ↔ przeglądarka (zob. `docs/README.md` dodatku FreeCAD) |
 | GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | korelacja makro SolidWorks ↔ przeglądarka dla "do którego elementu należy ten rysunek", gdy jego widoki wskazują na więcej niż jeden już podlinkowany element |
 | GET | `/api/config` | lokalizacja magazynu plików (używana przez makra SolidWorks i Inventor) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | lokalizacja/statystyki magazynu, przeniesienie, backup (pg_dump + pliki w ZIP), przywrócenie z backupu — **tylko administrator** |

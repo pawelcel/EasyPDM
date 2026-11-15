@@ -18,7 +18,7 @@ using PdfSharp.Pdf.IO;
 //
 // Only a PDF the macros marked as exported from an EasyPDM sheet (item_attachments.sheet_layout,
 // e.g. "easypdm-A3") is touched: the layout says where the fields are. The EasyPDM sheets are the
-// same in FreeCAD and SolidWorks (EasyPDM.FreeCad/templates/build_templates.py): the title block
+// same in FreeCAD and SolidWorks (tools/build_templates.py in pawelcel/EasyPDM-FreeCAD): the title block
 // is 180 x 44 mm in the bottom-right corner, 10 mm from the trimmed edges; DRAWN BY's value
 // baseline is 8.5 mm below its top edge and APPROVED BY's 19.5 mm, each 1.5 mm in, with the
 // dates 47.5 mm in.

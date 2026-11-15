@@ -134,7 +134,7 @@ function AddNodeDialog({
   // Rozmiar dokumentu CAD w bajtach (z biletu makra) -- tylko po to, żeby ostrzec przy opcji
   // eksportu STEP, że dla dużego modelu potrwa to długo. Zob. STEP_SLOW_EXPORT_BYTES.
   documentSize?: number
-  // Bilet z makra CAD (zob. EasyPDM.FreeCad/EasyPDMUpload.FCMacro) — doklejany do POST
+  // Bilet z makra CAD (zob. EasyPDM-FreeCAD/freecad/EasyPDM/EasyPDMUpload.FCMacro) — doklejany do POST
   // /nodes, żeby makro mogło się dowiedzieć (GET /create-tickets/{ticket}), że element
   // powstał. Podawany JAWNIE przez wywołującego (PendingTicketBanner), nie czytany z
   // żadnego globalnego stanu — zwykłe, ręczne użycia tego dialogu (bez tego propa) nigdy
