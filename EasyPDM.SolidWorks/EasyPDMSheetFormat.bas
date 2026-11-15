@@ -34,7 +34,10 @@ Private Const SW_DOC_DRAWING As Long = 3                    ' swDocumentTypes_e.
 Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e.swCustomInfoText
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 Private Const SW_SAVEAS_SILENT_COPY As Long = 3             ' swSaveAsOptions_Silent + swSaveAsOptions_Copy
-Private Const THICK_MM As Double = 0.7
+' The frame, title block outline and centring marks are 0.7 mm in the FreeCAD templates (ISO
+' 5457), but SolidWorks shows them far heavier on screen than they print, and they were asked
+' to match the inner lines. In a PDF the difference is right; on screen it dominated the sheet.
+Private Const THICK_MM As Double = 0.35
 Private Const THIN_MM As Double = 0.35
 ' Text sizes in the layout are osifont's (em) sizes, as in the FreeCAD SVG. SolidWorks's note
 ' font set to the same height came out about 1.4x larger -- confirmed on a stamped PDF, where
@@ -296,7 +299,7 @@ Sub main()
         Case "polish": gLang = "pl"
         Case "german": gLang = "de"
     End Select
-    LogLine "EasyPDMSheetFormat revision 9 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
+    LogLine "EasyPDMSheetFormat revision 10 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
 
     Set swModel = swApp.ActiveDoc
     If swModel Is Nothing Then

@@ -690,7 +690,7 @@ SW_MACRO = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, o
 # property of the same name ($PRP:"pdm_drawn_by"), which the Upload/Download macros write.
 # Bumped by hand on every change to the SolidWorks macro, and written into the first line of its
 # log -- so a log shows at once whether the latest macro was imported or an older copy ran.
-SW_MACRO_REVISION = 9
+SW_MACRO_REVISION = 10
 
 _SW_NATIVE_FIELDS = {
     "pdm_scale": '$PRP:""SW-Sheet Scale""',
@@ -733,7 +733,10 @@ Private Const SW_DOC_DRAWING As Long = 3                    ' swDocumentTypes_e.
 Private Const SW_CUSTOM_INFO_TEXT As Long = 30              ' swCustomInfoType_e.swCustomInfoText
 Private Const SW_CUSTOM_PROPERTY_REPLACE As Long = 2        ' swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 Private Const SW_SAVEAS_SILENT_COPY As Long = 3             ' swSaveAsOptions_Silent + swSaveAsOptions_Copy
-Private Const THICK_MM As Double = 0.7
+' The frame, title block outline and centring marks are 0.7 mm in the FreeCAD templates (ISO
+' 5457), but SolidWorks shows them far heavier on screen than they print, and they were asked
+' to match the inner lines. In a PDF the difference is right; on screen it dominated the sheet.
+Private Const THICK_MM As Double = 0.35
 Private Const THIN_MM As Double = 0.35
 ' Text sizes in the layout are osifont's (em) sizes, as in the FreeCAD SVG. SolidWorks's note
 ' font set to the same height came out about 1.4x larger -- confirmed on a stamped PDF, where
