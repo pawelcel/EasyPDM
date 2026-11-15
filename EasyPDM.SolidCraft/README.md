@@ -33,3 +33,7 @@ folders granted both).
   there because 0.42 grants plugins only through the Preferences window.
 - With the 0.42 nightly (2026-11-15), which grants through `plugin.install`, the upload entry
   writes the `.sc`, the STEP and the request; the `.sc` reopens in 0.42 with its body intact.
+
+`plugin/wit/plugin.wit` is SolidCraft's plugin interface, copied unchanged from
+[tangency-labs/solidcraft](https://github.com/tangency-labs/solidcraft)
+(`crates/craft-plugin/wit/plugin.wit`, Apache License 2.0).
