@@ -244,6 +244,25 @@ whole macro project), so for EACH of the two files separately:
 The API address (default `http://localhost:5000/api`) is saved automatically after being
 entered once at login — shared by both macros.
 
+### An EasyPDM toolbar
+
+SolidWorks can put macro procedures on toolbar buttons, which gives the same four commands as
+the FreeCAD add-on without a compiled add-in. **Tools → Customize → Commands → Macro**, drag
+the "New Macro Button" onto a toolbar four times and point each at:
+
+| Button | Macro | Procedure (module `EasyPDMUpload` / `EasyPDMDownload`) |
+|---|---|---|
+| Upload | `EasyPDMUpload.swp` | `main` |
+| Download | `EasyPDMDownload.swp` | `main` |
+| Log in | `EasyPDMUpload.swp` | `LoginInBrowser` |
+| Log out | `EasyPDMUpload.swp` | `Logout` |
+
+**Log in** (`LoginInBrowser`, EasyPDM servers from 0.9) asks for the server address, opens
+EasyPDM in the browser with a code, and after you click Allow there and OK in SolidWorks
+stores the macro's own token — the password never passes through SolidWorks. The Upload
+macro's own login with login and password still works, and for older servers it is the only
+one.
+
 ## History of fixed issues
 
 Found and fixed on 2026-08-20, during the first real test of `EasyPDMUpload.bas` on live

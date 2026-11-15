@@ -275,6 +275,25 @@ sind VBA-Projekte. `.bas` ist das Standard-Export-/Importformat für ein VBA-**M
 Die API-Adresse (standardmäßig `http://localhost:5000/api`) wird nach der ersten Eingabe
 bei der Anmeldung automatisch gespeichert — gemeinsam für beide Makros.
 
+### Eine EasyPDM-Symbolleiste
+
+SolidWorks kann Makroprozeduren auf Symbolleistenschaltflächen legen — dieselben vier Befehle wie
+im FreeCAD-Add-on, ohne kompiliertes Add-in. **Extras → Anpassen → Befehle → Makro**, die
+„Neue Makroschaltfläche“ viermal auf eine Symbolleiste ziehen und jeweils angeben:
+
+| Schaltfläche | Makro | Prozedur (Modul `EasyPDMUpload` / `EasyPDMDownload`) |
+|---|---|---|
+| Upload | `EasyPDMUpload.swp` | `main` |
+| Download | `EasyPDMDownload.swp` | `main` |
+| Anmelden | `EasyPDMUpload.swp` | `LoginInBrowser` |
+| Abmelden | `EasyPDMUpload.swp` | `Logout` |
+
+**Anmelden** (`LoginInBrowser`, EasyPDM-Server ab 0.9) fragt nach der Serveradresse, öffnet
+EasyPDM im Browser mit einem Code und speichert nach Erlauben dort und OK in SolidWorks ein
+eigenes Makro-Token — das Passwort geht nie durch SolidWorks. Die bisherige Anmeldung mit
+Benutzer und Passwort beim Start des Upload-Makros funktioniert weiter und ist für ältere Server
+die einzige.
+
 ## Historie behobener Probleme
 
 Gefunden und behoben am 2026-08-20, während des ersten echten Tests von

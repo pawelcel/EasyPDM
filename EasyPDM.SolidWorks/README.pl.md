@@ -245,6 +245,24 @@ projektu makra), więc dla KAŻDEGO z dwóch plików osobno:
 Adres API (domyślnie `http://localhost:5000/api`) zapisuje się automatycznie po pierwszym
 podaniu przy logowaniu — wspólnie dla obu makr.
 
+### Pasek narzędzi EasyPDM
+
+SolidWorks pozwala przypiąć procedury makr do przycisków na pasku narzędzi — to te same cztery
+polecenia co w dodatku do FreeCAD, bez kompilowanego dodatku. **Narzędzia → Dostosuj →
+Polecenia → Makro**, przeciągnij „Nowy przycisk makra” na pasek cztery razy i wskaż:
+
+| Przycisk | Makro | Procedura (moduł `EasyPDMUpload` / `EasyPDMDownload`) |
+|---|---|---|
+| Upload | `EasyPDMUpload.swp` | `main` |
+| Download | `EasyPDMDownload.swp` | `main` |
+| Zaloguj | `EasyPDMUpload.swp` | `LoginInBrowser` |
+| Wyloguj | `EasyPDMUpload.swp` | `Logout` |
+
+**Zaloguj** (`LoginInBrowser`, serwery EasyPDM od 0.9) pyta o adres serwera, otwiera EasyPDM w
+przeglądarce z kodem, a po kliknięciu tam Zezwól i OK w SolidWorks zapisuje własny token makra
+— hasło nie przechodzi przez SolidWorks. Dotychczasowe logowanie loginem i hasłem przy starcie
+makra Upload nadal działa, a dla starszych serwerów jest jedynym.
+
 ## Historia naprawionych problemów
 
 Znalezione i naprawione 2026-08-20, podczas pierwszego realnego testu `EasyPDMUpload.bas`
