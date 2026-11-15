@@ -3,29 +3,57 @@
   "name": "EasyPDM",
   "version": "0.9.0",
   "description": "Upload designs to an EasyPDM server and download them, through the EasyPDM companion program.",
-  "capabilities": ["commands@0.1"],
+  "capabilities": [
+    "commands@0.1"
+  ],
   "runtime": {
     "module": "easypdm.wasm",
     "entries": [
       {
         "name": "upload",
         "effect": "edit",
-        "slots": [{"kind": "menu", "name": "File"}],
+        "slots": [
+          {
+            "kind": "menu",
+            "name": "File"
+          }
+        ],
         "input_schema": {
           "type": "object",
           "properties": {
-            "outbox_path": {"type": "string", "title": "EasyPDM outbox folder"},
-            "comment": {"type": "string", "title": "Comment"}
+            "outbox_path": {
+              "type": "string",
+              "title": "EasyPDM outbox folder"
+            },
+            "comment": {
+              "type": "string",
+              "title": "Comment"
+            }
           },
-          "required": ["outbox_path"]
+          "required": [
+            "outbox_path"
+          ]
         }
       }
     ],
-    "commands": ["document.metadata", "file.save_as", "file.export_step", "assembly.mass_properties"],
+    "commands": [
+      "document.metadata",
+      "document.metadata.set",
+      "file.save_as",
+      "file.export_step"
+    ],
     "permissions": {
-      "files": [{"name": "outbox", "read": true, "write": true}],
+      "files": [
+        {
+          "name": "outbox",
+          "read": true,
+          "write": true
+        }
+      ],
       "clock": true,
-      "command_groups": ["file"]
+      "command_groups": [
+        "file"
+      ]
     }
   }
 }

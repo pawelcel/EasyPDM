@@ -378,8 +378,15 @@ sealed class Uploader(Api api, SolidCraftCli cli, bool openBrowser)
         var name = props?["description"]?.ToString() is { Length: > 0 } d ? d
             : props?["part_number"]?.ToString() is { Length: > 0 } pn ? pn : "SolidCraft design";
 
-        // Which item: the design's own link, or the browser.
+        // Which item: the design's own link; the link file an earlier upload of the same design
+        // left (when that upload went through after the plugin last ran, so the design does not
+        // carry the item yet); or the browser.
+        var designId = request["easypdm"]?["designId"]?.ToString();
+        var linkFile = designId is { Length: > 0 } && !designId.Contains('/') && !designId.Contains('\\')
+            ? Path.Combine(outbox, designId + ".link.json") : null;
         var itemId = request["easypdm"]?["itemId"]?.ToString();
+        if (itemId is null && linkFile is not null && File.Exists(linkFile))
+            itemId = JsonNode.Parse(await File.ReadAllTextAsync(linkFile))?["itemId"]?.ToString();
         var existing = itemId is not null;
         var exportStep = true;
         if (itemId is null)
@@ -419,6 +426,14 @@ sealed class Uploader(Api api, SolidCraftCli cli, bool openBrowser)
             try { await api.Send(HttpMethod.Patch, $"/items/{itemId}/properties", new Dictionary<string, string> { ["mass"] = MassText(kg) }); }
             catch (CompanionException e) { Console.Error.WriteLine($"mass not saved: {e.Message}"); }
         }
+
+        // The plugin reads this back into the design on its next upload (see the plugin's
+        // link_file): the design learns which item it is without the user doing anything.
+        if (linkFile is not null)
+            await File.WriteAllTextAsync(linkFile, new JsonObject
+            {
+                ["designId"] = designId, ["itemId"] = itemId, ["recordName"] = record, ["revision"] = revision,
+            }.ToJsonString());
 
         return new JsonObject
         {

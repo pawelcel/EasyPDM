@@ -10,7 +10,12 @@ self-hosted servers in tangency-labs/solidcraft#17343). So the integration has t
   prepare an upload in a folder the user grants at install time (the *outbox*): the design as
   `.sc`, a STEP of it and a `<id>.request.json` with the design properties (part number,
   revision…) and EasyPDM's link to the item, kept under the design metadata key
-  `io.github.pawelcel.easypdm`.
+  `io.github.pawelcel.easypdm`. The first upload gives the design a `designId` and writes
+  `<designId>.link.json` into the outbox; the companion fills the item in once the upload has
+  gone through, and the next upload reads it into the design, with the record name and
+  revision as SolidCraft's own part number and revision. The plugin reads only that file, and
+  only until the design knows its item: SolidCraft voids a whole plugin call when one of its
+  reads fails, even one the plugin handles, so it never asks for a file that may not exist.
 - **[`EasyPDM.Companion`](../EasyPDM.Companion/)** — a small EasyPDM program on the same
   computer (`easypdm-companion login | logout | status | process | watch`). It picks requests
   up and uploads them the way the FreeCAD and SolidWorks macros do: a design already linked to
@@ -43,6 +48,10 @@ folders granted both).
   created through the ticket gets the `.sc`, STEP, preview and mass; a linked item in progress
   takes the same revision again; a linked released item is refused without a comment and gets
   revision B with one.
+- The round trip in one headless session (0.42 nightly) against the test server: the first
+  upload creates the item through the browser ticket, the second writes the link and part
+  number into the design and goes to the same item without the browser; two uploads in the
+  same second before the companion runs get distinct requests, and both land in one item.
 
 `plugin/wit/plugin.wit` is SolidCraft's plugin interface, copied unchanged from
 [tangency-labs/solidcraft](https://github.com/tangency-labs/solidcraft)
