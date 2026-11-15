@@ -1,0 +1,56 @@
+name: Sync FreeCAD add-on
+
+# Copies EasyPDM.FreeCad into pawelcel/EasyPDM-FreeCAD, the repository FreeCAD's Addon Manager
+# installs the add-on from (it clones a whole repository and needs package.xml at its top, which
+# this monorepo cannot offer). Runs on every release tag, with the tag's version in package.xml,
+# and by hand for a test build.
+#
+# Needs the secret FREECAD_ADDON_DEPLOY_KEY: the private half of an SSH deploy key with write
+# access to pawelcel/EasyPDM-FreeCAD only (GITHUB_TOKEN cannot push to another repository).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to write into package.xml (e.g. 0.9.0)"
+        required: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the deploy key is set
+        env:
+          KEY: ${{ secrets.FREECAD_ADDON_DEPLOY_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::Secret FREECAD_ADDON_DEPLOY_KEY is missing -- see the comment at the top of this workflow."
+            exit 1
+          fi
+
+      - name: Assemble and push
+        env:
+          KEY: ${{ secrets.FREECAD_ADDON_DEPLOY_KEY }}
+          VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          VERSION="${VERSION#v}"
+          mkdir -p ~/.ssh && printf '%s\n' "$KEY" > ~/.ssh/addon_key && chmod 600 ~/.ssh/addon_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/addon_key -o IdentitiesOnly=yes"
+          git clone --depth 1 git@github.com:pawelcel/EasyPDM-FreeCAD.git addon
+          find addon -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          EasyPDM.FreeCad/build_addon.sh addon "$VERSION"
+          cd addon
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "Nothing changed."; exit 0; fi
+          git commit -m "EasyPDM FreeCAD add-on ${VERSION} (from pawelcel/EasyPDM ${GITHUB_SHA::7})"
+          git tag -f "v${VERSION}"
+          git push origin main
+          git push -f origin "v${VERSION}"

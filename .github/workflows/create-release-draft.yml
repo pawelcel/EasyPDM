@@ -114,12 +114,7 @@ jobs:
           done
           # The FreeCAD add-on: an "EasyPDM" folder to unpack into FreeCAD's Mod folder; its menu
           # runs the same macros, which travel inside it.
-          mkdir -p addon/EasyPDM
-          cp EasyPDM.FreeCad/InitGui.py EasyPDM.FreeCad/Init.py EasyPDM.FreeCad/easypdm_addon.py \
-             EasyPDM.FreeCad/package.xml EasyPDM.FreeCad/EasyPDMUpload.FCMacro EasyPDM.FreeCad/EasyPDMDownload.FCMacro \
-             LICENSE addon/EasyPDM/
-          cp -r EasyPDM.FreeCad/icons addon/EasyPDM/
-          mkdir -p addon/EasyPDM/templates && cp EasyPDM.FreeCad/templates/*.svg addon/EasyPDM/templates/
+          EasyPDM.FreeCad/build_addon.sh addon/EasyPDM "$VERSION"
           (cd addon && zip -q -r "../artifacts/macros/EasyPDM_FreeCad_Addon_v${VERSION}.zip" EasyPDM)
           # SolidWorks sheet formats and drawing templates: binary files only SolidWorks can write,
           # built by EasyPDMSheetFormat on a live SolidWorks and committed under

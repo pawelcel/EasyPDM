@@ -24,7 +24,12 @@ w jednym starcza dla drugiego.
 
 ### Jako dodatek (zalecane, od 0.9)
 
-Rozpakuj `EasyPDM_FreeCad_Addon_vX.zip` z wydania do folderu `Mod` FreeCAD (Linux zwykle
+**Przez Menedżer dodatków FreeCAD:** Przybory → Menedżer dodatków → ⚙ → Własne repozytoria,
+dodaj `https://github.com/pawelcel/EasyPDM-FreeCAD` (gałąź `main`), zainstaluj **EasyPDM** i
+uruchom FreeCAD ponownie; aktualizacje przychodzą tą samą drogą. To repozytorium powstaje z tego
+folderu przy każdym wydaniu (`build_addon.sh`, workflow `sync-freecad-addon.yml`).
+
+**Ręcznie:** Rozpakuj `EasyPDM_FreeCad_Addon_vX.zip` z wydania do folderu `Mod` FreeCAD (Linux zwykle
 `~/.local/share/FreeCAD/v1-1/Mod`, Windows `%APPDATA%\FreeCAD\v1-1\Mod`; dokładną ścieżkę
 pokazuje Pomoc → O FreeCAD → „Katalog danych użytkownika” + `Mod`) i uruchom FreeCAD ponownie.
 W każdym środowisku pracy pojawi się menu **EasyPDM** z pozycjami **Wyślij (Upload)**,

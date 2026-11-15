@@ -5,7 +5,11 @@
   <version>0.9.0</version>
   <maintainer email="noreply@github.com">pawelcel</maintainer>
   <license file="LICENSE">MIT</license>
-  <url type="repository" branch="main">https://github.com/pawelcel/EasyPDM</url>
+  <date>2026-11-15</date>
+  <url type="repository" branch="main">https://github.com/pawelcel/EasyPDM-FreeCAD</url>
+  <url type="website">https://github.com/pawelcel/EasyPDM</url>
+  <url type="documentation">https://github.com/pawelcel/EasyPDM/wiki/CAD-Integrations</url>
+  <url type="bugtracker">https://github.com/pawelcel/EasyPDM/issues</url>
   <icon>icons/EasyPDM.svg</icon>
   <content>
     <workbench>
