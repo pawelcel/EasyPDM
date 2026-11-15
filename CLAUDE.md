@@ -34,6 +34,12 @@ They need a reachable PostgreSQL and run against a **separate schema** (`pdm_tes
 they drop and recreate each time — they never touch `public`. Point them elsewhere with
 `EASYPDM_TEST_CONNECTION_STRING` if needed.
 
+The backup/restore tests also need `pg_dump` and `pg_restore` matching the server (18) on
+`PATH`, and the right to create a database: `pg_dump` takes a whole database, so they work in a
+database of their own (`pdm_backup_test`) rather than the shared one. Tests that make the app
+write its settings file use their own content root (`ContentRoot` on the factory), never
+`EasyPDM.Api/`, where a developer's `appsettings.Local.json` lives.
+
 Checking an endpoint by hand with `curl` is not a substitute: a change once passed every
 live check and still broke CI, because a test asserted on a hard-coded CSV string nobody
 thought to look at.

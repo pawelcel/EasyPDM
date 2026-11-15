@@ -28,9 +28,16 @@ public sealed class EasyPDMWebApplicationFactory : WebApplicationFactory<Program
     // Dodatkowe ustawienia dla jednego testu, ponad powyższe.
     public Dictionary<string, string?> ExtraSettings { get; init; } = new();
 
+    // A content root of the test's own, for tests that make the app write its settings file
+    // (appsettings.Local.json lives in the content root, which is otherwise EasyPDM.Api/ in the
+    // repository -- a developer's own configuration).
+    public string? ContentRoot { get; init; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        if (ContentRoot is not null)
+            builder.UseContentRoot(ContentRoot);
         builder.ConfigureAppConfiguration((_, config) =>
         {
             var settings = new Dictionary<string, string?>

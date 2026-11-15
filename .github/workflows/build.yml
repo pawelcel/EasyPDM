@@ -37,6 +37,19 @@ jobs:
       - name: Buduj EasyPDM.Api
         run: dotnet build EasyPDM.Api
 
+      # The backup/restore tests run the real pg_dump and pg_restore, which must match the
+      # PostgreSQL 18 service; the runner's own client is older. Same PGDG source as the Dockerfile.
+      - name: Install PostgreSQL 18 client tools
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -sSf -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+
       - name: Uruchom testy integracyjne
         run: dotnet test EasyPDM.Api.Tests --logger "console;verbosity=normal"
 
