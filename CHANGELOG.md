@@ -2,6 +2,12 @@
 
 All notable changes to EasyPDM are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **SolidCraft integration: Upload, Download, Log in and Log out in SolidCraft's File menu.** SolidCraft plugins run without network access, so the integration has two parts: an EasyPDM plugin that prepares each action in an outbox folder in Documents (the design as `.sc`, a STEP and a request), and the new EasyPDM companion program on the same computer, which talks to the server the way the FreeCAD and SolidWorks macros do. A new design's item is created or picked in the browser through the same ticket flow; after its first upload the design remembers its item, and SolidCraft's part number and revision show the EasyPDM record name and revision. A released item gets a new revision only with a comment. The design goes up as `<record name>.<revision>.sc` with its STEP, a preview image and the mass. Download picks an item in the browser, saves its current `.sc` in Documents/EasyPDM/designs with the item link written in, and opens it in the running SolidCraft when its control channel is on (Preferences > Assistant > Let AI agents connect). `easypdm-companion setup-solidcraft` prepares the plugin for the computer and `easypdm-companion autostart` starts the companion at login. SolidCraft has no drawing workspace yet, so there is no title block or drawing PDF for it.
+- **Programs sign in by approval in the browser instead of a password.** A program asks the server for a sign-in, opens EasyPDM in the browser, and the logged-in person sees which program asks and a code and allows or refuses it; the program then gets its own macro token, listed and revocable under Settings → Users like any macro login. The password never passes through the program. The EasyPDM companion uses it today; the FreeCAD and SolidWorks add-ins are meant to as well.
+
 ## [0.8.2]
 
 **In short:** SolidWorks gets the same EasyPDM drawing sheet as FreeCAD — A3, A2 and A1 formats with the title block, processes and revision tables and the company logo filled in on upload. "Drawn by" and "approved by" now come from the server: whoever sends a drawing for review and whoever releases it are written into its PDF at that moment, for FreeCAD and SolidWorks alike. An administrator can limit which file types the server accepts and how large each may be, and an item's History shows who changed its name, properties and tags. Drawing sheets are complete for FreeCAD and SolidWorks; there is no Inventor version for now.

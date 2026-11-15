@@ -23,16 +23,66 @@
           "properties": {
             "outbox_path": {
               "type": "string",
-              "title": "EasyPDM outbox folder"
+              "title": "EasyPDM outbox folder",
+              "description": "Set by `easypdm-companion setup-solidcraft`."
             },
             "comment": {
               "type": "string",
-              "title": "Comment"
+              "title": "Comment",
+              "description": "Needed when the item is released: it starts a new revision."
             }
           },
           "required": [
             "outbox_path"
           ]
+        }
+      },
+      {
+        "name": "download",
+        "effect": "read",
+        "slots": [
+          {
+            "kind": "menu",
+            "name": "File"
+          }
+        ],
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "login",
+        "effect": "read",
+        "slots": [
+          {
+            "kind": "menu",
+            "name": "File"
+          }
+        ],
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "server": {
+              "type": "string",
+              "title": "EasyPDM server",
+              "description": "For example http://192.168.1.49:5001. Leave empty to use the last one."
+            }
+          }
+        }
+      },
+      {
+        "name": "logout",
+        "effect": "read",
+        "slots": [
+          {
+            "kind": "menu",
+            "name": "File"
+          }
+        ],
+        "input_schema": {
+          "type": "object",
+          "properties": {}
         }
       }
     ],

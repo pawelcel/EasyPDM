@@ -23,20 +23,34 @@ self-hosted servers in tangency-labs/solidcraft#17343). So the integration has t
   item is created or picked in the browser through the macros' ticket flow; the design goes up
   as the `cad` attachment `<record name>.<revision>.sc`, with the STEP, a preview from
   `solidcraft-cli snapshot` and the mass from `solidcraft-cli eval`. The outcome is written as
-  `<id>.result.json` and the processed files move to `outbox/done`. Downloads (opening a design
-  in SolidCraft through its local control channel) are still to do.
+  `<id>.result.json` and the processed files move to `outbox/done`. Downloads are saved in
+  `Documents/EasyPDM/designs` with the item link written in and opened in SolidCraft through its
+  local control channel; login and logout come from the plugin's menu too, approved in the
+  browser.
 
 SolidCraft has no drawing workspace yet, so there is no title block or drawing PDF for it.
+
+## Setting it up on a computer
+
+1. `easypdm-companion login --server http://host:port` — allow the sign-in in the browser.
+2. `easypdm-companion setup-solidcraft --plugin easypdm.zip` — writes
+   `Documents/EasyPDM/easypdm-solidcraft.zip`, the plugin with this computer's outbox path set
+   in its upload form (SolidCraft takes only absolute paths inside a granted folder, and a
+   plugin cannot learn its grant's path).
+3. SolidCraft: Preferences > Plugins > Install plugin…, that file; allow the `file` command
+   group and the `outbox` folder, read and write (SolidCraft's file commands see only folders
+   granted both).
+4. `easypdm-companion autostart`, so `watch` runs whenever you are logged in.
+5. To open downloads in SolidCraft: Preferences > Assistant > Let AI agents connect.
+
+The File menu then has **EasyPDM: Upload / Download / Log in / Log out**. The menu entries only
+leave requests in the outbox; the companion does the work.
 
 ## Building the plugin
 
 ```bash
 plugin/build.sh      # needs Rust (target wasm32-unknown-unknown) and wasm-tools
 ```
-
-Install `plugin/easypdm.zip` in SolidCraft under Preferences > Plugins and grant it the `file`
-command group and the `outbox` folder (read and write: SolidCraft's file commands only see
-folders granted both).
 
 ## Tested so far
 
@@ -52,6 +66,11 @@ folders granted both).
   upload creates the item through the browser ticket, the second writes the link and part
   number into the design and goes to the same item without the browser; two uploads in the
   same second before the companion runs get distinct requests, and both land in one item.
+- The whole menu in one headless session against the test server, with the companion in
+  `watch`: Log in (approved in the browser), Upload (new item through the ticket), Download
+  (picked in the browser, saved with the link; opening checked against a stand-in control
+  channel, since no SolidCraft window was running), Log out (token revoked on the server).
+- Not yet: the plugin in SolidCraft's own window, installed through Preferences.
 
 `plugin/wit/plugin.wit` is SolidCraft's plugin interface, copied unchanged from
 [tangency-labs/solidcraft](https://github.com/tangency-labs/solidcraft)

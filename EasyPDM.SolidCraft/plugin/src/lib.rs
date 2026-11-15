@@ -119,14 +119,12 @@ fn upload(params: &Value) -> Result<Value, PluginError> {
     let design = format!("{id}.sc");
     let step = format!("{id}.step");
     // file.* commands take absolute paths within the granted folder.
-    let outbox_path = params
-        .get("outbox_path")
-        .and_then(Value::as_str)
-        .ok_or_else(|| invalid("outbox_path", "the outbox folder is not set up"))?;
-    let sep = if outbox_path.contains('\\') { "\\" } else { "/" };
+    let outbox_path = params.get("outbox_path").and_then(Value::as_str).unwrap_or("");
+    let sep = if outbox_path.is_empty() { "" } else if outbox_path.contains('\\') { "\\" } else { "/" };
 
     log::log(log::Level::Info, &format!("EasyPDM: preparing upload {id}"));
-    run("file.save_as", json!({ "path": format!("{outbox_path}{sep}{design}"), "cache": true }))?;
+    let save = run("file.save_as", json!({ "path": format!("{outbox_path}{sep}{design}"), "cache": true }))?;
+    log::log(log::Level::Info, &format!("EasyPDM: saved {save}"));
     run("file.export_step", json!({ "path": format!("{outbox_path}{sep}{step}") }))?;
 
     if link.get("itemId").is_none() {
@@ -146,12 +144,33 @@ fn upload(params: &Value) -> Result<Value, PluginError> {
     Ok(json!({ "queued": id, "message": "Sent to EasyPDM. The companion program uploads it." }))
 }
 
+// Login, logout and download need nothing from the design: they only leave a request for the
+// companion, which does the work (the login is approved in the browser, so no password is ever
+// written here).
+fn simple_request(kind: &str, extra: Value) -> Result<Value, PluginError> {
+    let id = format!("{}-{kind}", now());
+    let mut request = json!({ "kind": kind, "id": id });
+    if let (Value::Object(r), Value::Object(e)) = (&mut request, extra) {
+        r.extend(e);
+    }
+    files::write_file(OUTBOX, &format!("{id}.request.json"), request.to_string().as_bytes())?;
+    let message = match kind {
+        "login" => "EasyPDM opens in the browser: allow the sign-in there.",
+        "logout" => "Signing out of EasyPDM.",
+        _ => "EasyPDM opens in the browser: pick the item to open.",
+    };
+    Ok(json!({ "queued": id, "message": message }))
+}
+
 impl Guest for Plugin {
     fn execute(entry: String, params: String) -> Result<String, PluginError> {
         let params: Value = serde_json::from_str(if params.is_empty() { "{}" } else { &params })
             .map_err(|e| invalid("params", &e.to_string()))?;
         let result = match entry.as_str() {
             "upload" => upload(&params)?,
+            "login" => simple_request("login", json!({ "server": params.get("server").cloned().unwrap_or(Value::Null) }))?,
+            "logout" => simple_request("logout", json!({}))?,
+            "download" => simple_request("download", json!({}))?,
             other => return Err(invalid("entry", &format!("unknown entry {other}"))),
         };
         Ok(result.to_string())
