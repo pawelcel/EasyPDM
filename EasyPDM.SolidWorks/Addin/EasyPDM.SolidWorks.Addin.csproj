@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SOLIDWORKS loads add-ins into its .NET Framework runtime, so this is a .NET Framework 4.8
+       class library, registered for COM by install.cmd (regasm /codebase). -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>EasyPDM.SolidWorks.Addin</AssemblyName>
+    <RootNamespace>EasyPDM.SolidWorksAddin</RootNamespace>
+    <Version>0.9.0</Version>
+    <PlatformTarget>x64</PlatformTarget>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <ComVisible>false</ComVisible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Builds the .NET Framework target on any OS, Linux CI included. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <!-- SOLIDWORKS 2024 SP1 interop assemblies (Dassault-signed, repackaged on NuGet), used at
+         compile time only: their types are embedded below, so nothing of them ships and the
+         add-in binds to whatever SOLIDWORKS version is installed. -->
+    <PackageReference Include="SolidWorks.Interop.sldworks" Version="32.1.0" PrivateAssets="all" />
+    <PackageReference Include="SolidWorks.Interop.swconst" Version="32.1.0" PrivateAssets="all" />
+    <PackageReference Include="SolidWorks.Interop.swpublished" Version="32.1.0" PrivateAssets="all" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+  <!-- PackageReference has no EmbedInteropTypes switch; set it on the resolved references. -->
+  <Target Name="EmbedSolidWorksInteropTypes" AfterTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <ReferencePath Condition="$([System.String]::Copy('%(FileName)').StartsWith('SolidWorks.Interop.'))">
+        <EmbedInteropTypes>true</EmbedInteropTypes>
+      </ReferencePath>
+    </ItemGroup>
+  </Target>
+
+</Project>
