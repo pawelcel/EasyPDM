@@ -690,7 +690,7 @@ SW_MACRO = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, o
 # property of the same name ($PRP:"pdm_drawn_by"), which the Upload/Download macros write.
 # Bumped by hand on every change to the SolidWorks macro, and written into the first line of its
 # log -- so a log shows at once whether the latest macro was imported or an older copy ran.
-SW_MACRO_REVISION = 6
+SW_MACRO_REVISION = 7
 
 _SW_NATIVE_FIELDS = {
     "pdm_scale": '$PRP:""SW-Sheet Scale""',
@@ -898,6 +898,12 @@ Sub ApplyWidths(ByVal segs As Collection, ByVal widthMm As Double)
     Next seg
     swModel.SetLineWidthCustom widthMm / 1000#
     If Err.Number <> 0 Then LogLine "line width " & widthMm & " mm failed: " & Err.Description
+    Err.Clear
+    ' Black, set explicitly: left at the default, the sheet format's sketch lines came out pale
+    ' grey next to the black tables Upload adds (reported from a live drawing). &H010101 rather
+    ' than 0, which some SolidWorks calls read as "default colour"; the difference is invisible.
+    swModel.SetLineColor &H10101
+    If Err.Number <> 0 Then LogLine "line colour failed: " & Err.Description
     swModel.ClearSelection2 True
     On Error GoTo 0
 End Sub

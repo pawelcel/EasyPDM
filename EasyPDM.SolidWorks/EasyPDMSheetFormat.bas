@@ -199,6 +199,12 @@ Sub ApplyWidths(ByVal segs As Collection, ByVal widthMm As Double)
     Next seg
     swModel.SetLineWidthCustom widthMm / 1000#
     If Err.Number <> 0 Then LogLine "line width " & widthMm & " mm failed: " & Err.Description
+    Err.Clear
+    ' Black, set explicitly: left at the default, the sheet format's sketch lines came out pale
+    ' grey next to the black tables Upload adds (reported from a live drawing). &H010101 rather
+    ' than 0, which some SolidWorks calls read as "default colour"; the difference is invisible.
+    swModel.SetLineColor &H10101
+    If Err.Number <> 0 Then LogLine "line colour failed: " & Err.Description
     swModel.ClearSelection2 True
     On Error GoTo 0
 End Sub
@@ -284,7 +290,7 @@ Sub main()
         Case "polish": gLang = "pl"
         Case "german": gLang = "de"
     End Select
-    LogLine "EasyPDMSheetFormat revision 6 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
+    LogLine "EasyPDMSheetFormat revision 7 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
 
     Set swModel = swApp.ActiveDoc
     If swModel Is Nothing Then
