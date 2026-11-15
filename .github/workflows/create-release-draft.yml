@@ -84,6 +84,14 @@ jobs:
           for f in A3 A2 A1; do
             cp "EasyPDM.FreeCad/templates/EasyPDM_${f}_Landscape.svg" "artifacts/macros/EasyPDM_FreeCad_${f}_Landscape_v${VERSION}.svg"
           done
+          # SolidWorks sheet formats and drawing templates: binary files only SolidWorks can write,
+          # built by EasyPDMSheetFormat on a live SolidWorks and committed under
+          # EasyPDM.SolidWorks/templates -- rebuild and commit them when the sheet layout changes.
+          for f in A3 A2 A1; do
+            for ext in slddrt drwdot; do
+              cp "EasyPDM.SolidWorks/templates/EasyPDM_${f}_Landscape.${ext}" "artifacts/macros/EasyPDM_SW_${f}_Landscape_v${VERSION}.${ext}"
+            done
+          done
 
       # Tag to np. "v0.2", nagłówek w CHANGELOG.md to "## [0.2]" (bez "v") — wycina samą
       # sekcję dla tej wersji (od nagłówka do NASTĘPNEGO "## [", wyłącznie), do notatek

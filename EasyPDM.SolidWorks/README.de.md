@@ -375,12 +375,14 @@ das es bei jedem Senden einer Zeichnung ausfüllt.
 
 ### `EasyPDMSheetFormat.bas` — Blattformat erstellen (einmalig)
 
-**Ohne das Makro:** Jedes Release ab 0.8.2 enthält die fertigen Dateien —
-`EasyPDM_A3/A2/A1_Landscape.slddrt` (Blattformat) und `.drwdot` (Zeichnungsvorlage). Legen Sie
+**Ohne das Makro:** Die fertigen Dateien liegen in [`templates/`](templates/) und in jedem
+Release ab 0.8.2 — `EasyPDM_A3/A2/A1_Landscape.slddrt` (Blattformat) und `.drwdot`
+(Zeichnungsvorlage); ab 0.8.3 als `EasyPDM_SW_A3_Landscape_vX.Y.Z.slddrt` usw. Legen Sie
 sie in einen beliebigen Ordner, tragen Sie ihn unter Extras → Optionen → Dateipositionen ein
 (Blattformate und Dokumentvorlagen) und beginnen Sie Zeichnungen mit der Vorlage; Schritt 3
 unten ist derselbe. Das Makro dient dazu, sie selbst zu erzeugen, z. B. nach einer Änderung an
-`build_templates.py`.
+`build_templates.py` — dann müssen auch die Dateien in `templates/` neu erzeugt und committet
+werden, da nur SolidWorks sie schreiben kann.
 
 Es zeichnet das EasyPDM-Blattformat — denselben Rahmen, dieselbe Feldeinteilung nach ISO 5457
 und dasselbe Schriftfeld wie die FreeCAD-Vorlagen — auf das aktuelle Blatt einer Zeichnung und

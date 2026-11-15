@@ -78,6 +78,11 @@ workflow refuses the build:
 - `EasyPDM.Web/src/version.ts` — `APP_VERSION`
 - `packaging/windows/EasyPDM.iss` — `MyAppVersion`
 
+The SolidWorks sheet formats and drawing templates in `EasyPDM.SolidWorks/templates/` are
+attached by CI, but they are binaries only SolidWorks can write: after a change to the sheet
+layout (`build_templates.py`), rebuild them with `EasyPDMSheetFormat` on a live SolidWorks and
+commit them, or the release ships the old sheet.
+
 SolidWorks `.swp` macros are deliberately **not** attached by CI — they need compiling on a
 live SolidWorks and are added to the draft by hand. When a release carries macro changes,
 that step is what actually delivers them.

@@ -333,11 +333,13 @@ makro Upload, które wypełnia go przy każdej wysyłce rysunku.
 
 ### `EasyPDMSheetFormat.bas` — tworzenie formatu arkusza (raz)
 
-**Bez makra:** każde wydanie od 0.8.2 zawiera gotowe pliki — `EasyPDM_A3/A2/A1_Landscape.slddrt`
-(format arkusza) i `.drwdot` (szablon rysunku). Wystarczy umieścić je w dowolnym folderze, dodać
+**Bez makra:** gotowe pliki są w [`templates/`](templates/) i w każdym wydaniu od 0.8.2 —
+`EasyPDM_A3/A2/A1_Landscape.slddrt` (format arkusza) i `.drwdot` (szablon rysunku); od 0.8.3 pod
+nazwami `EasyPDM_SW_A3_Landscape_vX.Y.Z.slddrt` itd. Wystarczy umieścić je w dowolnym folderze, dodać
 go w Narzędzia → Opcje → Lokalizacje plików (Formaty arkusza i Szablony dokumentów) i zaczynać
 rysunki od szablonu; krok 3 poniżej jest ten sam. Makro służy do zbudowania ich samemu, np. po
-zmianie `build_templates.py`.
+zmianie `build_templates.py` — wtedy pliki w `templates/` też trzeba zbudować od nowa i
+zacommitować, bo zapisać je potrafi tylko SolidWorks.
 
 Rysuje format arkusza EasyPDM — tę samą ramkę, strefy wg ISO 5457 i tabelkę co szablony
 FreeCAD — na bieżącym arkuszu rysunku i zapisuje go jako format arkusza (`.slddrt`) i szablon
