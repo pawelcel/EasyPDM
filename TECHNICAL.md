@@ -64,9 +64,10 @@ PostgreSQL 18.
   uploads the file with STEP/PDF/preview, renames the local file to the record name, fills
   the drawing sheet) and `EasyPDMDownload.FCMacro` (pick an item in the browser, fetch it
   with its whole component tree so `App::Link` references resolve, open it). The folder is
-  also a FreeCAD add-on (`InitGui.py`, `easypdm_addon.py`): an EasyPDM menu in every
-  workbench whose Upload and Download run those same macros, plus Log in (approved in the
-  browser) and Log out. Live-tested on FreeCAD 1.1; see `EasyPDM.FreeCad/README.md`.
+  also a FreeCAD add-on (`init_gui.py`, `easypdm_addon.py`, assembled by `build_addon.sh` in
+  FreeCAD's namespaced layout and published to `pawelcel/EasyPDM-FreeCAD`): an EasyPDM
+  workbench, and optionally a menu in every workbench, whose Upload and Download run those same
+  macros, plus Log in (approved in the browser) and Log out. Live-tested on FreeCAD 1.1; see `EasyPDM.FreeCad/README.md`.
 - **`EasyPDM.SolidWorks/`** — the SolidWorks counterpart (VBA macros
   `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, plus `EasyPDMSheetFormat.bas` for the drawing
   sheet), live-tested on SolidWorks 2024; `Addin/` is a .NET Framework COM add-in with an

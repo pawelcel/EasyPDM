@@ -33,8 +33,10 @@ folderu przy każdym wydaniu (`build_addon.sh`, workflow `sync-freecad-addon.yml
 **Ręcznie:** Rozpakuj `EasyPDM_FreeCad_Addon_vX.zip` z wydania do folderu `Mod` FreeCAD (Linux zwykle
 `~/.local/share/FreeCAD/v1-1/Mod`, Windows `%APPDATA%\FreeCAD\v1-1\Mod`; dokładną ścieżkę
 pokazuje Pomoc → O FreeCAD → „Katalog danych użytkownika” + `Mod`) i uruchom FreeCAD ponownie.
-W każdym środowisku pracy pojawi się menu **EasyPDM** z pozycjami **Wyślij (Upload)**,
-**Pobierz (Download)**, **Zaloguj…** i **Wyloguj**. Upload i Download to te same dwa makra
+Środowisko pracy **EasyPDM** ma menu i pasek narzędzi z pozycjami **Wyślij (Upload)**,
+**Pobierz (Download)**, **Zaloguj…** i **Wyloguj**; zaznaczenie **Menu EasyPDM w każdym środowisku
+pracy** w jego menu pokazuje to samo menu w każdym innym środowisku (domyślnie wyłączone, jak
+wymaga indeks dodatków FreeCAD). Upload i Download to te same dwa makra
 opisane niżej, zawarte w dodatku, więc działają identycznie. **Zaloguj…** zatwierdza logowanie
 w przeglądarce — otwiera się EasyPDM, sprawdzasz kod i klikasz Zezwól, a FreeCAD nigdy nie widzi
 hasła; „Log in with password…” zostaje dla serwerów starszych niż 0.9. Logowanie jest wspólne z

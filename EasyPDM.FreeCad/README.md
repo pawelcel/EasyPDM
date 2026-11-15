@@ -32,8 +32,9 @@ release (`build_addon.sh`, workflow `sync-freecad-addon.yml`).
 **By hand:** Unpack `EasyPDM_FreeCad_Addon_vX.zip` from the release into FreeCAD's `Mod` folder (FreeCAD
 shows it under Help → About FreeCAD → Copy to clipboard: "User data directory" + `Mod`; on
 Linux usually `~/.local/share/FreeCAD/v1-1/Mod`, on Windows
-`%APPDATA%\FreeCAD\v1-1\Mod`) and restart FreeCAD. Every workbench then has an **EasyPDM**
-menu with **Upload**, **Download**, **Log in…** and **Log out**. Upload and Download are the
+`%APPDATA%\FreeCAD\v1-1\Mod`) and restart FreeCAD. The **EasyPDM** workbench then has a menu and a toolbar with **Upload**,
+**Download**, **Log in…** and **Log out**; ticking **EasyPDM menu in every workbench** in its menu
+shows the same menu in every other workbench too (off by default, as FreeCAD's Addon Index asks). Upload and Download are the
 two macros below, carried inside the add-on, so they behave exactly the same. **Log in…**
 approves the sign-in in the browser — EasyPDM opens, you check the code and click Allow, and
 FreeCAD never sees the password; "Log in with password…" is kept for servers older than 0.9.

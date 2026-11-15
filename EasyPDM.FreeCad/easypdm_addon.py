@@ -1,5 +1,7 @@
-# EasyPDM add-on for FreeCAD: an "EasyPDM" menu in every workbench with Log in, Log out,
-# Upload and Download, instead of running the macros by hand.
+# EasyPDM add-on for FreeCAD: an EasyPDM workbench with Upload, Download, Log in and Log out,
+# instead of running the macros by hand. The same menu can also be shown in every workbench,
+# off by default (FreeCAD's Addon Index asks add-ons to keep to their own workbench unless the
+# user asks otherwise): "EasyPDM menu in every workbench" in the workbench's menu.
 #
 # Upload and Download are the macros themselves (EasyPDMUpload.FCMacro, EasyPDMDownload.FCMacro
 # next to this file): each menu click loads the macro afresh into its own namespace and calls its
@@ -38,8 +40,10 @@ CLIENT_NAME = "EasyPDM for FreeCAD"
 
 # Menu texts in FreeCAD's own language (Preferences > General > Language), as the macros do.
 _TEXTS = {
-    "pl": {"Upload": "Wyślij (Upload)", "Download": "Pobierz (Download)", "Log in…": "Zaloguj…", "Log out": "Wyloguj"},
-    "de": {"Upload": "Hochladen", "Download": "Herunterladen", "Log in…": "Anmelden…", "Log out": "Abmelden"},
+    "pl": {"Upload": "Wyślij (Upload)", "Download": "Pobierz (Download)", "Log in…": "Zaloguj…", "Log out": "Wyloguj",
+           "EasyPDM menu in every workbench": "Menu EasyPDM w każdym środowisku pracy"},
+    "de": {"Upload": "Hochladen", "Download": "Herunterladen", "Log in…": "Anmelden…", "Log out": "Abmelden",
+           "EasyPDM menu in every workbench": "EasyPDM-Menü in jedem Arbeitsbereich"},
 }
 
 
@@ -231,7 +235,7 @@ class _Command:
 
     def GetResources(self):
         return {"MenuText": _tr(self.text), "ToolTip": self.tip,
-                "Pixmap": os.path.join(HERE, "icons", "EasyPDM.svg")}
+                "Pixmap": ICON}
 
     def IsActive(self):
         return App.ActiveDocument is not None if self.needs_document else True
@@ -254,18 +258,54 @@ COMMANDS = [
 ]
 
 
+ICON = os.path.join(HERE, "icons", "EasyPDM.svg")
+MENU_EVERYWHERE = "MenuInEveryWorkbench"
+
+
+def menu_everywhere():
+    return _params().GetBool(MENU_EVERYWHERE, False)
+
+
+class _MenuEverywhereCommand:
+    """The opt-in for the EasyPDM menu in every workbench, a tick in the workbench's own menu."""
+
+    def GetResources(self):
+        return {"MenuText": _tr("EasyPDM menu in every workbench"),
+                "ToolTip": "Show the EasyPDM menu in every workbench, not only in EasyPDM",
+                "Checkable": menu_everywhere()}
+
+    def IsActive(self):
+        return True
+
+    def Activated(self, checked=None):
+        on = (not menu_everywhere()) if checked is None else bool(checked)
+        _params().SetBool(MENU_EVERYWHERE, on)
+        _sync_menu()
+
+
 def register_commands():
     for name, command in COMMANDS:
         Gui.addCommand(name, command)
+    Gui.addCommand("EasyPDM_MenuEverywhere", _MenuEverywhereCommand())
 
 
-# The menu: FreeCAD rebuilds the menu bar whenever the workbench changes, so the EasyPDM menu is
-# put back after every switch, at the end of the bar, before Help when there is one.
-def _ensure_menu(*_):
+def _global_menu_action(bar):
+    return next((a for a in bar.actions() if a.objectName() == "EasyPDM_Menu"), None)
+
+
+# The menu in every workbench, when the user turned it on. FreeCAD rebuilds the menu bar whenever
+# the workbench changes, so it is put back after every switch, at the end of the bar, before Help
+# when there is one. In the EasyPDM workbench its own menu is there already.
+def _sync_menu(*_):
     mw = Gui.getMainWindow()
     bar = mw.menuBar()
+    ours = _global_menu_action(bar)
+    if not menu_everywhere():
+        if ours is not None:
+            bar.removeAction(ours)
+        return
     for action in bar.actions():
-        if action.objectName() == "EasyPDM_Menu" or action.text().replace("&", "") == "EasyPDM":
+        if action is ours or action.text().replace("&", "") == "EasyPDM":
             return
     menu = QtWidgets.QMenu("&EasyPDM", mw)
     menu.menuAction().setObjectName("EasyPDM_Menu")
@@ -284,5 +324,21 @@ def _ensure_menu(*_):
 
 def install_menu():
     mw = Gui.getMainWindow()
-    mw.workbenchActivated.connect(lambda *_: QtCore.QTimer.singleShot(0, _ensure_menu))
-    QtCore.QTimer.singleShot(0, _ensure_menu)
+    mw.workbenchActivated.connect(lambda *_: QtCore.QTimer.singleShot(0, _sync_menu))
+    QtCore.QTimer.singleShot(0, _sync_menu)
+
+
+class EasyPDMWorkbench(Gui.Workbench):
+    """The EasyPDM workbench: its menu and toolbar hold the add-on's commands."""
+
+    MenuText = "EasyPDM"
+    ToolTip = "Upload to and download from an EasyPDM server"
+    Icon = ICON
+
+    def Initialize(self):
+        names = [name for name, _ in COMMANDS]
+        self.appendToolbar("EasyPDM", names)
+        self.appendMenu("EasyPDM", names + ["Separator", "EasyPDM_MenuEverywhere"])
+
+    def GetClassName(self):
+        return "Gui::PythonWorkbench"
