@@ -38,6 +38,11 @@ Checking an endpoint by hand with `curl` is not a substitute: a change once pass
 live check and still broke CI, because a test asserted on a hard-coded CSV string nobody
 thought to look at.
 
+The suite covers the server only. A commit that touches nothing but the CAD macros
+(`.bas`, `.FCMacro`, `build_templates.py` and what it generates), documentation or the
+changelog can be pushed without it. Anything under `EasyPDM.Api/`, `db/` or the tests
+themselves cannot — and neither can a frontend change, whose bundle the server serves.
+
 ## Commit messages in English
 
 Switched from Polish; applies to everything from here on. Explain *why* the change is
