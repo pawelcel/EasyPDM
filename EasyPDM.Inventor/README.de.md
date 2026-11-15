@@ -208,6 +208,15 @@ VBA-Projekte. `.bas` ist das Standard-Export-/Importformat für ein VBA-**Modul*
 Die API-Adresse (Standard `http://localhost:5000/api`) wird nach einmaliger Eingabe bei
 der Anmeldung automatisch gespeichert — auch mit den SolidWorks/FreeCAD-Makros geteilt.
 
+### Anmeldung über den Browser
+
+`EasyPDMUpload.bas` hat auch `LoginInBrowser` (EasyPDM-Server ab 0.9): über Extras → Makros
+(`EasyPDMUpload.LoginInBrowser`) starten oder auf eine Schaltfläche im Menüband legen. Es fragt
+nach der Serveradresse, öffnet EasyPDM im Browser mit einem Code und speichert nach Erlauben dort
+und OK in Inventor ein eigenes Makro-Token — das Passwort geht nie durch Inventor. Benutzer und
+Passwort, nach denen das Upload-Makro fragt, funktionieren weiter und sind für ältere Server der
+einzige Weg.
+
 ## Bekannte Risiken / zuerst zu prüfende Stellen
 
 Zwei echte, bestätigte Bugs speziell in dieser Inventor-2027.1-Installation wurden bei

@@ -14,8 +14,8 @@ EasyPDM to miejsce, w którym Twoje Części i Złożenia mają jeden, wspólny 
 zespołu porządek: każdy element ma swój numer, rewizję, status i historię zmian, a
 złożenia — gotowe zestawienie części (BOM). Koniec z
 `wspornik_v3_NAPRAWDE_FINALNA.SLDPRT` na wspólnym dysku i pytaniem "która wersja jest
-aktualna?". Do FreeCAD, SolidWorks i Autodesk Inventor są gotowe makra, które wysyłają i
-pobierają pliki wprost z poziomu programu CAD — reszta (przeglądarka, katalogi
+aktualna?". Do FreeCAD, SolidWorks, Autodesk Inventor i SolidCraft są gotowe makra i menu,
+które wysyłają i pobierają pliki wprost z poziomu programu CAD — reszta (przeglądarka, katalogi
 materiałów/producentów, BOM) działa tak samo niezależnie od tego, w czym projektujesz.
 
 Jestem konstruktorem mechanikiem i dokładnie wiedziałem, jak takie narzędzie powinno
@@ -102,15 +102,19 @@ Po zalogowaniu: wybierz projekt (albo utwórz nowy, jeśli masz uprawnienia) —
 na Twoje pliki i strukturę złożenia — i doinstaluj makro do swojego programu CAD, patrz
 niżej.
 
-## Praca z poziomu FreeCAD / SolidWorks / Inventor
+## Praca z poziomu FreeCAD / SolidWorks / Inventor / SolidCraft
 
 Makra dodają w CAD-zie dwie proste operacje: **Upload** (wyślij aktywny dokument do PDM) i
 **Download** (pobierz Część/Złożenie z PDM, razem z całym złożeniem, i otwórz w programie).
+W FreeCAD i SolidWorks dodatek umieszcza je w **menu EasyPDM**, razem z **Zaloguj**
+(zatwierdzane w przeglądarce, więc program CAD nie widzi Twojego hasła) i **Wyloguj**.
 
 Instalacja i szczegóły:
-- FreeCAD: [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
-- SolidWorks: [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
+- FreeCAD (dodatek albo makra): [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
+- SolidWorks (makra, dodatek w [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
+- SolidCraft (wtyczka + pomocnik EasyPDM, bo wtyczki SolidCraft nie mają sieci):
+  [`EasyPDM.SolidCraft/README.md`](EasyPDM.SolidCraft/README.md)
 
 **Upload** — masz otwarty i zapisany plik, klikasz Upload. Otwiera się przeglądarka
 (automatycznie zalogowana) z pytaniem: nowy element, duplikat istniejącego (kopiuje jego

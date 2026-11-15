@@ -56,24 +56,11 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   tej samej bazie, zerowany przed każdą klasą testową). Lokalnie: `dotnet test
   EasyPDM.Api.Tests` (connection string domyślnie wskazuje na lokalny `pdm`/`pdm_user` —
   nadpisywalny zmienną `EASYPDM_TEST_CONNECTION_STRING`, tak jak w CI).
-- **`EasyPDM.FreeCad/`** — dwa makra: `EasyPDMUpload.FCMacro` (uruchamiane z poziomu
-  FreeCAD, zapisuje aktywny dokument, deleguje wybór projektu/nowy-czy-istniejący/
-  właściwości do przeglądarki, tworzy Część/Złożenie w PDM, dogrywa plik jako załącznik,
-  eksportuje STEP i zmienia nazwę lokalnego pliku na `numer(nazwa)`) i
-  `EasyPDMDownload.FCMacro` (odwrotny kierunek: wybór Części/Złożenia w przeglądarce,
-  pobiera je razem z CAŁYM drzewem składników Złożenia — żeby odnośniki `App::Link` się
-  rozwiązały — i od razu otwiera w FreeCAD; pomija już pobrane pliki, pyta przed
-  nadpisaniem starszej rewizji nowszą). **Oba makra nieprzetestowane na żywym FreeCAD w
-  obecnej wersji** (przepływ przez przeglądarkę) — zob. `EasyPDM.FreeCad/README.md`.
-- **`EasyPDM.SolidWorks/`** — odpowiednik powyższego dla SolidWorks (makra VBA
-  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), z tym samym przepływem przez przeglądarkę,
-  eksportem STEP i automatycznym wykrywaniem drzewa złożenia. **Niezweryfikowane na żywym
-  SolidWorks** — zob. `EasyPDM.SolidWorks/README.md` po szczegóły i znane ryzyka.
-- **`EasyPDM.Inventor/`** — odpowiednik powyższego dla Autodesk Inventor (makra VBA
-  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), port z `EasyPDM.SolidWorks/` z tym samym
-  przepływem przez przeglądarkę, eksportem STEP/PDF i automatycznym wykrywaniem drzewa
-  złożenia. **Niezweryfikowane na żywym Inventorze** — zob. `EasyPDM.Inventor/README.md`
-  po szczegóły i znane ryzyka.
+- **`EasyPDM.FreeCad/`** — dwa makra: `EasyPDMUpload.FCMacro` (zapisuje aktywny dokument, wybór projektu i „nowy czy istniejący” zostawia przeglądarce, tworzy Część/Złożenie, wgrywa plik ze STEP/PDF/podglądem, zmienia nazwę lokalnego pliku na nazwę rekordu, wypełnia arkusz rysunku) i `EasyPDMDownload.FCMacro` (wybór elementu w przeglądarce, pobranie z całym drzewem komponentów, żeby odnośniki `App::Link` się rozwiązały, otwarcie). Folder jest też dodatkiem do FreeCAD (`InitGui.py`, `easypdm_addon.py`): menu EasyPDM w każdym środowisku pracy, którego Upload i Download uruchamiają te same makra, plus Zaloguj (zatwierdzane w przeglądarce) i Wyloguj. Sprawdzone na żywym FreeCAD 1.1; zob. `EasyPDM.FreeCad/README.md`.
+- **`EasyPDM.SolidWorks/`** — odpowiednik dla SolidWorks (makra VBA `EasyPDMUpload.bas`/`EasyPDMDownload.bas` oraz `EasyPDMSheetFormat.bas` do arkusza rysunku), sprawdzony na żywym SolidWorks 2024; `Addin/` to dodatek COM dla .NET Framework z menu i paskiem EasyPDM, który uruchamia skompilowane makra (jeszcze nieuruchomiony w SolidWorks).
+- **`EasyPDM.Inventor/`** — odpowiednik dla Autodesk Inventor (makra VBA `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), port z `EasyPDM.SolidWorks/`; sprawdzony na żywym Inventorze. Bez arkusza rysunku (brak licencji Inventora, na której dałoby się go zrobić).
+- **`EasyPDM.SolidCraft/`** — wtyczka SolidCraft (Rust → komponent WebAssembly). Wtyczki SolidCraft nie mają sieci, więc jej pozycje w menu File (Upload, Download, Zaloguj, Wyloguj) tylko zapisują zlecenia do folderu wymiany w Dokumentach.
+- **`EasyPDM.Companion/`** — program na stanowisku CAD, który obsługuje te zlecenia: rozmawia z serwerem jak makra (te same endpointy, ten sam bilet w przeglądarce), otwiera pobrane pliki w SolidCraft przez jego lokalny kanał sterowania, loguje się przez logowanie urządzenia i działa w tle z powiadomieniami.
 - **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** i **`packaging/windows/`**
   (instalator `.exe`, Inno Setup) — trzy ścieżki wdrożenia bez ręcznego składania z osobna

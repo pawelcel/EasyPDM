@@ -65,27 +65,11 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   EasyPDM.Api.Tests` (die Connection-String zeigt standardmäßig auf ein lokales
   `pdm`/`pdm_user` — überschreibbar über die Variable
   `EASYPDM_TEST_CONNECTION_STRING`, genau wie in der CI).
-- **`EasyPDM.FreeCad/`** — zwei Makros: `EasyPDMUpload.FCMacro` (wird aus FreeCAD heraus
-  ausgeführt, speichert das aktive Dokument, delegiert die Wahl von Projekt/neu-oder-
-  vorhanden/Eigenschaften an den Browser, erstellt ein Teil/eine Baugruppe im PDM, hängt
-  die Datei als Anhang an, exportiert STEP und benennt die lokale Datei in
-  `nummer(name)` um) und `EasyPDMDownload.FCMacro` (die umgekehrte Richtung: Teil/
-  Baugruppe im Browser auswählen, zusammen mit dem GESAMTEN Baum der
-  Baugruppenkomponenten abrufen — damit sich `App::Link`-Referenzen auflösen — und sofort
-  in FreeCAD öffnen; überspringt bereits heruntergeladene Dateien, fragt vor dem
-  Überschreiben einer älteren Revision durch eine neuere). **Beide Makros sind in ihrer
-  aktuellen Version (Browser-basierter Ablauf) auf einem echten FreeCAD ungetestet** —
-  siehe `EasyPDM.FreeCad/README.md`.
-- **`EasyPDM.SolidWorks/`** — das Gegenstück zu oben für SolidWorks (VBA-Makros
-  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), mit demselben Browser-basierten Ablauf,
-  STEP-Export und automatischer Erkennung des Baugruppenbaums. **Nicht auf einem echten
-  SolidWorks verifiziert** — siehe `EasyPDM.SolidWorks/README.md` für Details und bekannte
-  Risiken.
-- **`EasyPDM.Inventor/`** — das Gegenstück zu oben für Autodesk Inventor (VBA-Makros
-  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), portiert aus `EasyPDM.SolidWorks/` mit
-  demselben Browser-basierten Ablauf, STEP/PDF-Export und automatischer Erkennung des
-  Baugruppenbaums. **Nicht auf einem echten Inventor verifiziert** — siehe
-  `EasyPDM.Inventor/README.md` für Details und bekannte Risiken.
+- **`EasyPDM.FreeCad/`** — zwei Makros: `EasyPDMUpload.FCMacro` (speichert das aktive Dokument, überlässt die Wahl von Projekt und „neu oder vorhanden“ dem Browser, legt Teil/Baugruppe an, lädt die Datei mit STEP/PDF/Vorschau hoch, benennt die lokale Datei nach dem Datensatz um, füllt das Zeichnungsblatt) und `EasyPDMDownload.FCMacro` (Element im Browser wählen, mit dem ganzen Komponentenbaum holen, damit `App::Link`-Verweise aufgehen, öffnen). Der Ordner ist auch ein FreeCAD-Add-on (`InitGui.py`, `easypdm_addon.py`): ein EasyPDM-Menü in jedem Arbeitsbereich, dessen Upload und Download dieselben Makros ausführen, dazu Anmelden (im Browser bestätigt) und Abmelden. Auf FreeCAD 1.1 live getestet; siehe `EasyPDM.FreeCad/README.md`.
+- **`EasyPDM.SolidWorks/`** — das Gegenstück für SolidWorks (VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas` und `EasyPDMSheetFormat.bas` für das Zeichnungsblatt), auf SolidWorks 2024 live getestet; `Addin/` ist ein .NET-Framework-COM-Add-in mit EasyPDM-Menü und -Symbolleiste, das die kompilierten Makros ausführt (noch nicht in SolidWorks gelaufen).
+- **`EasyPDM.Inventor/`** — das Gegenstück für Autodesk Inventor (VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), aus `EasyPDM.SolidWorks/` portiert; auf Inventor live getestet. Kein Zeichnungsblatt (keine Inventor-Lizenz, um eines zu bauen).
+- **`EasyPDM.SolidCraft/`** — das SolidCraft-Plugin (Rust → WebAssembly-Komponente). SolidCraft-Plugins haben kein Netzwerk, daher legen seine Einträge im Menü File (Upload, Download, Anmelden, Abmelden) nur Aufträge in einem Ausgangsordner unter Dokumente ab.
+- **`EasyPDM.Companion/`** — das Programm auf dem CAD-Arbeitsplatz, das diese Aufträge erledigt: Es spricht wie die Makros mit dem Server (dieselben Endpunkte, derselbe Browser-Ticket-Ablauf), öffnet Downloads in SolidCraft über dessen lokalen Steuerkanal, meldet sich per Geräteanmeldung an und läuft im Hintergrund mit Desktop-Benachrichtigungen.
 - **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** und **`packaging/windows/`**
   (der `.exe`-Installer, Inno Setup) — drei Bereitstellungswege, ohne Backend/Frontend/

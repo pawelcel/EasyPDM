@@ -59,24 +59,28 @@ PostgreSQL 18.
   database, reset before every test class). Locally: `dotnet test EasyPDM.Api.Tests`
   (the connection string defaults to a local `pdm`/`pdm_user` — overridable via the
   `EASYPDM_TEST_CONNECTION_STRING` variable, same as in CI).
-- **`EasyPDM.FreeCad/`** — two macros: `EasyPDMUpload.FCMacro` (run from within FreeCAD,
-  saves the active document, delegates the project/new-vs-existing/properties choice to
-  the browser, creates a Part/Assembly in the PDM, attaches the file, exports STEP, and
-  renames the local file to `number(name)`) and `EasyPDMDownload.FCMacro` (the opposite
-  direction: pick a Part/Assembly in the browser, fetch it together with the WHOLE tree
-  of the Assembly's components — so that `App::Link` references resolve — and open it
-  in FreeCAD right away; skips already-downloaded files, asks before overwriting an
-  older revision with a newer one). **Both macros are untested on live FreeCAD in their
-  current version** (the browser-based flow) — see `EasyPDM.FreeCad/README.md`.
-- **`EasyPDM.SolidWorks/`** — the SolidWorks counterpart of the above (VBA macros
-  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), with the same browser-based flow, STEP
-  export, and automatic assembly-tree detection. **Unverified on live SolidWorks** — see
-  `EasyPDM.SolidWorks/README.md` for details and known risks.
-- **`EasyPDM.Inventor/`** — the Autodesk Inventor counterpart of the above (VBA macros
-  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), ported from `EasyPDM.SolidWorks/` with the
-  same browser-based flow, STEP/PDF export, and automatic assembly-tree detection.
-  **Unverified on live Inventor** — see `EasyPDM.Inventor/README.md` for details and
-  known risks.
+- **`EasyPDM.FreeCad/`** — two macros, `EasyPDMUpload.FCMacro` (saves the active document,
+  lets the browser pick the project and new-versus-existing, creates the Part/Assembly,
+  uploads the file with STEP/PDF/preview, renames the local file to the record name, fills
+  the drawing sheet) and `EasyPDMDownload.FCMacro` (pick an item in the browser, fetch it
+  with its whole component tree so `App::Link` references resolve, open it). The folder is
+  also a FreeCAD add-on (`InitGui.py`, `easypdm_addon.py`): an EasyPDM menu in every
+  workbench whose Upload and Download run those same macros, plus Log in (approved in the
+  browser) and Log out. Live-tested on FreeCAD 1.1; see `EasyPDM.FreeCad/README.md`.
+- **`EasyPDM.SolidWorks/`** — the SolidWorks counterpart (VBA macros
+  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, plus `EasyPDMSheetFormat.bas` for the drawing
+  sheet), live-tested on SolidWorks 2024; `Addin/` is a .NET Framework COM add-in with an
+  EasyPDM menu and toolbar that runs the compiled macros (not yet run on SolidWorks).
+- **`EasyPDM.Inventor/`** — the Autodesk Inventor counterpart (VBA macros
+  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), ported from `EasyPDM.SolidWorks/`; live-tested
+  on Inventor. No drawing sheet (no Inventor licence to build one on).
+- **`EasyPDM.SolidCraft/`** — the SolidCraft plugin (Rust → WebAssembly component). SolidCraft
+  plugins have no network, so its File-menu entries (Upload, Download, Log in, Log out) only
+  write requests into an outbox folder in Documents.
+- **`EasyPDM.Companion/`** — the program on the CAD workstation that serves those requests:
+  it talks to the server like the macros do (same endpoints, same browser ticket flow),
+  opens downloads in SolidCraft over its local control channel, signs in through device
+  login and runs in the background with desktop notifications.
 - **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** and **`packaging/windows/`**
   (the `.exe` installer, Inno Setup) — three deployment paths without manually assembling

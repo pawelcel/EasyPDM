@@ -13,9 +13,9 @@
 EasyPDM is where your Parts and Assemblies get one, shared order for the whole team:
 every item has its own number, revision, status and change history, and assemblies get
 a ready-made bill of materials (BOM). No more `bracket_v3_FINAL_FOR_REAL.SLDPRT` on a
-shared drive and the question "which version is the current one?". Ready-made macros
-for FreeCAD, SolidWorks and Autodesk Inventor send and fetch files straight from within
-the CAD program — everything else (the browser app, material/manufacturer catalogs, BOM)
+shared drive and the question "which version is the current one?". Ready-made macros and
+menus for FreeCAD, SolidWorks, Autodesk Inventor and SolidCraft send and fetch files straight
+from within the CAD program — everything else (the browser app, material/manufacturer catalogs, BOM)
 works the same regardless of what you design in.
 
 I'm a mechanical design engineer and I knew exactly what such a tool should look like
@@ -101,16 +101,20 @@ After logging in: pick a project (or create a new one, if you have permission) �
 the container for your files and assembly structure — and install the macro for your
 CAD program, see below.
 
-## Working from FreeCAD / SolidWorks / Inventor
+## Working from FreeCAD / SolidWorks / Inventor / SolidCraft
 
 The macros add two simple operations inside the CAD program: **Upload** (send the active
 document to the PDM) and **Download** (fetch a Part/Assembly from the PDM, together with
-the whole assembly, and open it in the program).
+the whole assembly, and open it in the program). In FreeCAD and SolidWorks an add-on puts
+them in an **EasyPDM menu**, with **Log in** (approved in the browser, so the CAD program never
+sees your password) and **Log out**.
 
 Installation and details:
-- FreeCAD: [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
-- SolidWorks: [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
+- FreeCAD (add-on or macros): [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
+- SolidWorks (macros, add-in in [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
+- SolidCraft (plugin + the EasyPDM companion, since SolidCraft plugins have no network):
+  [`EasyPDM.SolidCraft/README.md`](EasyPDM.SolidCraft/README.md)
 
 **Upload** — you have a saved file open, you click Upload. Your browser opens
 (automatically logged in) and asks: new item, duplicate of an existing one (copies its

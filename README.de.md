@@ -14,7 +14,7 @@ EasyPDM ist der Ort, an dem Ihre Teile und Baugruppen eine einzige, für das gan
 gemeinsame Ordnung erhalten: Jedes Element hat seine eigene Nummer, Revision, Status und
 Änderungshistorie, und Baugruppen erhalten eine fertige Stückliste (BOM). Schluss mit
 `halterung_v3_ENDGUELTIG_FINAL.SLDPRT` auf dem gemeinsamen Laufwerk und der Frage
-"welche Version ist eigentlich aktuell?". Für FreeCAD, SolidWorks und Autodesk Inventor
+"welche Version ist eigentlich aktuell?". Für FreeCAD, SolidWorks, Autodesk Inventor und SolidCraft
 gibt es fertige Makros, die Dateien direkt aus dem CAD-Programm heraus senden und abrufen —
 der Rest
 (Browser-Anwendung, Material-/Herstellerkataloge, Stückliste) funktioniert unabhängig
@@ -110,9 +110,22 @@ Nach der Anmeldung: wählen Sie ein Projekt (oder erstellen Sie ein neues, falls
 Berechtigung haben) — das ist der Container für Ihre Dateien und die
 Baugruppenstruktur — und installieren Sie das Makro für Ihr CAD-Programm, siehe unten.
 
-## Arbeiten von FreeCAD / SolidWorks / Inventor aus
+## Arbeiten von FreeCAD / SolidWorks / Inventor / SolidCraft aus
 
 Die Makros fügen im CAD-Programm zwei einfache Operationen hinzu: **Upload** (aktives
+Dokument an das PDM senden) und **Download** (Teil/Baugruppe aus dem PDM abrufen,
+zusammen mit der gesamten Baugruppe, und im Programm öffnen). In FreeCAD und SolidWorks legt
+ein Add-on sie in ein **EasyPDM-Menü**, mit **Anmelden** (im Browser bestätigt, das CAD-Programm
+sieht Ihr Passwort nie) und **Abmelden**.
+
+Installation und Details:
+- FreeCAD (Add-on oder Makros): [`EasyPDM.FreeCad/README.md`](EasyPDM.FreeCad/README.md)
+- SolidWorks (Makros, Add-in in [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
+- Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
+- SolidCraft (Plugin + EasyPDM-Begleitprogramm, da SolidCraft-Plugins kein Netzwerk haben):
+  [`EasyPDM.SolidCraft/README.md`](EasyPDM.SolidCraft/README.md)
+
+**Upload** (aktives
 Dokument an das PDM senden) und **Download** (Teil/Baugruppe aus dem PDM abrufen,
 zusammen mit der gesamten Baugruppe, und im Programm öffnen).
 

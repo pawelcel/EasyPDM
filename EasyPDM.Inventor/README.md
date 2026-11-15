@@ -193,6 +193,15 @@ Like SolidWorks, Inventor has no plain-text macro format — macros are VBA proj
 The API address (default `http://localhost:5000/api`) is saved automatically after being
 entered once at login — shared with the SolidWorks/FreeCAD macros too.
 
+### Logging in through the browser
+
+`EasyPDMUpload.bas` also has `LoginInBrowser` (EasyPDM servers from 0.9): run it from
+Tools → Macros (`EasyPDMUpload.LoginInBrowser`) or bind it to a ribbon button. It asks for the
+server address, opens EasyPDM in the browser with a code, and after you click Allow there and
+OK in Inventor stores the macro's own token — the password never passes through Inventor. The
+login and password asked for by the Upload macro still work, and are the only way for older
+servers.
+
 ## Known risks / places to check first
 
 Two genuine, confirmed bugs specific to this Inventor 2027.1 install were found and fixed
