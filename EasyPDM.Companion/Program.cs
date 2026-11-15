@@ -391,6 +391,58 @@ sealed class SolidCraftCli(string? configured)
         return (p.ExitCode, await stdout);
     }
 
+    // Where command scripts for `solidcraft-cli run` are written: a folder the SolidCraft Flatpak
+    // can see (the outbox's work folder, in Documents).
+    public string ScriptDir { get; set; } = Path.GetTempPath();
+
+    async Task<JsonArray?> RunScript(string design, JsonArray steps, bool save)
+    {
+        Directory.CreateDirectory(ScriptDir);
+        var script = Path.Combine(ScriptDir, $"script-{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(script, steps.ToJsonString());
+        try
+        {
+            var args = save
+                ? new[] { "run", script, "--in", design, "--save", design, "--quiet" }
+                : new[] { "run", script, "--in", design, "--results" };
+            var (code, stdout) = await Run(args);
+            if (code != 0) return null;
+            if (save && File.Exists(design + ".bak")) File.Delete(design + ".bak");
+            return save ? [] : JsonNode.Parse(stdout)?.AsArray();
+        }
+        finally { File.Delete(script); }
+    }
+
+    static JsonObject Step(string command, JsonObject? args = null) =>
+        new() { ["command"] = command, ["params"] = args ?? new JsonObject() };
+
+    // What a design links to (component.links), its top-level BOM (assembly.bom) and its design
+    // properties with EasyPDM's link (document.metadata) -- one run of solidcraft-cli.
+    public async Task<(JsonArray Links, JsonArray BomRows, JsonNode? Metadata)> Inspect(string design)
+    {
+        var r = await RunScript(design, new JsonArray(
+            Step("component.links"),
+            Step("assembly.bom", new JsonObject { ["levels"] = "top" }),
+            Step("document.metadata")), save: false)
+            ?? throw new CompanionException($"SolidCraft could not read {Path.GetFileName(design)}");
+        return (r[0]?["links"]?.AsArray() ?? [], r[1]?["rows"]?.AsArray() ?? [], r[2]);
+    }
+
+    // Points linked components at other files and saves the design (component.relink keeps
+    // their placements and joints).
+    public async Task Relink(string design, IDictionary<int, string> targets)
+    {
+        var steps = new JsonArray();
+        foreach (var (component, path) in targets)
+            steps.Add(Step("component.relink", new JsonObject { ["component"] = component, ["path"] = path }));
+        if (steps.Count > 0 && await RunScript(design, steps, save: true) is null)
+            throw new CompanionException($"SolidCraft could not relink the components of {Path.GetFileName(design)}");
+    }
+
+    public async Task<bool> ExportStep(string design, string step) =>
+        await RunScript(design, new JsonArray(Step("file.export_step", new JsonObject { ["path"] = step })), save: false) is not null
+        && File.Exists(step);
+
     public async Task<double?> MassKg(string design)
     {
         try
@@ -554,6 +606,24 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         api = apiFactory();
         var design = Path.Combine(outbox, request["design"]?.ToString() ?? throw new CompanionException("the request names no design"));
         if (!File.Exists(design)) throw new CompanionException($"{design} is missing");
+        var work = Path.Combine(outbox, "work", request["id"]?.ToString() ?? Guid.NewGuid().ToString("N"));
+        cli.ScriptDir = work;
+        try
+        {
+            return await UploadTop(outbox, request, design, work);
+        }
+        finally
+        {
+            try { if (Directory.Exists(work)) Directory.Delete(work, recursive: true); } catch { /* a leftover work folder is harmless */ }
+        }
+    }
+
+    async Task<JsonObject> UploadTop(string outbox, JsonNode request, string design, string work)
+    {
+        // An assembly's linked designs go first, each as an item of its own -- as the macros send
+        // an assembly's components before its main file -- and the copy uploaded in its place
+        // points at them under their EasyPDM names.
+        var (toUpload, bom, linkedCount) = await PrepareAssembly(design, work, new HashSet<string>(StringComparer.Ordinal), outbox);
         var step = request["step"]?.ToString() is { Length: > 0 } s ? Path.Combine(outbox, s) : null;
         var comment = request["comment"]?.ToString();
         var props = request["properties"];
@@ -595,19 +665,11 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         var revision = item["revisionLabel"]?.ToString() ?? "A";
         var baseName = $"{Sanitize(record)}.{revision}";
 
-        await api.Upload($"/items/{itemId}/attachments", design, baseName + ".sc", new Dictionary<string, string> { ["role"] = "cad" });
+        await api.Upload($"/items/{itemId}/attachments", toUpload, baseName + ".sc", new Dictionary<string, string> { ["role"] = "cad" });
         if (exportStep && step is not null && File.Exists(step))
             await api.Upload($"/items/{itemId}/attachments", step, baseName + ".step", new Dictionary<string, string> { ["role"] = "step" });
-
-        var png = Path.Combine(outbox, Path.GetFileNameWithoutExtension(design) + ".png");
-        if (await cli.Snapshot(design, png))
-            await api.Upload($"/items/{itemId}/attachments", png, baseName + ".png", new Dictionary<string, string> { ["role"] = "image" });
-
-        if (await cli.MassKg(design) is double kg)
-        {
-            try { await api.Send(HttpMethod.Patch, $"/items/{itemId}/properties", new Dictionary<string, string> { ["mass"] = MassText(kg) }); }
-            catch (CompanionException e) { Console.Error.WriteLine($"mass not saved: {e.Message}"); }
-        }
+        await UploadPreviewAndMass(itemId!, toUpload, baseName, Path.Combine(outbox, Path.GetFileNameWithoutExtension(design) + ".png"));
+        var bomNote = await SetBom(itemId!, bom);
 
         // The plugin reads this back into the design on its next upload (see the plugin's
         // link_file): the design learns which item it is without the user doing anything.
@@ -623,8 +685,140 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
             ["itemId"] = itemId,
             ["recordName"] = record,
             ["revision"] = revision,
-            ["message"] = $"uploaded as {baseName}.sc",
+            ["message"] = $"uploaded as {baseName}.sc" + (linkedCount > 0 ? $" with {linkedCount} linked design(s)" : "") + bomNote,
         };
+    }
+
+    async Task UploadPreviewAndMass(string itemId, string design, string baseName, string png)
+    {
+        if (await cli.Snapshot(design, png))
+            await api.Upload($"/items/{itemId}/attachments", png, baseName + ".png", new Dictionary<string, string> { ["role"] = "image" });
+        if (await cli.MassKg(design) is double kg)
+        {
+            try { await api.Send(HttpMethod.Patch, $"/items/{itemId}/properties", new Dictionary<string, string> { ["mass"] = MassText(kg) }); }
+            catch (CompanionException e) { Console.Error.WriteLine($"mass not saved: {e.Message}"); }
+        }
+    }
+
+    sealed record Linked(string ItemId, string Record, string Revision, string WorkPath);
+
+    // The designs `design` links to, each uploaded as its own item (recursively, so a linked
+    // sub-assembly brings its own parts), and the design to upload in its place: a copy in the
+    // flat work folder whose links point at the components' copies there, under their EasyPDM
+    // names -- downloaded together into one folder, the links resolve again. Also the BOM
+    // {item: quantity} from SolidCraft's own count of occurrences. A design without links comes
+    // back unchanged.
+    async Task<(string Design, Dictionary<string, decimal> Bom, int Linked)> PrepareAssembly(string design, string work, HashSet<string> chain, string outbox)
+    {
+        var (links, rows, _) = await cli.Inspect(design);
+        var bom = new Dictionary<string, decimal>();
+        var found = links.Where(l => l?["found"]?.GetValue<bool?>() == true && l?["file"] is not null).ToList();
+        foreach (var l in links.Except(found))
+            Console.Error.WriteLine($"  linked design {l?["path"]} not found ({l?["state"] ?? "missing"}); left out");
+        if (found.Count == 0) return (design, bom, 0);
+
+        Directory.CreateDirectory(work);
+        var byComponent = new Dictionary<int, Linked>();
+        var byFile = new Dictionary<string, Linked>(StringComparer.Ordinal);
+        foreach (var l in found)
+        {
+            var file = l!["file"]!.ToString();
+            if (!byFile.TryGetValue(file, out var linked))
+            {
+                if (!chain.Add(file))
+                    throw new CompanionException($"{Path.GetFileName(file)} links back to itself through its components");
+                linked = await UploadComponent(file, work, chain, outbox);
+                chain.Remove(file);
+                byFile[file] = linked;
+            }
+            byComponent[l["component"]!.GetValue<int>()] = linked;
+        }
+
+        var copy = Path.Combine(work, $"{Guid.NewGuid():N}.sc");
+        File.Copy(design, copy, overwrite: true);
+        await cli.Relink(copy, byComponent.ToDictionary(kv => kv.Key, kv => kv.Value.WorkPath));
+
+        foreach (var row in rows)
+        {
+            var component = row?["components"]?.AsArray().Select(c => c?.GetValue<int>()).FirstOrDefault(c => c is not null && byComponent.ContainsKey(c.Value));
+            if (component is null) continue;   // a component inside the design itself, not a linked file
+            var itemId = byComponent[component.Value].ItemId;
+            bom[itemId] = bom.GetValueOrDefault(itemId) + (row!["count"]?.GetValue<decimal>() ?? 1);
+        }
+        return (copy, bom, byFile.Count);
+    }
+
+    // One linked design: its item from its own EasyPDM link (a downloaded design carries one),
+    // from the link file of an earlier upload of it on its own, from this computer's record of
+    // components uploaded before, or else chosen in the browser as a component. A released item
+    // is used as it is, not uploaded again (as the macros leave released components alone).
+    async Task<Linked> UploadComponent(string file, string work, HashSet<string> chain, string outbox)
+    {
+        var (_, _, metadata) = await cli.Inspect(file);
+        var link = metadata?["metadata"]?["io.github.pawelcel.easypdm"];
+        var props = metadata?["properties"];
+        var itemId = link?["itemId"]?.ToString();
+        if (itemId is null && link?["designId"]?.ToString() is { } did && !did.Contains('/') && !did.Contains('\\')
+            && File.Exists(Path.Combine(outbox, did + ".link.json")))
+            itemId = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(outbox, did + ".link.json")))?["itemId"]?.ToString();
+        itemId ??= LinkStore.Get(file);
+
+        var (toUpload, bom, _) = await PrepareAssembly(file, work, chain, outbox);
+
+        var existing = itemId is not null;
+        var exportStep = true;
+        if (itemId is null)
+        {
+            var name = props?["description"]?.ToString() is { Length: > 0 } d ? d
+                : props?["part_number"]?.ToString() is { Length: > 0 } pn ? pn : Path.GetFileNameWithoutExtension(file);
+            var ticket = await ChooseInBrowser(name, component: true);
+            itemId = ticket["itemId"]!.ToString();
+            existing = ticket["existing"]?.GetValue<bool>() ?? false;
+            exportStep = ticket["exportStep"]?.GetValue<bool?>() ?? true;
+        }
+        var item = await api.Get($"/items/{itemId}") ?? throw new CompanionException("item not found");
+        var record = item["recordName"]?.ToString() ?? $"{item["itemNumber"]}({item["name"]})";
+        var revision = item["revisionLabel"]?.ToString() ?? "A";
+        var baseName = $"{Sanitize(record)}.{revision}";
+        var copy = Path.Combine(work, baseName + ".sc");
+        File.Copy(toUpload, copy, overwrite: true);
+
+        if (existing && (item["isLocked"]?.GetValue<bool>() ?? false))
+            Console.WriteLine($"  {record} is {item["status"]}: used as it is");
+        else
+        {
+            Console.WriteLine($"  component {record}");
+            await api.Upload($"/items/{itemId}/attachments", copy, baseName + ".sc", new Dictionary<string, string> { ["role"] = "cad" });
+            var step = Path.Combine(work, baseName + ".step");
+            if (exportStep && await cli.ExportStep(copy, step))
+                await api.Upload($"/items/{itemId}/attachments", step, baseName + ".step", new Dictionary<string, string> { ["role"] = "step" });
+            await UploadPreviewAndMass(itemId!, copy, baseName, Path.Combine(work, baseName + ".png"));
+            await SetBom(itemId!, bom);
+        }
+        LinkStore.Set(file, itemId!);
+        return new Linked(itemId!, record, revision, copy);
+    }
+
+    // The assembly's BOM positions with SolidCraft's quantities. Positions in EasyPDM that the
+    // design no longer has are only reported: the macros ask before removing them, and there is
+    // nobody to ask here, so removing stays a decision made in the browser.
+    async Task<string> SetBom(string parentId, Dictionary<string, decimal> bom)
+    {
+        if (bom.Count == 0) return "";
+        try
+        {
+            foreach (var (childId, quantity) in bom)
+                await api.Send(HttpMethod.Post, $"/items/{parentId}/children", new { childId, quantity });
+        }
+        catch (CompanionException e)
+        {
+            return $"; BOM not updated: {e.Message}";
+        }
+        var current = (await api.Get($"/items/{parentId}/children"))?.AsArray() ?? [];
+        var stale = current.Select(c => c?["item"] ?? c).Where(c => c?["id"]?.ToString() is { } id && !bom.ContainsKey(id))
+            .Select(c => c?["recordName"]?.ToString() ?? c?["name"]?.ToString()).ToList();
+        return stale.Count == 0 ? ""
+            : $"; still in its EasyPDM BOM but no longer in the design: {string.Join(", ", stale)} (remove them in the browser if they should go)";
     }
 
     // Download: the item is picked in the browser (as the FreeCAD Download macro does, mode
@@ -650,43 +844,86 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         api = apiFactory();
         var picked = await ChooseInBrowser("", mode: "download");
         var itemId = picked["itemId"]!.ToString();
+        var folder = Path.Combine(Path.GetDirectoryName(Outbox.DefaultPath())!, "designs");
+        Directory.CreateDirectory(folder);
+        cli.ScriptDir = Path.Combine(Path.GetDirectoryName(Outbox.DefaultPath())!, "outbox", "work", "download-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var downloaded = new Dictionary<string, string>();
+            var (target, record, revision) = await DownloadItem(itemId, folder, downloaded)
+                ?? throw new CompanionException("the item has no SolidCraft design (.sc) to download");
+            var openError = await SolidCraftApp.Open(target);
+            var parts = downloaded.Count > 1 ? $" with {downloaded.Count - 1} linked design(s)" : "";
+            return new JsonObject
+            {
+                ["ok"] = true, ["itemId"] = itemId, ["recordName"] = record, ["revision"] = revision, ["path"] = target,
+                ["message"] = openError is null ? $"opened {Path.GetFileName(target)}{parts} in SolidCraft" : $"saved {target}{parts}; {openError}",
+            };
+        }
+        finally
+        {
+            try { if (Directory.Exists(cli.ScriptDir)) Directory.Delete(cli.ScriptDir, recursive: true); } catch { }
+        }
+    }
+
+    // The item's current .sc into `folder`, then the designs it links to beside it (its BOM
+    // children that have one), relinked to those files where the link names an older revision.
+    // Everything lands flat in one folder, like the FreeCAD Download macro does.
+    async Task<(string Path, string Record, string Revision)?> DownloadItem(string itemId, string folder, Dictionary<string, string> downloaded)
+    {
+        if (downloaded.TryGetValue(itemId, out var already)) return (already, "", "");
         var item = await api.Get($"/items/{itemId}") ?? throw new CompanionException("item not found");
         var atts = (await api.Get($"/items/{itemId}/attachments"))?.AsArray() ?? [];
         var designs = atts.Where(a => a?["role"]?.ToString() is null or "cad"
                 && (a?["fileName"]?.ToString() ?? "").EndsWith(".sc", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (designs.Count == 0) return null;
         var rev = item["revisionNumber"]?.GetValue<int>();
-        var current = designs.FirstOrDefault(a => a?["revisionNumber"]?.GetValue<int?>() == rev) ?? designs.LastOrDefault()
-            ?? throw new CompanionException($"{item["recordName"]} has no SolidCraft design (.sc) to download");
-
-        var folder = Path.Combine(Path.GetDirectoryName(Outbox.DefaultPath())!, "designs");
-        Directory.CreateDirectory(folder);
+        var current = designs.FirstOrDefault(a => a?["revisionNumber"]?.GetValue<int?>() == rev) ?? designs.Last();
         var target = Path.Combine(folder, Path.GetFileName(current!["fileName"]!.ToString()));
         await api.DownloadTo($"/attachments/{current["id"]}/file", target);
-
+        downloaded[itemId] = target;
         var record = item["recordName"]?.ToString() ?? "";
         var revision = item["revisionLabel"]?.ToString() ?? "A";
+
+        var children = (await api.Get($"/items/{itemId}/children"))?.AsArray() ?? [];
+        var byRecord = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var c in children)
+        {
+            var child = c?["item"] ?? c;
+            if (child?["id"]?.ToString() is not { } childId) continue;
+            if (await DownloadItem(childId, folder, downloaded) is { } got && child["recordName"]?.ToString() is { } childRecord)
+                byRecord[Sanitize(childRecord)] = got.Path;
+        }
+        if (byRecord.Count > 0)
+        {
+            var (links, _, _) = await cli.Inspect(target);
+            var relink = new Dictionary<int, string>();
+            foreach (var l in links)
+            {
+                var name = Path.GetFileName(l?["path"]?.ToString() ?? "");
+                var match = byRecord.FirstOrDefault(kv => name.StartsWith(kv.Key + ".", StringComparison.Ordinal));
+                if (match.Value is not null && !string.Equals(l?["file"]?.ToString(), match.Value, StringComparison.Ordinal))
+                    relink[l!["component"]!.GetValue<int>()] = match.Value;
+            }
+            await cli.Relink(target, relink);
+        }
         await cli.SetLink(target, new JsonObject
         {
             ["designId"] = "i" + itemId, ["itemId"] = itemId, ["recordName"] = record, ["revision"] = revision,
         });
-        var openError = await SolidCraftApp.Open(target);
-        return new JsonObject
-        {
-            ["ok"] = true, ["itemId"] = itemId, ["recordName"] = record, ["revision"] = revision, ["path"] = target,
-            ["message"] = openError is null ? $"opened {Path.GetFileName(target)} in SolidCraft" : $"saved {target}; {openError}",
-        };
+        return (target, record, revision);
     }
 
     // The same two-step dance as the macros' submit_via_browser: offer the form to a tab this run
     // already opened, otherwise open one through the one-time login bridge, then wait for the
     // browser to create the item or attach the upload to an existing one.
-    async Task<JsonNode> ChooseInBrowser(string name, string mode = "create")
+    async Task<JsonNode> ChooseInBrowser(string name, string mode = "create", bool component = false)
     {
         var ticket = Guid.NewGuid().ToString();
         var taken = false;
         if (_tabOpened)
         {
-            await api.Send(HttpMethod.Put, "/cad-requests", new { runId = _runId, ticket, mode, name });
+            await api.Send(HttpMethod.Put, "/cad-requests", new { runId = _runId, ticket, mode, name, component });
             for (var i = 0; i < 15 && !taken; i++)
             {
                 await Task.Delay(400);
@@ -700,7 +937,7 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         {
             var deepLink = mode == "download"
                 ? $"/?ticket={Uri.EscapeDataString(ticket)}&mode=download&runId={_runId}"
-                : $"/?ticket={Uri.EscapeDataString(ticket)}&name={Uri.EscapeDataString(name)}&runId={_runId}";
+                : $"/?ticket={Uri.EscapeDataString(ticket)}&name={Uri.EscapeDataString(name)}&runId={_runId}" + (component ? "&component=1" : "");
             var login = await api.Send(HttpMethod.Post, "/auth/browser-bridge-ticket", new { });
             var url = $"{api.Base}/auth/browser-login?ticket={Uri.EscapeDataString(login!["ticket"]!.ToString())}&redirect={Uri.EscapeDataString(deepLink)}";
             if (openBrowser) Browser.Open(url);
@@ -888,5 +1125,29 @@ static class Background
         public override Encoding Encoding => inner.Encoding;
         public override void Write(char value) => inner.Write(value);
         public override void WriteLine(string? value) => inner.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {value}");
+    }
+}
+
+// This computer's record of which EasyPDM item each linked design file was uploaded as, for
+// components first uploaded as part of an assembly: writing the link into a component's own file
+// could clash with SolidCraft having that file open, so the record stays here, beside the outbox.
+static class LinkStore
+{
+    static string FilePath => Path.Combine(Path.GetDirectoryName(Outbox.DefaultPath())!, "linked-designs.json");
+
+    static Dictionary<string, string> Load()
+    {
+        try { return JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(FilePath)) ?? new(); }
+        catch { return new(); }
+    }
+
+    public static string? Get(string file) => Load().GetValueOrDefault(Path.GetFullPath(file));
+
+    public static void Set(string file, string itemId)
+    {
+        var map = Load();
+        map[Path.GetFullPath(file)] = itemId;
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        File.WriteAllText(FilePath, JsonSerializer.Serialize(map, new JsonSerializerOptions { WriteIndented = true }));
     }
 }

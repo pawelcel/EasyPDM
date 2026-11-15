@@ -28,6 +28,16 @@ self-hosted servers in tangency-labs/solidcraft#17343). So the integration has t
   local control channel; login and logout come from the plugin's menu too, approved in the
   browser.
 
+**Assemblies of linked designs** (`component.insert_design`): the companion uploads each
+linked design first as an item of its own (recursively; a released one is used as it is),
+relinks a copy of the assembly to the components' copies named `<record name>.<revision>.sc`
+(`component.relink`), uploads that copy and sets the BOM from `assembly.bom` quantities. Download
+fetches the BOM children's designs into the same folder and relinks where a link names an older
+revision. Which item a linked design is: its own EasyPDM link, the link file of an earlier
+upload of it on its own, or `Documents/EasyPDM/linked-designs.json` (written instead of the
+component's file, which SolidCraft may have open). BOM positions the design no longer has are
+only reported, never removed. Components living inside one design are not split into items.
+
 SolidCraft has no drawing workspace yet, so there is no title block or drawing PDF for it.
 
 ## Setting it up on a computer
@@ -70,6 +80,9 @@ plugin/build.sh      # needs Rust (target wasm32-unknown-unknown) and wasm-tools
   `watch`: Log in (approved in the browser), Upload (new item through the ticket), Download
   (picked in the browser, saved with the link; opening checked against a stand-in control
   channel, since no SolidCraft window was running), Log out (token revoked on the server).
+- An assembly linking one part twice: the part uploaded first as a component (`.sc`, STEP,
+  preview), then the assembly with the BOM part × 2; download brought both into one folder with
+  the link resolving to the downloaded part; uploading again went through without the browser.
 - Not yet: the plugin in SolidCraft's own window, installed through Preferences.
 
 `plugin/wit/plugin.wit` is SolidCraft's plugin interface, copied unchanged from
