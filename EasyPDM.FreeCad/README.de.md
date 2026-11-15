@@ -24,6 +24,20 @@ die Anmeldung bei einem reicht für das andere.
 
 ## Installation
 
+### Als Add-on (empfohlen, ab 0.9)
+
+`EasyPDM_FreeCad_Addon_vX.zip` aus dem Release in den `Mod`-Ordner von FreeCAD entpacken (Linux
+meist `~/.local/share/FreeCAD/v1-1/Mod`, Windows `%APPDATA%\FreeCAD\v1-1\Mod`; den genauen Pfad
+zeigt Hilfe → Über FreeCAD → „Benutzerdatenverzeichnis“ + `Mod`) und FreeCAD neu starten. Jeder
+Arbeitsbereich hat dann ein Menü **EasyPDM** mit **Hochladen**, **Herunterladen**, **Anmelden…**
+und **Abmelden**. Hochladen und Herunterladen sind die beiden unten beschriebenen Makros, die im
+Add-on mitkommen, und verhalten sich genauso. **Anmelden…** bestätigt die Anmeldung im Browser —
+EasyPDM öffnet sich, Sie prüfen den Code und klicken Erlauben, und FreeCAD sieht nie das Passwort;
+„Log in with password…“ bleibt für Server älter als 0.9. Die Anmeldung gilt auch für die Makros.
+Die Befehle lassen sich unter Werkzeuge → Anpassen (Kategorie „EasyPDM“) in eine Symbolleiste legen.
+
+### Als Makros
+
 Es muss nichts als Workbench installiert werden. Für jedes der beiden Makros einzeln, in
 FreeCAD:
 

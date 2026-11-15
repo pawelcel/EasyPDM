@@ -22,6 +22,20 @@ w jednym starcza dla drugiego.
 
 ## Instalacja
 
+### Jako dodatek (zalecane, od 0.9)
+
+Rozpakuj `EasyPDM_FreeCad_Addon_vX.zip` z wydania do folderu `Mod` FreeCAD (Linux zwykle
+`~/.local/share/FreeCAD/v1-1/Mod`, Windows `%APPDATA%\FreeCAD\v1-1\Mod`; dokładną ścieżkę
+pokazuje Pomoc → O FreeCAD → „Katalog danych użytkownika” + `Mod`) i uruchom FreeCAD ponownie.
+W każdym środowisku pracy pojawi się menu **EasyPDM** z pozycjami **Wyślij (Upload)**,
+**Pobierz (Download)**, **Zaloguj…** i **Wyloguj**. Upload i Download to te same dwa makra
+opisane niżej, zawarte w dodatku, więc działają identycznie. **Zaloguj…** zatwierdza logowanie
+w przeglądarce — otwiera się EasyPDM, sprawdzasz kod i klikasz Zezwól, a FreeCAD nigdy nie widzi
+hasła; „Log in with password…” zostaje dla serwerów starszych niż 0.9. Logowanie jest wspólne z
+makrami. Polecenia można też dodać do paska narzędzi w Przybory → Dostosuj (kategoria „EasyPDM”).
+
+### Jako makra
+
 Nie trzeba niczego instalować jako workbench. Dla każdego z dwóch makr osobno, w FreeCAD:
 
 - **Macro → Macros… → Add path to macro path list** i wskazać ten folder (`EasyPDM.FreeCad/`),

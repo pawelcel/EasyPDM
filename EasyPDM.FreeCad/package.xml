@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
+  <name>EasyPDM</name>
+  <description>EasyPDM menu in every workbench: log in, log out, upload and download documents to and from an EasyPDM server.</description>
+  <version>0.9.0</version>
+  <maintainer email="noreply@github.com">pawelcel</maintainer>
+  <license file="LICENSE">MIT</license>
+  <url type="repository" branch="main">https://github.com/pawelcel/EasyPDM</url>
+  <icon>icons/EasyPDM.svg</icon>
+  <content>
+    <workbench>
+      <name>EasyPDM</name>
+      <subdirectory>./</subdirectory>
+      <freecadmin>1.0.0</freecadmin>
+    </workbench>
+  </content>
+</package>

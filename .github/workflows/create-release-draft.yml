@@ -84,6 +84,15 @@ jobs:
           for f in A3 A2 A1; do
             cp "EasyPDM.FreeCad/templates/EasyPDM_${f}_Landscape.svg" "artifacts/macros/EasyPDM_FreeCad_${f}_Landscape_v${VERSION}.svg"
           done
+          # The FreeCAD add-on: an "EasyPDM" folder to unpack into FreeCAD's Mod folder; its menu
+          # runs the same macros, which travel inside it.
+          mkdir -p addon/EasyPDM
+          cp EasyPDM.FreeCad/InitGui.py EasyPDM.FreeCad/Init.py EasyPDM.FreeCad/easypdm_addon.py \
+             EasyPDM.FreeCad/package.xml EasyPDM.FreeCad/EasyPDMUpload.FCMacro EasyPDM.FreeCad/EasyPDMDownload.FCMacro \
+             LICENSE addon/EasyPDM/
+          cp -r EasyPDM.FreeCad/icons addon/EasyPDM/
+          mkdir -p addon/EasyPDM/templates && cp EasyPDM.FreeCad/templates/*.svg addon/EasyPDM/templates/
+          (cd addon && zip -q -r "../artifacts/macros/EasyPDM_FreeCad_Addon_v${VERSION}.zip" EasyPDM)
           # SolidWorks sheet formats and drawing templates: binary files only SolidWorks can write,
           # built by EasyPDMSheetFormat on a live SolidWorks and committed under
           # EasyPDM.SolidWorks/templates -- rebuild and commit them when the sheet layout changes.

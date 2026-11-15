@@ -4052,6 +4052,8 @@ def _send_and_link(doc, target_folder):
 
 
 # Odpala się tylko, gdy faktycznie działa GUI FreeCAD (a nie np. freecadcmd/import
-# do testów) — bez GUI i tak nie dałoby się pokazać okna dialogowego.
-if App.GuiUp:
+# do testów) — bez GUI i tak nie dałoby się pokazać okna dialogowego. Only when run as a
+# macro (FreeCAD runs macros as __main__, as EasyPDMDownload relies on too): the EasyPDM
+# FreeCAD add-on loads this file as a module and calls run() from its menu.
+if App.GuiUp and __name__ == "__main__":
     run()

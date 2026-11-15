@@ -22,6 +22,21 @@ with one is enough for the other.
 
 ## Installation
 
+### As an add-on (recommended, from 0.9)
+
+Unpack `EasyPDM_FreeCad_Addon_vX.zip` from the release into FreeCAD's `Mod` folder (FreeCAD
+shows it under Help → About FreeCAD → Copy to clipboard: "User data directory" + `Mod`; on
+Linux usually `~/.local/share/FreeCAD/v1-1/Mod`, on Windows
+`%APPDATA%\FreeCAD\v1-1\Mod`) and restart FreeCAD. Every workbench then has an **EasyPDM**
+menu with **Upload**, **Download**, **Log in…** and **Log out**. Upload and Download are the
+two macros below, carried inside the add-on, so they behave exactly the same. **Log in…**
+approves the sign-in in the browser — EasyPDM opens, you check the code and click Allow, and
+FreeCAD never sees the password; "Log in with password…" is kept for servers older than 0.9.
+The login is the macros' login too. The commands can also be put on a toolbar under
+Tools → Customize (category "EasyPDM").
+
+### As macros
+
 Nothing needs to be installed as a workbench. For each of the two macros separately, in
 FreeCAD:
 
