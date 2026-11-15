@@ -596,6 +596,8 @@ makra. Bilet mostu do przeglądarki wydany dla tokenu makra sprawia, że
 `/auth/browser-login` zakłada osobną sesję przeglądarki, więc token makra nigdy nie trafia
 do przeglądarki.
 
+**Logowanie urządzenia** (`DeviceLoginEndpoints.cs`) loguje program bez pokazywania mu hasła: program woła `POST /api/auth/device/start` (bez logowania) i dostaje tajny, 256-bitowy kod urządzenia oraz krótki kod użytkownika (`ABCD-EFGH`, bez 0/O/1/I), po czym otwiera przeglądarkę na `/?deviceLogin=<kod użytkownika>`. Aplikacja webowa pokazuje, który program prosi i jaki kod (okno przetrwa ekran logowania, jak bilety makr), a **Zezwól** wydaje zwykły token makra dla zalogowanej osoby przez to samo `AuthEndpoints.IssueMacroTokenAsync` co `macro-login`. Program odpytuje `POST /api/auth/device/token` i dostaje token raz (202 w oczekiwaniu, 403 po odmowie, 410 po wygaśnięciu lub odebraniu). Prośby żyją w pamięci dziesięć minut, najwyżej 500 naraz, bo rozpoczęcie nie wymaga logowania; z middleware'u logowania zwolnione są tylko `start` i `token`. Dziś używa tego pomocnik EasyPDM; dodatki do FreeCAD i SolidWorks planowane na 0.9 też mają.
+
 Jeśli tabela `users` jest pusta przy starcie API, samo zakłada domyślne konto
 **`admin` / `admin`** (patrz konsola przy pierwszym uruchomieniu) — zmień to hasło od razu
 po zalogowaniu (`PATCH /api/auth/password`, albo z poziomu aplikacji webowej).
@@ -631,6 +633,8 @@ zmian.
 | POST | `/api/auth/browser-bridge-ticket` | wystawia jednorazowy, krótkotrwały bilet logowania dla bieżącej sesji wołającego |
 | GET | `/api/auth/browser-login` | zamienia bilet logowania (nie sam token sesji) na ciasteczko przeglądarki, dla makr CAD (otwiera przeglądarkę już zalogowaną) |
 | POST | `/api/auth/macro-login` | logowanie makra CAD — osobny, odwoływalny token makra, w tym samym kształcie odpowiedzi co `/auth/login` |
+| POST | `/api/auth/device/start` \| `/api/auth/device/token` | logowanie urządzenia, bez sesji: rozpoczęcie prośby (kod urządzenia + kod użytkownika), potem odpytywanie o token makra po zatwierdzeniu |
+| GET / POST | `/api/auth/device/{userCode}` \| `/approve` \| `/deny` | strona przeglądarki w logowaniu urządzenia: który program prosi, zezwolenie (wydaje mu token makra zalogowanego użytkownika), odmowa |
 | GET/DELETE | `/api/macro-tokens[/{id}]` | tokeny zalogowanych makr — administrator widzi i odwołuje wszystkie, użytkownik tylko swoje |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | zarządzanie kontami — **tylko administrator** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | lista/tworzenie/edycja/usunięcie projektu (zapis — tylko administrator; lista filtrowana wg dostępu) |

@@ -150,6 +150,32 @@ static class AuthEndpoints
 
     // Tokeny makr i sesji przeglądarki trzymane są w bazie tylko jako skrót SHA-256
     // (zob. migracje 071 i 073).
+    // A new macro token for `userId`: listed and revocable in Settings -> Users under `client`.
+    // Shared by the password login (macro-login) and the browser-approved device login
+    // (DeviceLoginEndpoints), so both issue exactly the same kind of token.
+    internal static async Task<(string Token, DateTime ExpiresAt)> IssueMacroTokenAsync(NpgsqlConnection conn, Guid userId, string? client)
+    {
+        var token = "pdmm_" + Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var expiresAt = DateTime.UtcNow.Add(MacroTokenLifetime);
+        client = string.IsNullOrWhiteSpace(client) ? "CAD macro" : client.Trim();
+        if (client.Length > 100) client = client[..100];
+
+        await using (var cleanup = new NpgsqlCommand("DELETE FROM macro_tokens WHERE expires_at < now();", conn))
+            await cleanup.ExecuteNonQueryAsync();
+        await using (var cmd = new NpgsqlCommand("""
+            INSERT INTO macro_tokens (user_id, token_hash, client, expires_at)
+            VALUES (@userId, @hash, @client, @expiresAt);
+            """, conn))
+        {
+            cmd.Parameters.AddWithValue("userId", userId);
+            cmd.Parameters.AddWithValue("hash", HashToken(token));
+            cmd.Parameters.AddWithValue("client", client);
+            cmd.Parameters.AddWithValue("expiresAt", expiresAt);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        return (token, expiresAt);
+    }
+
     internal static string HashToken(string token) =>
         Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)));
 
@@ -231,24 +257,7 @@ static class AuthEndpoints
             if (user is null)
                 return error!;
 
-            var token = "pdmm_" + Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-            var expiresAt = DateTime.UtcNow.Add(MacroTokenLifetime);
-            var client = string.IsNullOrWhiteSpace(body.Client) ? "CAD macro" : body.Client.Trim();
-            if (client.Length > 100) client = client[..100];
-
-            await using (var cleanup = new NpgsqlCommand("DELETE FROM macro_tokens WHERE expires_at < now();", conn))
-                await cleanup.ExecuteNonQueryAsync();
-            await using (var cmd = new NpgsqlCommand("""
-                INSERT INTO macro_tokens (user_id, token_hash, client, expires_at)
-                VALUES (@userId, @hash, @client, @expiresAt);
-                """, conn))
-            {
-                cmd.Parameters.AddWithValue("userId", user.Id);
-                cmd.Parameters.AddWithValue("hash", HashToken(token));
-                cmd.Parameters.AddWithValue("client", client);
-                cmd.Parameters.AddWithValue("expiresAt", expiresAt);
-                await cmd.ExecuteNonQueryAsync();
-            }
+            var (token, expiresAt) = await IssueMacroTokenAsync(conn, user.Id, body.Client);
 
             ctx.Response.Cookies.Append(CookieName, token, new CookieOptions
             {

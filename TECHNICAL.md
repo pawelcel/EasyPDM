@@ -850,6 +850,18 @@ for older servers); the middleware accepts either a session or a macro token.
 makes `/auth/browser-login` create a separate browser session, so the macro token never
 reaches the browser.
 
+**Device login** (`DeviceLoginEndpoints.cs`) signs a program in without its ever seeing the
+password: the program calls `POST /api/auth/device/start` (no login) and gets a secret
+256-bit device code and a short user code (`ABCD-EFGH`, no 0/O/1/I), then opens the browser
+on `/?deviceLogin=<user code>`. The web app shows which program asks and the code (the dialog
+survives the login screen, like the macro tickets), and **Allow** issues an ordinary macro
+token for the logged-in person through the same `AuthEndpoints.IssueMacroTokenAsync` as
+`macro-login`. The program polls `POST /api/auth/device/token` and receives the token once
+(202 while pending, 403 when denied, 410 when expired or already handed out). Requests live
+in memory for ten minutes, at most 500 at once since starting one needs no login; only
+`start` and `token` are exempt from the auth middleware. The EasyPDM companion uses it today;
+the FreeCAD and SolidWorks add-ins planned for 0.9 are meant to as well.
+
 If the `users` table is empty when the API starts, it sets up a default
 **`admin` / `admin`** account on its own (see the console on first run) — change this
 password right after logging in (`PATCH /api/auth/password`, or from within the web
@@ -884,6 +896,8 @@ and the server's message otherwise; the CAD macros show the server's message as 
 | POST | `/api/auth/browser-bridge-ticket` | mints a one-time, short-lived login-bridge ticket for the caller's own session |
 | GET | `/api/auth/browser-login` | exchanges a bridge ticket (not the raw session token) for a browser cookie, for CAD macros (opens the browser already logged in) |
 | POST | `/api/auth/macro-login` | CAD macro login — a separate, revocable macro token in the same response shape as `/auth/login` |
+| POST | `/api/auth/device/start` \| `/api/auth/device/token` | device login, no session needed: start a request (device code + user code), then poll for the macro token once it is approved |
+| GET / POST | `/api/auth/device/{userCode}` \| `/approve` \| `/deny` | the browser side of device login: which program asks, allow (issues it a macro token for the logged-in user), refuse |
 | GET/DELETE | `/api/macro-tokens[/{id}]` | logged-in macro tokens — the administrator sees and revokes all, a user only their own |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | account management — **administrator only** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | list/create/edit/delete a project (writes — administrator only; list filtered by access) |

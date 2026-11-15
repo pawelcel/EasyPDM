@@ -252,6 +252,21 @@ export const api = {
   // Dopełnienie biletu "wybór elementu dla rysunku SolidWorks" (zob. pending-drawing-ticket.ts)
   // -- makro znalazło kilku kandydatów po drzewie widoków rysunku i nie potrafiło samo
   // rozstrzygnąć, do którego podpiąć plik, więc otworzyło przeglądarkę z listą do wyboru.
+  getDeviceLogin: (code: string) =>
+    fetch(`${BASE}/auth/device/${encodeURIComponent(code)}`).then((r) =>
+      handleResponse<{ userCode: string; client: string; createdAt: string }>(r)
+    ),
+
+  approveDeviceLogin: (code: string) =>
+    fetch(`${BASE}/auth/device/${encodeURIComponent(code)}/approve`, { method: "POST" }).then((r) =>
+      handleResponse<{ client: string }>(r)
+    ),
+
+  denyDeviceLogin: (code: string) =>
+    fetch(`${BASE}/auth/device/${encodeURIComponent(code)}/deny`, { method: "POST" }).then((r) =>
+      handleResponse<void>(r)
+    ),
+
   resolveDrawingTicket: (ticket: string, itemId: string, exportPdf: boolean) =>
     fetch(`${BASE}/drawing-tickets/${ticket}/resolve`, json({ itemId, exportPdf })).then((r) =>
       handleResponse<void>(r)

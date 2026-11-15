@@ -13,6 +13,7 @@ import { ProjectSelect } from "@/features/projects/project-select"
 import { useProjects } from "@/features/projects/use-projects"
 import { AddNodeDialog } from "@/features/items/add-node-dialog"
 import { ItemList } from "@/features/items/item-list"
+import { DeviceLoginDialog } from "@/features/auth/device-login-dialog"
 import { PendingDrawingTicketBanner } from "@/features/items/pending-drawing-ticket-banner"
 import { PendingTicketBanner } from "@/features/items/pending-ticket-banner"
 import { TransferProgressPanel } from "@/features/transfer/transfer-progress-panel"
@@ -220,6 +221,7 @@ function App() {
 
           <PendingTicketBanner />
           <PendingDrawingTicketBanner />
+          <DeviceLoginDialog />
           <TransferProgressPanel />
 
           {view === "projects" && (

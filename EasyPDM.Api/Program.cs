@@ -132,7 +132,8 @@ app.Use(async (context, next) =>
     if (context.Request.Path.StartsWithSegments("/api") &&
         !context.Request.Path.StartsWithSegments("/api/auth/login") &&
         !context.Request.Path.StartsWithSegments("/api/auth/macro-login") &&
-        !context.Request.Path.StartsWithSegments("/api/auth/browser-login"))
+        !context.Request.Path.StartsWithSegments("/api/auth/browser-login") &&
+        !DeviceLoginEndpoints.IsAnonymous(context.Request.Path))
     {
         var user = await AuthEndpoints.GetCurrentUser(context, connectionString);
         if (user is null)
@@ -169,6 +170,7 @@ var transferProgressStore = new TransferProgressStore();
 var cadRequestStore = new CadRequestStore();
 
 app.MapAuthEndpoints(connectionString, browserBridgeTicketStore);
+app.MapDeviceLoginEndpoints(connectionString);
 app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
 app.MapProjectAccessEndpoints(connectionString);

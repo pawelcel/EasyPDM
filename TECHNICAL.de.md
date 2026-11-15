@@ -658,6 +658,8 @@ Makro-Token. Ein für ein Makro-Token ausgestelltes Browser-Brücken-Ticket läs
 `/auth/browser-login` eine eigene Browsersitzung anlegen, sodass das Makro-Token nie im
 Browser landet.
 
+**Geräteanmeldung** (`DeviceLoginEndpoints.cs`) meldet ein Programm an, ohne dass es je das Passwort sieht: Das Programm ruft `POST /api/auth/device/start` (ohne Anmeldung) auf und erhält einen geheimen 256-Bit-Gerätecode und einen kurzen Benutzercode (`ABCD-EFGH`, ohne 0/O/1/I) und öffnet den Browser auf `/?deviceLogin=<Benutzercode>`. Die Web-App zeigt, welches Programm fragt, und den Code (der Dialog übersteht den Anmeldebildschirm wie die Makro-Tickets), und **Erlauben** stellt über dasselbe `AuthEndpoints.IssueMacroTokenAsync` wie `macro-login` ein gewöhnliches Makro-Token für die angemeldete Person aus. Das Programm fragt `POST /api/auth/device/token` ab und erhält das Token einmal (202 solange offen, 403 nach Ablehnung, 410 nach Ablauf oder Abholung). Anfragen leben zehn Minuten im Speicher, höchstens 500 gleichzeitig, da der Start keine Anmeldung braucht; nur `start` und `token` sind von der Anmelde-Middleware ausgenommen. Heute nutzt sie der EasyPDM-Begleiter; die für 0.9 geplanten Add-ins für FreeCAD und SolidWorks sollen es ebenfalls.
+
 Wenn die Tabelle `users` beim Start der API leer ist, legt sie selbst ein Standardkonto
 **`admin` / `admin`** an (siehe Konsole beim ersten Start) — ändern Sie dieses Passwort
 sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwendung).
@@ -695,6 +697,8 @@ Meldung des Servers unverändert.
 | POST | `/api/auth/browser-bridge-ticket` | stellt ein einmaliges, kurzlebiges Anmelde-Ticket für die eigene Sitzung des Aufrufers aus |
 | GET | `/api/auth/browser-login` | tauscht ein Anmelde-Ticket (nicht das rohe Sitzungstoken) gegen ein Browser-Cookie, für CAD-Makros (öffnet den Browser bereits angemeldet) |
 | POST | `/api/auth/macro-login` | Anmeldung eines CAD-Makros — eigenes, widerrufbares Makro-Token in derselben Antwortform wie `/auth/login` |
+| POST | `/api/auth/device/start` \| `/api/auth/device/token` | Geräteanmeldung, ohne Sitzung: Anfrage starten (Gerätecode + Benutzercode), dann nach der Freigabe das Makro-Token abholen |
+| GET / POST | `/api/auth/device/{userCode}` \| `/approve` \| `/deny` | Browserseite der Geräteanmeldung: welches Programm fragt, erlauben (stellt ihm ein Makro-Token des angemeldeten Benutzers aus), ablehnen |
 | GET/DELETE | `/api/macro-tokens[/{id}]` | Tokens angemeldeter Makros — der Administrator sieht und widerruft alle, ein Benutzer nur seine eigenen |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | Kontenverwaltung — **nur Administrator** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | Liste/Erstellung/Bearbeitung/Löschung eines Projekts (Schreiben — nur Administrator; Liste nach Zugriff gefiltert) |
