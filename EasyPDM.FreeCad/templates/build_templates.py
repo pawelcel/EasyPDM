@@ -220,7 +220,7 @@ def build_base_sheet(fmt_name, rec=None):
     add(ln(X(70), Y(28), X(180), Y(28), 0.35))
     add(ln(X(163), Y(11), X(163), Y(28), 0.35))
     add(ln(X(140), Y(28), X(140), Y(44), 0.35))
-    add(ln(X(162), Y(28), X(162), Y(44), 0.35))
+    add(ln(X(163), Y(28), X(163), Y(44), 0.35))  # in line with the logo square's edge above
     add("</g>")
     box(x0, y0, 180, 44, 0.7)
     add('<rect id="title_block_frame" x="%s" y="%s" width="180" height="44" style="%s"/>'
@@ -255,8 +255,8 @@ def build_base_sheet(fmt_name, rec=None):
     label("name", X(71.5), Y(14));          value("name", X(71.5), Y(21.5), size=6, bold=True)
     value("name_translations", X(71.5), Y(26.3), size=2.3)
     label("drawing_number", X(71.5), Y(31)); value("drawing_number", X(71.5), Y(40), size=5, bold=True)
-    label("revision", X(141.5), Y(31));     value("revision", X(151), Y(41.5), size=7, bold=True, anchor="middle")
-    label("format", X(163.5), Y(31));       value("format", X(171), Y(40.5), text=fmt_name, anchor="middle")
+    label("revision", X(141.5), Y(31));     value("revision", X(151.5), Y(41.5), size=7, bold=True, anchor="middle")
+    label("format", X(164.5), Y(31));       value("format", X(171.5), Y(41), size=5, text=fmt_name, anchor="middle")
     add("</g>")
 
     if rec is not None:
@@ -690,7 +690,7 @@ SW_MACRO = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, o
 # property of the same name ($PRP:"pdm_drawn_by"), which the Upload/Download macros write.
 # Bumped by hand on every change to the SolidWorks macro, and written into the first line of its
 # log -- so a log shows at once whether the latest macro was imported or an older copy ran.
-SW_MACRO_REVISION = 7
+SW_MACRO_REVISION = 8
 
 _SW_NATIVE_FIELDS = {
     "pdm_scale": '$PRP:""SW-Sheet Scale""',

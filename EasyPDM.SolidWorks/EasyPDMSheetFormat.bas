@@ -290,7 +290,7 @@ Sub main()
         Case "polish": gLang = "pl"
         Case "german": gLang = "de"
     End Select
-    LogLine "EasyPDMSheetFormat revision 7 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
+    LogLine "EasyPDMSheetFormat revision 8 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
 
     Set swModel = swApp.ActiveDoc
     If swModel Is Nothing Then
@@ -433,7 +433,7 @@ Sub DrawA3()
     L 300, 271, 410, 271, 0.35
     L 393, 254, 393, 271, 0.35
     L 370, 271, 370, 287, 0.35
-    L 392, 271, 392, 287, 0.35
+    L 393, 271, 393, 287, 0.35
     L 230, 243, 410, 243, 0.7
     L 410, 243, 410, 287, 0.7
     L 410, 287, 230, 287, 0.7
@@ -490,9 +490,9 @@ Sub DrawA3()
     N 301.5, 274, "$PRP:""pdm_label_drawing_number""", 2, False, False, 14
     N 301.5, 283, "$PRP:""pdm_drawing_number""", 5, True, False, 1
     N 371.5, 274, "$PRP:""pdm_label_revision""", 2, False, False, 8
-    N 381, 284.5, "$PRP:""pdm_revision""", 7, True, True, 1
-    N 393.5, 274, "$PRP:""pdm_label_format""", 2, False, False, 6
-    N 401, 283.5, "A3", 3.5, False, True, 2
+    N 381.5, 284.5, "$PRP:""pdm_revision""", 7, True, True, 1
+    N 394.5, 274, "$PRP:""pdm_label_format""", 2, False, False, 6
+    N 401.5, 284, "A3", 5, False, True, 2
 End Sub
 
 Sub DrawA2()
@@ -555,7 +555,7 @@ Sub DrawA2()
     L 474, 394, 584, 394, 0.35
     L 567, 377, 567, 394, 0.35
     L 544, 394, 544, 410, 0.35
-    L 566, 394, 566, 410, 0.35
+    L 567, 394, 567, 410, 0.35
     L 404, 366, 584, 366, 0.7
     L 584, 366, 584, 410, 0.7
     L 584, 410, 404, 410, 0.7
@@ -624,9 +624,9 @@ Sub DrawA2()
     N 475.5, 397, "$PRP:""pdm_label_drawing_number""", 2, False, False, 14
     N 475.5, 406, "$PRP:""pdm_drawing_number""", 5, True, False, 1
     N 545.5, 397, "$PRP:""pdm_label_revision""", 2, False, False, 8
-    N 555, 407.5, "$PRP:""pdm_revision""", 7, True, True, 1
-    N 567.5, 397, "$PRP:""pdm_label_format""", 2, False, False, 6
-    N 575, 406.5, "A2", 3.5, False, True, 2
+    N 555.5, 407.5, "$PRP:""pdm_revision""", 7, True, True, 1
+    N 568.5, 397, "$PRP:""pdm_label_format""", 2, False, False, 6
+    N 575.5, 407, "A2", 5, False, True, 2
 End Sub
 
 Sub DrawA1()
@@ -705,7 +705,7 @@ Sub DrawA1()
     L 721, 568, 831, 568, 0.35
     L 814, 551, 814, 568, 0.35
     L 791, 568, 791, 584, 0.35
-    L 813, 568, 813, 584, 0.35
+    L 814, 568, 814, 584, 0.35
     L 651, 540, 831, 540, 0.7
     L 831, 540, 831, 584, 0.7
     L 831, 584, 651, 584, 0.7
@@ -790,7 +790,7 @@ Sub DrawA1()
     N 722.5, 571, "$PRP:""pdm_label_drawing_number""", 2, False, False, 14
     N 722.5, 580, "$PRP:""pdm_drawing_number""", 5, True, False, 1
     N 792.5, 571, "$PRP:""pdm_label_revision""", 2, False, False, 8
-    N 802, 581.5, "$PRP:""pdm_revision""", 7, True, True, 1
-    N 814.5, 571, "$PRP:""pdm_label_format""", 2, False, False, 6
-    N 822, 580.5, "A1", 3.5, False, True, 2
+    N 802.5, 581.5, "$PRP:""pdm_revision""", 7, True, True, 1
+    N 815.5, 571, "$PRP:""pdm_label_format""", 2, False, False, 6
+    N 822.5, 581, "A1", 5, False, True, 2
 End Sub

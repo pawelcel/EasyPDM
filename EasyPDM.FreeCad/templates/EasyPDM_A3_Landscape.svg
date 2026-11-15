@@ -80,7 +80,7 @@
   <path d="M 300,271 L 410,271"/>
   <path d="M 393,254 L 393,271"/>
   <path d="M 370,271 L 370,287"/>
-  <path d="M 392,271 L 392,287"/>
+  <path d="M 393,271 L 393,287"/>
   </g>
   <rect id="title_block_frame" x="230" y="243" width="180" height="44" style="fill:none;stroke:#000000;stroke-width:0.7;stroke-linecap:round;stroke-linejoin:round"/>
   <g id="title_block_fields" style="fill:#000000;stroke:none">
@@ -108,9 +108,9 @@
   <text freecad:editable="pdm_label_drawing_number" x="301.5" y="274" style="font-size:2px;fill:#000000"><tspan>DRAWING NUMBER</tspan></text>
   <text freecad:editable="pdm_drawing_number" x="301.5" y="283" style="font-size:5px;fill:#000000;font-weight:bold"><tspan></tspan></text>
   <text freecad:editable="pdm_label_revision" x="371.5" y="274" style="font-size:2px;fill:#000000"><tspan>REVISION</tspan></text>
-  <text freecad:editable="pdm_revision" x="381" y="284.5" style="font-size:7px;fill:#000000;font-weight:bold;text-anchor:middle"><tspan></tspan></text>
-  <text freecad:editable="pdm_label_format" x="393.5" y="274" style="font-size:2px;fill:#000000"><tspan>FORMAT</tspan></text>
-  <text freecad:editable="pdm_format" x="401" y="283.5" style="font-size:3.5px;fill:#000000;text-anchor:middle"><tspan>A3</tspan></text>
+  <text freecad:editable="pdm_revision" x="381.5" y="284.5" style="font-size:7px;fill:#000000;font-weight:bold;text-anchor:middle"><tspan></tspan></text>
+  <text freecad:editable="pdm_label_format" x="394.5" y="274" style="font-size:2px;fill:#000000"><tspan>FORMAT</tspan></text>
+  <text freecad:editable="pdm_format" x="401.5" y="284" style="font-size:5px;fill:#000000;text-anchor:middle"><tspan>A3</tspan></text>
   </g>
   <g id="pdm_logo" data-x="393" data-y="254" data-size="17"/>
   <g id="pdm_processes" data-x="230" data-bottom="243" data-width="180"/>
