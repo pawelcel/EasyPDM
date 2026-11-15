@@ -4,6 +4,8 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [0.8.2]
 
+**In short:** SolidWorks gets the same EasyPDM drawing sheet as FreeCAD — A3, A2 and A1 formats with the title block, processes and revision tables and the company logo filled in on upload. "Drawn by" and "approved by" now come from the server: whoever sends a drawing for review and whoever releases it are written into its PDF at that moment, for FreeCAD and SolidWorks alike. An administrator can limit which file types the server accepts and how large each may be, and an item's History shows who changed its name, properties and tags. Drawing sheets are complete for FreeCAD and SolidWorks; there is no Inventor version for now.
+
 ![SolidWorks drawing with the EasyPDM title block: processes table, company logo, and "drawn by" / "approved by" stamped by the server](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/solidworks-sheet-title-block.png)
 
 ![The whole EasyPDM A3 sheet in SolidWorks, with the revision table in the top-right corner](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/solidworks-sheet-a3.png)
