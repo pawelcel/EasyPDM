@@ -193,6 +193,16 @@ End Sub
 Sub ApplyWidths(ByVal segs As Collection, ByVal widthMm As Double)
     Dim seg As Object
     On Error Resume Next
+    ' Black, set explicitly and per segment, BEFORE the width: left at the default the lines came
+    ' out pale grey next to the black tables Upload adds, and setting it afterwards on the whole
+    ' selection (ModelDoc2.SetLineColor, revision 7) turned every line as thick as the frame --
+    ' both seen on live drawings. &H010101 rather than 0, which some SolidWorks calls read as
+    ' "default colour"; the difference is invisible.
+    For Each seg In segs
+        seg.Color = &H10101
+    Next seg
+    If Err.Number <> 0 Then LogLine "line colour failed: " & Err.Description
+    Err.Clear
     swModel.ClearSelection2 True
     For Each seg In segs
         seg.Select4 True, Nothing
@@ -200,12 +210,8 @@ Sub ApplyWidths(ByVal segs As Collection, ByVal widthMm As Double)
     swModel.SetLineWidthCustom widthMm / 1000#
     If Err.Number <> 0 Then LogLine "line width " & widthMm & " mm failed: " & Err.Description
     Err.Clear
-    ' Black, set explicitly: left at the default, the sheet format's sketch lines came out pale
-    ' grey next to the black tables Upload adds (reported from a live drawing). &H010101 rather
-    ' than 0, which some SolidWorks calls read as "default colour"; the difference is invisible.
-    swModel.SetLineColor &H10101
-    If Err.Number <> 0 Then LogLine "line colour failed: " & Err.Description
     swModel.ClearSelection2 True
+    If segs.Count > 0 Then LogLine "lines " & widthMm & " mm: " & segs.Count & " segments, first has width " & segs(1).Width & ", colour " & segs(1).Color
     On Error GoTo 0
 End Sub
 
@@ -290,7 +296,7 @@ Sub main()
         Case "polish": gLang = "pl"
         Case "german": gLang = "de"
     End Select
-    LogLine "EasyPDMSheetFormat revision 8 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
+    LogLine "EasyPDMSheetFormat revision 9 start, SolidWorks " & swApp.RevisionNumber & ", language " & swApp.GetCurrentLanguage
 
     Set swModel = swApp.ActiveDoc
     If swModel Is Nothing Then
