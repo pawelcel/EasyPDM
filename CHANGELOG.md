@@ -2,7 +2,7 @@
 
 All notable changes to EasyPDM are documented in this file.
 
-## [Unreleased]
+## [0.8.2]
 
 ### Added
 - **Drawing sheets with a title block filled in from EasyPDM, in SolidWorks.** A one-time setup macro, EasyPDMSheetFormat, draws the EasyPDM A3, A2 or A1 sheet format — the same frame, grid references and title block as in FreeCAD — and saves it as a sheet format and a drawing template. The SolidWorks Upload macro then fills in the title block of a drawing that uses it before saving and sending it: drawn by and approved by with dates, name with translations, drawing number, revision, material, mass, company, labels in the project's main language, a processes table above the title block, a revision table in the top-right corner and the company logo. Running Upload again replaces its own tables and logo and leaves the rest of the drawing alone.
