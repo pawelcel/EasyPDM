@@ -13,6 +13,8 @@ All notable changes to EasyPDM are documented in this file.
 - **A link straight to an item.** `/?item=<id>` opens that item in the whole-database view, also after the login screen; the FreeCAD add-on's "Open in browser" uses it.
 - **Programs sign in by approval in the browser instead of a password.** A program asks the server for a sign-in, opens EasyPDM in the browser, and the logged-in person sees which program asks and a code and allows or refuses it; the program then gets its own macro token, listed and revocable under Settings → Users like any macro login. The password never passes through the program. The EasyPDM companion uses it today; the FreeCAD and SolidWorks add-ins are meant to as well.
 
+- **The server knows every CAD file version an item has had.** Each CAD file upload is recorded, also when a later upload of the same revision replaces the file, and `POST /api/items/cad-versions` tells a CAD program whether its local copy of a component is the current file, an older one (with who uploaded the newer one and when) or one the server has never seen. CAD programs can stamp the file they send (`contentVersion`), so a file saved again unchanged is still recognised; files without a stamp are recognised by their content. The FreeCAD add-on uses it to show which components of an assembly are outdated and to refuse uploading work built on them.
+
 ### Fixed
 - **The browser no longer shows the previous version after the server is updated.** The page was sent without caching rules, so browsers kept the old one for hours on their own reckoning (seen as an "Open in browser" link from a CAD program landing on the start screen). The page is now checked on every load, while the bundle files, whose names change with every build, are kept for good.
 

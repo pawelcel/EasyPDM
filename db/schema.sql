@@ -432,6 +432,7 @@ CREATE TABLE item_attachments (
     uploaded_at  TIMESTAMPTZ DEFAULT now(),
     uploaded_by  UUID REFERENCES users(id) ON DELETE SET NULL,  -- who uploaded it (migration 072)
     sheet_layout TEXT,  -- EasyPDM sheet a PDF came from, e.g. 'easypdm-A3' (migration 080, DrawingStamp.cs)
+    content_version TEXT,  -- version stamp the CAD client wrote into a "cad" file (migration 081, CadVersionEndpoints.cs)
     -- Opcjonalna "rola" załącznika:
     --   pdf/step — wskazuje, KTÓRY załącznik zasila stały podgląd (2D/3D) w panelu
     --     właściwości elementu (jeden na rolę, nowy zastępuje poprzedni).
@@ -454,6 +455,25 @@ CREATE TABLE item_attachments (
 );
 
 CREATE INDEX idx_item_attachments_item ON item_attachments (item_id);
+
+-- Every CAD file version an item has had, one row per "cad" upload, kept after a later upload
+-- of the same revision replaces the attachment (migration 081). CAD clients ask through
+-- POST /api/items/cad-versions whether their local copy of a component is current, older or
+-- unknown: by content_version (a stamp the client wrote into the file, surviving re-saves) or,
+-- for files without one, by file_hash.
+CREATE TABLE item_cad_versions (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id          UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    attachment_id    UUID,
+    file_name        TEXT NOT NULL,
+    content_version  TEXT,
+    file_hash        TEXT,
+    revision_number  INTEGER,
+    uploaded_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    uploaded_by      UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_item_cad_versions_item ON item_cad_versions (item_id);
 
 -- ============================================================
 -- Komentarze do rewizji Części/Złożenia (opcjonalne) — tworzone przy zmianie statusu

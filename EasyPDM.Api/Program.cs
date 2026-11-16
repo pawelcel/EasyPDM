@@ -206,6 +206,7 @@ app.MapManufacturerEndpoints(connectionString);
 app.MapClientEndpoints(connectionString, storage, uploadPolicy);
 app.MapSavedFilterEndpoints(connectionString);
 app.MapAttachmentEndpoints(connectionString, storage, uploadPolicy);
+app.MapCadVersionEndpoints(connectionString);
 app.MapClientVerificationEndpoints(connectionString, storage, uploadPolicy);
 app.MapProjectAttachmentEndpoints(connectionString, storage, uploadPolicy);
 app.MapConfigEndpoints(storage);

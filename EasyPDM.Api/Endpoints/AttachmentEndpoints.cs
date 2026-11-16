@@ -79,6 +79,10 @@ static class AttachmentEndpoints
             if (role != "pdf" || !DrawingStamp.IsKnownLayout(sheetLayout))
                 sheetLayout = null;
 
+            // The version stamp a CAD client wrote into the file it sends (CadVersionEndpoints.cs);
+            // kept only on a "cad" file and only in a plain form, anything else is ignored.
+            var contentVersion = CadVersionEndpoints.CleanContentVersion(role, form["contentVersion"].ToString());
+
             var info = await ItemEndpoints.GetItemTypeAndStatus(connectionString, itemId);
             if (info is null)
                 return Results.NotFound("The item does not exist.");
@@ -116,8 +120,8 @@ static class AttachmentEndpoints
             }
 
             const string insertSql = """
-                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, uploaded_by, preview_role, revision_number, sheet_layout)
-                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @uploadedBy, @role, @revisionNumber, @sheetLayout);
+                INSERT INTO item_attachments (id, item_id, file_name, file_path, file_hash, file_size, uploaded_at, uploaded_by, preview_role, revision_number, sheet_layout, content_version)
+                VALUES (@id, @itemId, @fileName, @filePath, @hash, @size, now(), @uploadedBy, @role, @revisionNumber, @sheetLayout, @contentVersion);
                 """;
             try
             {
@@ -134,7 +138,10 @@ static class AttachmentEndpoints
                 insertCmd.Parameters.AddWithValue("role", (object?)role ?? DBNull.Value);
                 insertCmd.Parameters.AddWithValue("revisionNumber", (object?)info.Value.RevisionNumber ?? DBNull.Value);
                 insertCmd.Parameters.AddWithValue("sheetLayout", (object?)sheetLayout ?? DBNull.Value);
+                insertCmd.Parameters.AddWithValue("contentVersion", (object?)contentVersion ?? DBNull.Value);
                 await insertCmd.ExecuteNonQueryAsync();
+                if (role == "cad")
+                    await CadVersionEndpoints.RecordAsync(conn, itemId, attachmentId, file.FileName, contentVersion, hash, info.Value.RevisionNumber, user.Id);
             }
             catch
             {
@@ -223,6 +230,8 @@ static class AttachmentEndpoints
             insertCmd.Parameters.AddWithValue("role", (object?)body.Role ?? DBNull.Value);
             insertCmd.Parameters.AddWithValue("revisionNumber", (object?)info.Value.RevisionNumber ?? DBNull.Value);
             await insertCmd.ExecuteNonQueryAsync();
+            if (body.Role == "cad")
+                await CadVersionEndpoints.RecordAsync(conn, itemId, attachmentId, fileName, null, hash, info.Value.RevisionNumber, user.Id);
 
             await LogAttachmentHistoryAsync(conn, itemId, fileName, "added", user.Id);
 
