@@ -115,7 +115,8 @@ Installation and details:
 - FreeCAD (add-on, in its own repository): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD), with [its wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki)
 - SolidWorks (macros, add-in in [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
-- SolidCraft (plugin + the EasyPDM companion, since SolidCraft plugins have no network):
+- SolidCraft (plugin + the EasyPDM SolidCraft companion, since SolidCraft plugins have no network):
+  **[installing step by step](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** on the wiki; details in
   [`EasyPDM.SolidCraft/README.md`](EasyPDM.SolidCraft/README.md)
 
 **Upload** — you have a saved file open, you click Upload. Your browser opens

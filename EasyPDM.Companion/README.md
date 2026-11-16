@@ -32,8 +32,10 @@ easypdm-companion status | logout | process | download
 - **Downloads** go to `Documents/EasyPDM/designs`, with the item link written into the design,
   and open in the running SolidCraft through its local control channel when that is on.
 
-Releases carry `EasyPDM_Companion_win-x64_vX.zip` and `EasyPDM_Companion_linux-x64_vX.zip`: one
-self-contained program (no .NET to install) with the SolidCraft plugin package beside it, which
-`setup-solidcraft` picks up by itself.
+Releases carry `EasyPDM_SolidCraft_Companion_win-x64_vX.zip` and
+`EasyPDM_SolidCraft_Companion_linux-x64_vX.zip` (named after SolidCraft, the program it is for):
+one self-contained program (no .NET to install) with the SolidCraft plugin package beside it,
+which `setup-solidcraft` picks up by itself. Installing step by step:
+[SolidCraft](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft) on the wiki.
 
 Build: `dotnet build EasyPDM.Companion` (.NET 10, no other dependencies).

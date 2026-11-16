@@ -86,7 +86,7 @@ jobs:
               -p:PublishSingleFile=true -p:DebugType=none -p:Version="$VERSION" -o "companion/$rid"
             cp EasyPDM.SolidCraft/plugin/easypdm.zip "companion/$rid/easypdm-solidcraft-plugin.zip"
             cp EasyPDM.Companion/README.md "companion/$rid/"
-            (cd "companion/$rid" && zip -q -r "../../artifacts/macros/EasyPDM_Companion_${rid}_v${VERSION}.zip" .)
+            (cd "companion/$rid" && zip -q -r "../../artifacts/macros/EasyPDM_SolidCraft_Companion_${rid}_v${VERSION}.zip" .)
           done
           # The SOLIDWORKS add-in (EasyPDM.SolidWorks/Addin) is not released until it has run on a
           # live SolidWorks. To attach it again: dotnet build EasyPDM.SolidWorks/Addin -c Release

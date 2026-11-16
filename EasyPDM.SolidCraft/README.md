@@ -43,6 +43,8 @@ SolidCraft has no drawing workspace yet, so there is no title block or drawing P
 
 ## Setting it up on a computer
 
+Step by step with screenshots, for Windows and Linux: [SolidCraft](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft) on the wiki.
+
 Needs **SolidCraft 0.43** or later: Upload saves and exports through SolidCraft's `file` commands,
 which a plugin may use only when the user grants it that command group, and 0.42 has no way to
 grant one in its window (its README: "this version has no grant UI yet"); 0.43's install dialog

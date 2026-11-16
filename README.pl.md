@@ -116,6 +116,7 @@ Instalacja i szczegóły:
 - SolidWorks (makra, dodatek w [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (wtyczka + pomocnik EasyPDM, bo wtyczki SolidCraft nie mają sieci):
+  **[instalacja krok po kroku](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** w wiki (po angielsku); szczegóły w
   [`EasyPDM.SolidCraft/README.md`](EasyPDM.SolidCraft/README.md)
 
 **Upload** — masz otwarty i zapisany plik, klikasz Upload. Otwiera się przeglądarka

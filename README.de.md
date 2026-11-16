@@ -125,6 +125,7 @@ Installation und Details:
 - SolidWorks (Makros, Add-in in [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (Plugin + EasyPDM-Begleitprogramm, da SolidCraft-Plugins kein Netzwerk haben):
+  **[Installation Schritt für Schritt](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** im Wiki (auf Englisch); Details in
   [`EasyPDM.SolidCraft/README.md`](EasyPDM.SolidCraft/README.md)
 
 **Upload** — Sie haben eine gespeicherte Datei geöffnet und klicken auf Upload. Der
