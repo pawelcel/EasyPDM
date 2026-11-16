@@ -103,15 +103,8 @@ jobs:
           mkdir -p artifacts/macros
           cp EasyPDM.Inventor/EasyPDMUpload.bas   "artifacts/macros/EasyPDM_Inventor_Upload_v${VERSION}.bas"
           cp EasyPDM.Inventor/EasyPDMDownload.bas "artifacts/macros/EasyPDM_Inventor_Download_v${VERSION}.bas"
-          # SolidWorks sheet formats and drawing templates: binary files only SolidWorks can write,
-          # built by EasyPDMSheetFormat on a live SolidWorks and committed under
-          # EasyPDM.SolidWorks/templates -- rebuild and commit them when the sheet layout changes
-          # (the layout's source is tools/build_templates.py in pawelcel/EasyPDM-FreeCAD).
-          for f in A3 A2 A1; do
-            for ext in slddrt drwdot; do
-              cp "EasyPDM.SolidWorks/templates/EasyPDM_${f}_Landscape.${ext}" "artifacts/macros/EasyPDM_SW_${f}_Landscape_v${VERSION}.${ext}"
-            done
-          done
+          # The SolidWorks sheet formats and drawing templates (EasyPDM.SolidWorks/templates) are
+          # deliberately not attached: the release notes link that folder at the tag instead.
 
       # Tag to np. "v0.2", nagłówek w CHANGELOG.md to "## [0.2]" (bez "v") — wycina samą
       # sekcję dla tej wersji (od nagłówka do NASTĘPNEGO "## [", wyłącznie), do notatek

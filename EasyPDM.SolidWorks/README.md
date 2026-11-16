@@ -356,9 +356,10 @@ which fills it in every time a drawing is sent.
 
 ### `EasyPDMSheetFormat.bas` — creating the sheet format (once)
 
-**Without the macro:** the finished files are in [`templates/`](templates/) and attached to
-every release from 0.8.2 — `EasyPDM_A3/A2/A1_Landscape.slddrt` (sheet format) and `.drwdot`
-(drawing template); from 0.8.3 named `EasyPDM_SW_A3_Landscape_vX.Y.Z.slddrt` and so on. Put them
+**Without the macro:** the finished files are in [`templates/`](templates/) —
+`EasyPDM_A3/A2/A1_Landscape.slddrt` (sheet format) and `.drwdot` (drawing template); take them
+from the folder of the tag your server runs (0.8.2 attached them to its release, later releases
+link the folder instead). Put them
 in any folder, add it under Tools → Options → File Locations (Sheet Formats and Document
 Templates) and start drawings from the template; step 3 below is the same. The macro is for
 building them yourself, e.g. after changing `build_templates.py` — and then the files in

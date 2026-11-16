@@ -400,9 +400,10 @@ das es bei jedem Senden einer Zeichnung ausfüllt.
 
 ### `EasyPDMSheetFormat.bas` — Blattformat erstellen (einmalig)
 
-**Ohne das Makro:** Die fertigen Dateien liegen in [`templates/`](templates/) und in jedem
-Release ab 0.8.2 — `EasyPDM_A3/A2/A1_Landscape.slddrt` (Blattformat) und `.drwdot`
-(Zeichnungsvorlage); ab 0.8.3 als `EasyPDM_SW_A3_Landscape_vX.Y.Z.slddrt` usw. Legen Sie
+**Ohne das Makro:** Die fertigen Dateien liegen in [`templates/`](templates/) —
+`EasyPDM_A3/A2/A1_Landscape.slddrt` (Blattformat) und `.drwdot` (Zeichnungsvorlage); am besten
+aus dem Ordner des Tags der Version, die Ihr Server nutzt (0.8.2 hängte sie an sein Release,
+spätere Releases verlinken den Ordner). Legen Sie
 sie in einen beliebigen Ordner, tragen Sie ihn unter Extras → Optionen → Dateipositionen ein
 (Blattformate und Dokumentvorlagen) und beginnen Sie Zeichnungen mit der Vorlage; Schritt 3
 unten ist derselbe. Das Makro dient dazu, sie selbst zu erzeugen, z. B. nach einer Änderung an

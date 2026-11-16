@@ -357,9 +357,10 @@ makro Upload, które wypełnia go przy każdej wysyłce rysunku.
 
 ### `EasyPDMSheetFormat.bas` — tworzenie formatu arkusza (raz)
 
-**Bez makra:** gotowe pliki są w [`templates/`](templates/) i w każdym wydaniu od 0.8.2 —
-`EasyPDM_A3/A2/A1_Landscape.slddrt` (format arkusza) i `.drwdot` (szablon rysunku); od 0.8.3 pod
-nazwami `EasyPDM_SW_A3_Landscape_vX.Y.Z.slddrt` itd. Wystarczy umieścić je w dowolnym folderze, dodać
+**Bez makra:** gotowe pliki są w [`templates/`](templates/) —
+`EasyPDM_A3/A2/A1_Landscape.slddrt` (format arkusza) i `.drwdot` (szablon rysunku); najlepiej z
+folderu tagu wersji, na której działa serwer (0.8.2 dołączało je do wydania, kolejne wydania
+linkują folder). Wystarczy umieścić je w dowolnym folderze, dodać
 go w Narzędzia → Opcje → Lokalizacje plików (Formaty arkusza i Szablony dokumentów) i zaczynać
 rysunki od szablonu; krok 3 poniżej jest ten sam. Makro służy do zbudowania ich samemu, np. po
 zmianie `build_templates.py` — wtedy pliki w `templates/` też trzeba zbudować od nowa i

@@ -85,9 +85,10 @@ workflow refuses the build:
 - `packaging/windows/EasyPDM.iss` — `MyAppVersion`
 
 The SolidWorks sheet formats and drawing templates in `EasyPDM.SolidWorks/templates/` are
-attached by CI, but they are binaries only SolidWorks can write: after a change to the sheet
+not attached to releases (the user's choice, from 0.9): the release notes link that folder at
+the release's tag. They are binaries only SolidWorks can write: after a change to the sheet
 layout, rebuild them with `EasyPDMSheetFormat` on a live SolidWorks and commit them, or the
-release ships the old sheet.
+tag points at the old sheet.
 
 The sheet layout itself, and the FreeCAD add-on with its macros, live in
 [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9).
