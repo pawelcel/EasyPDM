@@ -88,13 +88,10 @@ jobs:
             cp EasyPDM.Companion/README.md "companion/$rid/"
             (cd "companion/$rid" && zip -q -r "../../artifacts/macros/EasyPDM_Companion_${rid}_v${VERSION}.zip" .)
           done
-          # The SOLIDWORKS add-in (.NET Framework 4.8; builds here against reference assemblies).
-          dotnet build EasyPDM.SolidWorks/Addin -c Release -p:Version="$VERSION"
-          mkdir -p swaddin
-          cp EasyPDM.SolidWorks/Addin/bin/Release/net48/EasyPDM.SolidWorks.Addin.dll \
-             EasyPDM.SolidWorks/Addin/install.cmd EasyPDM.SolidWorks/Addin/uninstall.cmd \
-             EasyPDM.SolidWorks/Addin/README.md swaddin/
-          (cd swaddin && zip -q -r "../artifacts/macros/EasyPDM_SolidWorks_Addin_v${VERSION}.zip" .)
+          # The SOLIDWORKS add-in (EasyPDM.SolidWorks/Addin) is not released until it has run on a
+          # live SolidWorks. To attach it again: dotnet build EasyPDM.SolidWorks/Addin -c Release
+          # -p:Version="$VERSION", then zip bin/Release/net48/EasyPDM.SolidWorks.Addin.dll with
+          # install.cmd, uninstall.cmd and README.md as EasyPDM_SolidWorks_Addin_v${VERSION}.zip.
       # Inventor macros as plain files, ready to import. (FreeCAD's add-on and its macros are
       # released from pawelcel/EasyPDM-FreeCAD, their own repository, since 0.9.)
       - name: Przygotuj makra CAD

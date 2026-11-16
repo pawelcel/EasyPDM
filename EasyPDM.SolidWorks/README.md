@@ -244,10 +244,11 @@ whole macro project), so for EACH of the two files separately:
 The API address (default `http://localhost:5000/api`) is saved automatically after being
 entered once at login — shared by both macros.
 
-### The EasyPDM add-in (from 0.9)
+### The EasyPDM add-in (in the repository, not released yet)
 
 [`Addin/`](Addin/) is a SOLIDWORKS add-in with an EasyPDM menu and toolbar (Upload, Download,
-Log in, Log out) that runs these macros; see its README for installing. Without it, the same
+Log in, Log out) that runs these macros; see its README for building and installing. It is not
+attached to releases until it has run on a live SolidWorks. Without it, the same
 toolbar can be made from the macros by hand:
 
 ### An EasyPDM toolbar

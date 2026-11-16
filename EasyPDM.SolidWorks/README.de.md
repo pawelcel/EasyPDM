@@ -275,7 +275,7 @@ sind VBA-Projekte. `.bas` ist das Standard-Export-/Importformat für ein VBA-**M
 Die API-Adresse (standardmäßig `http://localhost:5000/api`) wird nach der ersten Eingabe
 bei der Anmeldung automatisch gespeichert — gemeinsam für beide Makros.
 
-### Das EasyPDM-Add-in (ab 0.9)
+### Das EasyPDM-Add-in (im Repository, noch nicht veröffentlicht)
 
 [`Addin/`](Addin/) ist ein SOLIDWORKS-Add-in mit EasyPDM-Menü und -Symbolleiste (Upload,
 Download, Anmelden, Abmelden), das diese Makros ausführt; die Installation beschreibt seine

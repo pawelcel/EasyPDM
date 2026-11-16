@@ -245,7 +245,7 @@ projektu makra), więc dla KAŻDEGO z dwóch plików osobno:
 Adres API (domyślnie `http://localhost:5000/api`) zapisuje się automatycznie po pierwszym
 podaniu przy logowaniu — wspólnie dla obu makr.
 
-### Dodatek EasyPDM (od 0.9)
+### Dodatek EasyPDM (w repozytorium, jeszcze niewydany)
 
 [`Addin/`](Addin/) to dodatek do SOLIDWORKS z menu i paskiem EasyPDM (Upload, Download,
 Zaloguj, Wyloguj), który uruchamia te makra; instalację opisuje jego README. Bez niego ten sam
