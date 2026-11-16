@@ -138,6 +138,8 @@ static class Browser
                 const wins = workspace.windowList ? workspace.windowList() : workspace.clientList();
                 for (const w of wins) {
                     if (w.normalWindow && (w.caption || "").indexOf({{JsonSerializer.Serialize(WindowTitle)}}) === 0) {
+                        const active = workspace.activeWindow !== undefined ? workspace.activeWindow : workspace.activeClient;
+                        if (active === w) break;  // already in front: a repeated raise changes nothing
                         if (workspace.activeWindow !== undefined) workspace.activeWindow = w;
                         else workspace.activeClient = w;
                         break;
@@ -1060,10 +1062,15 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
             if (openBrowser)
             {
                 Browser.Open(url);
-                // A browser already running takes the tab without raising its window; give the
-                // page a moment to load and set its title, then bring the window up.
-                await Task.Delay(2500);
-                Browser.Raise();
+                // A browser already running takes the tab without raising its window. The window
+                // is found by the page's title, which the tab has only once the login bridge has
+                // redirected and the app has loaded -- 2.5 s was not always enough in practice --
+                // so try a few times; a raise of a window already in front does nothing.
+                foreach (var wait in new[] { 1500, 2000, 3000, 4000 })
+                {
+                    await Task.Delay(wait);
+                    Browser.Raise();
+                }
             }
             else Console.WriteLine($"  open in the browser: {url}");
             _tabOpened = true;
