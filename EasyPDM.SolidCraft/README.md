@@ -6,7 +6,7 @@ SolidCraft plugins are WebAssembly components with **no network access** (SolidC
 RFC reserves it for signed plugins from a future curated index; EasyPDM asked for a path for
 self-hosted servers in tangency-labs/solidcraft#17343). So the integration has two parts:
 
-- **`plugin/`** — the SolidCraft plugin (Rust, `craft:plugin@0.1.0`). Its File-menu entries
+- **`plugin/`** — the SolidCraft plugin (Rust, `craft:plugin@0.1.0`). Its menu entries (Plugins > EasyPDM)
   prepare an upload in a folder the user grants at install time (the *outbox*): the design as
   `.sc`, a STEP of it and a `<id>.request.json` with the design properties (part number,
   revision…) and EasyPDM's link to the item, kept under the design metadata key
@@ -51,10 +51,16 @@ SolidCraft has no drawing workspace yet, so there is no title block or drawing P
    group and the `outbox` folder, read and write (SolidCraft's file commands see only folders
    granted both).
 4. `easypdm-companion autostart`, so `watch` runs whenever you are logged in.
-5. To open downloads in SolidCraft: Preferences > Assistant > Let AI agents connect.
+5. To open downloads in SolidCraft: Preferences > Assistant > Agents through MCP > Let AI agents connect.
 
-The File menu then has **EasyPDM: Upload / Download / Log in / Log out**. The menu entries only
+The Plugins menu then has **EasyPDM > Upload / Download / Log in / Log out**. The menu entries only
 leave requests in the outbox; the companion does the work.
+
+The names come from each entry's `menu` slot: SolidCraft 0.42 and 0.43 title a plugin command in
+the Plugins menu with its menu slot's name, and 0.43 additionally moves an entry into its File or
+Help menu when the slot names one of those -- labelled there `EasyPDM · upload`, with the entry's
+id. Slots naming File made every command read "File…", so they name the command instead and stay
+in the Plugins menu.
 
 ## Building the plugin
 

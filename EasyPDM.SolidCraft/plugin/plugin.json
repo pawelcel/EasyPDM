@@ -15,7 +15,7 @@
         "slots": [
           {
             "kind": "menu",
-            "name": "File"
+            "name": "Upload"
           }
         ],
         "input_schema": {
@@ -43,7 +43,7 @@
         "slots": [
           {
             "kind": "menu",
-            "name": "File"
+            "name": "Download"
           }
         ],
         "input_schema": {
@@ -57,7 +57,7 @@
         "slots": [
           {
             "kind": "menu",
-            "name": "File"
+            "name": "Log in"
           }
         ],
         "input_schema": {
@@ -77,7 +77,7 @@
         "slots": [
           {
             "kind": "menu",
-            "name": "File"
+            "name": "Log out"
           }
         ],
         "input_schema": {
