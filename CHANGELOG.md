@@ -12,6 +12,8 @@ All notable changes to EasyPDM are documented in this file.
 
 ![The FreeCAD document panel for an assembly: one component has a newer file in EasyPDM, and Upload would refuse it](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM-FreeCAD/images/panel-assembly.png)
 
+![SolidCraft's Plugins menu and ribbon with EasyPDM's Upload, Download, Log in and Log out](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/solidcraft-plugins-menu.png)
+
 ![Signing a CAD program in by approving it in the browser, with the same code as the program shows](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/device-login.png)
 
 The FreeCAD add-on is released on its own: [EasyPDM for FreeCAD 0.9.0](https://github.com/pawelcel/EasyPDM-FreeCAD/releases/tag/v0.9.0), with [a wiki showing where everything is](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki). SolidCraft and the other integrations: [CAD Integrations](https://github.com/pawelcel/EasyPDM/wiki/CAD-Integrations) on the wiki. The SolidWorks sheet formats and drawing templates (A3, A2, A1) are no longer attached to the release: take them from [EasyPDM.SolidWorks/templates](https://github.com/pawelcel/EasyPDM/tree/v0.9.0/EasyPDM.SolidWorks/templates) at this version.
