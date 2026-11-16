@@ -760,7 +760,9 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         var exportStep = true;
         if (itemId is null)
         {
-            var ticket = await ChooseInBrowser(name);
+            // A design that links others is an assembly: say so, as the macros do, so the form
+            // proposes the right kind instead of Part.
+            var ticket = await ChooseInBrowser(name, itemType: linkedCount > 0 ? "assembly" : "part");
             itemId = ticket["itemId"]!.ToString();
             existing = ticket["existing"]?.GetValue<bool>() ?? false;
             exportStep = ticket["exportStep"]?.GetValue<bool?>() ?? true;
@@ -888,7 +890,7 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         {
             var name = props?["description"]?.ToString() is { Length: > 0 } d ? d
                 : props?["part_number"]?.ToString() is { Length: > 0 } pn ? pn : Path.GetFileNameWithoutExtension(file);
-            var ticket = await ChooseInBrowser(name, component: true);
+            var ticket = await ChooseInBrowser(name, component: true, itemType: bom.Count > 0 ? "assembly" : "part");
             itemId = ticket["itemId"]!.ToString();
             existing = ticket["existing"]?.GetValue<bool>() ?? false;
             exportStep = ticket["exportStep"]?.GetValue<bool?>() ?? true;
@@ -1034,13 +1036,13 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
     // The same two-step dance as the macros' submit_via_browser: offer the form to a tab this run
     // already opened, otherwise open one through the one-time login bridge, then wait for the
     // browser to create the item or attach the upload to an existing one.
-    async Task<JsonNode> ChooseInBrowser(string name, string mode = "create", bool component = false)
+    async Task<JsonNode> ChooseInBrowser(string name, string mode = "create", bool component = false, string? itemType = null)
     {
         var ticket = Guid.NewGuid().ToString();
         var taken = false;
         if (_tabOpened)
         {
-            await api.Send(HttpMethod.Put, "/cad-requests", new { runId = _runId, ticket, mode, name, component });
+            await api.Send(HttpMethod.Put, "/cad-requests", new { runId = _runId, ticket, mode, name, component, itemType });
             for (var i = 0; i < 15 && !taken; i++)
             {
                 await Task.Delay(400);
@@ -1056,7 +1058,8 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         {
             var deepLink = mode == "download"
                 ? $"/?ticket={Uri.EscapeDataString(ticket)}&mode=download&runId={_runId}"
-                : $"/?ticket={Uri.EscapeDataString(ticket)}&name={Uri.EscapeDataString(name)}&runId={_runId}" + (component ? "&component=1" : "");
+                : $"/?ticket={Uri.EscapeDataString(ticket)}&name={Uri.EscapeDataString(name)}&runId={_runId}" + (component ? "&component=1" : "")
+                  + (itemType is null ? "" : $"&itemType={itemType}");
             var login = await api.Send(HttpMethod.Post, "/auth/browser-bridge-ticket", new { });
             var url = $"{api.Base}/auth/browser-login?ticket={Uri.EscapeDataString(login!["ticket"]!.ToString())}&redirect={Uri.EscapeDataString(deepLink)}";
             if (openBrowser)
