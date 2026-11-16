@@ -119,7 +119,7 @@ ein Add-on sie in ein **EasyPDM-Menü**, mit **Anmelden** (im Browser bestätigt
 sieht Ihr Passwort nie) und **Abmelden**.
 
 Installation und Details:
-- FreeCAD (Add-on, eigenes Repository): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)
+- FreeCAD (Add-on, eigenes Repository): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD), mit [eigenem Wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki)
 - SolidWorks (Makros, Add-in in [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (Plugin + EasyPDM-Begleitprogramm, da SolidCraft-Plugins kein Netzwerk haben):

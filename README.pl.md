@@ -110,7 +110,7 @@ W FreeCAD i SolidWorks dodatek umieszcza je w **menu EasyPDM**, razem z **Zalogu
 (zatwierdzane w przeglądarce, więc program CAD nie widzi Twojego hasła) i **Wyloguj**.
 
 Instalacja i szczegóły:
-- FreeCAD (dodatek, we własnym repozytorium): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)
+- FreeCAD (dodatek, we własnym repozytorium): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD), z [własnym wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki)
 - SolidWorks (makra, dodatek w [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (wtyczka + pomocnik EasyPDM, bo wtyczki SolidCraft nie mają sieci):
