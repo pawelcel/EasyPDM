@@ -102,7 +102,9 @@ plugin/build.sh      # needs Rust (target wasm32-unknown-unknown) and wasm-tools
   browser, Download picked it in the tab Upload had opened, saved it and opened it in SolidCraft
   once "Let AI agents connect" was on. Without that setting the design is saved and the result
   says why it was not opened.
-- Not yet in the window: Log in / Log out from the plugin's menu, an assembly of linked designs.
+- Also in the window: Log in / Log out from the plugin's menu, and an assembly of two linked
+  designs (components as items of their own, the assembly proposed as an Assembly in the form,
+  the BOM set, the transfer panel showing the tree).
 
 `plugin/wit/plugin.wit` is SolidCraft's plugin interface, copied unchanged from
 [tangency-labs/solidcraft](https://github.com/tangency-labs/solidcraft)
