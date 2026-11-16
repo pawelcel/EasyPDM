@@ -96,7 +96,12 @@ plugin/build.sh      # needs Rust (target wasm32-unknown-unknown) and wasm-tools
 - An assembly linking one part twice: the part uploaded first as a component (`.sc`, STEP,
   preview), then the assembly with the BOM part × 2; download brought both into one folder with
   the link resolving to the downloaded part; uploading again went through without the browser.
-- Not yet: the plugin in SolidCraft's own window, installed through Preferences.
+- In SolidCraft 0.43's own window, installed through Plugins > Install plugin… with the `file`
+  group and the outbox granted, against a real server: Upload created the item through the
+  browser, Download picked it in the tab Upload had opened, saved it and opened it in SolidCraft
+  once "Let AI agents connect" was on. Without that setting the design is saved and the result
+  says why it was not opened.
+- Not yet in the window: Log in / Log out from the plugin's menu, an assembly of linked designs.
 
 `plugin/wit/plugin.wit` is SolidCraft's plugin interface, copied unchanged from
 [tangency-labs/solidcraft](https://github.com/tangency-labs/solidcraft)
