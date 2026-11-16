@@ -10,6 +10,8 @@
 [4. From CAD to PDM — the upload macro](https://youtu.be/vMQPxwWQrGc) ·
 [5. A whole assembly — upload, download, update and drawings](https://youtu.be/vXHYbRlPu_s)
 
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** — installation, using EasyPDM, the CAD integrations (with where the drawing sheets are), settings; with screenshots. FreeCAD add-on: [its own wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki).
+
 EasyPDM is where your Parts and Assemblies get one, shared order for the whole team:
 every item has its own number, revision, status and change history, and assemblies get
 a ready-made bill of materials (BOM). No more `bracket_v3_FINAL_FOR_REAL.SLDPRT` on a

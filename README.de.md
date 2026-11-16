@@ -10,6 +10,8 @@
 [4. Von CAD ins PDM — das Upload-Makro](https://youtu.be/vMQPxwWQrGc) ·
 [5. Eine ganze Baugruppe — Hochladen, Herunterladen, Aktualisieren und Zeichnungen](https://youtu.be/vXHYbRlPu_s)
 
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch) — Installation, Arbeit mit EasyPDM, die CAD-Integrationen (auch wo die Zeichnungsblätter liegen), Einstellungen; mit Screenshots. FreeCAD-Add-on: [eigenes Wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki).
+
 EasyPDM ist der Ort, an dem Ihre Teile und Baugruppen eine einzige, für das ganze Team
 gemeinsame Ordnung erhalten: Jedes Element hat seine eigene Nummer, Revision, Status und
 Änderungshistorie, und Baugruppen erhalten eine fertige Stückliste (BOM). Schluss mit
