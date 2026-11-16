@@ -22,7 +22,8 @@ self-hosted servers in tangency-labs/solidcraft#17343). So the integration has t
   an item goes to it (a released item gets a new revision only with a comment), otherwise the
   item is created or picked in the browser through the macros' ticket flow; the design goes up
   as the `cad` attachment `<record name>.<revision>.sc`, with the STEP, a preview from
-  `solidcraft-cli snapshot` and the mass from `solidcraft-cli eval`. The outcome is written as
+  `solidcraft-cli snapshot` (its background gradient cut out, as the FreeCAD add-on's preview is
+  transparent) and the mass from `solidcraft-cli eval`. The outcome is written as
   `<id>.result.json` and the processed files move to `outbox/done`. Downloads are saved in
   `Documents/EasyPDM/designs` with the item link written in and opened in SolidCraft through its
   local control channel; login and logout come from the plugin's menu too, approved in the

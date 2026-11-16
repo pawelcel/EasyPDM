@@ -74,11 +74,122 @@ sealed class CompanionException(string message) : Exception(message);
 
 static class Browser
 {
+    // The EasyPDM web app's page title (EasyPDM.Web/index.html); the browser window's caption
+    // starts with it. The macros find the window the same way (APP_WINDOW_TITLE, AppActivate).
+    public const string WindowTitle = "EasyPDM — CAD item browser";
+
     public static void Open(string url)
     {
         var psi = OperatingSystem.IsWindows() ? new ProcessStartInfo(url) { UseShellExecute = true }
             : OperatingSystem.IsMacOS() ? new ProcessStartInfo("open", url) : new ProcessStartInfo("xdg-open", url);
         Process.Start(psi);
+    }
+
+    // Brings the browser window with EasyPDM to the front. Needed when a request is handed to a
+    // tab already open (nothing new opens, so nothing comes up by itself) and when a running
+    // browser takes a new tab without raising its window. Best effort, never an error: on KDE
+    // through a KWin script (X11 and Wayland, where no program may activate another's window but
+    // the compositor can), else wmctrl / xdotool under X11, on Windows through the window API.
+    public static void Raise()
+    {
+        try
+        {
+            if (OperatingSystem.IsWindows()) { RaiseWindows(); return; }
+            if (OperatingSystem.IsLinux() && (RaiseKWin() || Try("wmctrl", "-a", WindowTitle)
+                || Try("xdotool", "search", "--name", "^" + Regex.Escape(WindowTitle), "windowactivate")))
+                return;
+        }
+        catch { /* the request is waiting in the tab either way */ }
+    }
+
+    static bool Try(string program, params string[] args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(program) { RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+            using var p = Process.Start(psi);
+            if (p is null) return false;
+            p.WaitForExit(3000);
+            return p.HasExited && p.ExitCode == 0;
+        }
+        catch { return false; }
+    }
+
+    static (int Code, string Out) Run(string program, params string[] args)
+    {
+        var psi = new ProcessStartInfo(program) { RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var p = Process.Start(psi)!;
+        var output = p.StandardOutput.ReadToEnd();
+        p.WaitForExit(3000);
+        return (p.HasExited ? p.ExitCode : -1, output);
+    }
+
+    // As the FreeCAD add-on's _raise_via_kwin: load a one-line KWin script over D-Bus, run it,
+    // unload it. Fails quietly outside KDE (no gdbus, no org.kde.KWin).
+    static bool RaiseKWin()
+    {
+        const string plugin = "easypdm-companion-raise-browser";
+        var path = Path.Combine(Path.GetTempPath(), $"easypdm-kwin-{Environment.ProcessId}.js");
+        try
+        {
+            File.WriteAllText(path, $$"""
+                const wins = workspace.windowList ? workspace.windowList() : workspace.clientList();
+                for (const w of wins) {
+                    if (w.normalWindow && (w.caption || "").indexOf({{JsonSerializer.Serialize(WindowTitle)}}) === 0) {
+                        if (workspace.activeWindow !== undefined) workspace.activeWindow = w;
+                        else workspace.activeClient = w;
+                        break;
+                    }
+                }
+                """);
+            string[] Call(string objectPath, string method, params string[] args) =>
+                ["call", "--session", "--dest", "org.kde.KWin", "--object-path", objectPath, "--method", method, .. args];
+            Run("gdbus", Call("/Scripting", "org.kde.kwin.Scripting.unloadScript", plugin));
+            var (code, output) = Run("gdbus", Call("/Scripting", "org.kde.kwin.Scripting.loadScript", path, plugin));
+            var id = Regex.Match(output, @"-?\d+");
+            if (code != 0 || !id.Success || int.Parse(id.Value) < 0)
+                return false;
+            var (ran, _) = Run("gdbus", Call($"/Scripting/Script{id.Value}", "org.kde.kwin.Script.run"));
+            Run("gdbus", Call("/Scripting", "org.kde.kwin.Scripting.unloadScript", plugin));
+            return ran == 0;
+        }
+        catch { return false; }
+        finally { try { File.Delete(path); } catch { } }
+    }
+
+    // Windows: the first visible top-level window whose title starts with the page title.
+    // Windows may refuse a background program the foreground and flash the taskbar button
+    // instead, which still shows where to look.
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    static void RaiseWindows()
+    {
+        IntPtr found = IntPtr.Zero;
+        Native.EnumWindows((hwnd, _) =>
+        {
+            if (!Native.IsWindowVisible(hwnd)) return true;
+            var text = new StringBuilder(512);
+            Native.GetWindowText(hwnd, text, text.Capacity);
+            if (!text.ToString().StartsWith(WindowTitle, StringComparison.Ordinal)) return true;
+            found = hwnd;
+            return false;
+        }, IntPtr.Zero);
+        if (found == IntPtr.Zero) return;
+        if (Native.IsIconic(found)) Native.ShowWindow(found, 9 /* SW_RESTORE */);
+        Native.SetForegroundWindow(found);
+    }
+
+    static class Native
+    {
+        public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        public static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int max);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hwnd, int command);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
     }
 }
 
@@ -489,7 +600,11 @@ sealed class SolidCraftCli(string? configured)
         {
             var (code, _) = await Run("snapshot", "--in", design, "--out", png, "--view", "iso",
                 "--width", "800", "--height", "600", "--no-grid", "--no-axes");
-            return code == 0 && File.Exists(png);
+            if (code != 0 || !File.Exists(png))
+                return false;
+            // Without the viewport's gradient, as the FreeCAD add-on's preview (TransparentPreview.cs).
+            TransparentPreview.Apply(png);
+            return true;
         }
         catch (Exception e) { Console.Error.WriteLine($"  no preview: {e.Message}"); return false; }
     }
@@ -932,6 +1047,8 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
             }
             if (!taken)
                 try { await api.Send(HttpMethod.Delete, $"/cad-requests?ticket={Uri.EscapeDataString(ticket)}", null); } catch { }
+            else if (openBrowser)
+                Browser.Raise();  // nothing new opens: show the tab that took the request
         }
         if (!taken)
         {
@@ -940,7 +1057,14 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
                 : $"/?ticket={Uri.EscapeDataString(ticket)}&name={Uri.EscapeDataString(name)}&runId={_runId}" + (component ? "&component=1" : "");
             var login = await api.Send(HttpMethod.Post, "/auth/browser-bridge-ticket", new { });
             var url = $"{api.Base}/auth/browser-login?ticket={Uri.EscapeDataString(login!["ticket"]!.ToString())}&redirect={Uri.EscapeDataString(deepLink)}";
-            if (openBrowser) Browser.Open(url);
+            if (openBrowser)
+            {
+                Browser.Open(url);
+                // A browser already running takes the tab without raising its window; give the
+                // page a moment to load and set its title, then bring the window up.
+                await Task.Delay(2500);
+                Browser.Raise();
+            }
             else Console.WriteLine($"  open in the browser: {url}");
             _tabOpened = true;
         }
