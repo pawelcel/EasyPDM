@@ -42,6 +42,12 @@ SolidCraft has no drawing workspace yet, so there is no title block or drawing P
 
 ## Setting it up on a computer
 
+Needs **SolidCraft 0.43** or later: Upload saves and exports through SolidCraft's `file` commands,
+which a plugin may use only when the user grants it that command group, and 0.42 has no way to
+grant one in its window (its README: "this version has no grant UI yet"); 0.43's install dialog
+grants the groups and folders the plugin asks for.
+
+
 1. `easypdm-companion login --server http://host:port` — allow the sign-in in the browser.
 2. `easypdm-companion setup-solidcraft --plugin easypdm.zip` — writes
    `Documents/EasyPDM/easypdm-solidcraft.zip`, the plugin with this computer's outbox path set
@@ -70,8 +76,9 @@ plugin/build.sh      # needs Rust (target wasm32-unknown-unknown) and wasm-tools
 
 ## Tested so far
 
-- SolidCraft 0.42.0 installs, inspects and runs the plugin headless; it refuses the `file` group
-  there because 0.42 grants plugins only through the Preferences window.
+- SolidCraft 0.42.0 installs, inspects and runs the plugin headless, but refuses the `file` group:
+  0.42 has no way to grant a command group, headless or in its window (the Upload dialog says
+  "permissions that have not been granted: file" and keeps Run off).
 - With the 0.42 nightly (2026-11-15), which grants through `plugin.install`, the upload entry
   writes the `.sc`, the STEP and the request; the `.sc` reopens in 0.42 with its body intact.
 - The companion, against a test server, with a script standing in for the browser: a new item
