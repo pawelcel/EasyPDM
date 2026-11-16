@@ -119,8 +119,21 @@ app.Use(async (context, next) =>
 });
 
 // Serwuje wwwroot/index.html pod adresem "/" oraz zbudowany frontend.
+//
+// index.html names the bundle (assets/index-<hash>.js), so it must be revalidated on every load:
+// without a Cache-Control header browsers cache it heuristically, for a tenth of its age since
+// Last-Modified -- after an update that served the previous release's page, and its old bundle,
+// for hours (seen as /?item= links landing on the welcome screen after the server was updated).
+// "no-cache" still lets the browser keep it and get a 304 through the ETag. The hashed files
+// under /assets never change under the same name, so they may be kept for good.
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+        ctx.Context.Response.Headers.CacheControl = ctx.Context.Request.Path.StartsWithSegments("/assets")
+            ? "public, max-age=31536000, immutable"
+            : "no-cache",
+});
 
 // Każda ścieżka /api/* (poza logowaniem i mostem token->ciasteczko dla przeglądarki
 // otwieranej przez makra CAD) wymaga poprawnej sesji — reszta endpointów nie musi tego

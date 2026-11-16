@@ -13,6 +13,9 @@ All notable changes to EasyPDM are documented in this file.
 - **A link straight to an item.** `/?item=<id>` opens that item in the whole-database view, also after the login screen; the FreeCAD add-on's "Open in browser" uses it.
 - **Programs sign in by approval in the browser instead of a password.** A program asks the server for a sign-in, opens EasyPDM in the browser, and the logged-in person sees which program asks and a code and allows or refuses it; the program then gets its own macro token, listed and revocable under Settings → Users like any macro login. The password never passes through the program. The EasyPDM companion uses it today; the FreeCAD and SolidWorks add-ins are meant to as well.
 
+### Fixed
+- **The browser no longer shows the previous version after the server is updated.** The page was sent without caching rules, so browsers kept the old one for hours on their own reckoning (seen as an "Open in browser" link from a CAD program landing on the start screen). The page is now checked on every load, while the bundle files, whose names change with every build, are kept for good.
+
 ## [0.8.2]
 
 **In short:** SolidWorks gets the same EasyPDM drawing sheet as FreeCAD — A3, A2 and A1 formats with the title block, processes and revision tables and the company logo filled in on upload. "Drawn by" and "approved by" now come from the server: whoever sends a drawing for review and whoever releases it are written into its PDF at that moment, for FreeCAD and SolidWorks alike. An administrator can limit which file types the server accepts and how large each may be, and an item's History shows who changed its name, properties and tags. Drawing sheets are complete for FreeCAD and SolidWorks; there is no Inventor version for now.
