@@ -195,6 +195,43 @@ static class Browser
     }
 }
 
+// The transfer panel in the web app (TransferProgressEndpoints.cs): the whole list first, then
+// each file's state, then finished. A side line of information: a failed call is ignored, and a
+// server without the endpoint simply shows nothing.
+sealed class Progress
+{
+    public static readonly Progress None = new(null);
+    readonly Api? api;
+    string? current;
+
+    public Progress(Api? api) => this.api = api;
+
+    async Task Send(HttpMethod method, string path, object body)
+    {
+        if (api is null) return;
+        try { await api.Send(method, path, body); } catch { /* information only */ }
+    }
+
+    public Task Start(string kind, IEnumerable<(string Key, string Label)> entries, IEnumerable<(string Parent, string Child)>? edges = null) =>
+        Send(HttpMethod.Put, "/progress", new
+        {
+            kind,
+            entries = entries.Select(e => new { key = e.Key, label = e.Label }).ToArray(),
+            edges = edges?.Select(e => new { parent = e.Parent, child = e.Child }).ToArray(),
+        });
+
+    public Task Mark(string key, string status)
+    {
+        current = status == "active" ? key : current == key ? null : current;
+        return Send(HttpMethod.Patch, "/progress", new { key, status });
+    }
+
+    // The file that was going when the run broke off.
+    public Task FailCurrent() => current is { } key ? Mark(key, "failed") : Task.CompletedTask;
+
+    public Task Finish() => Send(HttpMethod.Post, "/progress/finish", new { });
+}
+
 sealed class Options
 {
     public Dictionary<string, string> Values { get; } = new();
@@ -725,13 +762,62 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         if (!File.Exists(design)) throw new CompanionException($"{design} is missing");
         var work = Path.Combine(outbox, "work", request["id"]?.ToString() ?? Guid.NewGuid().ToString("N"));
         cli.ScriptDir = work;
+        _inspected.Clear();
+        progress = new Progress(api);
         try
         {
+            // The whole tree first, as the macros report it: a list that grew while files were
+            // going would turn "3 of 3" into "3 of 9" halfway through.
+            var entries = new List<(string, string)>();
+            var edges = new List<(string, string)>();
+            await ScanTree(design, DesignName(request), entries, edges, new HashSet<string>(StringComparer.Ordinal));
+            await progress.Start("upload", entries, edges);
             return await UploadTop(outbox, request, design, work);
+        }
+        catch
+        {
+            await progress.FailCurrent();
+            throw;
         }
         finally
         {
+            await progress.Finish();
             try { if (Directory.Exists(work)) Directory.Delete(work, recursive: true); } catch { /* a leftover work folder is harmless */ }
+        }
+    }
+
+    // The web app's transfer panel (PUT/PATCH /api/progress), as the FreeCAD and SolidWorks
+    // uploads and downloads fill it; for this run only.
+    Progress progress = Progress.None;
+
+    // cli.Inspect of the original files, kept for one upload: the tree is scanned for the
+    // progress list first and walked again to upload it.
+    readonly Dictionary<string, (JsonArray Links, JsonArray BomRows, JsonNode? Metadata)> _inspected = new(StringComparer.Ordinal);
+
+    async Task<(JsonArray Links, JsonArray BomRows, JsonNode? Metadata)> Inspected(string file)
+    {
+        if (!_inspected.TryGetValue(file, out var found))
+            _inspected[file] = found = await cli.Inspect(file);
+        return found;
+    }
+
+    static string DesignName(JsonNode request)
+    {
+        var props = request["properties"];
+        return props?["description"]?.ToString() is { Length: > 0 } d ? d
+            : props?["part_number"]?.ToString() is { Length: > 0 } pn ? pn : "SolidCraft design";
+    }
+
+    async Task ScanTree(string file, string label, List<(string, string)> entries, List<(string, string)> edges, HashSet<string> seen)
+    {
+        if (!seen.Add(file)) return;
+        entries.Add((file, label));
+        var (links, _, _) = await Inspected(file);
+        foreach (var l in links)
+        {
+            if (l?["found"]?.GetValue<bool?>() != true || l["file"]?.ToString() is not { } child) continue;
+            edges.Add((file, child));
+            await ScanTree(child, Path.GetFileNameWithoutExtension(child), entries, edges, seen);
         }
     }
 
@@ -741,11 +827,11 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         // an assembly's components before its main file -- and the copy uploaded in its place
         // points at them under their EasyPDM names.
         var (toUpload, bom, linkedCount) = await PrepareAssembly(design, work, new HashSet<string>(StringComparer.Ordinal), outbox);
+        await progress.Mark(design, "active");
         var step = request["step"]?.ToString() is { Length: > 0 } s ? Path.Combine(outbox, s) : null;
         var comment = request["comment"]?.ToString();
         var props = request["properties"];
-        var name = props?["description"]?.ToString() is { Length: > 0 } d ? d
-            : props?["part_number"]?.ToString() is { Length: > 0 } pn ? pn : "SolidCraft design";
+        var name = DesignName(request);
 
         // Which item: the design's own link; the link file an earlier upload of the same design
         // left (when that upload went through after the plugin last ran, so the design does not
@@ -798,6 +884,7 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
                 ["designId"] = designId, ["itemId"] = itemId, ["recordName"] = record, ["revision"] = revision,
             }.ToJsonString());
 
+        await progress.Mark(design, "done");
         return new JsonObject
         {
             ["ok"] = true,
@@ -829,7 +916,7 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
     // back unchanged.
     async Task<(string Design, Dictionary<string, decimal> Bom, int Linked)> PrepareAssembly(string design, string work, HashSet<string> chain, string outbox)
     {
-        var (links, rows, _) = await cli.Inspect(design);
+        var (links, rows, _) = await Inspected(design);
         var bom = new Dictionary<string, decimal>();
         var found = links.Where(l => l?["found"]?.GetValue<bool?>() == true && l?["file"] is not null).ToList();
         foreach (var l in links.Except(found))
@@ -873,7 +960,7 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
     // is used as it is, not uploaded again (as the macros leave released components alone).
     async Task<Linked> UploadComponent(string file, string work, HashSet<string> chain, string outbox)
     {
-        var (_, _, metadata) = await cli.Inspect(file);
+        var (_, _, metadata) = await Inspected(file);
         var link = metadata?["metadata"]?["io.github.pawelcel.easypdm"];
         var props = metadata?["properties"];
         var itemId = link?["itemId"]?.ToString();
@@ -883,6 +970,7 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         itemId ??= LinkStore.Get(file);
 
         var (toUpload, bom, _) = await PrepareAssembly(file, work, chain, outbox);
+        await progress.Mark(file, "active");
 
         var existing = itemId is not null;
         var exportStep = true;
@@ -903,7 +991,10 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         File.Copy(toUpload, copy, overwrite: true);
 
         if (existing && (item["isLocked"]?.GetValue<bool>() ?? false))
+        {
             Console.WriteLine($"  {record} is {item["status"]}: used as it is");
+            await progress.Mark(file, "skipped");
+        }
         else
         {
             Console.WriteLine($"  component {record}");
@@ -915,6 +1006,7 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
             await SetBom(itemId!, bom);
         }
         LinkStore.Set(file, itemId!);
+        await progress.Mark(file, "done");
         return new Linked(itemId!, record, revision, copy);
     }
 
@@ -966,8 +1058,14 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         var folder = Path.Combine(Path.GetDirectoryName(Outbox.DefaultPath())!, "designs");
         Directory.CreateDirectory(folder);
         cli.ScriptDir = Path.Combine(Path.GetDirectoryName(Outbox.DefaultPath())!, "outbox", "work", "download-" + Guid.NewGuid().ToString("N"));
+        progress = new Progress(api);
         try
         {
+            // The item and everything under it, keyed by item id: the server lays the list out as
+            // the BOM tree itself when the keys are ids (TransferProgressEndpoints).
+            var entries = new List<(string, string)>();
+            await ScanItems(itemId, entries, new HashSet<string>(StringComparer.Ordinal));
+            await progress.Start("download", entries);
             var downloaded = new Dictionary<string, string>();
             var (target, record, revision) = await DownloadItem(itemId, folder, downloaded)
                 ?? throw new CompanionException("the item has no SolidCraft design (.sc) to download");
@@ -979,10 +1077,26 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
                 ["message"] = openError is null ? $"opened {Path.GetFileName(target)}{parts} in SolidCraft" : $"saved {target}{parts}; {openError}",
             };
         }
+        catch
+        {
+            await progress.FailCurrent();
+            throw;
+        }
         finally
         {
+            await progress.Finish();
             try { if (Directory.Exists(cli.ScriptDir)) Directory.Delete(cli.ScriptDir, recursive: true); } catch { }
         }
+    }
+
+    async Task ScanItems(string itemId, List<(string, string)> entries, HashSet<string> seen)
+    {
+        if (!seen.Add(itemId)) return;
+        var item = await api.Get($"/items/{itemId}");
+        entries.Add((itemId, item?["recordName"]?.ToString() ?? itemId));
+        foreach (var c in (await api.Get($"/items/{itemId}/children"))?.AsArray() ?? [])
+            if ((c?["item"] ?? c)?["id"]?.ToString() is { } childId)
+                await ScanItems(childId, entries, seen);
     }
 
     // The item's current .sc into `folder`, then the designs it links to beside it (its BOM
@@ -995,7 +1109,12 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         var atts = (await api.Get($"/items/{itemId}/attachments"))?.AsArray() ?? [];
         var designs = atts.Where(a => a?["role"]?.ToString() is null or "cad"
                 && (a?["fileName"]?.ToString() ?? "").EndsWith(".sc", StringComparison.OrdinalIgnoreCase)).ToList();
-        if (designs.Count == 0) return null;
+        if (designs.Count == 0)
+        {
+            await progress.Mark(itemId, "skipped");  // no SolidCraft design to fetch
+            return null;
+        }
+        await progress.Mark(itemId, "active");
         var rev = item["revisionNumber"]?.GetValue<int>();
         var current = designs.FirstOrDefault(a => a?["revisionNumber"]?.GetValue<int?>() == rev) ?? designs.Last();
         var target = Path.Combine(folder, Path.GetFileName(current!["fileName"]!.ToString()));
@@ -1030,6 +1149,7 @@ sealed class Uploader(Func<Api> apiFactory, SolidCraftCli cli, bool openBrowser)
         {
             ["designId"] = "i" + itemId, ["itemId"] = itemId, ["recordName"] = record, ["revision"] = revision,
         });
+        await progress.Mark(itemId, "done");
         return (target, record, revision);
     }
 
