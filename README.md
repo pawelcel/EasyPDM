@@ -10,7 +10,7 @@
 [4. From CAD to PDM — the upload macro](https://youtu.be/vMQPxwWQrGc) ·
 [5. A whole assembly — upload, download, update and drawings](https://youtu.be/vXHYbRlPu_s)
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** — installation, using EasyPDM, the CAD integrations (with where the drawing sheets are), settings; with screenshots. FreeCAD add-on: [its own wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki).
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** — installation, using EasyPDM, the CAD integrations (with where the drawing sheets are), settings; with screenshots. The FreeCAD and SolidWorks add-ons have wikis of their own: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki).
 
 EasyPDM is where your Parts and Assemblies get one, shared order for the whole team:
 every item has its own number, revision, status and change history, and assemblies get
@@ -100,20 +100,22 @@ with two parts, something to explore instead of a blank slate. A notification po
 out and reminds you to clear it (Settings → File storage → Danger zone) before real use.
 
 After logging in: pick a project (or create a new one, if you have permission) — that's
-the container for your files and assembly structure — and install the macro for your
-CAD program, see below.
+the container for your files and assembly structure — and install the add-on or macros for
+your CAD program, see below.
 
 ## Working from FreeCAD / SolidWorks / Inventor / SolidCraft
 
 The macros add two simple operations inside the CAD program: **Upload** (send the active
 document to the PDM) and **Download** (fetch a Part/Assembly from the PDM, together with
-the whole assembly, and open it in the program). In FreeCAD and SolidWorks an add-on puts
-them in an **EasyPDM menu**, with **Log in** (approved in the browser, so the CAD program never
-sees your password) and **Log out**.
+the whole assembly, and open it in the program). In FreeCAD (a workbench) and SolidWorks (an
+add-in with its own tab) they sit next to **Log in** (approved in the browser, so the CAD program
+never sees your password), **Log out**, the item's **lock** and a **document panel** showing the
+item you have open and, for an assembly, which components have a newer file in EasyPDM — Upload
+refuses to send work built on those. In SolidCraft they are in the Plugins menu.
 
 Installation and details:
 - FreeCAD (add-on, in its own repository): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD), with [its wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki)
-- SolidWorks (add-in with an EasyPDM tab and document panel, macros, drawing sheet; in its own repository): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)
+- SolidWorks (add-in with an EasyPDM tab and document panel, macros, drawing sheet; in its own repository): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks), with [its wiki](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (plugin + the EasyPDM SolidCraft companion, since SolidCraft plugins have no network):
   **[installing step by step](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** on the wiki; in its own
@@ -152,11 +154,11 @@ you can pick it again and filter by it. That is
 what makes dropping the name from the file name practical: the name still travels with the
 document, just not in its file name.
 
-The FreeCAD macro sends the **material and mass of a part** as well. FreeCAD stores no mass,
-so the macro computes it from the volume and the density of the material assigned to the
+The FreeCAD add-on sends the **material and mass of a part** as well. FreeCAD stores no mass,
+so the add-on computes it from the volume and the density of the material assigned to the
 part, at the moment of upload; send the part again after changing it to refresh the value.
 Assemblies are skipped, and a part whose solids have different materials, or one without a
-material, gets no value rather than a wrong one. The macro also names the part's solid and an assembly's links after their items in the PDM, so inserting a component no longer means choosing between "Body" and "Body001".
+material, gets no value rather than a wrong one. The add-on also names the part's solid and an assembly's links after their items in the PDM, so inserting a component no longer means choosing between "Body" and "Body001".
 
 **Download** — you click Download, and in the browser you point to the Part/Assembly to
 fetch. For an assembly, the ENTIRE component tree is fetched right away, and the main
@@ -292,7 +294,7 @@ The list's **Cancel** button stops the rest of the transfer, after asking you to
 
 This matters most for an assembly. Sending one used to be a wait with nothing to look at — no way to tell whether the macro was on the second component or the last, or which file it was working on. The list appears about a second after the macro starts and stays for a moment at the end with everything ticked, which is your confirmation that the whole thing went up.
 
-It behaves identically from SolidWorks, Inventor and FreeCAD, and in both directions. If the connection drops or the server restarts mid-way, the list simply stops updating — the upload or download itself carries on untouched.
+It behaves identically from SolidWorks, Inventor, FreeCAD and SolidCraft, and in both directions. If the connection drops or the server restarts mid-way, the list simply stops updating — the upload or download itself carries on untouched.
 
 ### Status and revisions
 
@@ -428,7 +430,9 @@ tags, kind. Several tags can be ticked at once; the list then shows the items th
 of them. Found filters can be saved for reuse, and a "Clear filters" button resets
 everything at once.
 
-Tags are typed freely, so typos and labels nobody uses any more pile up. An administrator
+When you add a tag to an item, the field lists the tags already in use (those the item does
+not have yet) and narrows them as you type; picking one adds it, and a new one is typed and
+added with Enter. Tags are still free text, so typos and labels nobody uses any more pile up. An administrator
 sees every tag in **Settings → Tags**, with how many items carry it, and can filter for the
 unused ones. Deleting a tag there removes it from all items at once, released ones
 included, and from the suggestions and the filter.

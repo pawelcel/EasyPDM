@@ -10,7 +10,7 @@
 [4. Z CAD do PDM — makro wysyłania](https://youtu.be/vMQPxwWQrGc) ·
 [5. Całe złożenie — wysyłanie, pobieranie, aktualizacja i rysunki](https://youtu.be/vXHYbRlPu_s)
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (po angielsku) — instalacja, praca z EasyPDM, integracje CAD (w tym gdzie są arkusze rysunkowe), ustawienia; ze zrzutami ekranu. Dodatek FreeCAD: [własne wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki).
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (po angielsku) — instalacja, praca z EasyPDM, integracje CAD (w tym gdzie są arkusze rysunkowe), ustawienia; ze zrzutami ekranu. Dodatki do FreeCAD i SolidWorks mają własne wiki: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki).
 
 EasyPDM to miejsce, w którym Twoje Części i Złożenia mają jeden, wspólny dla całego
 zespołu porządek: każdy element ma swój numer, rewizję, status i historię zmian, a
@@ -101,19 +101,22 @@ przypomina o jego usunięciu (Ustawienia → Pliki → Strefa zagrożenia) przed
 prawdziwej pracy.
 
 Po zalogowaniu: wybierz projekt (albo utwórz nowy, jeśli masz uprawnienia) — to kontener
-na Twoje pliki i strukturę złożenia — i doinstaluj makro do swojego programu CAD, patrz
-niżej.
+na Twoje pliki i strukturę złożenia — i doinstaluj dodatek albo makra do swojego programu CAD,
+patrz niżej.
 
 ## Praca z poziomu FreeCAD / SolidWorks / Inventor / SolidCraft
 
 Makra dodają w CAD-zie dwie proste operacje: **Upload** (wyślij aktywny dokument do PDM) i
 **Download** (pobierz Część/Złożenie z PDM, razem z całym złożeniem, i otwórz w programie).
-W FreeCAD i SolidWorks dodatek umieszcza je w **menu EasyPDM**, razem z **Zaloguj**
-(zatwierdzane w przeglądarce, więc program CAD nie widzi Twojego hasła) i **Wyloguj**.
+W FreeCAD (środowisko pracy) i SolidWorks (dodatek z własną zakładką) stoją obok **Zaloguj**
+(zatwierdzane w przeglądarce, więc program CAD nie widzi Twojego hasła), **Wyloguj**,
+**blokady** elementu i **panelu dokumentu**, który pokazuje otwarty element, a dla złożenia —
+które komponenty mają w EasyPDM nowszy plik; Upload odmawia wysłania pracy opartej na takich.
+W SolidCraft są w menu Plugins.
 
 Instalacja i szczegóły:
 - FreeCAD (dodatek, we własnym repozytorium): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD), z [własnym wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki)
-- SolidWorks (dodatek z zakładką EasyPDM i panelem dokumentu, makra, arkusz rysunku; we własnym repozytorium): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)
+- SolidWorks (dodatek z zakładką EasyPDM i panelem dokumentu, makra, arkusz rysunku; we własnym repozytorium): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks), z [własnym wiki](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (wtyczka + pomocnik EasyPDM, bo wtyczki SolidCraft nie mają sieci):
   **[instalacja krok po kroku](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** w wiki (po angielsku); we własnym
@@ -153,10 +156,10 @@ materiałów, żeby dało się go wybrać ponownie i filtrować po nim. To ona
 sprawia, że usunięcie nazwy z nazwy pliku jest praktyczne: nazwa dalej wędruje razem z
 dokumentem, tyle że nie w jego nazwie.
 
-Makro FreeCAD wysyła również **materiał i masę części**. FreeCAD nie przechowuje masy, więc
-makro liczy ją z objętości i gęstości materiału nadanego części, w chwili wysyłki; po zmianie
+Dodatek FreeCAD wysyła również **materiał i masę części**. FreeCAD nie przechowuje masy, więc
+dodatek liczy ją z objętości i gęstości materiału nadanego części, w chwili wysyłki; po zmianie
 części wyślij ją ponownie, żeby odświeżyć wartość. Złożenia są pomijane, a część, której
-bryły mają różne materiały albo nie mają materiału, nie dostaje wartości zamiast złej. Makro nadaje też bryle części i linkom w złożeniu nazwy ich elementów z PDM, więc przy wstawianiu komponentu nie wybiera się już między „Body” a „Body001”.
+bryły mają różne materiały albo nie mają materiału, nie dostaje wartości zamiast złej. Dodatek nadaje też bryle części i linkom w złożeniu nazwy ich elementów z PDM, więc przy wstawianiu komponentu nie wybiera się już między „Body” a „Body001”.
 
 **Download** — klikasz Download, w przeglądarce wskazujesz Część/Złożenie do pobrania.
 Dla złożenia od razu ściąga się CAŁE drzewo komponentów, a główny plik otwiera się
@@ -293,7 +296,7 @@ Przycisk **Anuluj** na liście zatrzymuje resztę przesyłania — po potwierdze
 
 Najbardziej przydaje się to przy złożeniu. Wysyłka takiego do tej pory była czekaniem bez żadnej informacji — nie dało się stwierdzić, czy makro jest przy drugim komponencie, czy przy ostatnim, ani nad którym plikiem akurat pracuje. Lista pojawia się około sekundy po starcie makra i zostaje chwilę na koniec z kompletem ptaszków, co jest potwierdzeniem, że całość poszła.
 
-Działa tak samo z SolidWorksa, Inventora i FreeCAD-a, w obie strony. Jeśli w trakcie padnie połączenie albo serwer się zrestartuje, lista po prostu przestaje się odświeżać — sama wysyłka czy pobieranie lecą dalej, nietknięte.
+Działa tak samo z SolidWorksa, Inventora, FreeCAD-a i SolidCrafta, w obie strony. Jeśli w trakcie padnie połączenie albo serwer się zrestartuje, lista po prostu przestaje się odświeżać — sama wysyłka czy pobieranie lecą dalej, nietknięte.
 
 ### Status i rewizje
 
@@ -427,7 +430,9 @@ numerze, tagach, rodzaju. Można zaznaczyć kilka tagów naraz — lista pokazuj
 które mają je wszystkie. Znalezione filtry można zapisać do ponownego użycia, a przycisk
 "Wyczyść filtry" resetuje wszystko naraz.
 
-Tagi wpisuje się dowolnie, więc z czasem zbierają się literówki i etykiety, których nikt już
+Przy dodawaniu tagu do elementu pole podpowiada tagi już używane (te, których element jeszcze
+nie ma) i zawęża je przy pisaniu; wybór z listy dodaje tag, a nowy wpisuje się i dodaje Enterem.
+Tagi pozostają jednak dowolnym tekstem, więc z czasem zbierają się literówki i etykiety, których nikt już
 nie używa. Administrator widzi wszystkie tagi w **Ustawienia → Tagi**, z liczbą elementów,
 które je noszą, i może pokazać tylko nieużywane. Usunięcie tagu w tym miejscu zdejmuje go ze
 wszystkich elementów naraz, także wydanych, oraz z podpowiedzi i filtra.

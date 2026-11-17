@@ -10,7 +10,7 @@
 [4. Von CAD ins PDM — das Upload-Makro](https://youtu.be/vMQPxwWQrGc) ·
 [5. Eine ganze Baugruppe — Hochladen, Herunterladen, Aktualisieren und Zeichnungen](https://youtu.be/vXHYbRlPu_s)
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch) — Installation, Arbeit mit EasyPDM, die CAD-Integrationen (auch wo die Zeichnungsblätter liegen), Einstellungen; mit Screenshots. FreeCAD-Add-on: [eigenes Wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki).
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch) — Installation, Arbeit mit EasyPDM, die CAD-Integrationen (auch wo die Zeichnungsblätter liegen), Einstellungen; mit Screenshots. Die Add-ons für FreeCAD und SolidWorks haben eigene Wikis: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki).
 
 EasyPDM ist der Ort, an dem Ihre Teile und Baugruppen eine einzige, für das ganze Team
 gemeinsame Ordnung erhalten: Jedes Element hat seine eigene Nummer, Revision, Status und
@@ -110,19 +110,23 @@ löschen (Einstellungen → Dateispeicher → Gefahrenzone).
 
 Nach der Anmeldung: wählen Sie ein Projekt (oder erstellen Sie ein neues, falls Sie die
 Berechtigung haben) — das ist der Container für Ihre Dateien und die
-Baugruppenstruktur — und installieren Sie das Makro für Ihr CAD-Programm, siehe unten.
+Baugruppenstruktur — und installieren Sie das Add-on oder die Makros für Ihr CAD-Programm,
+siehe unten.
 
 ## Arbeiten von FreeCAD / SolidWorks / Inventor / SolidCraft aus
 
 Die Makros fügen im CAD-Programm zwei einfache Operationen hinzu: **Upload** (aktives
 Dokument an das PDM senden) und **Download** (Teil/Baugruppe aus dem PDM abrufen,
-zusammen mit der gesamten Baugruppe, und im Programm öffnen). In FreeCAD und SolidWorks legt
-ein Add-on sie in ein **EasyPDM-Menü**, mit **Anmelden** (im Browser bestätigt, das CAD-Programm
-sieht Ihr Passwort nie) und **Abmelden**.
+zusammen mit der gesamten Baugruppe, und im Programm öffnen). In FreeCAD (ein Arbeitsbereich)
+und SolidWorks (ein Add-in mit eigener Registerkarte) stehen sie neben **Anmelden** (im Browser
+bestätigt, das CAD-Programm sieht Ihr Passwort nie), **Abmelden**, der **Sperre** des Elements und
+einem **Dokumentbereich**, der das geöffnete Element zeigt und bei einer Baugruppe, welche
+Komponenten in EasyPDM eine neuere Datei haben — Upload verweigert das Senden darauf beruhender
+Arbeit. In SolidCraft liegen sie im Menü Plugins.
 
 Installation und Details:
 - FreeCAD (Add-on, eigenes Repository): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD), mit [eigenem Wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki)
-- SolidWorks (Add-in mit EasyPDM-Registerkarte und Dokumentbereich, Makros, Zeichnungsblatt; im eigenen Repository): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)
+- SolidWorks (Add-in mit EasyPDM-Registerkarte und Dokumentbereich, Makros, Zeichnungsblatt; im eigenen Repository): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks), mit [eigenem Wiki](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (Plugin + EasyPDM-Begleitprogramm, da SolidCraft-Plugins kein Netzwerk haben):
   **[Installation Schritt für Schritt](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** im Wiki (auf Englisch); im eigenen
@@ -164,11 +168,11 @@ Materialkatalog aufgenommen, damit es sich erneut auswählen und als Filter nutz
 lässt. Genau das macht das Weglassen des Namens im Dateinamen praktikabel:
 Der Name reist weiterhin mit dem Dokument, nur eben nicht in dessen Dateinamen.
 
-Das FreeCAD-Makro sendet ebenfalls **Material und Masse eines Teils**. FreeCAD speichert
-keine Masse, daher berechnet das Makro sie beim Hochladen aus dem Volumen und der Dichte des
+Das FreeCAD-Add-on sendet ebenfalls **Material und Masse eines Teils**. FreeCAD speichert
+keine Masse, daher berechnet das Add-on sie beim Hochladen aus dem Volumen und der Dichte des
 dem Teil zugewiesenen Materials; senden Sie das Teil nach einer Änderung erneut, um den Wert
 zu aktualisieren. Baugruppen werden übersprungen, und ein Teil, dessen Körper verschiedene
-oder keine Materialien haben, bekommt lieber keinen Wert als einen falschen. Das Makro benennt außerdem den Körper eines Teils und die Links einer Baugruppe nach ihren Elementen im PDM, sodass man beim Einfügen einer Komponente nicht mehr zwischen „Body“ und „Body001“ wählt.
+oder keine Materialien haben, bekommt lieber keinen Wert als einen falschen. Das Add-on benennt außerdem den Körper eines Teils und die Links einer Baugruppe nach ihren Elementen im PDM, sodass man beim Einfügen einer Komponente nicht mehr zwischen „Body“ und „Body001“ wählt.
 
 **Download** — Sie klicken auf Download und geben im Browser das abzurufende
 Teil/Baugruppe an. Bei einer Baugruppe wird sofort der GESAMTE Komponentenbaum
@@ -316,7 +320,7 @@ Die Schaltfläche **Abbrechen** an der Liste stoppt den Rest der Übertragung �
 
 Am meisten bringt das bei einer Baugruppe. Deren Versand war bisher ein Warten ohne jede Rückmeldung — man konnte nicht erkennen, ob das Makro beim zweiten Bauteil oder beim letzten war, noch an welcher Datei es gerade arbeitete. Die Liste erscheint etwa eine Sekunde nach dem Start des Makros und bleibt am Ende einen Moment mit allen Haken stehen, was die Bestätigung ist, dass alles hochgegangen ist.
 
-Aus SolidWorks, Inventor und FreeCAD verhält es sich identisch, und in beide Richtungen. Bricht unterwegs die Verbindung ab oder startet der Server neu, hört die Liste einfach auf sich zu aktualisieren — das Hoch- oder Herunterladen selbst läuft unberührt weiter.
+Aus SolidWorks, Inventor, FreeCAD und SolidCraft verhält es sich identisch, und in beide Richtungen. Bricht unterwegs die Verbindung ab oder startet der Server neu, hört die Liste einfach auf sich zu aktualisieren — das Hoch- oder Herunterladen selbst läuft unberührt weiter.
 
 ### Status und Revisionen
 
@@ -468,7 +472,9 @@ Name, Nummer, Tags, Art. Mehrere Tags lassen sich gleichzeitig ankreuzen; die Li
 die Elemente, die alle davon tragen. Gefundene Filter können zur Wiederverwendung gespeichert
 werden, und eine Schaltfläche "Filter zurücksetzen" setzt alles auf einmal zurück.
 
-Tags werden frei eingegeben, daher sammeln sich mit der Zeit Tippfehler und Bezeichnungen,
+Beim Hinzufügen eines Tags zu einem Element schlägt das Feld die bereits verwendeten Tags vor
+(die das Element noch nicht hat) und grenzt sie beim Tippen ein; die Auswahl fügt den Tag hinzu,
+ein neuer wird eingetippt und mit Enter hinzugefügt. Tags bleiben aber freier Text, daher sammeln sich mit der Zeit Tippfehler und Bezeichnungen,
 die niemand mehr nutzt. Ein Administrator sieht alle Tags unter **Einstellungen → Tags**,
 jeweils mit der Zahl der Elemente, die ihn tragen, und kann nur die unbenutzten anzeigen.
 Das Löschen eines Tags dort entfernt ihn auf einmal von allen Elementen, auch freigegebenen,

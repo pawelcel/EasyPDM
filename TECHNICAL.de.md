@@ -25,7 +25,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
 
 - **`db/schema.sql`** — das vollständige Schema von Grund auf (aktueller Stand nach allen
   Migrationen).
-- **`db/migrations/`** — Migrationen `002`–`046` für eine bereits bestehende Datenbank:
+- **`db/migrations/`** — Migrationen `002`–`081` für eine bereits bestehende Datenbank:
   Projekte, Elementtypen, Sichtbarkeit im Baum, Status/Revisionen, Materialien
   (+ Gruppen/Untergruppen), Anhänge, Stücklisten-Reihenfolge, Revisionskommentare,
   Anmeldung und Rollen, Projekteigenschaften, kaskadierendes Löschen, Reihenfolge der
@@ -45,8 +45,14 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   dieselbe `name2_id`-Aufteilung bei `client_nodes`, sodass jede Name 2 ihre eigenen
   Dateien haben kann, unabhängig vom Dateibaum des Kunden selbst, sowie eine neue
   Anhang-Rolle `"drawing"` (neben `pdf`/`step`/`cad`) für eine SolidWorks-Zeichnung
-  (.SLDDRW), die neben der eigenen CAD-Datei des Teils/der Baugruppe hochgeladen wird.
-  Seit Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
+  (.SLDDRW), die neben der eigenen CAD-Datei des Teils/der Baugruppe hochgeladen wird;
+  danach Name 2 des Kunden am Projekt, geschlossene Projekte, Revisionsnummer an Anhängen, der
+  Projektleiter beim Kunden, Kundenprüfung, Projektdokumente, Nummerierungseinstellungen
+  (Stellen, Name im Datensatznamen), die Modellbild-Rolle, Bearbeitungen,
+  Dokumentationssprachen und Übersetzungen, Vor- und Nachnamen der Benutzer, Firmendaten,
+  Beschriftungen in Dokumenten, Makro-Tokens, gehashte Sitzungstokens, die Änderungshistorie
+  eines Elements, Upload-Regeln, das Blattformat eines PDFs und (081) jede CAD-Dateiversion, die
+  ein Element hatte. Seit Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
   resources) und werden **automatisch bei jedem Start** angewendet — siehe
   `MigrationRunner.cs` und "Inbetriebnahme" unten — sie müssen nicht mehr manuell per
   psql ausgeführt werden.
@@ -65,15 +71,15 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   EasyPDM.Api.Tests` (die Connection-String zeigt standardmäßig auf ein lokales
   `pdm`/`pdm_user` — überschreibbar über die Variable
   `EASYPDM_TEST_CONNECTION_STRING`, genau wie in der CI).
-- **FreeCAD** — seit 0.9 in einem eigenen Repository, [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD): ein EasyPDM-Arbeitsbereich, dessen Upload und Download — bis 0.9 FreeCAD-Makros — (`upload.py`: im Browser gewähltes Element, Upload mit STEP/PDF/Vorschau, Umbenennung nach dem Datensatz, Zeichnungsblatt; `download.py`: das Element mit seinem ganzen Komponentenbaum, geöffnet), dazu Anmelden (im Browser bestätigt) und Abmelden. Sein `tools/build_templates.py` ist die einzige Quelle des Zeichnungsblatts und schreibt auch `EasyPDMSheetFormat.bas` in EasyPDM-SolidWorks. Auf FreeCAD 1.1 live getestet.
+- **FreeCAD** — seit 0.9 in einem eigenen Repository, [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD): ein EasyPDM-Arbeitsbereich, dessen Upload und Download — bis 0.9 FreeCAD-Makros — (`upload.py`: im Browser gewähltes Element, Upload mit STEP/PDF/Vorschau, Umbenennung nach dem Datensatz, Zeichnungsblatt; `download.py`: das Element mit seinem ganzen Komponentenbaum, geöffnet), dazu Anmelden (im Browser bestätigt), Abmelden, Sperre, Dokumentbereich und die Prüfung veralteter Komponenten; daher spricht dieses Dokument stellenweise noch vom „FreeCAD-Makro“. Sein `tools/build_templates.py` ist die einzige Quelle des Zeichnungsblatts und schreibt auch `EasyPDMSheetFormat.bas` in EasyPDM-SolidWorks. Auf FreeCAD 1.1 live getestet.
 - **SolidWorks** — im eigenen Repository, [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) (nach 0.9.0 aus `EasyPDM.SolidWorks/` ausgelagert): VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, auf SolidWorks 2024 und 2026 live getestet, `EasyPDMSheetFormat.bas` für das Zeichnungsblatt und ein .NET-Framework-COM-Add-in mit EasyPDM-Registerkarte, das die kompilierten Makros ausführt und einen eigenen Dokumentbereich, Sperren und die Prüfung veralteter Komponenten ergänzt.
-- **`EasyPDM.Inventor/`** — das Gegenstück für Autodesk Inventor (VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), aus den SolidWorks-Makros portiert; auf Inventor live getestet. Kein Zeichnungsblatt (keine Inventor-Lizenz, um eines zu bauen).
+- **`EasyPDM.Inventor/`** — das Gegenstück für Autodesk Inventor (VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), aus den SolidWorks-Makros portiert; auf Inventor live getestet. Kein Zeichnungsblatt. Wird nicht weiterentwickelt, da keine Inventor-Lizenz zum Testen mehr vorhanden ist; bleibt mit der API des Servers lauffähig.
 - **SolidCraft** — im eigenen Repository, [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft) (nach 0.9.0 aus `EasyPDM.SolidCraft/` und `EasyPDM.Companion/` ausgelagert): ein Plugin (Rust → WebAssembly-Komponente), dessen Menüeinträge nur Aufträge in einen Ausgangsordner schreiben, da SolidCraft-Plugins kein Netzwerk haben, und das Begleitprogramm auf dem CAD-Arbeitsplatz, das sie wie die Makros über die API dieses Servers erledigt.
 - **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** und **`packaging/windows/`**
   (der `.exe`-Installer, Inno Setup) — drei Bereitstellungswege, ohne Backend/Frontend/
   Datenbank manuell einzeln zusammenzusetzen, siehe "Inbetriebnahme" unten.
-- **`.github/workflows/`** — sieben CI-Workflows, alle auch manuell ausführbar
+- **`.github/workflows/`** — acht CI-Workflows, alle auch manuell ausführbar
   (`workflow_dispatch`) oder über `gh workflow run <datei>`:
   - `build.yml` — bei jedem Push/PR: Backend-Build + Integrationstests
     (`EasyPDM.Api.Tests`, gegen einen `postgres`-Dienst in der CI) sowie
@@ -106,9 +112,15 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
     `APP_VERSION` (`version.ts`) tatsächlich mit dem Tag übereinstimmen (bricht sonst sofort
     ab), ruft dann `build-windows-installer.yml`/`build-linux-package.yml` als
     wiederverwendbare Workflows auf und erstellt einen **Entwurf** (draft) eines GitHub
-    Release mit beiden angehängten Artefakten und Versionshinweisen aus dem passenden
+    Release mit beiden Installern und den Inventor-Makros als Anhang (die Integrationen für
+    FreeCAD, SolidWorks und SolidCraft erscheinen in ihren eigenen Repositories) und
+    Versionshinweisen aus dem passenden
     `## [X.Y]`-Abschnitt der `CHANGELOG.md`. Veröffentlicht ihn bewusst nie automatisch —
     jemand muss den Entwurf noch prüfen und auf "Publish release" klicken.
+  - `reset-demo-db.yml` — täglich um 02:00 UTC (oder von Hand): leert die Datenbank der
+    öffentlichen Demo (Neon) und startet die Demo-App neu (Deploy Hook von Render), damit sie
+    das Konto `admin`/`admin` und das Beispielprojekt wie beim ersten Start anlegt. Braucht die
+    Repository-Secrets `RESET_PSQL_URL` und `RENDER_DEPLOY_HOOK_URL`.
 
 ### Datenmodell — Elemente und Struktur
 
@@ -169,9 +181,11 @@ beschädigt die Struktur des anderen Projekts nicht mehr.
 
 Ein Teil hat vier **Arten** (`properties.rodzaj`), jede mit einem anderen Satz von
 Feldern und einem anderen Symbol im Baum: **Gefertigt** (Material, Preis, Zusätzliche
-Informationen), **Zugekauft** (Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Masse, Preis,
+Informationen), **Zugekauft** (Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Preis,
 Zusätzliche Informationen), **Norm** (Material, Norm, Zusätzliche Informationen),
-**Kundenteil** (Kunde, Zusätzliche Informationen).
+**Kundenteil** (Kunde, Name 2, Zusätzliche Informationen). **Masse** (`properties.mass`) ist ein
+Feld darüber, gemeinsam für jede Art und für Baugruppen; die CAD-Integrationen füllen es beim
+Hochladen, und ein Wechsel der Art lässt es stehen.
 
 Eine Baugruppe hat drei eigene Arten im selben `properties.rodzaj`: **Wykonywane**
 (gefertigt), **Zakupowe** (zugekauft — Hersteller, Serie/Typ, Untertyp) und **Klienta** (vom
@@ -311,7 +325,7 @@ Teilbaum), mit Auswahl, welche Dateierweiterungen einbezogen werden sollen.
 
 Die festen Rollen gibt es in zwei Arten. `pdf`, `step` und `image` haben einen Platz: Eine neue Datei ersetzt die vorherige. `cad` und `drawing` sammeln sich an, damit frühere Revisionen bleiben — aber die Makros benennen Dateien `Datensatzname.REVISION.Endung`, also bedeutet derselbe Dateiname am selben Element dieselbe Revision, erneut gesendet, und diese Zeile wird ersetzt statt einer zweiten hinzugefügt (`ReplaceExistingRoleAttachmentAsync`). Die alte Datei wird nur gelöscht, wenn sie nicht der Pfad der neuen Zeile ist, denn `/register` kopiert bei gemeinsamem Speicher die neue Datei zuerst an dieselbe Stelle. Vorher fügte jedes erneute Senden eines Teils in Arbeit eine Zeile hinzu, und bei gemeinsamem Speicher zeigten alle auf eine Datei, sodass das Löschen einer davon sie den anderen entzog.
 
-Das FreeCAD-Makro sendet die Datei immer per HTTP. Ein Pfad aus `GET /api/config` beweist nicht, dass Client und Server dieselbe Festplatte sehen: Bei FreeCAD unter Windows und dem Server in Docker legte `os.makedirs` ein lokales `C:\data\storage` an, die Kopie landete dort, und `/register` schlug fehl; existierte der Eintrag bereits, meldete ein erneutes Senden Erfolg, ohne etwas zu senden. Die Makros für SolidWorks und Inventor versuchen weiterhin zuerst `/register`, legen aber nur die letzte Ordnerebene an, sodass ein Speicherstamm, den es auf dem Client nicht gibt, sie zu HTTP führt.
+Das FreeCAD-Add-on sendet die Datei immer per HTTP. Ein Pfad aus `GET /api/config` beweist nicht, dass Client und Server dieselbe Festplatte sehen: Bei FreeCAD unter Windows und dem Server in Docker legte `os.makedirs` ein lokales `C:\data\storage` an, die Kopie landete dort, und `/register` schlug fehl; existierte der Eintrag bereits, meldete ein erneutes Senden Erfolg, ohne etwas zu senden. Die Makros für SolidWorks und Inventor versuchen weiterhin zuerst `/register`, legen aber nur die letzte Ordnerebene an, sodass ein Speicherstamm, den es auf dem Client nicht gibt, sie zu HTTP führt. Das SolidWorks-Makro registriert eine gleichnamige Datei nach dem Überschreiben erneut, mit ihrem Versionsstempel (`contentVersion`, siehe `POST /api/items/cad-versions`), damit der Server die neue Datei erfasst; ein Server vor 0.7 lehnt das ab, und die Kopie bleibt dann, wie sie ist.
 
 Die Nummer eines Elements (`item_number`) stammt aus einer einzigen, globalen
 PostgreSQL-Sequenz — das Löschen eines Elements gibt seine Nummer NICHT automatisch
@@ -331,7 +345,7 @@ Vorsicht um ihrer selbst willen: Die CAD-Makros bauen aus dieser Nummer den Date
 somit auf der Festplatte und in `item_attachments` liegt, wo ihn nachträglich nichts mehr
 umschreibt. `ItemNumbering.Label` setzt die drei Teile an einer Stelle zusammen, und die API
 liefert das Ergebnis als `itemNumberLabel` neben `itemNumber`/`itemNumberPrefix` — dasselbe
-Muster wie `revisionLabel`, damit das Web-Frontend und die drei CAD-Makros es nie selbst
+Muster wie `revisionLabel`, damit das Web-Frontend und die CAD-Integrationen es nie selbst
 zusammensetzen (und nie voneinander abweichen).
 
 Die einzige Ausnahme ist ein früh bemerkter Fehler: Das Ändern der Art eines Teils/einer
@@ -376,7 +390,7 @@ oder keine schlichte Zahl ist, wird protokolliert und übersprungen — sie wird
 Ziffern und einen Dezimalpunkt normalisiert, da sie mit Einheit und landesüblichem
 Dezimalkomma eintreffen kann.
 
-FreeCAD speichert keine der beiden, daher berechnet sein Makro beide beim Hochladen und sendet sie direkt an `PATCH /properties`, ohne Dokumenteigenschaft dazwischen (`part_material_and_mass`). Es betrachtet nur die endgültigen Körper des Teils — sichtbare `Part::Feature`-Objekte, die kein anderes `Part::Feature` verbraucht und die ein Volumen haben —, Skizzen, Zwischenfeatures und verborgene Hilfskörper zählen also nicht. Das Material wird nur gesendet, wenn alle diese Körper dasselbe haben und es nicht FreeCADs „Default“ ist; die Masse (Volumen × Dichte) nur, wenn jeder Körper ein Material mit Dichte hat, denn eine Teilsumme wäre eine plausibel aussehende falsche Zahl. Eine sehr kleine Masse wird in normalen Dezimalstellen geschrieben, nicht als `1.58e-05`. Baugruppen werden übersprungen, wie bei den anderen beiden.
+FreeCAD speichert keine der beiden, daher berechnet sein Add-on beide beim Hochladen und sendet sie direkt an `PATCH /properties`, ohne Dokumenteigenschaft dazwischen (`part_material_and_mass`). Es betrachtet nur die endgültigen Körper des Teils — sichtbare `Part::Feature`-Objekte, die kein anderes `Part::Feature` verbraucht und die ein Volumen haben —, Skizzen, Zwischenfeatures und verborgene Hilfskörper zählen also nicht. Das Material wird nur gesendet, wenn alle diese Körper dasselbe haben und es nicht FreeCADs „Default“ ist; die Masse (Volumen × Dichte) nur, wenn jeder Körper ein Material mit Dichte hat, denn eine Teilsumme wäre eine plausibel aussehende falsche Zahl. Eine sehr kleine Masse wird in normalen Dezimalstellen geschrieben, nicht als `1.58e-05`. Baugruppen werden übersprungen, wie bei den anderen beiden.
 
 FreeCAD zeigt auch Namen innerhalb der Datei, ein umbenannter Dateiname allein genügt also nicht: Das Einfügen einer Komponente listet Objektbeschriftungen, und der Baugruppenbaum listet die Beschriftungen seiner Links, die beim Einfügen vom Objekt kopiert wurden („Body“, dann „Body001“). Daher gibt `_label_main_object` dem einzigen endgültigen Körper eines Teils oder dem äußersten `App::Part`, in dem er steckt, den Datensatznamen ohne Revision, und `_label_links` gibt den Links einer Baugruppe die Datensatznamen ihrer Komponenten. Ein verlinktes Dokument gilt als PDM-Datei, wenn seine Beschriftung dem Dateinamen entspricht und die Revision enthält, denn dieses Paar setzt das Makro selbst, der Server wird also nicht gebraucht. Eine Beschriftung, die bereits der Datensatzname ist oder dieser Name mit FreeCADs numerischem Suffix für ein weiteres Exemplar, bleibt. Ins PDM gelangt die Datei von der Platte, daher speichert `_save_local_as_pdm_name` auch dann, wenn sich der Pfad nicht ändert; sonst ging eine erneut gesendete Baugruppe mit ihren alten Beschriftungen hoch.
 
@@ -544,7 +558,7 @@ Dieselbe Regel erklärt, warum schon das *erste* Öffnen den Browser nicht nach 
 
 Das Token hilft allerdings nur einem Browser, der *gestartet* wird. Ein laufender bekommt die Adresse von einem kurzlebigen Hilfsprozess, und ob er das Token dann nutzt, liegt am Browser — in der Praxis kam ein geschlossener Browser nach vorn, ein offener nicht. Unter Linux bittet das Makro nach dem Öffnen einer Karte daher auch direkt den Compositor: `_raise_via_kwin` schreibt ein kleines KWin-Skript, lädt es über DBus (`org.kde.KWin /Scripting`), führt es aus und entlädt es — derselbe Weg wie bei `kdotool`, den Wayland erlaubt, weil der Compositor selbst das Fenster aktiviert. Es versucht das bei den ersten drei Abfragen, weil die Seite einen Moment zum Laden und Setzen ihres Titels braucht, und nicht öfter, um niemandem den Fokus zu entreißen, der bewusst zu FreeCAD zurückgekehrt ist. Erkannt wird das Fenster am vollständigen `<title>` der Anwendung am Anfang seines Titels: Ein Abgleich nur auf „EasyPDM“ schied nach einer Sonde in einer echten Sitzung aus, in der stattdessen ein Shotcut-Projekt namens `EasyPDM2.mlt` nach vorn gekommen wäre. Außerhalb von KDE bleibt `wmctrl`/`xdotool` (X11), und unter Windows läuft nichts davon.
 
-Derselbe Weg über KWin funktioniert im Download-Makro in umgekehrter Richtung. Seine Zusammenfassung öffnet sich direkt nach der Auswahl des Elements im Browser und blieb als Fenster ohne Elternfenster dahinter verborgen. `_show_on_top` bittet KWin zuerst, das FreeCAD-Fenster zu aktivieren, gefunden über die Prozess-ID und bei einem FreeCAD in einer Sandbox, dessen PID KWin nicht sieht, über die Fensterklasse, und öffnet dann die Meldung mit dem Hauptfenster als Elternfenster.
+Derselbe Weg über KWin funktioniert im Download des Add-ons in umgekehrter Richtung. Seine Zusammenfassung öffnet sich direkt nach der Auswahl des Elements im Browser und blieb als Fenster ohne Elternfenster dahinter verborgen. `_show_on_top` bittet KWin zuerst, das FreeCAD-Fenster zu aktivieren, gefunden über die Prozess-ID und bei einem FreeCAD in einer Sandbox, dessen PID KWin nicht sieht, über die Fensterklasse, und öffnet dann die Meldung mit dem Hauptfenster als Elternfenster.
 
 Deshalb kann die Anwendung den Menschen auch selbst zurückrufen: Wird eine Anfrage angenommen und hat der Tab keinen Fokus, zeigt sie eine System-Benachrichtigung, deren Klick zu ihm wechselt. Ein Klick ist der einzige Mechanismus, den kein Fenstersystem verweigert, denn der Wechsel geht vom Menschen aus. Um Erlaubnis wird einmal gebeten, aus einer Schaltfläche im Dialog des Makros heraus — Browser lehnen eine Anfrage ohne frische Benutzeraktion ab —, und ein fokussierter Tab zeigt nichts, denn dann gibt es nichts zurückzurufen.
 
@@ -593,10 +607,15 @@ Ein Fenster bleibt mit Absicht: Komponenten, die bereits mit einem PDM-Element v
 
 ### Anmeldung, Rollen und Projektzugriff
 
-Jede Anfrage an `/api/*` (außer `/api/auth/login`) erfordert eine Anmeldung — eine
-Sitzung ist ein zufälliges Token in einem httpOnly-Cookie (`pdm_session`, 30 Tage
-gültig); die Tabelle `sessions` speichert nur dessen SHA-256, sodass das Lesen der
-Tabelle keine gültige Sitzung liefert. Passwörter werden als PBKDF2 gespeichert
+Jede Anfrage an `/api/*` erfordert eine Anmeldung, außer den Wegen hinein: `/api/auth/login`,
+`/api/auth/macro-login`, `/api/auth/browser-login` und die beiden anonymen Schritte der
+Browser-Anmeldung, `/api/auth/device/start` und `/api/auth/device/token`
+(`DeviceLoginEndpoints.IsAnonymous`). Eine Browser-Sitzung ist ein zufälliges Token in einem
+httpOnly-Cookie (`pdm_session`, 30 Tage gültig); die Tabelle `sessions` speichert nur dessen
+SHA-256, sodass das Lesen der Tabelle keine gültige Sitzung liefert. CAD-Programme erhalten
+stattdessen ein **Makro-Token** (`macro_tokens`, ebenfalls als Hash, ein Jahr gültig), aus der
+Passwort- oder der Browser-Anmeldung, im selben Cookie gesendet; jedes steht mit seinem Programm
+unter Einstellungen → Benutzer und kann dort widerrufen werden. Passwörter werden als PBKDF2 gespeichert
 (eigene Implementierung in `PasswordHasher.cs`, nur `System.Security.Cryptography` —
 ohne zusätzliche NuGet-Pakete).
 
@@ -612,7 +631,7 @@ dem Administrator.
 
 `system_state.release_admin_only` (Einstellungen → Benutzer, standardmäßig aus) beschränkt den Übergang zu „freigegeben“ auf Administratoren. Durchgesetzt wird das von `PATCH /status`, nicht nur von der Oberfläche, denn auch die CAD-Makros ändern den Status; das Mitziehen der Komponenten einer Baugruppe läuft über dieselbe Anfrage, eine Ablehnung für die Baugruppe hält sie also ebenfalls auf. `GET /api/settings/release-policy` darf jeder Angemeldete lesen, damit die Statusschaltflächen „Freigegeben“ mit einer Erklärung ausgrauen können, statt beim Klick zu scheitern; nur `PATCH` ist dem Administrator vorbehalten. Bereits freigegebene Elemente bleiben unberührt.
 
-**Personen im Zeichnungs-PDF** (`DrawingStamp.cs`). „Gezeichnet“ ist, wer die aktuelle Revision zur Prüfung sendet, „freigegeben“, wer sie freigibt (`TitleBlockEndpoints.SignaturesAsync`, dieselben Daten, die die Makros bekommen): Für eine Zeichnung steht ein, wer sie fertiggestellt und weitergegeben hat. Beides ist beim Export der Zeichnung unbekannt, und ein freigegebenes Element lässt sich nicht erneut hochladen, also lassen die Upload-Makros GEZEICHNET leer und der Server füllt beide Felder: Wenn `PATCH /status` ein Element (und mitgezogene Komponenten) auf `sprawdzany` oder `wydany` setzt, schreibt er die ihm bekannten Namen und Daten in den neuesten `pdf`-Anhang des Elements, in die Felder des EasyPDM-Schriftfelds, in der in die Anwendung eingebetteten Schrift osifont (PDFsharp, keine Systemschriften nötig). Was die Felder zeigten, wird zuerst weiß übermalt, sodass eine zweite Prüfung oder der Wert eines älteren Makros ersetzt und nicht überdruckt wird. Berührt wird nur ein PDF, das die Makros als aus einem EasyPDM-Blatt exportiert markiert haben: `item_attachments.sheet_layout` (`easypdm-A3` / `-A2` / `-A1`, Migration 080), gesendet als Formularfeld `sheetLayout` neben `role=pdf` und für jede andere Rolle oder jeden anderen Wert ignoriert; die Markierung wird nach dem Freigabestempel entfernt, sodass eine freigegebene Datei nie erneut gestempelt wird. Jede Seite dieses Formats wird gestempelt (ein Schriftfeld pro Blatt); eine gedrehte Seite oder eine anderer Größe bleibt unverändert. Die gestempelte Datei **ersetzt** das Original (keine ungestempelte Kopie), `file_size` / `file_hash` folgen ihr. Das läuft nach dem Festschreiben der Statusänderung und nach bestem Bemühen: Ein PDF, das sich nicht stempeln lässt, wird protokolliert und bleibt, wie es ist, die Statusänderung gilt. Die CAD-Datei selbst ändert sich nicht — in FreeCAD füllt das Download-Makro das Blatt weiterhin beim Öffnen.
+**Personen im Zeichnungs-PDF** (`DrawingStamp.cs`). „Gezeichnet“ ist, wer die aktuelle Revision zur Prüfung sendet, „freigegeben“, wer sie freigibt (`TitleBlockEndpoints.SignaturesAsync`, dieselben Daten, die die Makros bekommen): Für eine Zeichnung steht ein, wer sie fertiggestellt und weitergegeben hat. Beides ist beim Export der Zeichnung unbekannt, und ein freigegebenes Element lässt sich nicht erneut hochladen, also lassen die Upload-Makros GEZEICHNET leer und der Server füllt beide Felder: Wenn `PATCH /status` ein Element (und mitgezogene Komponenten) auf `sprawdzany` oder `wydany` setzt, schreibt er die ihm bekannten Namen und Daten in den neuesten `pdf`-Anhang des Elements, in die Felder des EasyPDM-Schriftfelds, in der in die Anwendung eingebetteten Schrift osifont (PDFsharp, keine Systemschriften nötig). Was die Felder zeigten, wird zuerst weiß übermalt, sodass eine zweite Prüfung oder der Wert eines älteren Makros ersetzt und nicht überdruckt wird. Berührt wird nur ein PDF, das die Makros als aus einem EasyPDM-Blatt exportiert markiert haben: `item_attachments.sheet_layout` (`easypdm-A3` / `-A2` / `-A1`, Migration 080), gesendet als Formularfeld `sheetLayout` neben `role=pdf` und für jede andere Rolle oder jeden anderen Wert ignoriert; die Markierung wird nach dem Freigabestempel entfernt, sodass eine freigegebene Datei nie erneut gestempelt wird. Jede Seite dieses Formats wird gestempelt (ein Schriftfeld pro Blatt); eine gedrehte Seite oder eine anderer Größe bleibt unverändert. Die gestempelte Datei **ersetzt** das Original (keine ungestempelte Kopie), `file_size` / `file_hash` folgen ihr. Das läuft nach dem Festschreiben der Statusänderung und nach bestem Bemühen: Ein PDF, das sich nicht stempeln lässt, wird protokolliert und bleibt, wie es ist, die Statusänderung gilt. Die CAD-Datei selbst ändert sich nicht — in FreeCAD füllt der Download des Add-ons das Blatt weiterhin beim Öffnen.
 
 `users.first_name`/`last_name` (Migration 066) sind für das Zeichnungsschriftfeld vom
 `display_name` getrennt. `POST /api/users` verlangt sie; Konten von vor 066 und der
@@ -641,7 +660,7 @@ Makro-Token. Ein für ein Makro-Token ausgestelltes Browser-Brücken-Ticket läs
 `/auth/browser-login` eine eigene Browsersitzung anlegen, sodass das Makro-Token nie im
 Browser landet.
 
-**Geräteanmeldung** (`DeviceLoginEndpoints.cs`) meldet ein Programm an, ohne dass es je das Passwort sieht: Das Programm ruft `POST /api/auth/device/start` (ohne Anmeldung) auf und erhält einen geheimen 256-Bit-Gerätecode und einen kurzen Benutzercode (`ABCD-EFGH`, ohne 0/O/1/I) und öffnet den Browser auf `/?deviceLogin=<Benutzercode>`. Die Web-App zeigt, welches Programm fragt, und den Code (der Dialog übersteht den Anmeldebildschirm wie die Makro-Tickets), und **Erlauben** stellt über dasselbe `AuthEndpoints.IssueMacroTokenAsync` wie `macro-login` ein gewöhnliches Makro-Token für die angemeldete Person aus. Das Programm fragt `POST /api/auth/device/token` ab und erhält das Token einmal (202 solange offen, 403 nach Ablehnung, 410 nach Ablauf oder Abholung). Anfragen leben zehn Minuten im Speicher, höchstens 500 gleichzeitig, da der Start keine Anmeldung braucht; nur `start` und `token` sind von der Anmelde-Middleware ausgenommen. Heute nutzt sie der EasyPDM-Begleiter; die für 0.9 geplanten Add-ins für FreeCAD und SolidWorks sollen es ebenfalls.
+**Geräteanmeldung** (`DeviceLoginEndpoints.cs`) meldet ein Programm an, ohne dass es je das Passwort sieht: Das Programm ruft `POST /api/auth/device/start` (ohne Anmeldung) auf und erhält einen geheimen 256-Bit-Gerätecode und einen kurzen Benutzercode (`ABCD-EFGH`, ohne 0/O/1/I) und öffnet den Browser auf `/?deviceLogin=<Benutzercode>`. Die Web-App zeigt, welches Programm fragt, und den Code (der Dialog übersteht den Anmeldebildschirm wie die Makro-Tickets), und **Erlauben** stellt über dasselbe `AuthEndpoints.IssueMacroTokenAsync` wie `macro-login` ein gewöhnliches Makro-Token für die angemeldete Person aus. Das Programm fragt `POST /api/auth/device/token` ab und erhält das Token einmal (202 solange offen, 403 nach Ablehnung, 410 nach Ablauf oder Abholung). Anfragen leben zehn Minuten im Speicher, höchstens 500 gleichzeitig, da der Start keine Anmeldung braucht; nur `start` und `token` sind von der Anmelde-Middleware ausgenommen. So meldet sich jede CAD-Integration an: das FreeCAD-Add-on, die SolidWorks- und Inventor-Makros (`LoginInBrowser`, das auch das SolidWorks-Add-in ausführt) und das SolidCraft-Begleitprogramm.
 
 Wenn die Tabelle `users` beim Start der API leer ist, legt sie selbst ein Standardkonto
 **`admin` / `admin`** an (siehe Konsole beim ersten Start) — ändern Sie dieses Passwort
@@ -650,10 +669,12 @@ sofort nach der Anmeldung (`PATCH /api/auth/password`, oder über die Web-Anwend
 ### Benachrichtigungen
 
 Benachrichtigungen (Tabellen `notifications`/`notification_preferences`) sind an einen
-bestimmten Benutzer adressiert und werden für zehn Ereignistypen ausgelöst: ein eigenes
+bestimmten Benutzer adressiert und werden für dreizehn Ereignistypen ausgelöst: ein eigenes
 Element geht in Prüfung/wird freigegeben/auf "In Bearbeitung" zurückgesetzt
 (`status_review`/`status_released`/`status_regressed`), eine neue Revision
-(`new_revision`), Zuweisung zu oder Entfernung aus einem Projekt
+(`new_revision`), ein Ergebnis der Kundenprüfung an einem von Ihnen erstellten Element
+(`client_verification_needs_work`/`client_verification_verified`), der Bericht eines beendeten
+CAD-Uploads oder -Downloads (`cad_transfer_finished`), Zuweisung zu oder Entfernung aus einem Projekt
 (`project_assigned`/`project_unassigned`), Löschung eines zugewiesenen Projekts
 (`project_deleted`), Änderung Ihres Passworts durch einen Administrator
 (`password_changed`), wenig Speicherplatz auf dem Speicher (`low_disk_space`, nur
@@ -675,7 +696,7 @@ Meldung des Servers unverändert.
 
 | Methode | Pfad | Was es tut |
 |---|---|---|
-| POST | `/api/auth/login` \| `/logout` | Anmeldung / Abmeldung — Login ist der einzige Endpunkt ohne erforderliche Sitzung |
+| POST | `/api/auth/login` \| `/logout` | Anmeldung / Abmeldung — die Anmeldung braucht, wie die anderen Wege hinein (`macro-login`, `browser-login`, `device/start`, `device/token`), keine Sitzung |
 | GET/PATCH | `/api/auth/me` \| `/password` | Daten des angemeldeten Benutzers / Änderung des EIGENEN Passworts |
 | POST | `/api/auth/browser-bridge-ticket` | stellt ein einmaliges, kurzlebiges Anmelde-Ticket für die eigene Sitzung des Aufrufers aus |
 | GET | `/api/auth/browser-login` | tauscht ein Anmelde-Ticket (nicht das rohe Sitzungstoken) gegen ein Browser-Cookie, für CAD-Makros (öffnet den Browser bereits angemeldet) |
@@ -685,11 +706,18 @@ Meldung des Servers unverändert.
 | GET/DELETE | `/api/macro-tokens[/{id}]` | Tokens angemeldeter Makros — der Administrator sieht und widerruft alle, ein Benutzer nur seine eigenen |
 | GET/POST/PATCH/DELETE | `/api/users[/{id}]` | Kontenverwaltung — **nur Administrator** |
 | GET/POST/PATCH/DELETE | `/api/projects[/{id}]` | Liste/Erstellung/Bearbeitung/Löschung eines Projekts (Schreiben — nur Administrator; Liste nach Zugriff gefiltert) |
+| PATCH | `/api/projects/{id}/closed` | Projekt schließen / wieder öffnen (eigener Endpunkt, damit er nicht mit dem Speichern des Projektformulars konkurriert) |
+| GET/POST | `/api/projects/{projectId}/attachments` | die Auftragsdokumente des Projekts: Angebot, Auftragsbestätigung (je mehrere Dateien) und Sonstiges |
+| GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | eines davon herunterladen / löschen |
+| GET | `/api/projects/{projectId}/client-verifications` | Übersicht der Kundenprüfung im Projekt (Nacharbeit / in Arbeit / geprüft) |
+| GET/POST | `/api/projects/{projectId}/items/{itemId}/client-verifications` | Prüfverlauf eines Elements in diesem Projekt / Eintrag hinzufügen (Ergebnis, Kommentar, Anhänge) |
+| GET/DELETE | `/api/client-verification-attachments/{id}/download`, `/api/client-verifications/{id}` | Anhang eines Eintrags herunterladen / Eintrag löschen — nur Administrator |
 | GET/POST/DELETE | `/api/project-users`, `/api/projects/{projectId}/users/{userId}` | Verwaltung von Benutzer-Projekt-Zuweisungen — **nur Administrator** |
 | GET | `/api/items?search=&tag=&tag=&projectId=` | gefilterte Elementliste (nach Projektzugriff gefiltert); `tag` darf sich wiederholen, ein Element muss alle tragen |
 | GET | `/api/items/{id}` | Elementdetails |
 | GET | `/api/items/by-number/{itemNumber}` | Elementdetails nach Elementnummer statt Guid — verwendet vom SolidWorks-Makro, um eine Zeichnung (.SLDDRW) dem Teil/der Baugruppe zuzuordnen, die sie dokumentiert |
 | POST | `/api/projects/{projectId}/nodes` | erstellt Ordner/Teil/Baugruppe/Datei ohne Upload (optional mit Ticket für ein CAD-Makro) |
+| POST | `/api/nodes` | dasselbe ohne Projekt — ein Element nur über „Gesamte Datenbank“ erreichbar, oder eine Baugruppenkomponente aus CAD, per `parentId` an ihr Elternteil gehängt |
 | POST | `/api/projects/{projectId}/items` | **multipart/form-data**: Datei-Upload (optional `parentId`) |
 | GET | `/api/items/{id}/file` | Download der hochgeladenen Datei |
 | POST | `/api/items/{id}/duplicate` | dupliziert ein Teil/eine Baugruppe (neue Nummer, Status, Eigentümer) |
@@ -698,6 +726,8 @@ Meldung des Servers unverändert.
 | POST | `/api/items/{id}/lock` \| `/release` | Sperren (Eigentum übernehmen) / Freigeben eines Elements |
 | DELETE | `/api/items/{id}` | vollständige Löschung (Rekursion nur über Ordner — Komponenten einer Baugruppe werden nie mitgelöscht) — **nur Administrator** |
 | GET | `/api/projects/{projectId}/relations` | Eltern-Kind-Beziehungen (Struktur/Stückliste) eines Projekts |
+| GET | `/api/items/{id}/children` \| `/descendants` | direkte Kinder eines Elements / das Element mit seinem ganzen Teilbaum, jedes einmal, Eltern zuerst (was Download holt; füllt die Transferliste von Anfang an) |
+| POST | `/api/items/cad-versions` | ob die lokalen Kopien von Komponenten bei einem CAD-Client die aktuelle CAD-Datei sind: je Komponente `current` / `older` / `unknown` / `none`, nach dem in die Datei geschriebenen Versionsstempel (`contentVersion`) oder ohne ihn nach SHA-256 (`fileHash`), mit Revision, Hochlader und Datum der aktuellen Datei |
 | POST/DELETE | `/api/items/{parentId}/children[/{childId}]` | Hinzufügen/Lösen eines Kindelements |
 | PATCH | `/api/items/{parentId}/children/{childId}/position` \| `/reorder` | Änderung der Stücklistenposition (einzelne Position oder gesamte neue Reihenfolge) |
 | PATCH | `/api/projects/{projectId}/roots/reorder` | Änderung der Reihenfolge der Baum-Wurzeln eines Projekts |
@@ -732,8 +762,14 @@ Meldung des Servers unverändert.
 | GET/PATCH | `/api/notification-preferences` | Abschalten von Benachrichtigungen pro Typ für den angemeldeten Benutzer |
 | GET/POST | `/api/create-tickets/{ticket}`, `/attach-existing` | Korrelation CAD-Makro ↔ Browser (siehe `docs/README.md` des FreeCAD-Add-ons) |
 | GET/POST | `/api/drawing-tickets/{ticket}`, `/resolve` | Korrelation SolidWorks-Makro ↔ Browser für "zu welchem Element gehört diese Zeichnung", wenn ihre Ansichten auf mehr als ein bereits verknüpftes Element verweisen |
+| PUT/GET/DELETE | `/api/cad-requests` | ein CAD-Programm hinterlegt eine Formularanfrage für den offenen Browser-Tab, statt einen neuen zu öffnen / der Tab fragt sie ab / erledigt oder verworfen |
+| POST/GET | `/api/cad-requests/take` \| `/taken` | der Tab übernimmt eine Anfrage / das CAD-Programm fragt, ob sie übernommen wurde (flaches `1`/`0`) |
+| PUT/PATCH/GET/DELETE | `/api/progress` | die Transferliste: ein CAD-Programm meldet seine Dateien / hakt sie ab / der Browser fragt ab / die Person schließt die Liste |
+| POST/GET | `/api/progress/finish` \| `/cancel` \| `/cancelled` | der Lauf ist beendet (Bericht in den Benachrichtigungen) / die Person bittet um Abbruch / das CAD-Programm fragt, ob es abbrechen soll (flaches `1`/`0`) |
 | GET | `/api/config` | Speicherort für Dateien (verwendet von den Makros für SolidWorks und Inventor) |
 | GET/POST | `/api/settings/storage`, `/storage/move`, `/backup`, `/restore` | Speicherort/-statistiken, Verschieben, Sicherung (pg_dump + Dateien in einem ZIP), Wiederherstellung aus einer Sicherung — **nur Administrator** |
+| POST | `/api/settings/storage/clear-database` | Einstellungen → Dateispeicher → Gefahrenzone: leert die gewählten Kategorien (Projekte und Elemente, Materialien, Bearbeitungen, Hersteller, Kunden, Firmendaten); Konten und Servereinstellungen bleiben — **nur Administrator** |
+| GET/PUT | `/api/settings/upload-rules` | Größenlimits für Uploads je Dateierweiterung — **nur Administrator** |
 | GET/PATCH | `/api/settings/backup-schedule` | Zeitplan für automatische Sicherung (ein-/ausschalten, Häufigkeit, Tag, Uhrzeit, Anzahl aufbewahrter Kopien) — **nur Administrator** |
 | GET/PATCH | `/api/settings/item-number-prefixes[/{rodzaj}]` | Buchstaben-Präfixe der Elementnummer pro Art (die 4 Teile-Arten plus `Zlozenie` = gefertigte Baugruppe; zugekaufte/Kunden-Baugruppen nutzen das Präfix der Teile-Art) — **nur Administrator** |
 | GET/PATCH | `/api/settings/item-number-format` | Nummernformat für ab jetzt erstellte Elemente: `digits` (Mindestbreite zum Auffüllen mit Nullen, 0 = kein Auffüllen) und `withName` (ob der Elementname in Klammern angehängt wird). Beide bei PATCH optional und unabhängig gespeichert, da es in der Oberfläche zwei getrennte Abschnitte sind; beim Erstellen am Element eingefroren — **nur Administrator** |
@@ -885,19 +921,11 @@ docker compose pull
 docker compose up -d
 ```
 
-> Solange das Repo (und das Paket in GHCR) privat ist, erfordern das obige `curl` und
-> `docker compose pull` eine Authentifizierung — `curl` mit einem
-> `Authorization: Bearer <token>`-Header, und vor `docker compose pull` zusätzlich
-> `docker login ghcr.io -u <login> -p <token>` (ein Token mit der Berechtigung
-> `read:packages`). Nach der Veröffentlichung des Repos/Images als öffentlich ist keine
-> Anmeldung mehr erforderlich.
->
-> **Einmalig, nach der ersten Veröffentlichung**: JEDES Paket in GHCR ist standardmäßig
-> PRIVAT, unabhängig von der Sichtbarkeit des Repos selbst — es muss einmal manuell auf
-> öffentlich umgestellt werden, für BEIDE Pakete (GitHub → Reiter **Packages** beim Repo
-> → `easypdm-api` / `easypdm-postgres` → **Package settings** → **Change visibility**),
-> sonst erhält `docker compose pull` ohne vorheriges `docker login` selbst bei einem
-> öffentlichen Repo einen 403/404-Fehler.
+> Das Repository und beide Images sind öffentlich, daher brauchen weder `curl` noch
+> `docker compose pull` eine Anmeldung. (Ein neu veröffentlichtes GHCR-Paket ist unabhängig von
+> der Sichtbarkeit des Repos zunächst privat; beide wurden einmal unter **Packages** beim Repo →
+> Paket → **Package settings** → **Change visibility** auf öffentlich gestellt. Ein neues Paket
+> bräuchte dasselbe.)
 
 **Update** auf diesem Weg: `docker compose pull && docker compose up -d` — ohne
 `git pull` (es gibt nichts zu pullen, Sie haben hier kein Repo), es wird einfach das
@@ -945,14 +973,31 @@ nur die Anwendung neu und ersetzt sie, und **startet den Dienst explizit neu**
 nichts bewirken würde). Neue Datenbankmigrationen wendet das Programm beim Start
 automatisch selbst an — es muss nichts Zusätzliches manuell getan werden.
 
-> Das Skript baut aus den Quellen dieses Repositorys (wie `run.sh`, nur als dauerhafter
-> Dienst statt als Vordergrundprozess) — es gibt (noch) kein separates, fertiges
-> Binär-Release zum Herunterladen. Die eigenständige veröffentlichte ausführbare Datei
-> selbst wurde tatsächlich ausgeführt und geprüft (liefert das Frontend aus,
-> protokolliert), und der Inhalt der systemd-Unit wurde mit `systemd-analyze verify`
-> überprüft; der vollständige Skriptablauf (Anlage von Rolle/Datenbank/Systemkonto über
-> `sudo`) wurde noch nicht end-to-end ausgeführt — beobachten Sie beim ersten Start die
-> Ausgabe und melden Sie, falls etwas nicht funktioniert.
+> Aus einem Klon baut das Skript aus den Quellen dieses Repositorys (wie `run.sh`, nur als
+> dauerhafter Dienst statt als Vordergrundprozess); das fertige Paket unten überspringt den
+> Build. Beide Wege laufen in der CI auf einem sauberen Ubuntu von Anfang bis Ende — Installation,
+> Prüfung, dass der Dienst antwortet, Update, Deinstallation (`test-linux-installer.yml` für den
+> Klon, `build-linux-package.yml` für das Paket).
+
+#### Fertiges Paket (ohne lokales .NET SDK/Node.js)
+
+`.github/workflows/build-linux-package.yml` baut das Frontend und das eigenständige Backend auf
+einem Ubuntu-Runner von GitHub und packt sie zusammen mit
+`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`/`db/schema.sql` in eine Datei
+`EasyPDM-Linux-x64_v<version>.tar.gz` (Versionsnummer aus `MyAppVersion` in
+`packaging/windows/EasyPDM.iss`). Das Paket liegt jedem Release bei. Die Zielmaschine braucht
+dann nur `sudo`, kein `.NET SDK` und kein `Node.js`:
+
+```bash
+mkdir easypdm
+tar xzf EasyPDM-Linux-x64_v<version>.tar.gz -C easypdm   # das Archiv hat keinen Oberordner
+cd easypdm
+sudo ./install-easypdm-linux.sh
+```
+
+`install-easypdm-linux.sh` erkennt den mitgelieferten, bereits gebauten Ordner `publish/`
+(`PACKAGE_MODE=1`) und überspringt den Build — alles Übrige (PostgreSQL, systemd-Dienst, Update
+durch erneutes Ausführen aus einem neueren Paket) funktioniert wie oben beschrieben.
 
 ### Windows — Installer (`.exe`, Inno Setup)
 
@@ -1013,9 +1058,9 @@ das bereits migrierte Schema nicht lesen.
 > (u. a. keine lokalen `const`-Abschnitte in Funktionen, `LoadStringFromFile` erfordert
 > `AnsiString`, kein `Randomize`/`RandSeed`/`GetTickCount` — es gibt keine
 > dokumentierte Möglichkeit, den eingebauten `Random` manuell zu initialisieren, daher
-> wird er unverändert verwendet). Die eigentliche End-to-End-Installation auf einer
-> lebenden Maschine mit PostgreSQL wurde noch nicht manuell getestet — beobachten Sie
-> beim ersten Start den Ablauf und melden Sie, was nicht funktioniert.
+> wird er unverändert verwendet). `build-windows-installer.yml` installiert das Ergebnis außerdem
+> auf einem Windows-Runner mit PostgreSQL, zweimal (Neuinstallation und simuliertes Update), und
+> prüft, dass der Dienst startet und der Server antwortet.
 
 Erste Anmeldung: **`admin` / `admin`** (das Konto wird automatisch angelegt, falls die
 Tabelle `users` leer ist — siehe "Anmeldung, Rollen und Projektzugriff" oben). Ändern
@@ -1023,8 +1068,8 @@ Sie dieses Passwort sofort nach der Anmeldung.
 
 ## Bekannte Einschränkungen
 
-1. **Keine Validierung von Größe/Typ hochgeladener Dateien und Anhänge** — jede Datei
-   wird akzeptiert, unabhängig von Erweiterung oder Größe.
+1. **Uploads sind standardmäßig nicht begrenzt** — jeder Dateityp und jede Größe geht durch,
+   bis ein Administrator „Erlaubte Dateitypen“ einrichtet (siehe oben).
 2. **Der Dateispeicher (`storage/`) ist ein gewöhnlicher Ordner auf der Festplatte des
    Servers.** Sicherung/Wiederherstellung über die Einstellungen packt einen `pg_dump`
    der Datenbank zusammen mit dem Dateispeicher in ein einziges ZIP; es kann manuell
@@ -1043,8 +1088,8 @@ Sie dieses Passwort sofort nach der Anmeldung.
    Pfadspalte aus `StoragePaths.FileTables` auf den Speicher dieses Servers um; bei älteren
    Sicherungen ohne diese Datei wird jeder Pfad über sein Ende im wiederhergestellten Speicher
    gefunden. Das Verschieben des Speichers nutzt dieselbe Tabellenliste. Eine CAD-Datei pro Revision ergibt sich aus den Dateinamen der Makros
-   (`Datensatzname.REVISION.Endung`, in allen dreien, per HTTP-Upload oder, in SolidWorks und
-   Inventor, per Registrierung in `storage/components/`): Derselbe Name ersetzt die Datei dieser
+   (`Datensatzname.REVISION.Endung`, in jeder CAD-Integration, per HTTP-Upload oder, bei den
+   SolidWorks- und Inventor-Makros, per Registrierung in `storage/components/`): Derselbe Name ersetzt die Datei dieser
    Revision, ein neuer steht daneben. Eine von Hand unter demselben Namen in einen CAD-Platz
    gelegte Datei ersetzt die vorherige, egal zu welcher Revision sie gehörte.
 3. **Die Historie umfasst nur Elemente.** Die Erstellung eines Elements, Statusänderungen,
@@ -1057,12 +1102,8 @@ Sie dieses Passwort sofort nach der Anmeldung.
    hinzufügen.
 4. **In Docker übersteht „Speicherort ändern" für den Dateispeicher (Einstellungen ->
    Dateispeicher) keinen Image-Rebuild** — diese Operation schreibt den neuen Pfad in
-   `appsettings.json` innerhalb des `api`-Containers (außerhalb des Volumes
+   `appsettings.Local.json` im Anwendungsordner des `api`-Containers (außerhalb des Volumes
    `pdm-data`), sodass er nach `docker compose up --build` auf den Wert der im
    `Dockerfile` gesetzten Umgebungsvariable `StorageRoot` zurückfällt. Die Änderung des
    Speicherorts selbst funktioniert während der Lebensdauer des Containers korrekt —
    das Problem betrifft nur die Persistenz dieser Einstellung über Rebuilds hinweg.
-
-## Nächste Schritte (vorgeschlagene Reihenfolge)
-
-1. Upload-Validierung (Typ/Größe) für Elemente und Anhänge.
