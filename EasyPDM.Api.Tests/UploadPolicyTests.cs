@@ -144,7 +144,9 @@ public class UploadPolicyTests
             var rule = read.GetProperty("rules").EnumerateArray().Single();
             Assert.Equal(".step", rule.GetProperty("extension").GetString());
             Assert.Equal(200, rule.GetProperty("maxSizeMb").GetInt32());
-            Assert.Contains(".fcstd", read.GetProperty("cadMacroExtensions").EnumerateArray().Select(e => e.GetString()));
+            var cadExtensions = read.GetProperty("cadMacroExtensions").EnumerateArray().Select(e => e.GetString()).ToList();
+            Assert.Contains(".fcstd", cadExtensions);
+            Assert.Contains(".sc", cadExtensions);  // SolidCraft designs, uploaded by the companion
 
             var userId = await admin.CreateUserAsync("up" + Guid.NewGuid().ToString("N")[..8], "haslo123");
             using var user = factory.CreateClient();

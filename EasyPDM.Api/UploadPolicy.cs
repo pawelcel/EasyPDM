@@ -27,10 +27,11 @@ public sealed class UploadPolicy
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromSeconds(30);
     private static readonly Regex ExtensionPattern = new(@"^\.[a-z0-9][a-z0-9_-]{0,15}$", RegexOptions.Compiled);
 
-    // Rozszerzenia wysyłane przez makra CAD (pliki modeli i rysunków, STEP, PDF, obraz podglądu)
-    // -- podpowiedź w ustawieniach, żeby lista dozwolonych typów nie odcięła makr.
+    // Rozszerzenia wysyłane przez integracje CAD (pliki modeli i rysunków, STEP, PDF, obraz
+    // podglądu) -- podpowiedź w ustawieniach, żeby lista dozwolonych typów nie odcięła żadnej z
+    // nich. ".sc" to projekt SolidCraft (pomocnik wysyła go jako plik CAD elementu).
     public static readonly string[] CadMacroExtensions =
-        [".fcstd", ".sldprt", ".sldasm", ".slddrw", ".ipt", ".iam", ".idw", ".dwg", ".step", ".stp", ".pdf", ".png"];
+        [".fcstd", ".sldprt", ".sldasm", ".slddrw", ".ipt", ".iam", ".idw", ".dwg", ".sc", ".step", ".stp", ".pdf", ".png"];
 
     private readonly string _connectionString;
     private Snapshot? _snapshot;
