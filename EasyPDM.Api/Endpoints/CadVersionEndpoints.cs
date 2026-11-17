@@ -10,7 +10,8 @@ using Npgsql;
 // says what it has, per component, and the server compares it with what it holds:
 //
 //   contentVersion  a stamp the client wrote into the file before uploading it (the FreeCAD
-//                   add-on keeps it in the document's Meta). It stays the same when the file is
+//                   add-on keeps it in the document's Meta, the SolidWorks macro in the custom
+//                   property EasyPDM_ContentVersion, sent also when registering a file). It stays the same when the file is
 //                   saved again without being uploaded, which a hash does not: CAD programs
 //                   re-save components when the assembly is saved.
 //   fileHash        SHA-256 of the local file, for files without a stamp (older uploads, CAD

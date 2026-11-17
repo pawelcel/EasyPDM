@@ -4,6 +4,9 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Version stamps on registered CAD files.** `POST /api/items/{id}/attachments/register` takes `contentVersion` like a plain upload, so a file the SolidWorks macro copies into the shared storage is recognised by the outdated-component check also after SolidWorks saves it again unchanged.
+
 ## [0.9.0]
 
 **In short:** EasyPDM moves into the CAD programs themselves. FreeCAD gets an EasyPDM workbench, now in its own repository and released on its own ([EasyPDM for FreeCAD 0.9.0](https://github.com/pawelcel/EasyPDM-FreeCAD/releases/tag/v0.9.0)), with a document panel that shows which components of an assembly are outdated and an Upload that refuses work built on them. SolidCraft gets Upload, Download, Log in and Log out in its Plugins menu, with assemblies of linked designs. Programs sign in by approving it in the browser instead of typing a password, and the server now remembers every CAD file version an item has had. A SolidWorks add-in with an EasyPDM menu is on its way; it is not part of this release yet.

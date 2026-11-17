@@ -231,7 +231,8 @@ static class AttachmentEndpoints
             insertCmd.Parameters.AddWithValue("revisionNumber", (object?)info.Value.RevisionNumber ?? DBNull.Value);
             await insertCmd.ExecuteNonQueryAsync();
             if (body.Role == "cad")
-                await CadVersionEndpoints.RecordAsync(conn, itemId, attachmentId, fileName, null, hash, info.Value.RevisionNumber, user.Id);
+                await CadVersionEndpoints.RecordAsync(conn, itemId, attachmentId, fileName,
+                    CadVersionEndpoints.CleanContentVersion(body.Role, body.ContentVersion), hash, info.Value.RevisionNumber, user.Id);
 
             await LogAttachmentHistoryAsync(conn, itemId, fileName, "added", user.Id);
 
@@ -458,4 +459,6 @@ static class AttachmentEndpoints
     }
 }
 
-record RegisterAttachmentRequest(string FilePath, string? Role = null);
+// ContentVersion: the version stamp the SolidWorks macro writes into the file (see
+// CadVersionEndpoints), as the "contentVersion" form field of a plain upload.
+record RegisterAttachmentRequest(string FilePath, string? Role = null, string? ContentVersion = null);

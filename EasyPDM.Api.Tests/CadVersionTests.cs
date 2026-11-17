@@ -84,6 +84,34 @@ public class CadVersionTests
         Assert.Equal("unknown", (await CheckAsync(client, itemId)).GetProperty("local").GetString());
     }
 
+    // The SolidWorks macro copies the file into the shared storage and registers it, on the
+    // same path again when the revision stays: each registration records the new file.
+    [Fact]
+    public async Task Registered_files_keep_their_stamp()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var client = factory.CreateClient();
+        await client.LoginAsync("admin", "admin");
+        var itemId = await CreatePartAsync(client, await client.CreateProjectAsync($"Versions {Guid.NewGuid()}"));
+
+        var dir = Path.Combine(factory.StorageRoot, "components");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, $"{Guid.NewGuid():N}(Plyta).A.SLDPRT");
+        async Task RegisterAsync(string content, string stamp)
+        {
+            await File.WriteAllTextAsync(path, content);
+            (await client.PostAsJsonAsync($"/api/items/{itemId}/attachments/register",
+                new { filePath = path, role = "cad", contentVersion = stamp })).EnsureSuccessStatusCode();
+        }
+
+        await RegisterAsync("first", "sw-1");
+        await RegisterAsync("second", "sw-2");
+
+        Assert.Equal("current", (await CheckAsync(client, itemId, "sw-2")).GetProperty("local").GetString());
+        Assert.Equal("older", (await CheckAsync(client, itemId, "sw-1")).GetProperty("local").GetString());
+        Assert.Equal("current", (await CheckAsync(client, itemId, null, Sha256("second"))).GetProperty("local").GetString());
+    }
+
     [Fact]
     public async Task Unknown_items_and_malformed_stamps()
     {
