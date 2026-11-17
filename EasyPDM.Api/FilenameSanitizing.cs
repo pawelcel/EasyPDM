@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 // Nazwy plików Windows nie mogą zawierać kilku znaków specjalnych -- ta sama lista i to samo
 // zastąpienie podkreśleniem, dawniej reimplementowane niezależnie w każdym makrze CAD
-// (SanitizeFilename w EasyPDM.SolidWorks/EasyPDM.Inventor, sanitize_filename w
+// (SanitizeFilename w EasyPDM-SolidWorks/EasyPDM.Inventor, sanitize_filename w
 // EasyPDM-FreeCAD -- każde z osobną, rozjeżdżającą się kopią: np. inny tekst zastępczy dla
 // pustej nazwy w FreeCAD niż w SolidWorks/Inventor). Jedno miejsce tutaj -- odpowiedzi API
 // dorzucają gotowe "sanitizedFileName" obok "fileName".

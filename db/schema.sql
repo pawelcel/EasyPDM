@@ -450,7 +450,7 @@ CREATE TABLE item_attachments (
     -- jeden aktualny załącznik na rolę, patrz ReplaceExistingRoleAttachmentAsync). Pozwala
     -- makrom CAD odnaleźć "który załącznik odpowiada aktualnej rewizji" wprost po tej
     -- kolumnie, zamiast zgadywać po nazwie pliku (dawniejszy jedyny sposób, patrz historia
-    -- FindCurrentAttachment w EasyPDM.SolidWorks/EasyPDM.Inventor/EasyPDMDownload).
+    -- FindCurrentAttachment w EasyPDM-SolidWorks/EasyPDM.Inventor/EasyPDMDownload).
     revision_number INTEGER
 );
 

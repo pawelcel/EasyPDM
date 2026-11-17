@@ -122,7 +122,7 @@ sieht Ihr Passwort nie) und **Abmelden**.
 
 Installation und Details:
 - FreeCAD (Add-on, eigenes Repository): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD), mit [eigenem Wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki)
-- SolidWorks (Makros, Add-in in [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
+- SolidWorks (Add-in mit EasyPDM-Registerkarte und Dokumentbereich, Makros, Zeichnungsblatt; im eigenen Repository): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (Plugin + EasyPDM-Begleitprogramm, da SolidCraft-Plugins kein Netzwerk haben):
   **[Installation Schritt für Schritt](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** im Wiki (auf Englisch); Details in

@@ -84,17 +84,10 @@ workflow refuses the build:
 - `EasyPDM.Web/src/version.ts` — `APP_VERSION`
 - `packaging/windows/EasyPDM.iss` — `MyAppVersion`
 
-The SolidWorks sheet formats and drawing templates in `EasyPDM.SolidWorks/templates/` are
-not attached to releases (the user's choice, from 0.9): the release notes link that folder at
-the release's tag. They are binaries only SolidWorks can write: after a change to the sheet
-layout, rebuild them with `EasyPDMSheetFormat` on a live SolidWorks and commit them, or the
-tag points at the old sheet.
-
-The sheet layout itself, and the FreeCAD add-on with its macros, live in
-[pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9).
-`EasyPDM.SolidWorks/EasyPDMSheetFormat.bas` is generated there by `tools/build_templates.py
---solidworks <path to this repository>`; never edit it here.
-
-SolidWorks `.swp` macros are deliberately **not** attached by CI — they need compiling on a
-live SolidWorks and are added to the draft by hand. When a release carries macro changes,
-that step is what actually delivers them.
+Two CAD integrations live in repositories of their own, with their own releases, checks and
+CLAUDE.md: the FreeCAD add-on and the drawing sheet generator in
+[pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9), and the
+SolidWorks add-in, macros and sheet formats in
+[pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) (moved out of
+`EasyPDM.SolidWorks/` after 0.9.0, with its history). A server change they depend on is
+released here first, and their notes say which EasyPDM version they need.

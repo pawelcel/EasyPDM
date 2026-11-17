@@ -5,7 +5,7 @@
 Zwei `.bas`-Makros, jedes vollständig eigenständig (separate Datei, separates
 VBA-Modul, keine Abhängigkeiten untereinander außer einer gemeinsamen Stelle in der
 Windows-Registrierung für die Anmeldesitzung) — die Inventor-Gegenstücke zu
-`EasyPDM.SolidWorks/EasyPDMUpload.bas` und `EasyPDMDownload.bas`:
+`EasyPDMUpload.bas` aus [EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) und `EasyPDMDownload.bas`:
 
 - **`EasyPDMUpload.bas`** — sendet das aktive Inventor-Dokument an EasyPDM. Die Auswahl
   von Projekt/neu-oder-vorhanden/duplizieren/Elementeigenschaften erfolgt im Browser
@@ -35,7 +35,7 @@ unten.
 ## Unterschiede zu den SolidWorks-Makros
 
 Dies sind **Ports**, keine Neuentwürfe — dieselbe Architektur wie
-`EasyPDM.SolidWorks/EasyPDMUpload.bas`/`EasyPDMDownload.bas`, mit denselben Sub-/
+`EasyPDM-SolidWorks/EasyPDMUpload.bas`/`EasyPDMDownload.bas`, mit denselben Sub-/
 Function-Namen, wo Inventors eigene API dies zulässt, damit sich die beiden
 Dateifamilien leicht nebeneinander vergleichen lassen. Nur die tatsächlichen CAD-
 API-Aufrufe unterscheiden sich:

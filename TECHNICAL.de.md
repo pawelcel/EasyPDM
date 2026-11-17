@@ -10,7 +10,7 @@ Konstruieren benutzt) finden Sie in [README.de.md](README.de.md).
 
 Projekte und Elemente werden manuell über die Web-Anwendung erstellt (Datei-Upload direkt
 in den Speicher der API) oder über das FreeCAD-Add-on ([pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)), das SolidWorks-
-(`EasyPDM.SolidWorks/`) oder Autodesk-Inventor-Makro (`EasyPDM.Inventor/`), die dieselbe
+([pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)) oder Autodesk-Inventor-Makro (`EasyPDM.Inventor/`), die dieselbe
 API aufrufen.
 Der frühere Ansatz mit Festplatten-Scan (`EasyPDM.Core`, `EasyPDM.Indexer`) wurde aus dem
 Repo entfernt — er war seit Migration `002` nicht mehr mit dem Schema kompatibel und
@@ -65,9 +65,9 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   EasyPDM.Api.Tests` (die Connection-String zeigt standardmäßig auf ein lokales
   `pdm`/`pdm_user` — überschreibbar über die Variable
   `EASYPDM_TEST_CONNECTION_STRING`, genau wie in der CI).
-- **FreeCAD** — seit 0.9 in einem eigenen Repository, [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD): ein EasyPDM-Arbeitsbereich, dessen Upload und Download — bis 0.9 FreeCAD-Makros — (`upload.py`: im Browser gewähltes Element, Upload mit STEP/PDF/Vorschau, Umbenennung nach dem Datensatz, Zeichnungsblatt; `download.py`: das Element mit seinem ganzen Komponentenbaum, geöffnet), dazu Anmelden (im Browser bestätigt) und Abmelden. Sein `tools/build_templates.py` ist die einzige Quelle des Zeichnungsblatts und schreibt auch hier `EasyPDM.SolidWorks/EasyPDMSheetFormat.bas`. Auf FreeCAD 1.1 live getestet.
-- **`EasyPDM.SolidWorks/`** — das Gegenstück für SolidWorks (VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas` und `EasyPDMSheetFormat.bas` für das Zeichnungsblatt), auf SolidWorks 2024 live getestet; `Addin/` ist ein .NET-Framework-COM-Add-in mit EasyPDM-Menü und -Symbolleiste, das die kompilierten Makros ausführt (noch nicht in SolidWorks gelaufen).
-- **`EasyPDM.Inventor/`** — das Gegenstück für Autodesk Inventor (VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), aus `EasyPDM.SolidWorks/` portiert; auf Inventor live getestet. Kein Zeichnungsblatt (keine Inventor-Lizenz, um eines zu bauen).
+- **FreeCAD** — seit 0.9 in einem eigenen Repository, [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD): ein EasyPDM-Arbeitsbereich, dessen Upload und Download — bis 0.9 FreeCAD-Makros — (`upload.py`: im Browser gewähltes Element, Upload mit STEP/PDF/Vorschau, Umbenennung nach dem Datensatz, Zeichnungsblatt; `download.py`: das Element mit seinem ganzen Komponentenbaum, geöffnet), dazu Anmelden (im Browser bestätigt) und Abmelden. Sein `tools/build_templates.py` ist die einzige Quelle des Zeichnungsblatts und schreibt auch `EasyPDMSheetFormat.bas` in EasyPDM-SolidWorks. Auf FreeCAD 1.1 live getestet.
+- **SolidWorks** — im eigenen Repository, [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) (nach 0.9.0 aus `EasyPDM.SolidWorks/` ausgelagert): VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, auf SolidWorks 2024 und 2026 live getestet, `EasyPDMSheetFormat.bas` für das Zeichnungsblatt und ein .NET-Framework-COM-Add-in mit EasyPDM-Registerkarte, das die kompilierten Makros ausführt und einen eigenen Dokumentbereich, Sperren und die Prüfung veralteter Komponenten ergänzt.
+- **`EasyPDM.Inventor/`** — das Gegenstück für Autodesk Inventor (VBA-Makros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), aus den SolidWorks-Makros portiert; auf Inventor live getestet. Kein Zeichnungsblatt (keine Inventor-Lizenz, um eines zu bauen).
 - **`EasyPDM.SolidCraft/`** — das SolidCraft-Plugin (Rust → WebAssembly-Komponente). SolidCraft-Plugins haben kein Netzwerk, daher legen seine Einträge im Menü File (Upload, Download, Anmelden, Abmelden) nur Aufträge in einem Ausgangsordner unter Dokumente ab.
 - **`EasyPDM.Companion/`** — das Programm auf dem CAD-Arbeitsplatz, das diese Aufträge erledigt: Es spricht wie die Makros mit dem Server (dieselben Endpunkte, derselbe Browser-Ticket-Ablauf), öffnet Downloads in SolidCraft über dessen lokalen Steuerkanal, meldet sich per Geräteanmeldung an und läuft im Hintergrund mit Desktop-Benachrichtigungen.
 - **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,

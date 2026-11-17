@@ -88,20 +88,15 @@ jobs:
             cp EasyPDM.Companion/README.md "companion/$rid/"
             (cd "companion/$rid" && zip -q -r "../../artifacts/macros/EasyPDM_SolidCraft_Companion_${rid}_v${VERSION}.zip" .)
           done
-          # The SOLIDWORKS add-in (EasyPDM.SolidWorks/Addin) is not released until it has run on a
-          # live SolidWorks. To attach it again: dotnet build EasyPDM.SolidWorks/Addin -c Release
-          # -p:Version="$VERSION", then zip bin/Release/net48/EasyPDM.SolidWorks.Addin.dll with
-          # install.cmd, uninstall.cmd and README.md as EasyPDM_SolidWorks_Addin_v${VERSION}.zip.
-      # Inventor macros as plain files, ready to import. (FreeCAD's add-on and its macros are
-      # released from pawelcel/EasyPDM-FreeCAD, their own repository, since 0.9.)
+      # Inventor macros as plain files, ready to import. FreeCAD's add-on is released from
+      # pawelcel/EasyPDM-FreeCAD (since 0.9), the SolidWorks add-in, macros and sheet formats from
+      # pawelcel/EasyPDM-SolidWorks (after 0.9.0).
       - name: Przygotuj makra CAD
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p artifacts/macros
           cp EasyPDM.Inventor/EasyPDMUpload.bas   "artifacts/macros/EasyPDM_Inventor_Upload_v${VERSION}.bas"
           cp EasyPDM.Inventor/EasyPDMDownload.bas "artifacts/macros/EasyPDM_Inventor_Download_v${VERSION}.bas"
-          # The SolidWorks sheet formats and drawing templates (EasyPDM.SolidWorks/templates) are
-          # deliberately not attached: the release notes link that folder at the tag instead.
 
       # Tag to np. "v0.2", nagłówek w CHANGELOG.md to "## [0.2]" (bez "v") — wycina samą
       # sekcję dla tej wersji (od nagłówka do NASTĘPNEGO "## [", wyłącznie), do notatek

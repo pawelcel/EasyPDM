@@ -10,7 +10,7 @@ designing) is in [README.md](README.md).
 
 Projects and items are created manually through the web application (uploading a file
 straight into the API's storage) or through the FreeCAD add-on ([pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)), SolidWorks
-(`EasyPDM.SolidWorks/`) or Autodesk Inventor (`EasyPDM.Inventor/`) macro, which call the
+([pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)) or Autodesk Inventor (`EasyPDM.Inventor/`) macro, which call the
 same API.
 The earlier disk-scanning approach (`EasyPDM.Core`, `EasyPDM.Indexer`) has been removed
 from the repo — it was incompatible with the schema since migration `002` and was never
@@ -65,13 +65,15 @@ PostgreSQL 18.
   record-name renaming, drawing sheet) and Download (`download.py`: the item with its whole
   component tree, opened), the FreeCAD macros until 0.9, plus Log in (approved in the browser)
   and Log out. Its `tools/build_templates.py` is the single source of the drawing sheet and also writes
-  `EasyPDM.SolidWorks/EasyPDMSheetFormat.bas` here. Live-tested on FreeCAD 1.1.
-- **`EasyPDM.SolidWorks/`** — the SolidWorks counterpart (VBA macros
-  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, plus `EasyPDMSheetFormat.bas` for the drawing
-  sheet), live-tested on SolidWorks 2024; `Addin/` is a .NET Framework COM add-in with an
-  EasyPDM menu and toolbar that runs the compiled macros (not yet run on SolidWorks).
+  `EasyPDMSheetFormat.bas` in EasyPDM-SolidWorks. Live-tested on FreeCAD 1.1.
+- **SolidWorks** — lives in its own repository,
+  [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) (moved out of `EasyPDM.SolidWorks/` after 0.9.0): VBA
+  macros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, live-tested on SolidWorks 2024 and 2026,
+  `EasyPDMSheetFormat.bas` for the drawing sheet, and a .NET Framework COM add-in with an
+  EasyPDM tab that runs the compiled macros and adds a document panel, locking and the
+  outdated-component check of its own.
 - **`EasyPDM.Inventor/`** — the Autodesk Inventor counterpart (VBA macros
-  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), ported from `EasyPDM.SolidWorks/`; live-tested
+  `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), ported from the SolidWorks macros; live-tested
   on Inventor. No drawing sheet (no Inventor licence to build one on).
 - **`EasyPDM.SolidCraft/`** — the SolidCraft plugin (Rust → WebAssembly component). SolidCraft
   plugins have no network, so its File-menu entries (Upload, Download, Log in, Log out) only

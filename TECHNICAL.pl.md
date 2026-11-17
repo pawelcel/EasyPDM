@@ -10,7 +10,7 @@ projektowaniu) jest w [README.pl.md](README.pl.md).
 
 Ręczne tworzenie projektów i elementów przez aplikację webową (upload pliku wprost do
 magazynu API) albo przez dodatek FreeCAD ([pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)), makro SolidWorks
-(`EasyPDM.SolidWorks/`) lub Autodesk Inventor (`EasyPDM.Inventor/`), które wołają to samo
+([pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)) lub Autodesk Inventor (`EasyPDM.Inventor/`), które wołają to samo
 API.
 Wcześniejsze podejście ze skanowaniem dysku (`EasyPDM.Core`, `EasyPDM.Indexer`) zostało
 usunięte z repo — było niezgodne ze schematem od migracji `002` i nigdy nieużywane przez
@@ -56,9 +56,9 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   tej samej bazie, zerowany przed każdą klasą testową). Lokalnie: `dotnet test
   EasyPDM.Api.Tests` (connection string domyślnie wskazuje na lokalny `pdm`/`pdm_user` —
   nadpisywalny zmienną `EASYPDM_TEST_CONNECTION_STRING`, tak jak w CI).
-- **FreeCAD** — od 0.9 we własnym repozytorium, [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD): środowisko pracy EasyPDM, którego Upload i Download — do 0.9 makra FreeCAD — to (`upload.py`: element wybrany w przeglądarce, wysyłka ze STEP/PDF/podglądem, zmiana nazwy na nazwę rekordu, arkusz rysunku; `download.py`: element z całym drzewem komponentów, otwarty), plus Zaloguj (zatwierdzane w przeglądarce) i Wyloguj. Jego `tools/build_templates.py` to jedyne źródło arkusza rysunku i zapisuje też tutaj `EasyPDM.SolidWorks/EasyPDMSheetFormat.bas`. Sprawdzone na żywym FreeCAD 1.1.
-- **`EasyPDM.SolidWorks/`** — odpowiednik dla SolidWorks (makra VBA `EasyPDMUpload.bas`/`EasyPDMDownload.bas` oraz `EasyPDMSheetFormat.bas` do arkusza rysunku), sprawdzony na żywym SolidWorks 2024; `Addin/` to dodatek COM dla .NET Framework z menu i paskiem EasyPDM, który uruchamia skompilowane makra (jeszcze nieuruchomiony w SolidWorks).
-- **`EasyPDM.Inventor/`** — odpowiednik dla Autodesk Inventor (makra VBA `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), port z `EasyPDM.SolidWorks/`; sprawdzony na żywym Inventorze. Bez arkusza rysunku (brak licencji Inventora, na której dałoby się go zrobić).
+- **FreeCAD** — od 0.9 we własnym repozytorium, [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD): środowisko pracy EasyPDM, którego Upload i Download — do 0.9 makra FreeCAD — to (`upload.py`: element wybrany w przeglądarce, wysyłka ze STEP/PDF/podglądem, zmiana nazwy na nazwę rekordu, arkusz rysunku; `download.py`: element z całym drzewem komponentów, otwarty), plus Zaloguj (zatwierdzane w przeglądarce) i Wyloguj. Jego `tools/build_templates.py` to jedyne źródło arkusza rysunku i zapisuje też `EasyPDMSheetFormat.bas` w EasyPDM-SolidWorks. Sprawdzone na żywym FreeCAD 1.1.
+- **SolidWorks** — we własnym repozytorium, [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) (wydzielone z `EasyPDM.SolidWorks/` po 0.9.0): makra VBA `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, sprawdzone na żywym SolidWorks 2024 i 2026, `EasyPDMSheetFormat.bas` do arkusza rysunku oraz dodatek COM dla .NET Framework z zakładką EasyPDM, który uruchamia skompilowane makra i dokłada własny panel dokumentu, blokowanie i sprawdzanie nieaktualnych komponentów.
+- **`EasyPDM.Inventor/`** — odpowiednik dla Autodesk Inventor (makra VBA `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), port makr SolidWorks; sprawdzony na żywym Inventorze. Bez arkusza rysunku (brak licencji Inventora, na której dałoby się go zrobić).
 - **`EasyPDM.SolidCraft/`** — wtyczka SolidCraft (Rust → komponent WebAssembly). Wtyczki SolidCraft nie mają sieci, więc jej pozycje w menu File (Upload, Download, Zaloguj, Wyloguj) tylko zapisują zlecenia do folderu wymiany w Dokumentach.
 - **`EasyPDM.Companion/`** — program na stanowisku CAD, który obsługuje te zlecenia: rozmawia z serwerem jak makra (te same endpointy, ten sam bilet w przeglądarce), otwiera pobrane pliki w SolidCraft przez jego lokalny kanał sterowania, loguje się przez logowanie urządzenia i działa w tle z powiadomieniami.
 - **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,

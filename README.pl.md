@@ -113,7 +113,7 @@ W FreeCAD i SolidWorks dodatek umieszcza je w **menu EasyPDM**, razem z **Zalogu
 
 Instalacja i szczegóły:
 - FreeCAD (dodatek, we własnym repozytorium): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD), z [własnym wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki)
-- SolidWorks (makra, dodatek w [`Addin/`](EasyPDM.SolidWorks/Addin/README.md)): [`EasyPDM.SolidWorks/README.md`](EasyPDM.SolidWorks/README.md)
+- SolidWorks (dodatek z zakładką EasyPDM i panelem dokumentu, makra, arkusz rysunku; we własnym repozytorium): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (wtyczka + pomocnik EasyPDM, bo wtyczki SolidCraft nie mają sieci):
   **[instalacja krok po kroku](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** w wiki (po angielsku); szczegóły w
