@@ -1,5 +1,5 @@
-// EasyPDM add-in for SOLIDWORKS: an EasyPDM menu and toolbar with Upload, Download, Log in and
-// Log out.
+// EasyPDM add-in for SOLIDWORKS: an EasyPDM tab in the CommandManager (parts, assemblies and
+// drawings), a Tools > EasyPDM menu and a toolbar with Upload, Download, Log in and Log out.
 //
 // The commands run the EasyPDM macros themselves -- EasyPDMUpload.swp and EasyPDMDownload.swp,
 // placed next to this DLL -- through ISldWorks.RunMacro2, the same way Tools > Macro > Run does.
@@ -89,14 +89,39 @@ namespace EasyPDM.SolidWorksAddin
             group.MainIconList = icons.Main;
 
             var where = (int)(swCommandItemType_e.swMenuItem | swCommandItemType_e.swToolbarItem);
+            var indices = new int[Commands.Length];
             for (var i = 0; i < Commands.Length; i++)
             {
                 var c = Commands[i];
-                group.AddCommandItem2(c.Text, -1, c.Tip, c.Tip, i, c.Callback, "", ids[i], where);
+                indices[i] = group.AddCommandItem2(c.Text, -1, c.Tip, c.Tip, i, c.Callback, "", ids[i], where);
             }
             group.HasToolbar = true;
             group.HasMenu = true;
             group.Activate();
+
+            // The command group alone gives the menu and a toolbar that is hidden by default; the
+            // CommandManager tab is a separate object, one per document type. SOLIDWORKS keeps a
+            // tab between sessions (the user may have rearranged it), so an existing one is kept
+            // unless the commands changed.
+            var commandIds = new int[indices.Length];
+            var textBelow = new int[indices.Length];
+            for (var i = 0; i < indices.Length; i++)
+            {
+                commandIds[i] = group.get_CommandID(indices[i]);
+                textBelow[i] = (int)swCommandTabButtonTextDisplay_e.swCommandTabButton_TextBelow;
+            }
+            foreach (var docType in new[] { swDocumentTypes_e.swDocPART, swDocumentTypes_e.swDocASSEMBLY, swDocumentTypes_e.swDocDRAWING })
+            {
+                var tab = _commands.GetCommandTab((int)docType, Title);
+                if (tab != null && changed)
+                {
+                    _commands.RemoveCommandTab(tab);
+                    tab = null;
+                }
+                if (tab != null) continue;
+                tab = _commands.AddCommandTab((int)docType, Title);
+                tab.AddCommandTabBox().AddCommands(commandIds, textBelow);
+            }
         }
 
         private static bool IdsMatch(int[] a, int[] b)
