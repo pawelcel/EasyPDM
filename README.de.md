@@ -10,7 +10,7 @@
 [4. Von CAD ins PDM — das Upload-Makro](https://youtu.be/vMQPxwWQrGc) ·
 [5. Eine ganze Baugruppe — Hochladen, Herunterladen, Aktualisieren und Zeichnungen](https://youtu.be/vXHYbRlPu_s)
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch) — Installation, Arbeit mit EasyPDM, die CAD-Integrationen (auch wo die Zeichnungsblätter liegen), Einstellungen; mit Screenshots. Die Add-ons für FreeCAD und SolidWorks haben eigene Wikis: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki).
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch) — Installation, Arbeit mit EasyPDM, die CAD-Integrationen (auch wo die Zeichnungsblätter liegen), Einstellungen; mit Screenshots. Die Add-ons für FreeCAD und SolidWorks haben eigene Wikis: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki); SolidCraft Schritt für Schritt: [seine Seite in diesem Wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
 
 EasyPDM ist der Ort, an dem Ihre Teile und Baugruppen eine einzige, für das ganze Team
 gemeinsame Ordnung erhalten: Jedes Element hat seine eigene Nummer, Revision, Status und

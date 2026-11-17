@@ -10,7 +10,7 @@
 [4. Z CAD do PDM — makro wysyłania](https://youtu.be/vMQPxwWQrGc) ·
 [5. Całe złożenie — wysyłanie, pobieranie, aktualizacja i rysunki](https://youtu.be/vXHYbRlPu_s)
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (po angielsku) — instalacja, praca z EasyPDM, integracje CAD (w tym gdzie są arkusze rysunkowe), ustawienia; ze zrzutami ekranu. Dodatki do FreeCAD i SolidWorks mają własne wiki: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki).
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (po angielsku) — instalacja, praca z EasyPDM, integracje CAD (w tym gdzie są arkusze rysunkowe), ustawienia; ze zrzutami ekranu. Dodatki do FreeCAD i SolidWorks mają własne wiki: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki); SolidCraft krok po kroku: [jego strona w tym wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
 
 EasyPDM to miejsce, w którym Twoje Części i Złożenia mają jeden, wspólny dla całego
 zespołu porządek: każdy element ma swój numer, rewizję, status i historię zmian, a

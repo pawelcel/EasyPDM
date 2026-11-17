@@ -10,7 +10,7 @@
 [4. From CAD to PDM — the upload macro](https://youtu.be/vMQPxwWQrGc) ·
 [5. A whole assembly — upload, download, update and drawings](https://youtu.be/vXHYbRlPu_s)
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** — installation, using EasyPDM, the CAD integrations (with where the drawing sheets are), settings; with screenshots. The FreeCAD and SolidWorks add-ons have wikis of their own: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki).
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** — installation, using EasyPDM, the CAD integrations (with where the drawing sheets are), settings; with screenshots. The FreeCAD and SolidWorks add-ons have wikis of their own: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki); SolidCraft, step by step: [its page on this wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
 
 EasyPDM is where your Parts and Assemblies get one, shared order for the whole team:
 every item has its own number, revision, status and change history, and assemblies get
