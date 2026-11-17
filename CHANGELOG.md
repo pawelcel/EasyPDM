@@ -4,15 +4,46 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
-### Changed
-- **SolidWorks has a repository of its own: [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)**, with the macros, the drawing sheet formats and the add-in (an EasyPDM tab, a document panel, locking and the outdated-component check), released on its own as the FreeCAD add-on is. `EasyPDM.SolidWorks/` is gone from this repository; its history went with it.
-- **SolidCraft too: [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft)**, the plugin and its companion (`EasyPDM.SolidCraft/`, `EasyPDM.Companion/`), released there from now on with the companion zips for Windows and Linux.
+## [0.9.1]
 
-### Added
-- **Version stamps on registered CAD files.** `POST /api/items/{id}/attachments/register` takes `contentVersion` like a plain upload, so a file the SolidWorks macro copies into the shared storage is recognised by the outdated-component check also after SolidWorks saves it again unchanged.
+**In short:** every CAD integration now has a repository and releases of its own: [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks), [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) and [SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft). SolidWorks gets its first add-in, with an EasyPDM tab, a document panel and an Upload that refuses work built on outdated components. The server keeps the version stamp of files the SolidWorks macros copy into its storage. This release attaches only the server installers and the Inventor macros; take each CAD integration from its own release, below.
 
-### Fixed
-- **Inventor: signing in through the browser left the macros logged out.** The macros talked to the server through WinINet, whose cookie jar (shared with Internet Explorer) kept the cookie of an earlier password login and sent it beside the new token, and the server took the old, revoked one. They now use WinHTTP (`MSXML2.ServerXMLHTTP.6.0`), as the SolidWorks macros do; Log in on a server before 0.9 now says so instead of reporting a failed login.
+Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+
+### SolidWorks: an add-in, released on its own
+
+![The EasyPDM tab in SOLIDWORKS: Upload, Download, Lock and Log in/out](https://raw.githubusercontent.com/pawelcel/EasyPDM-SolidWorks/v0.9.0/docs/images/ribbon.png)
+
+![SOLIDWORKS with the EasyPDM document panel in the Task Pane](https://raw.githubusercontent.com/pawelcel/EasyPDM-SolidWorks/v0.9.0/docs/images/panel-part.png)
+
+[**EasyPDM for SolidWorks 0.9.0**](https://github.com/pawelcel/EasyPDM-SolidWorks/releases/tag/v0.9.0), the first release from [its own repository](https://github.com/pawelcel/EasyPDM-SolidWorks), with the add-in, the compiled macros and the drawing sheets. Installing step by step, with screenshots: [its wiki](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki).
+
+- **An EasyPDM tab** in the CommandManager for parts, assemblies and drawings: Upload, Download, Lock and Log in/out.
+- **A document panel** in the Task Pane: the item's record, name, revision, status and who holds the lock; for an assembly every component marked ✓ newest, ⚠ newer file in EasyPDM, • changed here or – not in EasyPDM yet.
+- **Upload refuses work built on outdated files**: when a component has a newer file in EasyPDM, Upload lists them with who uploaded it and when.
+- **Lock and Log in/out are one button each**, shown pressed while you hold the lock or are signed in.
+- **Signing in through the browser** whenever the login is missing or expired, instead of a password typed into SolidWorks.
+- **Fixed:** the macros of EasyPDM 0.9.0 lost their login after signing in through the browser; they kept sending an old cookie from an earlier password login.
+- English, Polish and German, following SOLIDWORKS' own language.
+- **This server release:** files the macros copy into EasyPDM's shared storage keep their version stamp, so the outdated-component check recognises them after SOLIDWORKS saves them again unchanged (`POST /api/items/{id}/attachments/register` takes `contentVersion`).
+
+The SolidWorks macros are no longer attached to EasyPDM releases.
+
+### FreeCAD: unchanged
+
+![The EasyPDM workbench in FreeCAD: its menu, its toolbar and the document panel](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM-FreeCAD/images/workbench.png)
+
+[**EasyPDM for FreeCAD 0.9.0**](https://github.com/pawelcel/EasyPDM-FreeCAD/releases/tag/v0.9.0) stays current and works with EasyPDM 0.9.1. Install or update it through FreeCAD's Addon Manager; where everything is: [its wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki).
+
+### SolidCraft: released on its own
+
+![SolidCraft's Plugins menu with EasyPDM's Upload, Download, Log in and Log out](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/solidcraft-plugins-menu.png)
+
+[**EasyPDM for SolidCraft 0.9.0**](https://github.com/pawelcel/EasyPDM-SolidCraft/releases/tag/v0.9.0), from [its own repository](https://github.com/pawelcel/EasyPDM-SolidCraft): the same plugin and companion as attached to EasyPDM 0.9.0, nothing to reinstall if you have it. The companion zips are no longer attached to EasyPDM releases. Installing step by step: [SolidCraft](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft) on the wiki.
+
+### Inventor
+
+- **Fixed:** signing in through the browser left the Inventor macros logged out, for the same reason as the SolidWorks macros; they now talk to the server the same way. Log in on a server before 0.9 now says the server is too old, instead of reporting a failed login.
 
 ## [0.9.0]
 
