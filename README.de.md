@@ -125,8 +125,8 @@ Installation und Details:
 - SolidWorks (Add-in mit EasyPDM-Registerkarte und Dokumentbereich, Makros, Zeichnungsblatt; im eigenen Repository): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (Plugin + EasyPDM-Begleitprogramm, da SolidCraft-Plugins kein Netzwerk haben):
-  **[Installation Schritt für Schritt](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** im Wiki (auf Englisch); Details in
-  [`EasyPDM.SolidCraft/README.md`](EasyPDM.SolidCraft/README.md)
+  **[Installation Schritt für Schritt](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** im Wiki (auf Englisch); im eigenen
+  Repository, [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft)
 
 **Upload** — Sie haben eine gespeicherte Datei geöffnet und klicken auf Upload. Der
 Browser öffnet sich (automatisch angemeldet) mit der Frage: neues Element, Duplikat

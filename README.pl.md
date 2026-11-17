@@ -116,8 +116,8 @@ Instalacja i szczegóły:
 - SolidWorks (dodatek z zakładką EasyPDM i panelem dokumentu, makra, arkusz rysunku; we własnym repozytorium): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (wtyczka + pomocnik EasyPDM, bo wtyczki SolidCraft nie mają sieci):
-  **[instalacja krok po kroku](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** w wiki (po angielsku); szczegóły w
-  [`EasyPDM.SolidCraft/README.md`](EasyPDM.SolidCraft/README.md)
+  **[instalacja krok po kroku](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** w wiki (po angielsku); we własnym
+  repozytorium, [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft)
 
 **Upload** — masz otwarty i zapisany plik, klikasz Upload. Otwiera się przeglądarka
 (automatycznie zalogowana) z pytaniem: nowy element, duplikat istniejącego (kopiuje jego

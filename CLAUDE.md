@@ -84,10 +84,11 @@ workflow refuses the build:
 - `EasyPDM.Web/src/version.ts` — `APP_VERSION`
 - `packaging/windows/EasyPDM.iss` — `MyAppVersion`
 
-Two CAD integrations live in repositories of their own, with their own releases, checks and
+Three CAD integrations live in repositories of their own, with their own releases, checks and
 CLAUDE.md: the FreeCAD add-on and the drawing sheet generator in
-[pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9), and the
+[pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9), the
 SolidWorks add-in, macros and sheet formats in
-[pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) (moved out of
-`EasyPDM.SolidWorks/` after 0.9.0, with its history). A server change they depend on is
+[pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks), and the SolidCraft
+plugin with its companion in [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft) (both moved out after 0.9.0,
+with their history). A server change they depend on is
 released here first, and their notes say which EasyPDM version they need.

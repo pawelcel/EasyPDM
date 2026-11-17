@@ -6,6 +6,7 @@ All notable changes to EasyPDM are documented in this file.
 
 ### Changed
 - **SolidWorks has a repository of its own: [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)**, with the macros, the drawing sheet formats and the add-in (an EasyPDM tab, a document panel, locking and the outdated-component check), released on its own as the FreeCAD add-on is. `EasyPDM.SolidWorks/` is gone from this repository; its history went with it.
+- **SolidCraft too: [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft)**, the plugin and its companion (`EasyPDM.SolidCraft/`, `EasyPDM.Companion/`), released there from now on with the companion zips for Windows and Linux.
 
 ### Added
 - **Version stamps on registered CAD files.** `POST /api/items/{id}/attachments/register` takes `contentVersion` like a plain upload, so a file the SolidWorks macro copies into the shared storage is recognised by the outdated-component check also after SolidWorks saves it again unchanged.

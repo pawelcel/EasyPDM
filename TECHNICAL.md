@@ -75,13 +75,11 @@ PostgreSQL 18.
 - **`EasyPDM.Inventor/`** — the Autodesk Inventor counterpart (VBA macros
   `EasyPDMUpload.bas`/`EasyPDMDownload.bas`), ported from the SolidWorks macros; live-tested
   on Inventor. No drawing sheet (no Inventor licence to build one on).
-- **`EasyPDM.SolidCraft/`** — the SolidCraft plugin (Rust → WebAssembly component). SolidCraft
-  plugins have no network, so its File-menu entries (Upload, Download, Log in, Log out) only
-  write requests into an outbox folder in Documents.
-- **`EasyPDM.Companion/`** — the program on the CAD workstation that serves those requests:
-  it talks to the server like the macros do (same endpoints, same browser ticket flow),
-  opens downloads in SolidCraft over its local control channel, signs in through device
-  login and runs in the background with desktop notifications.
+- **SolidCraft** — lives in its own repository,
+  [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft) (moved out of `EasyPDM.SolidCraft/` and
+  `EasyPDM.Companion/` after 0.9.0): a plugin (Rust → WebAssembly component) whose menu entries
+  only write requests into an outbox folder, since SolidCraft plugins have no network, and the
+  companion on the CAD workstation that serves them against this server's API, like the macros.
 - **`Dockerfile`/`Dockerfile.postgres`/`docker-compose.yml`/`install-easypdm-docker.sh`**,
   **`install-easypdm-linux.sh`/`uninstall-easypdm-linux.sh`** and **`packaging/windows/`**
   (the `.exe` installer, Inno Setup) — three deployment paths without manually assembling
