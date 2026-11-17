@@ -868,8 +868,17 @@ End Function
 ' request (we don't rely on automatic cookie handling by the COM component).
 ' ============================================================================
 
+' ServerXMLHTTP (WinHTTP), not XMLHTTP (WinINet): WinINet keeps a cookie jar shared with
+' Internet Explorer and adds its cookies to every request. The password login
+' (/auth/macro-login) answers with a pdm_session cookie, which WinINet kept and sent beside
+' the token this macro sets by hand -- so after a browser sign-in (token in the body only)
+' the server got the old, revoked token as well and answered 401 (seen with the SolidWorks
+' macros, which share this code). WinHTTP has no shared jar and no cache.
+' Timeouts (ms): resolve, connect, send, receive -- longer than WinHTTP's 30 s defaults, for
+' big files on a slow link.
 Private Function NewHttpRequest() As Object
-    Set NewHttpRequest = CreateObject("MSXML2.XMLHTTP.6.0")
+    Set NewHttpRequest = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    NewHttpRequest.setTimeouts 0, 60000, 600000, 600000
 End Function
 
 ' Used ONLY by ApiUploadFile (binary/multipart body) -- see the comment there for why plain
@@ -4594,7 +4603,9 @@ Sub LoginInBrowser()
     http.send "{""client"":" & JsonStr("EasyPDM for Inventor") & "}"
     On Error GoTo 0
     LogLine "POST /auth/device/start -> " & http.Status
-    If http.Status = 404 Then
+    ' A server before 0.9 has no such route: 404, or 401 where its login check answers
+    ' before routing. From 0.9 the route needs no login, so 401 means an old server too.
+    If http.Status = 404 Or http.Status = 401 Then
         MsgBoxFront T("BrowserLoginOldServer"), vbExclamation, T("AppTitle")
         Exit Sub
     End If

@@ -598,8 +598,17 @@ End Function
 ' request. Same as EasyPDMUpload.bas.
 ' ============================================================================
 
+' ServerXMLHTTP (WinHTTP), not XMLHTTP (WinINet): WinINet keeps a cookie jar shared with
+' Internet Explorer and adds its cookies to every request. The password login
+' (/auth/macro-login) answers with a pdm_session cookie, which WinINet kept and sent beside
+' the token this macro sets by hand -- so after a browser sign-in (token in the body only)
+' the server got the old, revoked token as well and answered 401 (seen with the SolidWorks
+' macros, which share this code). WinHTTP has no shared jar and no cache.
+' Timeouts (ms): resolve, connect, send, receive -- longer than WinHTTP's 30 s defaults, for
+' big files on a slow link.
 Private Function NewHttpRequest() As Object
-    Set NewHttpRequest = CreateObject("MSXML2.XMLHTTP.6.0")
+    Set NewHttpRequest = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+    NewHttpRequest.setTimeouts 0, 60000, 600000, 600000
 End Function
 
 Private Function AuthCookieHeader() As String
