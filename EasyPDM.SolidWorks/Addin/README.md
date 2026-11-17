@@ -1,6 +1,6 @@
 # EasyPDM add-in for SOLIDWORKS
 
-An **EasyPDM** menu and toolbar in SOLIDWORKS with **Upload**, **Download**, **Log in** and
+An **EasyPDM** tab, menu and toolbar in SOLIDWORKS with **Upload**, **Download**, **Log in** and
 **Log out**. The commands run the EasyPDM macros themselves (`EasyPDMUpload.swp`,
 `EasyPDMDownload.swp`) through SOLIDWORKS' `RunMacro2`, so they behave exactly like the
 macros; **Log in** is the Upload macro's `LoginInBrowser` (approve the sign-in in the browser),
