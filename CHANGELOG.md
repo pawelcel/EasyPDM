@@ -6,9 +6,13 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [0.9.1]
 
-**In short:** every CAD integration now has a repository and releases of its own: [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks), [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) and [SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft). SolidWorks gets its first add-in, with an EasyPDM tab, a document panel and an Upload that refuses work built on outdated components. The server keeps the version stamp of files the SolidWorks macros copy into its storage. This release attaches only the server installers and the Inventor macros; take each CAD integration from its own release, below.
+**In short:** every CAD integration now has a repository and releases of its own: [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks), [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) and [SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft). SolidWorks gets its first add-in, with an EasyPDM tab, a document panel and an Upload that refuses work built on outdated components. The server keeps the version stamp of files the SolidWorks macros copy into its storage, and the tag field of an item suggests the tags already in use. This release attaches only the server installers and the Inventor macros; take each CAD integration from its own release, below.
 
 Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+
+### Web app
+
+- **The tag field suggests existing tags.** Clicking into an item's tag field lists the tags already in use (without the ones the item has), narrowing as you type; choosing one adds it at once. A new tag is still added by typing it and pressing Enter.
 
 ### SolidWorks: an add-in, released on its own
 

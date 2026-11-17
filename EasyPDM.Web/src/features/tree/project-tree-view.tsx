@@ -40,12 +40,15 @@ type Selection = { kind: "project" } | { kind: "item"; id: string; parentId: str
 function ProjectTreeView({
   project,
   isAdmin,
+  allTags,
   onTagsRefetch,
   onProjectUpdated,
   onProjectDeleted,
 }: {
   project: Project
   isAdmin: boolean
+  // Every tag in use, suggested when adding a tag to an item.
+  allTags: string[]
   onTagsRefetch: () => void | Promise<void>
   onProjectUpdated: () => void | Promise<void>
   onProjectDeleted: () => void | Promise<void>
@@ -569,6 +572,7 @@ function ProjectTreeView({
               childEntries={tree.childrenOf(selectedItem.id)}
               onSelectChild={(childId, parentId) => setSelection({ kind: "item", id: childId, parentId })}
               onItemsRefetch={tree.refetch}
+              allTags={allTags}
               onTagsRefetch={onTagsRefetch}
               clientVerification={clientVerifications.get(selectedItem.id) ?? null}
               // Akcje (usuń ze struktury/duplikuj/dokumentacja/usuń całkowicie) renderowane

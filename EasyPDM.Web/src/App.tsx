@@ -300,6 +300,7 @@ function App() {
                 key={`${selectedProject.id}-${treeRefreshKey}`}
                 project={selectedProject}
                 isAdmin={isAdmin}
+                allTags={allTags}
                 onTagsRefetch={refetchTags}
                 onProjectUpdated={refetchProjects}
                 onProjectDeleted={async () => {
@@ -324,6 +325,7 @@ function App() {
               onTagsChange={setSelectedTags}
               isAdmin={isAdmin}
               onItemsRefetch={refetchItems}
+              allTags={allTags}
               onTagsRefetch={refetchTags}
               onProjectsRefetch={refetchProjects}
               onNavigateToProject={navigateToProject}

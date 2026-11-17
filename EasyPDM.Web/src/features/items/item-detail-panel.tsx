@@ -158,6 +158,7 @@ function ItemDetailPanel({
   childEntries = [],
   onSelectChild,
   onItemsRefetch,
+  allTags,
   onTagsRefetch,
   onRemoveFromStructure,
   onDeleteCompletely,
@@ -181,6 +182,8 @@ function ItemDetailPanel({
   // "rodzic istnieje, ale nieznany tutaj" — z undefined "Usuń ze struktury" się nie pokazuje.
   onSelectChild?: (id: string, parentId: string | null | undefined) => void
   onItemsRefetch: () => void | Promise<void>
+  // Every tag in use: suggested in the add-tag field, without the ones this item has.
+  allTags: string[]
   onTagsRefetch: () => void | Promise<void>
   onRemoveFromStructure?: () => void | Promise<void>
   onDeleteCompletely?: () => void | Promise<void>
@@ -485,7 +488,12 @@ function ItemDetailPanel({
           <Hint>{t("item.noTags")}</Hint>
         )}
       </div>
-      <AddTagRow onAdd={handleAddTag} className="mt-2" disabled={isLocked(item) || !ownerEditable} />
+      <AddTagRow
+        onAdd={handleAddTag}
+        className="mt-2"
+        disabled={isLocked(item) || !ownerEditable}
+        suggestions={allTags.filter((tag) => !item.tags.includes(tag))}
+      />
 
       <SectionLabel>{t("item.properties")}</SectionLabel>
       {/* Część i Złożenie mają komplet pól zależnych od rodzaju (masa, dodatkowe informacje,

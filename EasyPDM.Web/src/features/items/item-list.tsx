@@ -44,6 +44,7 @@ function ItemList({
   onTagsChange,
   isAdmin,
   onItemsRefetch,
+  allTags,
   onTagsRefetch,
   onProjectsRefetch,
   onNavigateToProject,
@@ -62,6 +63,8 @@ function ItemList({
   onTagsChange: (value: string[]) => void
   isAdmin: boolean
   onItemsRefetch: () => void | Promise<void>
+  // Every tag in use, suggested when adding a tag to an item.
+  allTags: string[]
   onTagsRefetch: () => void | Promise<void>
   onProjectsRefetch: () => void | Promise<void>
   onNavigateToProject: (projectId: string) => void
@@ -513,6 +516,7 @@ function ItemList({
                 childEntries={selectedItemChildren}
                 onSelectChild={handleSelectChild}
                 onItemsRefetch={refetchItemsAndExternal}
+                allTags={allTags}
                 onTagsRefetch={onTagsRefetch}
                 // Akcje (duplikuj/dokumentacja/usuń całkowicie) renderowane w belce nad
                 // listą zamiast tutaj — zob. hideActions.

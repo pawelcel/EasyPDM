@@ -3,6 +3,7 @@ import { Autocomplete } from "@base-ui/react/autocomplete"
 import { ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxList } from "@/components/ui/combobox"
 import { Hint } from "@/components/ui/hint"
 import { useLanguage } from "@/i18n/use-language"
+import { cn } from "@/lib/utils"
 
 // Pole tekstowe z podpowiedziami: można wpisać dowolną wartość, ale istniejące pojawiają się
 // od razu po kliknięciu i zawężają przy pisaniu. Zastępuje natywny <datalist>, który pokazywał
@@ -19,6 +20,10 @@ function SuggestInput({
   placeholder,
   newValueHint,
   nearDuplicateHint = true,
+  onPick,
+  onEnter,
+  disabled,
+  inputClassName,
 }: {
   id?: string
   value: string
@@ -32,6 +37,14 @@ function SuggestInput({
   // pozycję (grupa materiału). Tam, gdzie tworzy się NOWĄ pozycję (nazwa obróbki), zachęta do
   // wybrania istniejącej prowadzi prosto w duplikat — takie miejsce ma własny komunikat.
   nearDuplicateHint?: boolean
+  // Called when a suggestion is chosen from the list (a click, or Enter on a highlighted one),
+  // for fields where choosing is the action itself (adding a tag), not just filling the field.
+  onPick?: (value: string) => void
+  // Enter with no suggestion highlighted. Deferred a tick, so a pick made by the same Enter
+  // (the list "clicks" the highlighted item) has already reached onPick.
+  onEnter?: () => void
+  disabled?: boolean
+  inputClassName?: string
 }) {
   const { t } = useLanguage()
   const trimmed = value.trim()
@@ -44,8 +57,29 @@ function SuggestInput({
 
   return (
     <div className="flex flex-col gap-1">
-      <Autocomplete.Root items={suggestions} value={value} onValueChange={onChange} openOnInputClick>
-        <ComboboxInput id={id} placeholder={placeholder} className="w-full" showTrigger={false} />
+      <Autocomplete.Root
+        items={suggestions}
+        value={value}
+        onValueChange={(next, details) => {
+          onChange(next)
+          if (details.reason === "item-press") onPick?.(next)
+        }}
+        openOnInputClick
+      >
+        <ComboboxInput
+          id={id}
+          placeholder={placeholder}
+          className={cn("w-full", inputClassName)}
+          showTrigger={false}
+          disabled={disabled}
+          onKeyDown={
+            onEnter
+              ? (e) => {
+                  if (e.key === "Enter") setTimeout(onEnter, 0)
+                }
+              : undefined
+          }
+        />
         <ComboboxContent>
           <ComboboxEmpty>{trimmed ? newValueHint : null}</ComboboxEmpty>
           <ComboboxList>
