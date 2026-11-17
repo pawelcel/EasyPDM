@@ -41,10 +41,17 @@ jobs:
       # PostgreSQL 18 service; the runner's own client is older. Same PGDG source as the Dockerfile.
       - name: Install PostgreSQL 18 client tools
         run: |
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -sSf -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          # The runner's postgresql-common usually ships the PGDG key at this path already; fetch
+          # it only when it is missing, and retry: www.postgresql.org has dropped the connection
+          # (curl 56) on several runs in a row, failing the build before a single test ran.
+          KEY=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          if [ ! -s "$KEY" ]; then
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -sSf --retry 5 --retry-all-errors --retry-delay 10 --connect-timeout 20 \
+              -o "$KEY" https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          fi
           . /etc/os-release
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+          echo "deb [signed-by=$KEY] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client-18
