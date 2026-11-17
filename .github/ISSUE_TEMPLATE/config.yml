@@ -1,1 +1,11 @@
 blank_issues_enabled: true
+contact_links:
+  - name: FreeCAD add-on
+    url: https://github.com/pawelcel/EasyPDM-FreeCAD/issues
+    about: Problems with the EasyPDM workbench in FreeCAD go to its own repository.
+  - name: SolidWorks add-in and macros
+    url: https://github.com/pawelcel/EasyPDM-SolidWorks/issues
+    about: Problems with the EasyPDM tab, panel or macros in SolidWorks go to their own repository.
+  - name: SolidCraft plugin and companion
+    url: https://github.com/pawelcel/EasyPDM-SolidCraft/issues
+    about: Problems with EasyPDM in SolidCraft go to its own repository.

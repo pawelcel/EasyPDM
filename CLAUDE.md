@@ -44,9 +44,9 @@ Checking an endpoint by hand with `curl` is not a substitute: a change once pass
 live check and still broke CI, because a test asserted on a hard-coded CSV string nobody
 thought to look at.
 
-The suite covers the server only. A commit that touches nothing but the CAD macros
-(`.bas`, the SolidCraft plugin, what `build_templates.py` generates here), documentation or the
-changelog can be pushed without it. Anything under `EasyPDM.Api/`, `db/` or the tests
+The suite covers the server only. A commit that touches nothing but the Inventor macros
+(`EasyPDM.Inventor/*.bas`), documentation, the issue templates or the changelog can be pushed
+without it. Anything under `EasyPDM.Api/`, `db/` or the tests
 themselves cannot — and neither can a frontend change, whose bundle the server serves.
 
 ## Commit messages in English
