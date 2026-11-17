@@ -8,7 +8,7 @@ odpowiedniki `EasyPDMUpload.bas` z [EasyPDM-SolidWorks](https://github.com/pawel
 
 - **`EasyPDMUpload.bas`** — wysyła aktywny dokument Inventora do EasyPDM. Wybór
   projektu/nowy-czy-istniejący/duplikuj/właściwości elementu odbywa się w przeglądarce
-  (ten sam wzorzec co makra SolidWorks i FreeCAD), poza jednym wyjątkiem — patrz "Różnice
+  (ten sam wzorzec co makra SolidWorks i dodatek FreeCAD), poza jednym wyjątkiem — patrz "Różnice
   względem makr SolidWorks" niżej.
 - **`EasyPDMDownload.bas`** — pobiera Część/Złożenie z EasyPDM (wraz ze wszystkimi
   składnikami złożenia) i otwiera je w Inventorze; wybór KTÓREGO elementu też odbywa się
@@ -28,6 +28,11 @@ jeśli ten kod kiedyś jeszcze trzeba będzie dotknąć.
 
 Kilka wąskich, rzadko używanych ścieżek kodu wciąż pozostaje faktycznie nieprzetestowanych
 w praktyce (oznaczone `UNVERIFIED` wprost w kodzie) — patrz "Znane ryzyka" niżej.
+
+**Nie jest dalej rozwijany** (od EasyPDM 0.9.1): nie ma już licencji Inventora do testów. Makra
+zostają takie, jakie są, i są utrzymywane tak, żeby działały z API serwera; funkcje, które
+dodatki SolidWorks i FreeCAD dostały w 0.9 (panel dokumentu, blokada z programu CAD,
+sprawdzanie nieaktualnych komponentów), do Inventora nie trafią.
 
 ## Różnice względem makr SolidWorks
 
@@ -76,11 +81,13 @@ stosuje się tutaj identycznie.
 ## Co robi `EasyPDMUpload.bas`
 
 1. **Logowanie** — przy pierwszym uruchomieniu (albo gdy zapisana sesja wygasła/została
-   unieważniona) pyta o adres API, login i hasło. Token sesji zapisywany jest w rejestrze
-   Windows (`HKEY_CURRENT_USER\Software\VB and VBA Program Settings\EasyPDM`) — kolejne
-   uruchomienia (także po restarcie Inventora, także z `EasyPDMDownload.bas`, a także
-   współdzielone z makrami SolidWorks/FreeCAD — sesja jest wspólna dla wszystkich) nie
-   pytają ponownie o logowanie, dopóki sesja jest ważna (30 dni).
+   unieważniona) pyta o adres API, login i hasło (albo zaloguj się wcześniej przez
+   przeglądarkę, patrz „Logowanie przez przeglądarkę” niżej). Token makra zapisywany jest w
+   rejestrze Windows (`HKEY_CURRENT_USER\Software\VB and VBA Program Settings\EasyPDM`) —
+   kolejne uruchomienia (także po restarcie Inventora, także z `EasyPDMDownload.bas`, a także
+   współdzielone z makrami SolidWorks, które trzymają go w tym samym miejscu) nie pytają
+   ponownie o logowanie, dopóki token jest ważny (rok, o ile nie zostanie unieważniony w
+   Ustawienia → Użytkownicy).
 2. **Zapisuje aktywny dokument**, jeśli nie był jeszcze zapisany.
 3. **Jeśli aktywny dokument to Złożenie**: wykrywa drzewo komponentów
    (`AssemblyDocument.ComponentDefinition.Occurrences`, rekurencyjnie). Podsumowanie
@@ -109,8 +116,8 @@ stosuje się tutaj identycznie.
    - **Jeszcze niepodpięty** — otwiera przeglądarkę systemową (już zalogowaną, mostek
      token→ciasteczko) na wyskakującym oknie "oczekujące żądanie z makra CAD", z trzema
      opcjami do wyboru TAM: **Nowy element**, **Duplikat** albo **Dograj do
-     istniejącego** — te same pola i logika rodzaju elementu co w makrach SolidWorks/
-     FreeCAD. Makro czeka (odpytuje co ~2s, limit 10 minut, Escape anuluje, postęp
+     istniejącego** — te same pola i logika rodzaju elementu co w makrach SolidWorks
+     i dodatku FreeCAD. Makro czeka (odpytuje co ~2s, limit 10 minut, Escape anuluje, postęp
      pokazywany na pasku statusu Inventora) i kontynuuje automatycznie po potwierdzeniu
      wyboru w przeglądarce.
    - **Istniejący element ze statusem "Wydany"**: pyta o zgodę na nową rewizję i
@@ -127,8 +134,9 @@ stosuje się tutaj identycznie.
    Inventora do tymczasowego pliku `.step`/`.pdf` i wysyła go jako załącznik z rolą
    `"step"`/`"pdf"`, zastępując poprzedni załącznik tej samej roli. Błąd eksportu NIE
    przerywa reszty operacji.
-7. Zapisuje `EasyPDM_LinkId`/`EasyPDM_LinkNumber` w iProperties dokumentu i pokazuje
-   potwierdzenie.
+7. Zapisuje `EasyPDM_LinkId`/`EasyPDM_LinkNumber` w iProperties dokumentu. Raport z biegu
+   (co poszło, co się nie udało) trafia do powiadomień w aplikacji webowej, a nie do okna w
+   Inventorze.
 
 ## Co robi `EasyPDMDownload.bas`
 
@@ -153,10 +161,11 @@ załącznik odpowiadający BIEŻĄCEJ rewizji.
 
 ## Jak sprawdzić, czy zadziałało
 
-1. **Komunikat na końcu** — po udanej operacji makro pokazuje okno z podsumowaniem. Okno
-   z "Error: ..." oznacza, że coś poszło nie tak.
-2. **Aplikacja webowa** — wejdź do projektu (albo "Cała baza"), znajdź element po numerze
-   z komunikatu i sprawdź, czy ma dołączony plik i poprawne właściwości.
+1. **Aplikacja webowa** — w trakcie lista transferu po prawej odhacza kolejne pliki, a na
+   końcu w dzwonku (powiadomienia) jest raport: ile plików poszło lub przyszło i które się
+   nie udały. Okno z "Error: ..." w Inventorze oznacza, że coś poszło nie tak.
+2. **Sam element** — wejdź do projektu (albo "Cała baza"), znajdź element i sprawdź, czy ma
+   dołączony plik i poprawne właściwości.
 3. **Log makra** — każde uruchomienie dopisuje szczegółowy, oznaczony czasem zapis do
    pliku tekstowego:
 
@@ -194,7 +203,7 @@ projekty VBA. `.bas` to standardowy format eksportu/importu **modułu** VBA:
    własnego przycisku/skrótu na pasku narzędzi.
 
 Adres API (domyślnie `http://localhost:5000/api`) jest zapisywany automatycznie po
-jednorazowym wpisaniu przy logowaniu — współdzielony też z makrami SolidWorks/FreeCAD.
+jednorazowym wpisaniu przy logowaniu — współdzielony też z makrami SolidWorks.
 
 ### Logowanie przez przeglądarkę
 
@@ -268,4 +277,4 @@ w tej rundzie), oznaczone `UNVERIFIED` wprost w kodzie:
 - Folder docelowy pobierania to zwykły `InputBox` ze ścieżką jako tekstem, nie systemowa
   przeglądarka plików.
 - Kopiowanie/rejestrowanie/pobieranie pliku przez `storage/` zakłada, że ten folder jest
-  widoczny w systemie plików tego komputera — tak samo jak w makrach SolidWorks/FreeCAD.
+  widoczny w systemie plików tego komputera — tak samo jak w makrach SolidWorks.

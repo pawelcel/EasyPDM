@@ -9,7 +9,7 @@ Windows-Registrierung für die Anmeldesitzung) — die Inventor-Gegenstücke zu
 
 - **`EasyPDMUpload.bas`** — sendet das aktive Inventor-Dokument an EasyPDM. Die Auswahl
   von Projekt/neu-oder-vorhanden/duplizieren/Elementeigenschaften erfolgt im Browser
-  (dasselbe Muster wie bei den SolidWorks- und FreeCAD-Makros), mit einer Ausnahme —
+  (dasselbe Muster wie bei den SolidWorks-Makros und dem FreeCAD-Add-on), mit einer Ausnahme —
   siehe "Unterschiede zu den SolidWorks-Makros" unten.
 - **`EasyPDMDownload.bas`** — lädt ein Teil/eine Baugruppe aus EasyPDM (zusammen mit
   allen Komponenten der Baugruppe) herunter und öffnet es/sie in Inventor; die Auswahl,
@@ -31,6 +31,11 @@ wieder angefasst werden muss.
 Ein paar schmale, selten durchlaufene Codepfade bleiben in der Praxis tatsächlich
 ungetestet (im Quellcode direkt mit `UNVERIFIED` markiert) — siehe "Bekannte Risiken"
 unten.
+
+**Wird nicht weiterentwickelt** (ab EasyPDM 0.9.1): es gibt keine Inventor-Lizenz zum Testen
+mehr. Die Makros bleiben, wie sie sind, und werden mit der API des Servers lauffähig gehalten;
+was die Add-ons für SolidWorks und FreeCAD in 0.9 bekommen haben (Dokumentbereich, Sperre aus
+dem CAD-Programm, Prüfung veralteter Komponenten), kommt nicht zu Inventor.
 
 ## Unterschiede zu den SolidWorks-Makros
 
@@ -79,12 +84,14 @@ Verhaltensbeschreibung in deren eigenem README gilt hier identisch.
 ## Was `EasyPDMUpload.bas` tut
 
 1. **Anmeldung** — beim ersten Lauf (oder wenn die gespeicherte Sitzung abgelaufen/
-   ungültig geworden ist) wird nach API-Adresse, Benutzername und Passwort gefragt. Das
-   Sitzungstoken wird in der Windows-Registrierung gespeichert
+   ungültig geworden ist) wird nach API-Adresse, Benutzername und Passwort gefragt (oder
+   vorher über den Browser anmelden, siehe „Anmeldung über den Browser“ unten). Das
+   Makro-Token wird in der Windows-Registrierung gespeichert
    (`HKEY_CURRENT_USER\Software\VB and VBA Program Settings\EasyPDM`) — spätere Läufe
    (auch nach einem Inventor-Neustart, auch von `EasyPDMDownload.bas` aus, und auch mit
-   den SolidWorks/FreeCAD-Makros geteilt — die Sitzung wird von allen gemeinsam genutzt)
-   fragen nicht erneut nach der Anmeldung, solange die Sitzung gültig ist (30 Tage).
+   den SolidWorks-Makros geteilt, die es am selben Ort ablegen) fragen nicht erneut nach der
+   Anmeldung, solange das Token gültig ist (ein Jahr, sofern es nicht unter Einstellungen →
+   Benutzer widerrufen wird).
 2. **Speichert das aktive Dokument**, falls es noch nicht gespeichert wurde.
 3. **Wenn das aktive Dokument eine Baugruppe ist**: erkennt den Komponentenbaum
    (`AssemblyDocument.ComponentDefinition.Occurrences`, rekursiv). Eine Zusammenfassung
@@ -118,7 +125,7 @@ Verhaltensbeschreibung in deren eigenem README gilt hier identisch.
      Cookie-Brücke) auf dem Popup "ausstehende Anfrage von einem CAD-Makro", mit drei
      dort zu treffenden Optionen: **Neues Element**, **Duplikat** oder **An vorhandenes
      anhängen** — dieselben Felder und dieselbe Elementarten-Logik wie bei den
-     SolidWorks/FreeCAD-Makros. Das Makro wartet (fragt alle ~2s ab, Limit 10 Minuten,
+     SolidWorks-Makros und dem FreeCAD-Add-on. Das Makro wartet (fragt alle ~2s ab, Limit 10 Minuten,
      Escape bricht ab, Fortschritt wird in Inventors Statusleiste angezeigt) und fährt
      automatisch fort, sobald die Wahl im Browser bestätigt wurde.
    - **Vorhandenes Element mit Status "Freigegeben"**: fragt nach Zustimmung zu einer
@@ -135,8 +142,9 @@ Verhaltensbeschreibung in deren eigenem README gilt hier identisch.
    Mechanismus in eine temporäre `.step`/`.pdf`-Datei und lädt sie als Anhang mit der
    Rolle `"step"`/`"pdf"` hoch, wobei der vorherige Anhang derselben Rolle ersetzt wird.
    Ein Exportfehler bricht den Rest der Operation NICHT ab.
-7. Speichert `EasyPDM_LinkId`/`EasyPDM_LinkNumber` in den iProperties des Dokuments und
-   zeigt eine Bestätigung an.
+7. Speichert `EasyPDM_LinkId`/`EasyPDM_LinkNumber` in den iProperties des Dokuments. Der
+   Bericht des Laufs (was hochging, was fehlschlug) landet in den Benachrichtigungen der
+   Webanwendung, nicht in einem Fenster in Inventor.
 
 ## Was `EasyPDMDownload.bas` tut
 
@@ -162,12 +170,12 @@ Namenskonvention, um beim Anhang der AKTUELLEN Revision zu landen.
 
 ## Wie man prüft, ob es funktioniert hat
 
-1. **Die Meldung am Ende** — nach einem erfolgreichen Vorgang zeigt das Makro ein
-   Fenster mit einer Zusammenfassung. Ein Fenster mit "Error: ..." bedeutet, dass etwas
-   schiefgegangen ist.
-2. **Die Webanwendung** — ins Projekt (oder "Gesamte Datenbank") gehen, das Element
-   anhand der Nummer aus der Meldung suchen und prüfen, ob eine Datei angehängt ist und
-   die Eigenschaften stimmen.
+1. **Die Webanwendung** — während des Laufs hakt die Transferliste rechts jede Datei ab; am
+   Ende steht in der Glocke (Benachrichtigungen) ein Bericht: wie viele Dateien hoch- oder
+   heruntergingen und welche fehlschlugen. Ein Fenster mit "Error: ..." in Inventor bedeutet,
+   dass etwas schiefgegangen ist.
+2. **Das Element selbst** — ins Projekt (oder "Gesamte Datenbank") gehen, das Element suchen
+   und prüfen, ob eine Datei angehängt ist und die Eigenschaften stimmen.
 3. **Das Makro-Log** — jeder Lauf hängt einen detaillierten, zeitgestempelten Eintrag an
    eine Textdatei an:
 
@@ -206,7 +214,7 @@ VBA-Projekte. `.bas` ist das Standard-Export-/Importformat für ein VBA-**Modul*
    eine eigene Symbolleisten-Schaltfläche/Tastenkombination gebunden werden.
 
 Die API-Adresse (Standard `http://localhost:5000/api`) wird nach einmaliger Eingabe bei
-der Anmeldung automatisch gespeichert — auch mit den SolidWorks/FreeCAD-Makros geteilt.
+der Anmeldung automatisch gespeichert — auch mit den SolidWorks-Makros geteilt.
 
 ### Anmeldung über den Browser
 
@@ -287,4 +295,4 @@ in dieser Runde), im Quellcode direkt mit `UNVERIFIED` markiert:
   kein systemeigener Datei-Browser.
 - Das Kopieren/Registrieren/Herunterladen einer Datei über `storage/` setzt voraus,
   dass dieser Ordner im Dateisystem dieses Rechners sichtbar ist — genau wie bei den
-  SolidWorks/FreeCAD-Makros.
+  SolidWorks-Makros.

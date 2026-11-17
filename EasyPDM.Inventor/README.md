@@ -9,7 +9,7 @@ session) — the Inventor counterparts of `EasyPDMUpload.bas` in [EasyPDM-SolidW
 
 - **`EasyPDMUpload.bas`** — sends the active Inventor document to EasyPDM. The choice of
   project/new-vs-existing/duplicate/item properties happens in the browser (the same
-  pattern as the SolidWorks and FreeCAD macros), with one exception — see "Differences
+  pattern as the SolidWorks macros and the FreeCAD add-on), with one exception — see "Differences
   from the SolidWorks macros" below.
 - **`EasyPDMDownload.bas`** — fetches a Part/Assembly from EasyPDM (together with all of
   the assembly's components) and opens it in Inventor; the choice of WHICH item also
@@ -28,6 +28,11 @@ they were and why they matter if this code is ever touched again.
 
 A few narrow, low-traffic code paths remain genuinely untested in practice (marked
 `UNVERIFIED` inline in the source) — see "Known risks" below.
+
+**No longer developed** (from EasyPDM 0.9.1): there is no Inventor licence to test on any more.
+The macros stay as they are and are kept working against the server's API; the features the
+SolidWorks and FreeCAD add-ons gained in 0.9 (document panel, locking from the CAD program, the
+outdated-component check) are not coming to Inventor.
 
 ## Differences from the SolidWorks macros
 
@@ -74,11 +79,12 @@ applies here identically.
 ## What `EasyPDMUpload.bas` does
 
 1. **Login** — on first run (or when the saved session has expired/been invalidated) it
-   asks for the API address, username, and password. The session token is saved in the
-   Windows registry (`HKEY_CURRENT_USER\Software\VB and VBA Program Settings\EasyPDM`) —
+   asks for the API address, username, and password (or sign in through the browser first,
+   see "Logging in through the browser" below). The macro token is saved in the Windows
+   registry (`HKEY_CURRENT_USER\Software\VB and VBA Program Settings\EasyPDM`) —
    subsequent runs (also after restarting Inventor, also from `EasyPDMDownload.bas`, and
-   also shared with the SolidWorks/FreeCAD macros — the session is shared across all of
-   them) don't ask to log in again as long as the session is valid (30 days).
+   also shared with the SolidWorks macros, which keep it in the same place) don't ask to log
+   in again as long as the token is valid (a year, unless revoked in Settings → Users).
 2. **Saves the active document**, if it hasn't been saved yet.
 3. **If the active document is an Assembly**: detects the component tree
    (`AssemblyDocument.ComponentDefinition.Occurrences`, recursively). A pre-walk summary
@@ -107,7 +113,7 @@ applies here identically.
    - **Not yet linked** — opens the system browser (already logged in, token→cookie
      bridge) to the "pending request from a CAD macro" popup, with three options to
      choose THERE: **New item**, **Duplicate**, or **Attach to existing** — same fields
-     and item-kind logic as the SolidWorks/FreeCAD macros. The macro waits (polls every
+     and item-kind logic as the SolidWorks macros and the FreeCAD add-on. The macro waits (polls every
      ~2s, 10-minute limit, Escape cancels, progress shown in Inventor's status bar) and
      continues automatically once the choice is confirmed in the browser.
    - **Existing item with "Released" status**: asks for consent to a new revision and an
@@ -124,8 +130,9 @@ applies here identically.
    to a temporary `.step`/`.pdf` file and uploads it as an attachment with the role
    `"step"`/`"pdf"`, replacing the previous attachment of that same role. An export error
    does NOT abort the rest of the operation.
-7. Saves `EasyPDM_LinkId`/`EasyPDM_LinkNumber` into the document's iProperties and shows
-   a confirmation.
+7. Saves `EasyPDM_LinkId`/`EasyPDM_LinkNumber` into the document's iProperties. The report
+   of the run (what went up, what failed) lands in the web app's notifications, not in a
+   window in Inventor.
 
 ## What `EasyPDMDownload.bas` does
 
@@ -150,11 +157,11 @@ on the attachment corresponding to the CURRENT revision.
 
 ## How to check whether it worked
 
-1. **The message at the end** — after a successful operation the macro shows a window
-   with a summary. A window with "Error: ..." means something went wrong.
-2. **The web application** — go into the project (or "Whole database"), find the item by
-   the number from the message and check whether it has an attached file and correct
-   properties.
+1. **The web application** — while the macro runs, the transfer list on the right ticks each
+   file off; at the end the bell (notifications) holds a report: how many files went up or came
+   down and which failed. A window with "Error: ..." in Inventor means something went wrong.
+2. **The item itself** — go into the project (or "Whole database"), find the item and check
+   whether it has an attached file and correct properties.
 3. **The macro log** — every run appends a detailed, timestamped record to a plain text
    file:
 
@@ -191,7 +198,7 @@ Like SolidWorks, Inventor has no plain-text macro format — macros are VBA proj
    to your own toolbar button/shortcut.
 
 The API address (default `http://localhost:5000/api`) is saved automatically after being
-entered once at login — shared with the SolidWorks/FreeCAD macros too.
+entered once at login — shared with the SolidWorks macros too.
 
 ### Logging in through the browser
 
@@ -263,4 +270,4 @@ round), marked `UNVERIFIED` inline in the source:
 - The download's target folder is a plain `InputBox` with a path as text, not a system
   file browser.
 - Copying/registering/downloading a file through `storage/` assumes this folder is
-  visible in this machine's filesystem — same as the SolidWorks/FreeCAD macros.
+  visible in this machine's filesystem — same as the SolidWorks macros.
