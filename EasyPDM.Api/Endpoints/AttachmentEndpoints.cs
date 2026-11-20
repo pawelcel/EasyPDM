@@ -26,7 +26,7 @@ static class AttachmentEndpoints
 
             var sql = $"""
                 SELECT a.id, a.file_name, a.file_size, a.uploaded_at, a.preview_role, a.revision_number,
-                       {UserNames.FullNameSql("u")}
+                       {UserNames.FullNameSql("u")}, a.file_hash
                 FROM item_attachments a
                 LEFT JOIN users u ON u.id = a.uploaded_by
                 WHERE a.item_id = @itemId
@@ -47,7 +47,11 @@ static class AttachmentEndpoints
                     uploadedAt = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3),
                     role = reader.IsDBNull(4) ? null : reader.GetString(4),
                     revisionNumber = reader.IsDBNull(5) ? (int?)null : reader.GetInt32(5),
-                    uploadedBy = reader.IsDBNull(6) ? null : reader.GetString(6)
+                    uploadedBy = reader.IsDBNull(6) ? null : reader.GetString(6),
+                    // Changes whenever the stored file does -- also when the server rewrites it
+                    // in place, as the drawing stamp does on review and release -- so the web
+                    // app can put it in the file's URL and its PDF preview reloads.
+                    version = reader.IsDBNull(7) ? null : reader.GetString(7)
                 });
             }
 
@@ -268,7 +272,13 @@ static class AttachmentEndpoints
             if (!File.Exists(path))
                 return Results.NotFound("The file is missing from the server's storage.");
 
-            return Results.File(path, "application/octet-stream", fileName);
+            // The same URL can serve another file: an upload of the same revision replaces it, and
+            // the drawing stamp rewrites the PDF on review and release. Browsers may otherwise keep
+            // the old copy on their own heuristics; "no-cache" makes them ask first, and the file's
+            // modification time answers with a 304 when nothing changed.
+            ctx.Response.Headers.CacheControl = "no-cache";
+            return Results.File(path, "application/octet-stream", fileName,
+                lastModified: File.GetLastWriteTimeUtc(path));
         });
 
         // DELETE /api/attachments/{id}

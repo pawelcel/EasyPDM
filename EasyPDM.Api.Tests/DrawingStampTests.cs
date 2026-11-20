@@ -82,6 +82,35 @@ public class DrawingStampTests
         Assert.Equal(stamped.Length, pdf.GetProperty("fileSize").GetInt64());
     }
 
+    // The stamp rewrites the PDF under the same attachment id, so the web app's preview needs
+    // something that changes with the file to reload it, and browsers must not reuse the old copy.
+    [Fact]
+    public async Task A_stamped_PDF_gets_a_new_version_and_is_not_cached()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        var (client, itemId) = await PartWithPdfAsync(factory, BlankPdf(420, 297), "easypdm-A3");
+
+        async Task<JsonElement> PdfEntryAsync()
+        {
+            var attachments = await client.GetFromJsonAsync<JsonElement>($"/api/items/{itemId}/attachments");
+            return attachments.EnumerateArray().Single(a => a.GetProperty("role").GetString() == "pdf");
+        }
+
+        var before = await PdfEntryAsync();
+        var versionBefore = before.GetProperty("version").GetString();
+        Assert.False(string.IsNullOrEmpty(versionBefore));
+
+        (await client.PatchAsJsonAsync($"/api/items/{itemId}/status", new { status = "sprawdzany" })).EnsureSuccessStatusCode();
+        var reviewed = await PdfEntryAsync();
+        Assert.Equal(before.GetProperty("id").GetGuid(), reviewed.GetProperty("id").GetGuid());
+        Assert.NotEqual(versionBefore, reviewed.GetProperty("version").GetString());
+
+        using var response = await client.GetAsync($"/api/attachments/{reviewed.GetProperty("id").GetGuid()}/file");
+        response.EnsureSuccessStatusCode();
+        Assert.True(response.Headers.CacheControl?.NoCache);
+        Assert.NotNull(response.Content.Headers.LastModified);
+    }
+
     [Fact]
     public async Task Releasing_again_without_a_new_PDF_does_not_stamp_it_twice()
     {

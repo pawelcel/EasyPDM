@@ -475,7 +475,7 @@ function AttachmentsPanel({
           open
           onOpenChange={(open) => !open && setPreviewing(null)}
           fileName={previewing.fileName}
-          url={api.attachmentDownloadUrl(previewing.id)}
+          url={api.attachmentDownloadUrl(previewing.id, previewing.version)}
           kind={previewKindOf(previewing.fileName)!}
         />
       )}

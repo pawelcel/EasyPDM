@@ -735,6 +735,9 @@ export interface Attachment {
   // w panelu elementu (wcześniej renderowaliśmy w tym celu plik STEP w przeglądarce).
   // Wgrywany RAZEM ze STEP-em i razem z nim kasowany, zob. AttachmentEndpoints.cs.
   role: "pdf" | "step" | "cad" | "drawing" | "image" | null
+  // Changes with the stored file -- also when the server rewrites it in place, as the drawing
+  // stamp does on review and release. Put into the file's URL so a preview reloads.
+  version: string | null
 }
 
 // Postęp wysyłki/pobierania prowadzonego przez makro CAD — stan żyje w pamięci serwera,

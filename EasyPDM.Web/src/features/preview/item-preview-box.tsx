@@ -51,9 +51,11 @@ function usePreviewSources(item: Item, refreshSignal: number): { pdf: PreviewSou
       const pdfAttachment = attachments.find((a) => a.role === "pdf")
       const imageAttachment = attachments.find((a) => a.role === "image")
       setAttachmentSources({
-        pdf: pdfAttachment ? { fileName: pdfAttachment.fileName, url: api.attachmentDownloadUrl(pdfAttachment.id) } : null,
+        pdf: pdfAttachment
+          ? { fileName: pdfAttachment.fileName, url: api.attachmentDownloadUrl(pdfAttachment.id, pdfAttachment.version) }
+          : null,
         image: imageAttachment
-          ? { fileName: imageAttachment.fileName, url: api.attachmentDownloadUrl(imageAttachment.id) }
+          ? { fileName: imageAttachment.fileName, url: api.attachmentDownloadUrl(imageAttachment.id, imageAttachment.version) }
           : null,
       })
     }).catch(() => {

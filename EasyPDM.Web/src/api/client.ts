@@ -973,7 +973,10 @@ export const api = {
   projectAttachmentDownloadUrl: (attachmentId: string) =>
     `${BASE}/project-attachments/${attachmentId}/download`,
 
-  attachmentDownloadUrl: (attachmentId: string) => `${BASE}/attachments/${attachmentId}/file`,
+  // `version` (Attachment.version) makes the URL change when the file does, so a preview whose
+  // file the server rewrote under the same id -- the drawing stamp -- loads the new one.
+  attachmentDownloadUrl: (attachmentId: string, version?: string | null) =>
+    `${BASE}/attachments/${attachmentId}/file${version ? `?v=${encodeURIComponent(version)}` : ""}`,
 
   login: (username: string, password: string) =>
     fetch(`${BASE}/auth/login`, json({ username, password })).then((r) =>
