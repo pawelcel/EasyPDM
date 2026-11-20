@@ -9,8 +9,8 @@ designing) is in [README.md](README.md).
 ## Status
 
 Projects and items are created manually through the web application (uploading a file
-straight into the API's storage) or through the FreeCAD add-on ([pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD)), SolidWorks
-([pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks)) or Autodesk Inventor (`EasyPDM.Inventor/`) macro, which call the
+straight into the API's storage) or through the FreeCAD add-on ([pawelcel/EasyPDM-FreeCAD-Addon](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon)), SolidWorks
+([pawelcel/EasyPDM-SolidWorks-Addon](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon)) or Autodesk Inventor (`EasyPDM.Inventor/`) macro, which call the
 same API.
 The earlier disk-scanning approach (`EasyPDM.Core`, `EasyPDM.Indexer`) has been removed
 from the repo — it was incompatible with the schema since migration `002` and was never
@@ -66,15 +66,15 @@ PostgreSQL 18.
   (the connection string defaults to a local `pdm`/`pdm_user` — overridable via the
   `EASYPDM_TEST_CONNECTION_STRING` variable, same as in CI).
 - **FreeCAD** — lives in its own repository,
-  [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9): an EasyPDM
+  [pawelcel/EasyPDM-FreeCAD-Addon](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon) (since 0.9): an EasyPDM
   workbench with Upload (`upload.py`: browser-picked item, upload with STEP/PDF/preview,
   record-name renaming, drawing sheet) and Download (`download.py`: the item with its whole
   component tree, opened), the FreeCAD macros until 0.9 — which is why parts of this document
   still call them "the FreeCAD macro" — plus Log in (approved in the browser), Log out, locking,
   a document panel and the outdated-component check. Its `tools/build_templates.py` is the single source of the drawing sheet and also writes
-  `EasyPDMSheetFormat.bas` in EasyPDM-SolidWorks. Live-tested on FreeCAD 1.1.
+  `EasyPDMSheetFormat.bas` in EasyPDM-SolidWorks-Addon. Live-tested on FreeCAD 1.1.
 - **SolidWorks** — lives in its own repository,
-  [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) (moved out of `EasyPDM.SolidWorks/` after 0.9.0): VBA
+  [pawelcel/EasyPDM-SolidWorks-Addon](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon) (moved out of `EasyPDM.SolidWorks/` after 0.9.0): VBA
   macros `EasyPDMUpload.bas`/`EasyPDMDownload.bas`, live-tested on SolidWorks 2024 and 2026,
   `EasyPDMSheetFormat.bas` for the drawing sheet, and a .NET Framework COM add-in with an
   EasyPDM tab that runs the compiled macros and adds a document panel, locking and the
@@ -84,7 +84,7 @@ PostgreSQL 18.
   on Inventor. No drawing sheet. Not developed further, as there is no Inventor licence to
   test on any more; kept working against the server's API.
 - **SolidCraft** — lives in its own repository,
-  [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft) (moved out of `EasyPDM.SolidCraft/` and
+  [pawelcel/EasyPDM-SolidCraft-Addon](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon) (moved out of `EasyPDM.SolidCraft/` and
   `EasyPDM.Companion/` after 0.9.0): a plugin (Rust → WebAssembly component) whose menu entries
   only write requests into an outbox folder, since SolidCraft plugins have no network, and the
   companion on the CAD workstation that serves them against this server's API, like the macros.

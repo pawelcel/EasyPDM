@@ -86,9 +86,9 @@ workflow refuses the build:
 
 Three CAD integrations live in repositories of their own, with their own releases, checks and
 CLAUDE.md: the FreeCAD add-on and the drawing sheet generator in
-[pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD) (since 0.9), the
+[pawelcel/EasyPDM-FreeCAD-Addon](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon) (since 0.9), the
 SolidWorks add-in, macros and sheet formats in
-[pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks), and the SolidCraft
-plugin with its companion in [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft) (both moved out after 0.9.0,
+[pawelcel/EasyPDM-SolidWorks-Addon](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon), and the SolidCraft
+plugin with its companion in [pawelcel/EasyPDM-SolidCraft-Addon](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon) (both moved out after 0.9.0,
 with their history). A server change they depend on is
 released here first, and their notes say which EasyPDM version they need.

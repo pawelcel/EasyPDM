@@ -5,7 +5,7 @@ Option Explicit
 ' EasyPDMDownload -- Autodesk Inventor macro that downloads a Part/Assembly from EasyPDM and
 ' opens it.
 '
-' This is the INVENTOR PORT of EasyPDM-SolidWorks/EasyPDMDownload.bas -- see that file's own
+' This is the INVENTOR PORT of EasyPDM-SolidWorks-Addon/EasyPDMDownload.bas -- see that file's own
 ' header, and EasyPDM.Inventor/EasyPDMUpload.bas's header, for the general reasons behind
 ' this macro family's design choices (own minimal JSON, no UserForm anywhere -- VBA
 ' UserForms are separate binary resources, not embeddable in a plain .bas text file).
@@ -83,7 +83,7 @@ Private Const ERR_API As Long = vbObjectError + 1002
 ' explicit GetObject call in an imported module, not automatically visible the way
 ' "ThisApplication" might be in other contexts). Grouped here with the module's other
 ' Private/Const declarations, all BEFORE any Sub/Function, matching the same defensive
-' layout already applied to EasyPDM-SolidWorks/EasyPDMUpload.bas after a real
+' layout already applied to EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas after a real
 ' "Variable not defined" lesson learned there.
 Private InvApp As Object
 
@@ -1195,7 +1195,7 @@ End Function
 
 ' ============================================================================
 ' Helpers -- revision label formatting, PDM naming convention regex, nested directory
-' creation. Identical to EasyPDM-SolidWorks/EasyPDMDownload.bas.
+' creation. Identical to EasyPDM-SolidWorks-Addon/EasyPDMDownload.bas.
 ' ============================================================================
 
 ' Revisions as uppercase letters instead of digits: 1->A, 2->B, ..., 26->Z, 27->AA... --
@@ -1648,7 +1648,7 @@ Sub main()
     End If
 
     ' Which item to download is picked in the browser, not a native InputBox -- exactly
-    ' like EasyPDM-FreeCAD/freecad/EasyPDM/download.py and EasyPDM-SolidWorks/
+    ' like EasyPDM-FreeCAD-Addon/freecad/EasyPDM/download.py and EasyPDM-SolidWorks-Addon/
     ' EasyPDMDownload.bas (see BuildBrowserDownloadUrl/WaitForTicket above).
     Dim ticket As String
     ticket = NewGuid()

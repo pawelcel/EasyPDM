@@ -68,9 +68,9 @@ jobs:
           path: artifacts/linux
 
       # Inventor macros as plain files, ready to import. FreeCAD's add-on is released from
-      # pawelcel/EasyPDM-FreeCAD (since 0.9); the SolidWorks add-in, macros and sheet formats from
-      # pawelcel/EasyPDM-SolidWorks and the SolidCraft plugin with its companion from
-      # pawelcel/EasyPDM-SolidCraft (after 0.9.0).
+      # pawelcel/EasyPDM-FreeCAD-Addon (since 0.9); the SolidWorks add-in, macros and sheet formats from
+      # pawelcel/EasyPDM-SolidWorks-Addon and the SolidCraft plugin with its companion from
+      # pawelcel/EasyPDM-SolidCraft-Addon (after 0.9.0).
       - name: Przygotuj makra CAD
         run: |
           VERSION="${GITHUB_REF_NAME#v}"

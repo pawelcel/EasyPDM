@@ -4,7 +4,7 @@
 
 Two `.bas` macros, each fully self-contained (separate file, separate VBA module, no
 dependencies between them beyond a shared spot in the Windows registry for the login
-session) — the Inventor counterparts of `EasyPDMUpload.bas` in [EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) and
+session) — the Inventor counterparts of `EasyPDMUpload.bas` in [EasyPDM-SolidWorks-Addon](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon) and
 `EasyPDMDownload.bas`:
 
 - **`EasyPDMUpload.bas`** — sends the active Inventor document to EasyPDM. The choice of
@@ -37,7 +37,7 @@ outdated-component check) are not coming to Inventor.
 ## Differences from the SolidWorks macros
 
 These are **ports**, not new designs — the same architecture as
-`EasyPDM-SolidWorks/EasyPDMUpload.bas`/`EasyPDMDownload.bas`, with the same Sub/Function
+`EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas`/`EasyPDMDownload.bas`, with the same Sub/Function
 names wherever Inventor's own API allows it, so the two file families stay easy to
 compare side by side. Only the actual CAD API calls differ:
 

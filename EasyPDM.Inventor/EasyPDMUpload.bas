@@ -6,9 +6,9 @@ Option Explicit
 '
 ' All comments/strings are in plain English (ASCII only) on purpose -- VBA's file import
 ' does not reliably handle UTF-8, confirmed in practice while building the SolidWorks
-' counterpart of this file (EasyPDM-SolidWorks/EasyPDMUpload.bas).
+' counterpart of this file (EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas).
 '
-' This is the INVENTOR PORT of EasyPDM-SolidWorks/EasyPDMUpload.bas -- same architecture,
+' This is the INVENTOR PORT of EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas -- same architecture,
 ' same Sub/Function names wherever Inventor's own API allows it (so the two files stay easy
 ' to compare side by side), only the actual CAD API calls differ. See
 ' EasyPDM.Inventor/README.md ("Differences from the SolidWorks macros") for the full list of
@@ -43,7 +43,7 @@ Option Explicit
 '     browser involved: Inventor already knows the target with certainty, a browser
 '     round-trip would add nothing.
 '   - Document NOT yet linked: opens the SAME web browser flow as
-'     EasyPDM-SolidWorks/EasyPDMUpload.bas and the FreeCAD upload.py (already
+'     EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas and the FreeCAD upload.py (already
 '     logged in via a one-time login-bridge ticket, see "Logowanie"/"Login" below) on the
 '     "pending request from a CAD macro" popup -- "New item" / "Duplicate" / "Attach to
 '     existing" all decided THERE, not locally. The macro waits (WaitForTicket, polling
@@ -89,7 +89,7 @@ Option Explicit
 ' The API address (default http://localhost:5000/api) and session token are stored in the
 ' Windows registry via SaveSetting/GetSetting (branch "HKEY_CURRENT_USER\Software\VB and
 ' VBA Program Settings\EasyPDM\Connection") -- the SAME registry keys as
-' EasyPDM-SolidWorks/EasyPDMUpload.bas on purpose, so logging in from either macro family
+' EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas on purpose, so logging in from either macro family
 ' (whichever CAD program happens to be installed) is enough for both; this is just a login/
 ' preferences store, nothing about it is SolidWorks- or Inventor-specific.
 ' ============================================================================
@@ -201,7 +201,7 @@ Private Const ERR_API As Long = vbObjectError + 1002
 ' in this module (that global is only guaranteed inside the VBA project's own "host"
 ' context in some configurations) -- obtained explicitly at the start of main() via
 ' GetObject(, "Inventor.Application"), the standard, documented way to bind to an ALREADY
-' RUNNING Automation server instance. Mirrors EasyPDM-SolidWorks/EasyPDMUpload.bas's own
+' RUNNING Automation server instance. Mirrors EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas's own
 ' "swApp" declaration and its documented reason (that file's "Variable not defined" lesson
 ' learned the hard way on a live SolidWorks install) -- same defensive choice made here
 ' up front instead of waiting to hit the same class of problem on a live Inventor install.
@@ -561,7 +561,7 @@ End Function
 ' failed), since there is no console here like in FreeCAD/the browser. A plain text file in
 ' %TEMP%, appended to (not overwritten) on every run -- open it with Notepad. The path is
 ' also shown in the summary dialog at the end of "main". Named distinctly from
-' EasyPDM-SolidWorks/EasyPDMUpload.bas's own log file, in case a user somehow has both
+' EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas's own log file, in case a user somehow has both
 ' installed on the same machine.
 ' ============================================================================
 
@@ -1005,7 +1005,7 @@ End Function
 
 ' Reads the whole file as a byte array -- used for the plain HTTP upload (when the PDM
 ' storage is not visible in this machine's file system). Deliberately the plain legacy
-' Open/Get/Close statements, NOT ADODB.Stream -- see EasyPDM-SolidWorks/EasyPDMUpload.bas's
+' Open/Get/Close statements, NOT ADODB.Stream -- see EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas's
 ' own comment on this exact function: an ADODB.Stream rewrite there, tried as a preemptive
 ' fix for a Unicode-path concern, turned out to be unnecessary for READING and caused two
 ' different new failures instead ("Cannot open file", then "Permission denied") -- reverted.
@@ -1906,7 +1906,7 @@ End Function
 ' Inventor document-type detection.
 '
 ' Deliberately NOT a hardcoded DocumentTypeEnum integer (the pattern
-' EasyPDM-SolidWorks/EasyPDMUpload.bas uses for swDocumentTypes_e, declared explicitly
+' EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas uses for swDocumentTypes_e, declared explicitly
 ' because late binding + Option Explicit cannot resolve the bare enum constant names without
 ' a type library reference) -- this file has no live Inventor install to confirm the exact
 ' enum values against, and guessing a wrong integer here would misclassify documents
@@ -3077,7 +3077,7 @@ End Function
 ' ComponentOccurrence.Suppressed (used below to skip suppressed components) and whether
 ' .Definition.Document reliably raises/returns Nothing for a component whose document isn't
 ' resolvable for some other reason (a broken reference, a missing file) -- confirm on first
-' real run. NOTE: unlike EasyPDM-SolidWorks/EasyPDMUpload.bas, there is deliberately NO
+' real run. NOTE: unlike EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas, there is deliberately NO
 ' "resolve lightweight components" step here -- Inventor does not have the same per-assembly
 ' "Lightweight" component concept SolidWorks does (its closest equivalents, Level of Detail
 ' representations and Express mode, work differently and are not walked/forced here); if a

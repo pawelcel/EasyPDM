@@ -15,7 +15,7 @@
 [5. Całe złożenie — wysyłanie, pobieranie, aktualizacja i rysunki](https://youtu.be/vXHYbRlPu_s) ·
 [6. Pola części — statusy, blokady, materiały i obróbki](https://youtu.be/JxMLm7bmuck)
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (po angielsku) — instalacja, praca z EasyPDM, integracje CAD (w tym gdzie są arkusze rysunkowe), ustawienia; ze zrzutami ekranu. Dodatki do FreeCAD i SolidWorks mają własne wiki: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki); SolidCraft krok po kroku: [jego strona w tym wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (po angielsku) — instalacja, praca z EasyPDM, integracje CAD (w tym gdzie są arkusze rysunkowe), ustawienia; ze zrzutami ekranu. Dodatki do FreeCAD i SolidWorks mają własne wiki: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki); SolidCraft krok po kroku: [jego strona w tym wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
 
 EasyPDM to miejsce, w którym Twoje Części i Złożenia mają jeden, wspólny dla całego
 zespołu porządek: każdy element ma swój numer, rewizję, status i historię zmian, a
@@ -120,12 +120,12 @@ które komponenty mają w EasyPDM nowszy plik; Upload odmawia wysłania pracy op
 W SolidCraft są w menu Plugins.
 
 Instalacja i szczegóły:
-- FreeCAD (dodatek, we własnym repozytorium): [pawelcel/EasyPDM-FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD), z [własnym wiki](https://github.com/pawelcel/EasyPDM-FreeCAD/wiki)
-- SolidWorks (dodatek z zakładką EasyPDM i panelem dokumentu, makra, arkusz rysunku; we własnym repozytorium): [pawelcel/EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks), z [własnym wiki](https://github.com/pawelcel/EasyPDM-SolidWorks/wiki)
+- FreeCAD (dodatek, we własnym repozytorium): [pawelcel/EasyPDM-FreeCAD-Addon](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon), z [własnym wiki](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki)
+- SolidWorks (dodatek z zakładką EasyPDM i panelem dokumentu, makra, arkusz rysunku; we własnym repozytorium): [pawelcel/EasyPDM-SolidWorks-Addon](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon), z [własnym wiki](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (wtyczka + pomocnik EasyPDM, bo wtyczki SolidCraft nie mają sieci):
   **[instalacja krok po kroku](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** w wiki (po angielsku); we własnym
-  repozytorium, [pawelcel/EasyPDM-SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft)
+  repozytorium, [pawelcel/EasyPDM-SolidCraft-Addon](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon)
 
 **Upload** — masz otwarty i zapisany plik, klikasz Upload. Otwiera się przeglądarka
 (automatycznie zalogowana) z pytaniem: nowy element, duplikat istniejącego (kopiuje jego

@@ -4,7 +4,7 @@
 
 Dwa makra `.bas`, każde w pełni samodzielne (osobny plik, osobny moduł VBA, bez zależności
 między sobą poza współdzielonym miejscem w rejestrze Windows na sesję logowania) —
-odpowiedniki `EasyPDMUpload.bas` z [EasyPDM-SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks) i `EasyPDMDownload.bas` dla Inventora:
+odpowiedniki `EasyPDMUpload.bas` z [EasyPDM-SolidWorks-Addon](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon) i `EasyPDMDownload.bas` dla Inventora:
 
 - **`EasyPDMUpload.bas`** — wysyła aktywny dokument Inventora do EasyPDM. Wybór
   projektu/nowy-czy-istniejący/duplikuj/właściwości elementu odbywa się w przeglądarce
@@ -37,7 +37,7 @@ sprawdzanie nieaktualnych komponentów), do Inventora nie trafią.
 ## Różnice względem makr SolidWorks
 
 To **porty**, nie nowe projekty — ta sama architektura co
-`EasyPDM-SolidWorks/EasyPDMUpload.bas`/`EasyPDMDownload.bas`, z tymi samymi nazwami
+`EasyPDM-SolidWorks-Addon/EasyPDMUpload.bas`/`EasyPDMDownload.bas`, z tymi samymi nazwami
 Sub/Function tam, gdzie pozwala na to samo API Inventora, żeby obie rodziny plików łatwo
 było porównać obok siebie. Różni się tylko faktyczne wywołania API CAD-a:
 
