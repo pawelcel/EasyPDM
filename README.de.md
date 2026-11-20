@@ -4,6 +4,8 @@
 
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="136">](https://buymeacoffee.com/easypdm)
 
+[![Release](https://img.shields.io/github/v/release/pawelcel/EasyPDM?label=release)](https://github.com/pawelcel/EasyPDM/releases/latest) [![License: MIT](https://img.shields.io/github/license/pawelcel/EasyPDM)](LICENSE) [![Tests](https://img.shields.io/github/actions/workflow/status/pawelcel/EasyPDM/build.yml?branch=main&label=tests)](https://github.com/pawelcel/EasyPDM/actions/workflows/build.yml) [![Wiki](https://img.shields.io/badge/Doku-Wiki-blue)](https://github.com/pawelcel/EasyPDM/wiki) [![YouTube](https://img.shields.io/badge/YouTube-Videoserie-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)
+
 ▶️ **Videoserie auf YouTube** (auf Englisch, [Playlist](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)): [1. Wozu PDM und was EasyPDM ist](https://youtu.be/OaqyJQCHkt4) ·
 [2. Installation — Windows, Docker oder Linux](https://youtu.be/ZwAWCJN9tWg) ·
 [3. Projekte und Struktur](https://youtu.be/ZB3pXQY6-e0) ·
