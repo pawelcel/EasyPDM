@@ -1,3 +1,5 @@
+<p align="center"><img src="EasyPDM.Web/public/favicon.svg" alt="EasyPDM logo" width="110"></p>
+
 # EasyPDM — PDM-System für CAD-Dateien
 
 [English](README.md) | [Polski](README.pl.md) | **Deutsch**
