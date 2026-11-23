@@ -38,6 +38,8 @@ static class DocumentLabels
         ("titleblock.processDescription", "Opis", "Description", "Beschreibung"),
         ("titleblock.bomNo", "Lp.", "No.", "Pos."),
         ("titleblock.bomDrawingNumber", "Numer rysunku", "Drawing number", "Zeichnungsnummer"),
+        ("titleblock.bomManufacturer", "Producent / Norma", "Manufacturer / Standard", "Hersteller / Norm"),
+        ("titleblock.bomOrderNumber", "Nr zamówieniowy", "Order number", "Bestellnummer"),
         ("titleblock.bomQuantity", "Ilość", "Qty", "Menge"),
         ("titleblock.revisionLetter", "Rew.", "Rev.", "Rev."),
         ("titleblock.revisionDate", "Data", "Date", "Datum"),

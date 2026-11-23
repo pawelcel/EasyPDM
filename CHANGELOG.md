@@ -6,12 +6,14 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [0.9.4]
 
-**In short:** assembly drawings get a parts list. The server now hands the add-ons an assembly's direct components, numbered by their position in the structure in EasyPDM, and [EasyPDM for FreeCAD 0.9.9](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/releases/tag/v0.9.9) draws them as a table above the processes table and sets the drawing's balloons to the same numbers.
+**In short:** assembly drawings get a parts list. The server now hands the add-ons an assembly's direct components, numbered by their position in the structure in EasyPDM, with their drawing numbers, manufacturer, standard, order numbers and quantities, and [EasyPDM for FreeCAD 0.9.9](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/releases/tag/v0.9.9) draws them as a table above the processes table and sets the drawing's balloons to the same numbers.
+
+![An assembly drawing in FreeCAD: balloons numbered from the parts list](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/drawing-sheet-parts-list.png)
 
 Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
 
 ### Added
-- **Parts list for assembly drawings.** The title block data an add-on reads for a drawing now carries an assembly's parts list: its direct components with their number, drawing number, name translations and quantity. The number is the component's position in the assembly's structure in EasyPDM, so a list on the drawing follows the order set there. Three new labels for its headers (number, drawing number, quantity) can be changed under Settings → Language like the others. [EasyPDM for FreeCAD 0.9.9](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/releases/tag/v0.9.9) draws the list on the sheet and numbers the drawing's balloons from it.
+- **Parts list for assembly drawings.** The title block data an add-on reads for a drawing now carries an assembly's parts list: its direct components with their number, drawing number, name translations, manufacturer, standard, order numbers 1 and 2 (the same properties as the BOM CSV export) and quantity. The number is the component's position in the assembly's structure in EasyPDM, so a list on the drawing follows the order set there. Five new labels for its headers (number, drawing number, manufacturer / standard, order number, quantity) can be changed under Settings → Language like the others. [EasyPDM for FreeCAD 0.9.9](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/releases/tag/v0.9.9) draws the list on the sheet and numbers the drawing's balloons from it.
 
 ## [0.9.3]
 

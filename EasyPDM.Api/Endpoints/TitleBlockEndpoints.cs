@@ -209,6 +209,11 @@ static class TitleBlockEndpoints
                             .ToList(),
                         drawingNumber = row.RecordName,
                         quantity = row.Quantity,
+                        // The same item properties as the BOM CSV's columns.
+                        manufacturer = Text(row.Props, "manufacturer"),
+                        standard = Text(row.Props, "norm"),
+                        orderNumber = Text(row.Props, "orderNumber"),
+                        orderNumber2 = Text(row.Props, "orderNumber2"),
                     });
                 }
             }

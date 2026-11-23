@@ -138,7 +138,7 @@ public class TitleBlockTests
 
         var frame = await NodeAsync("Rama", "assembly");
         var leg = await NodeAsync("Noga", "part", new { nameTexts = new[] { new { languageId = en, name = "Leg" } } });
-        var rail = await NodeAsync("Belka", "part");
+        var rail = await NodeAsync("Belka", "part", new { manufacturer = "Bosch Rexroth", norm = "DIN 912", orderNumber = "R0123", orderNumber2 = "R0124" });
         (await admin.PostAsJsonAsync($"/api/items/{frame}/children", new { childId = leg, quantity = 4 })).EnsureSuccessStatusCode();
         (await admin.PostAsJsonAsync($"/api/items/{frame}/children", new { childId = rail, quantity = 2 })).EnsureSuccessStatusCode();
 
@@ -156,6 +156,12 @@ public class TitleBlockTests
         Assert.Equal("EN", tr.GetProperty("languageCode").GetString());
         Assert.Equal("Leg", tr.GetProperty("name").GetString());
         Assert.Empty(rows[1].GetProperty("nameTranslations").EnumerateArray());
+        Assert.Equal("Bosch Rexroth", rows[1].GetProperty("manufacturer").GetString());
+        Assert.Equal("DIN 912", rows[1].GetProperty("standard").GetString());
+        Assert.Equal("R0123", rows[1].GetProperty("orderNumber").GetString());
+        Assert.Equal("R0124", rows[1].GetProperty("orderNumber2").GetString());
+        Assert.Equal(JsonValueKind.Null, rows[0].GetProperty("manufacturer").ValueKind);
+        Assert.Equal("Producent / Norma", tb.GetProperty("labels").GetProperty("bomManufacturer").GetString());
 
         // Reordered in the structure: the numbers follow.
         (await admin.PatchAsJsonAsync($"/api/items/{frame}/children/reorder", new { childIds = new[] { rail, leg } })).EnsureSuccessStatusCode();
