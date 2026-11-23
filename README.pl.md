@@ -13,7 +13,8 @@
 [3. Projekty i struktura](https://youtu.be/ZB3pXQY6-e0) ·
 [4. Z CAD do PDM — makro wysyłania](https://youtu.be/vMQPxwWQrGc) ·
 [5. Całe złożenie — wysyłanie, pobieranie, aktualizacja i rysunki](https://youtu.be/vXHYbRlPu_s) ·
-[6. Pola części — statusy, blokady, materiały i obróbki](https://youtu.be/JxMLm7bmuck)
+[6. Pola części — statusy, blokady, materiały i obróbki](https://youtu.be/JxMLm7bmuck) ·
+[7. PDM → rysunek — tabelka wypełnia się sama](https://youtu.be/ZJiMQNJRsB0)
 
 📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (po angielsku) — instalacja, praca z EasyPDM, integracje CAD (w tym gdzie są arkusze rysunkowe), ustawienia; ze zrzutami ekranu. Dodatki do FreeCAD i SolidWorks mają własne wiki: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki); SolidCraft krok po kroku: [jego strona w tym wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
 

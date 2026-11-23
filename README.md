@@ -13,7 +13,8 @@
 [3. Projects and structure](https://youtu.be/ZB3pXQY6-e0) ·
 [4. From CAD to PDM — the upload macro](https://youtu.be/vMQPxwWQrGc) ·
 [5. A whole assembly — upload, download, update and drawings](https://youtu.be/vXHYbRlPu_s) ·
-[6. Every field of a part — statuses, locks, materials and processes](https://youtu.be/JxMLm7bmuck)
+[6. Every field of a part — statuses, locks, materials and processes](https://youtu.be/JxMLm7bmuck) ·
+[7. PDM → Drawing — the title block fills itself in](https://youtu.be/ZJiMQNJRsB0)
 
 📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** — installation, using EasyPDM, the CAD integrations (with where the drawing sheets are), settings; with screenshots. The FreeCAD and SolidWorks add-ons have wikis of their own: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki); SolidCraft, step by step: [its page on this wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
 

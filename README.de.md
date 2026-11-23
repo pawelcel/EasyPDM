@@ -13,7 +13,8 @@
 [3. Projekte und Struktur](https://youtu.be/ZB3pXQY6-e0) ·
 [4. Von CAD ins PDM — das Upload-Makro](https://youtu.be/vMQPxwWQrGc) ·
 [5. Eine ganze Baugruppe — Hochladen, Herunterladen, Aktualisieren und Zeichnungen](https://youtu.be/vXHYbRlPu_s) ·
-[6. Die Felder eines Teils — Status, Sperren, Werkstoffe und Bearbeitungen](https://youtu.be/JxMLm7bmuck)
+[6. Die Felder eines Teils — Status, Sperren, Werkstoffe und Bearbeitungen](https://youtu.be/JxMLm7bmuck) ·
+[7. PDM → Zeichnung — das Schriftfeld füllt sich selbst](https://youtu.be/ZJiMQNJRsB0)
 
 📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch) — Installation, Arbeit mit EasyPDM, die CAD-Integrationen (auch wo die Zeichnungsblätter liegen), Einstellungen; mit Screenshots. Die Add-ons für FreeCAD und SolidWorks haben eigene Wikis: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki); SolidCraft Schritt für Schritt: [seine Seite in diesem Wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
 
