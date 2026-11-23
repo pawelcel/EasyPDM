@@ -16,7 +16,7 @@
 [6. Die Felder eines Teils — Status, Sperren, Werkstoffe und Bearbeitungen](https://youtu.be/JxMLm7bmuck) ·
 [7. PDM → Zeichnung — das Schriftfeld füllt sich selbst](https://youtu.be/ZJiMQNJRsB0)
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch) — Installation, Arbeit mit EasyPDM, die CAD-Integrationen (auch wo die Zeichnungsblätter liegen), Einstellungen; mit Screenshots. Die Add-ons für FreeCAD und SolidWorks haben eigene Wikis: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki); SolidCraft Schritt für Schritt: [seine Seite in diesem Wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch) — Installation, Arbeit mit EasyPDM, die CAD-Integrationen (auch wo die Zeichnungsblätter liegen), Einstellungen; mit Screenshots. Die Add-ons für FreeCAD, SolidWorks und SolidCraft haben eigene Wikis: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki), [SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon/wiki).
 
 EasyPDM ist der Ort, an dem Ihre Teile und Baugruppen eine einzige, für das ganze Team
 gemeinsame Ordnung erhalten: Jedes Element hat seine eigene Nummer, Revision, Status und
@@ -135,7 +135,7 @@ Installation und Details:
 - SolidWorks (Add-in mit EasyPDM-Registerkarte und Dokumentbereich, Makros, Zeichnungsblatt; im eigenen Repository): [pawelcel/EasyPDM-SolidWorks-Addon](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon), mit [eigenem Wiki](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (Plugin + EasyPDM-Begleitprogramm, da SolidCraft-Plugins kein Netzwerk haben):
-  **[Installation Schritt für Schritt](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** im Wiki (auf Englisch); im eigenen
+  **[Installation Schritt für Schritt](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon/wiki/Installation)** in seinem Wiki (auf Englisch); im eigenen
   Repository, [pawelcel/EasyPDM-SolidCraft-Addon](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon)
 
 **Upload** — Sie haben eine gespeicherte Datei geöffnet und klicken auf Upload. Der

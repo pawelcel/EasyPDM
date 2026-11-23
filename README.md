@@ -16,7 +16,7 @@
 [6. Every field of a part — statuses, locks, materials and processes](https://youtu.be/JxMLm7bmuck) ·
 [7. PDM → Drawing — the title block fills itself in](https://youtu.be/ZJiMQNJRsB0)
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** — installation, using EasyPDM, the CAD integrations (with where the drawing sheets are), settings; with screenshots. The FreeCAD and SolidWorks add-ons have wikis of their own: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki); SolidCraft, step by step: [its page on this wiki](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft).
+📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** — installation, using EasyPDM, the CAD integrations (with where the drawing sheets are), settings; with screenshots. The FreeCAD, SolidWorks and SolidCraft add-ons have wikis of their own: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki), [SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon/wiki).
 
 EasyPDM is where your Parts and Assemblies get one, shared order for the whole team:
 every item has its own number, revision, status and change history, and assemblies get
@@ -124,7 +124,7 @@ Installation and details:
 - SolidWorks (add-in with an EasyPDM tab and document panel, macros, drawing sheet; in its own repository): [pawelcel/EasyPDM-SolidWorks-Addon](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon), with [its wiki](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki)
 - Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
 - SolidCraft (plugin + the EasyPDM SolidCraft companion, since SolidCraft plugins have no network):
-  **[installing step by step](https://github.com/pawelcel/EasyPDM/wiki/SolidCraft)** on the wiki; in its own
+  **[installing step by step](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon/wiki/Installation)** on its wiki; in its own
   repository, [pawelcel/EasyPDM-SolidCraft-Addon](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon)
 
 **Upload** — you have a saved file open, you click Upload. Your browser opens
