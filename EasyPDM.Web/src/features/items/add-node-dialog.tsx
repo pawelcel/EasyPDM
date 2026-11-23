@@ -94,6 +94,7 @@ function AddNodeDialog({
   lockMode,
   initialOpen,
   initialName,
+  cadFileName,
   initialMode,
   initialProperties,
   materialLocked,
@@ -117,6 +118,10 @@ function AddNodeDialog({
   // montuje tę instancję dopiero po kliknięciu "Nowy element", z ukrytym triggerem.
   initialOpen?: boolean
   initialName?: string
+  // Nazwa lokalnego pliku CAD, którego dotyczy bilet -- do podpowiedzi "którego pliku dotyczy ten
+  // formularz". Zwykle ta sama co initialName; przy "Duplikuj" initialName to nazwa źródła, a
+  // podpowiedź nadal ma pokazywać plik z CAD.
+  cadFileName?: string
   // Wstępnie wybrany tryb (Część/Złożenie) — używane przez "Duplikuj" w PendingTicketBanner,
   // żeby od razu otworzyć się na tym samym typie co skopiowany element (nadal można zmienić
   // ręcznie, w odróżnieniu od lockMode, który chowa przyciski trybu całkowicie).
@@ -274,6 +279,7 @@ function AddNodeDialog({
 
   // Folder / Część
   const [name, setName] = useState(initialName ?? "")
+  const hintFileName = cadFileName ?? initialName
 
   // Podpowiedzi nazw Części/Złożeń w języku projektu. Wybór podpowiedzi (nazwa dokładnie równa
   // jednej z nich) dołącza do nowego elementu jej tłumaczenia — properties.nameTexts.
@@ -627,8 +633,8 @@ function AddNodeDialog({
             makro może przetwarzać CAŁE drzewo złożenia, jeden nowy komponent na bilet, więc
             bez tego przypomnienia łatwo stracić orientację, KTÓREGO lokalnego pliku dotyczy
             akurat wypełniany formularz (zgłoszone jako mylące przy wyborze rodzaju elementu). */}
-        {ticket && initialName && (
-          <Hint>{t("addNode.currentFileHint", { name: initialName })}</Hint>
+        {ticket && hintFileName && (
+          <Hint>{t("addNode.currentFileHint", { name: hintFileName })}</Hint>
         )}
         {assemblyComponent && <Hint>{t("addNode.assemblyComponentHint")}</Hint>}
 

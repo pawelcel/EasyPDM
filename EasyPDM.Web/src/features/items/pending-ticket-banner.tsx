@@ -248,7 +248,10 @@ function PendingTicketBanner() {
         <AddNodeDialog
           trigger={<span className="hidden" />}
           initialOpen
-          initialName={pendingTicket.name}
+          // Duplikat bierze nazwę ze źródła, tak jak resztę właściwości -- wybrano go po to, żeby
+          // nowy element był taki jak tamten. Nowy element bierze nazwę pliku CAD.
+          initialName={duplicateSource?.fileName || pendingTicket.name}
+          cadFileName={pendingTicket.name}
           // Duplikat dziedziczy typ po źródle; nowy element bierze typ rozpoznany przez makro
           // z samego pliku CAD — inaczej okno startuje bez wyboru i złożenie łatwo powstaje
           // jako Część, przez co struktura BOM nie ma się do czego podpiąć.

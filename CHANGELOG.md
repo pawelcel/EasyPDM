@@ -4,6 +4,9 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Duplicate takes the name from the item it copies.** Creating an item from a CAD upload with Duplicate filled in the kind, material and the rest from the chosen item but left the name of the CAD file in the Name field. The name now comes from the chosen item too; the hint above the form still says which CAD file the form is for.
+
 ## [0.9.2]
 
 **In short:** a point release with two fixes. The drawing preview in the item panel now shows "drawn by" and "approved by" as soon as an item is sent for review or released, instead of the PDF it had loaded before; and the "Add the types the CAD macros use" button in the allowed file types includes SolidCraft's `.sc`. Alongside it, [EasyPDM for FreeCAD 0.9.3](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/releases/tag/v0.9.3) keeps to the rules of FreeCAD's Addon Index, makes the sheet's SCALE field follow the page's scale and drops the fake bold that showed as doubled lettering in drawing PDFs.
