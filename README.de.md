@@ -47,6 +47,12 @@ existiert und funktioniert — warum es nicht auch anderen zur Verfügung stelle
   auseinanderentwickeln.
 - **Suche über die gesamte Firmendatenbank**, nicht nur im aktuellen Projekt — praktisch,
   wenn Sie prüfen wollen, ob ein ähnliches Teil schon irgendwo existiert.
+- **Das Schriftfeld füllt sich selbst** — in FreeCAD und SolidWorks übernimmt das Schriftfeld
+  Benennung, Zeichnungsnummer, Revision, Werkstoff, Bearbeitungen und Firmenlogo direkt aus
+  EasyPDM, und wer gezeichnet und wer freigegeben hat, wird bei Prüfung und Freigabe ins PDF
+  der Zeichnung geschrieben. Eine Baugruppenzeichnung in FreeCAD erhält außerdem eine
+  Stückliste, nummeriert wie die Struktur in EasyPDM, und ihre Positionsnummern dieselben
+  Nummern ([Details und Screenshots](https://github.com/pawelcel/EasyPDM/wiki/CAD-Integrations#drawing-sheets), auf Englisch).
 - **Elementsperre** — solange Sie an etwas arbeiten, überschreibt niemand sonst Ihre
   Änderungen ohne Ihre Zustimmung (ein Administrator kann bei Bedarf eine fremde Sperre
   übernehmen oder aufheben — z. B. wenn der Besitzer abwesend ist).

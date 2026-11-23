@@ -43,6 +43,11 @@ my own use, and since it already exists and works — why not share it with othe
   in by hand every time, so names don't drift apart between projects.
 - **Search across the whole company database**, not just the current project — handy
   when you want to check whether a similar part already exists somewhere.
+- **Drawing sheets filled in for you** — in FreeCAD and SolidWorks the title block takes the
+  name, drawing number, revision, material, processes and company logo straight from EasyPDM,
+  and who drew and who approved the drawing are written into its PDF at review and release.
+  An assembly drawing in FreeCAD also gets a parts list, numbered as the structure in EasyPDM,
+  and its balloons the same numbers ([details and screenshots](https://github.com/pawelcel/EasyPDM/wiki/CAD-Integrations#drawing-sheets)).
 - **Item locking** — while you're working on something, no one else can overwrite your
   changes without your consent (an administrator can take over or release someone
   else's lock if needed — e.g. when the owner is away).

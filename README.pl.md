@@ -43,6 +43,11 @@ powstał i działa — czemu nie udostępnić go innym.
   ręcznie za każdym razem, więc nazwy się nie rozjeżdżają między projektami.
 - **Wyszukiwanie po całej firmowej bazie**, nie tylko w bieżącym projekcie — przydatne, gdy
   szukasz, czy podobna część już gdzieś powstała.
+- **Tabelka rysunkowa wypełnia się sama** — we FreeCAD i SolidWorks tabelka bierze z EasyPDM
+  nazwę, numer rysunku, rewizję, materiał, obróbki i logo firmy, a kto narysował i kto
+  zatwierdził, trafia do PDF rysunku przy sprawdzeniu i wydaniu. Rysunek złożenia we FreeCAD
+  dostaje też listę części ponumerowaną jak struktura w EasyPDM, a jego balony te same numery
+  ([szczegóły i zrzuty](https://github.com/pawelcel/EasyPDM/wiki/CAD-Integrations#drawing-sheets)).
 - **Blokada elementu** — dopóki nad czymś pracujesz, nikt inny nie nadpisze Twoich zmian
   bez Twojej zgody (administrator może w razie potrzeby przejąć albo zwolnić cudzą
   blokadę — np. gdy właściciel jest nieobecny).
