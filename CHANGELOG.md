@@ -4,6 +4,12 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+## [0.9.2]
+
+**In short:** a point release with two fixes. The drawing preview in the item panel now shows "drawn by" and "approved by" as soon as an item is sent for review or released, instead of the PDF it had loaded before; and the "Add the types the CAD macros use" button in the allowed file types includes SolidCraft's `.sc`. Alongside it, [EasyPDM for FreeCAD 0.9.3](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/releases/tag/v0.9.3) keeps to the rules of FreeCAD's Addon Index, makes the sheet's SCALE field follow the page's scale and drops the fake bold that showed as doubled lettering in drawing PDFs.
+
+Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+
 ### Fixed
 - **"Add the types the CAD macros use" left out SolidCraft.** The list in Settings → File storage → Allowed file types did not include `.sc`, the file the SolidCraft companion uploads as an item's CAD file, so a server limited with that button refused every SolidCraft upload. `.sc` is now on the list.
 - **The drawing preview shows the signatures as soon as the item is sent for review or released.** The server writes "drawn by" and "approved by" into the drawing PDF at that moment, but under the same attachment, so the preview in the item panel kept showing the PDF it had loaded before, without them, until the page was reloaded, and a browser could keep the old copy longer still. The attachment list now gives each file a version that changes with its content, the preview puts it into the file's address and reloads, and attachment downloads tell the browser to check for a newer file first.

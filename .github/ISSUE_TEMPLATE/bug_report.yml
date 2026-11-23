@@ -41,8 +41,8 @@ body:
     id: version
     attributes:
       label: EasyPDM version
-      description: Shown top-left in the app, next to the name (e.g. v0.9.1)
-      placeholder: v0.9.1
+      description: Shown top-left in the app, next to the name (e.g. v0.9.2)
+      placeholder: v0.9.2
     validations:
       required: false
   - type: textarea
