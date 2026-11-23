@@ -4,6 +4,9 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Parts list for assembly drawings.** The title block data an add-on reads for a drawing now carries an assembly's parts list: its direct components with their number, drawing number, name translations and quantity. The number is the component's position in the assembly's structure in EasyPDM, so a list on the drawing follows the order set there. Three new labels for its headers (number, drawing number, quantity) can be changed under Settings → Language like the others. [EasyPDM for FreeCAD 0.9.9](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/releases/tag/v0.9.9) draws the list on the sheet and numbers the drawing's balloons from it.
+
 ## [0.9.3]
 
 **In short:** a point release with one fix: Duplicate in the form for a new item from CAD now takes the name from the item it copies, not from the CAD file. Alongside it, [EasyPDM for FreeCAD 0.9.5](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/releases/tag/v0.9.5) opens each component of an assembly in FreeCAD while its form is filled in, so it can be measured, closes it again afterwards with the assembly back in front, and no longer leaves the windows opened for the components' pictures behind. The SolidCraft guide has moved to [the SolidCraft add-on's own wiki](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon/wiki).

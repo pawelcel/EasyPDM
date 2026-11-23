@@ -113,4 +113,57 @@ public class TitleBlockTests
         Assert.Empty(tb.GetProperty("nameTranslations").EnumerateArray());
         Assert.Empty(tb.GetProperty("processes").EnumerateArray().Single().GetProperty("translations").EnumerateArray());
     }
+
+    // An assembly's drawing gets a parts list: its direct components, numbered by their BOM
+    // position in EasyPDM (so the balloons match the structure), with quantities and the name
+    // translations of a multilingual project.
+    [Fact]
+    public async Task Assembly_title_block_lists_its_components_in_structure_order()
+    {
+        await using var factory = new EasyPDMWebApplicationFactory();
+        using var admin = factory.CreateClient();
+        await admin.LoginAsync("admin", "admin");
+        var pl = await LanguageIdAsync(admin, "PL");
+        var en = await LanguageIdAsync(admin, "EN");
+        var projectId = await admin.CreateProjectAsync($"BOM {Guid.NewGuid()}");
+        (await admin.PatchAsJsonAsync($"/api/projects/{projectId}/languages",
+            new { mainLanguageId = pl, multilingual = true, languageIds = new[] { en } })).EnsureSuccessStatusCode();
+
+        async Task<Guid> NodeAsync(string name, string type, object? properties = null)
+        {
+            var r = await admin.PostAsJsonAsync($"/api/projects/{projectId}/nodes", new { name, itemType = type, properties = properties ?? new { } });
+            r.EnsureSuccessStatusCode();
+            return (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        }
+
+        var frame = await NodeAsync("Rama", "assembly");
+        var leg = await NodeAsync("Noga", "part", new { nameTexts = new[] { new { languageId = en, name = "Leg" } } });
+        var rail = await NodeAsync("Belka", "part");
+        (await admin.PostAsJsonAsync($"/api/items/{frame}/children", new { childId = leg, quantity = 4 })).EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync($"/api/items/{frame}/children", new { childId = rail, quantity = 2 })).EnsureSuccessStatusCode();
+
+        var tb = await TitleBlockAsync(admin, frame);
+        Assert.Equal("Lp.", tb.GetProperty("labels").GetProperty("bomNo").GetString());
+        Assert.Equal("Ilość", tb.GetProperty("labels").GetProperty("bomQuantity").GetString());
+        Assert.Equal("Numer rysunku", tb.GetProperty("labels").GetProperty("bomDrawingNumber").GetString());
+        var rows = tb.GetProperty("bom").EnumerateArray().ToList();
+        Assert.Equal(new[] { "Noga", "Belka" }, rows.Select(r => r.GetProperty("name").GetString()));
+        Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.GetProperty("position").GetInt32()));
+        Assert.Equal(4m, rows[0].GetProperty("quantity").GetDecimal());
+        Assert.Equal(leg, rows[0].GetProperty("itemId").GetGuid());
+        Assert.Contains("Noga", rows[0].GetProperty("drawingNumber").GetString());
+        var tr = rows[0].GetProperty("nameTranslations").EnumerateArray().Single();
+        Assert.Equal("EN", tr.GetProperty("languageCode").GetString());
+        Assert.Equal("Leg", tr.GetProperty("name").GetString());
+        Assert.Empty(rows[1].GetProperty("nameTranslations").EnumerateArray());
+
+        // Reordered in the structure: the numbers follow.
+        (await admin.PatchAsJsonAsync($"/api/items/{frame}/children/reorder", new { childIds = new[] { rail, leg } })).EnsureSuccessStatusCode();
+        rows = (await TitleBlockAsync(admin, frame)).GetProperty("bom").EnumerateArray().ToList();
+        Assert.Equal(new[] { "Belka", "Noga" }, rows.Select(r => r.GetProperty("name").GetString()));
+        Assert.Equal(new[] { 1, 2 }, rows.Select(r => r.GetProperty("position").GetInt32()));
+
+        // A part has no parts list.
+        Assert.Empty((await TitleBlockAsync(admin, leg)).GetProperty("bom").EnumerateArray());
+    }
 }

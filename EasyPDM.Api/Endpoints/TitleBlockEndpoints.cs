@@ -158,6 +158,61 @@ static class TitleBlockEndpoints
                 }
             }
 
+            // --- parts list of an assembly: its direct components, numbered as in EasyPDM ---
+            // The number is the BOM position (item_relations.position, the L.p. people edit and
+            // drag in the structure), not a count of the rows, so the drawing's balloons and the
+            // parts list say the same as the structure in EasyPDM. Names follow the same language
+            // rule as the item's own name: the main name, and translations into the project's
+            // other languages from each component's nameTexts.
+            var bom = new List<object>();
+            if (itemType == "assembly")
+            {
+                var rows = new List<(int Position, decimal Quantity, Guid Id, string Name, string RecordName, JsonElement Props)>();
+                await using (var cmd = new NpgsqlCommand("""
+                    SELECT r.position, COALESCE(r.quantity, 1), c.id, c.file_name, c.properties,
+                           c.item_number, c.item_number_prefix, c.item_number_digits, c.item_number_with_name
+                    FROM item_relations r
+                    JOIN items c ON c.id = r.child_id
+                    WHERE r.parent_id = @id
+                    ORDER BY r.position, c.file_name;
+                    """, conn))
+                {
+                    cmd.Parameters.AddWithValue("id", id);
+                    await using var r = await cmd.ExecuteReaderAsync();
+                    while (await r.ReadAsync())
+                    {
+                        var childName = r.GetString(3);
+                        var childRecord = r.IsDBNull(5)
+                            ? childName
+                            : ItemNumbering.RecordName(r.GetInt32(5), r.IsDBNull(6) ? null : r.GetString(6),
+                                r.IsDBNull(7) ? null : r.GetInt32(7), r.IsDBNull(8) ? null : r.GetBoolean(8), childName);
+                        rows.Add((r.GetInt32(0), r.GetDecimal(1), r.GetGuid(2), childName, childRecord,
+                            JsonDocument.Parse(r.GetFieldValue<string>(4)).RootElement.Clone()));
+                    }
+                }
+                foreach (var row in rows)
+                {
+                    var texts = new Dictionary<int, string>();
+                    if (row.Props.TryGetProperty("nameTexts", out var cnt) && cnt.ValueKind == JsonValueKind.Array)
+                        foreach (var t in cnt.EnumerateArray())
+                            if (t.ValueKind == JsonValueKind.Object && t.TryGetProperty("languageId", out var lid) && lid.ValueKind == JsonValueKind.Number
+                                && t.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(n.GetString()))
+                                texts[lid.GetInt32()] = n.GetString()!;
+                    bom.Add(new
+                    {
+                        position = row.Position,
+                        itemId = row.Id,
+                        name = row.Name,
+                        nameTranslations = otherLanguages
+                            .Where(l => texts.ContainsKey(l.Id))
+                            .Select(l => new { languageCode = l.Code, name = texts[l.Id] })
+                            .ToList(),
+                        drawingNumber = row.RecordName,
+                        quantity = row.Quantity,
+                    });
+                }
+            }
+
             // --- who drew / approved the current revision ---
             var (drawn, approved) = await SignaturesAsync(conn, id);
             object? drawnBy = drawn is { } d ? new { name = d.Name, at = d.At } : null;
@@ -215,6 +270,7 @@ static class TitleBlockEndpoints
                 approvedBy,
                 processes,
                 revisions,
+                bom,
                 company = new { name = companyName, hasLogo, logoUrl = hasLogo ? "/api/settings/company/logo" : null },
             });
         });
