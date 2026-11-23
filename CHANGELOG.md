@@ -4,6 +4,12 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+## [0.9.3]
+
+**In short:** a point release with one fix: Duplicate in the form for a new item from CAD now takes the name from the item it copies, not from the CAD file. Alongside it, [EasyPDM for FreeCAD 0.9.5](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/releases/tag/v0.9.5) opens each component of an assembly in FreeCAD while its form is filled in, so it can be measured, closes it again afterwards with the assembly back in front, and no longer leaves the windows opened for the components' pictures behind. The SolidCraft guide has moved to [the SolidCraft add-on's own wiki](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon/wiki).
+
+Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+
 ### Fixed
 - **Duplicate takes the name from the item it copies.** Creating an item from a CAD upload with Duplicate filled in the kind, material and the rest from the chosen item but left the name of the CAD file in the Name field. The name now comes from the chosen item too; the hint above the form still says which CAD file the form is for.
 
