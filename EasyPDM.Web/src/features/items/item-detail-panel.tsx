@@ -365,7 +365,8 @@ function ItemDetailPanel({
                   </Button>
                 }
                 fetchExtensions={() => api.getItemDocumentationExtensions(item.id)}
-                buildDownloadUrl={(extensions) => api.itemDocumentationUrl(item.id, extensions)}
+                buildDownloadUrl={(extensions, bom) => api.itemDocumentationUrl(item.id, extensions, bom)}
+                withBom={item.itemType === "assembly"}
               />
             )}
             {onDeleteCompletely && (

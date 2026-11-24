@@ -518,8 +518,11 @@ export const api = {
   getItemDocumentationExtensions: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/documentation/extensions`).then((r) => handleResponse<string[]>(r)),
 
-  itemDocumentationUrl: (itemId: string, extensions: string[]) =>
-    `${BASE}/items/${itemId}/documentation?${extensions.map((e) => `ext=${encodeURIComponent(e)}`).join("&")}`,
+  itemDocumentationUrl: (itemId: string, extensions: string[], bom: string[] = []) =>
+    `${BASE}/items/${itemId}/documentation?${[
+      ...extensions.map((e) => `ext=${encodeURIComponent(e)}`),
+      ...bom.map((b) => `bom=${encodeURIComponent(b)}`),
+    ].join("&")}`,
 
   getProjectDocumentationExtensions: (projectId: string) =>
     fetch(`${BASE}/projects/${projectId}/documentation/extensions`).then((r) => handleResponse<string[]>(r)),

@@ -55,36 +55,7 @@ static class BomEndpoints
             if (!await ItemExistsAsync(conn, id))
                 return Results.NotFound();
 
-            var rows = await FetchBomRowsAsync(conn, id);
-
-            var (languageId, _) = await DocumentationLanguageAsync(conn, id);
-            var csv = new StringBuilder();
-            csv.Append(await CsvHeaderLineAsync(conn, languageId, aggregated: false));
-            foreach (var row in rows)
-            {
-                var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
-                var name = row.ItemNumber is not null
-                    ? ItemNumbering.RecordName(row.ItemNumber, row.ItemNumberPrefix,
-                        row.ItemNumberDigits, row.ItemNumberWithName, row.FileName)
-                    : row.FileName;
-                csv.Append(string.Join(';', new[]
-                {
-                    CsvField(string.Join('.', row.Path)),
-                    CsvField(name),
-                    CsvField(row.Quantity.ToString(CultureInfo.InvariantCulture)),
-                    CsvField(PropertyOrEmpty(props, "material")),
-                    CsvField(PropertyOrEmpty(props, "norm")),
-                    CsvField(PropertyOrEmpty(props, "manufacturer")),
-                    CsvField(PropertyOrEmpty(props, "orderNumber")),
-                    CsvField(PropertyOrEmpty(props, "orderNumber2")),
-                    CsvField(ProcessesOrEmpty(props, languageId)),
-                }));
-                csv.Append("\r\n");
-            }
-
-            var itemLabel = await GetItemLabel(conn, id);
-            var fileName = $"BOM_{itemLabel}.csv".Replace("\"", "");
-            var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray();
+            var (fileName, bytes) = await BomCsvAsync(conn, id);
             return Results.File(bytes, "text/csv; charset=utf-8", fileName);
         });
 
@@ -169,50 +140,93 @@ static class BomEndpoints
             if (!await ItemExistsAsync(conn, id))
                 return Results.NotFound();
 
-            var rows = await FetchBomRowsAsync(conn, id);
-            var aggregated = rows
-                .GroupBy(r => r.ChildId)
-                .Select(g => new
-                {
-                    g.First().ItemNumber,
-                    g.First().ItemNumberPrefix,
-                    g.First().ItemNumberDigits,
-                    g.First().ItemNumberWithName,
-                    g.First().FileName,
-                    g.First().PropertiesJson,
-                    TotalQuantity = g.Sum(r => r.ExtendedQuantity)
-                })
-                .OrderBy(a => a.ItemNumber ?? int.MaxValue);
-
-            var (languageId, _) = await DocumentationLanguageAsync(conn, id);
-            var csv = new StringBuilder();
-            csv.Append(await CsvHeaderLineAsync(conn, languageId, aggregated: true));
-            foreach (var row in aggregated)
-            {
-                var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
-                var name = row.ItemNumber is not null
-                    ? ItemNumbering.RecordName(row.ItemNumber, row.ItemNumberPrefix,
-                        row.ItemNumberDigits, row.ItemNumberWithName, row.FileName)
-                    : row.FileName;
-                csv.Append(string.Join(';', new[]
-                {
-                    CsvField(name),
-                    CsvField(row.TotalQuantity.ToString(CultureInfo.InvariantCulture)),
-                    CsvField(PropertyOrEmpty(props, "material")),
-                    CsvField(PropertyOrEmpty(props, "norm")),
-                    CsvField(PropertyOrEmpty(props, "manufacturer")),
-                    CsvField(PropertyOrEmpty(props, "orderNumber")),
-                    CsvField(PropertyOrEmpty(props, "orderNumber2")),
-                    CsvField(ProcessesOrEmpty(props, languageId)),
-                }));
-                csv.Append("\r\n");
-            }
-
-            var itemLabel = await GetItemLabel(conn, id);
-            var fileName = $"BOM_zsumowany_{itemLabel}.csv".Replace("\"", "");
-            var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray();
+            var (fileName, bytes) = await AggregatedBomCsvAsync(conn, id);
             return Results.File(bytes, "text/csv; charset=utf-8", fileName);
         });
+    }
+
+    // The full nested BOM as CSV (GET /bom/csv), also packed into the documentation ZIP.
+    internal static async Task<(string FileName, byte[] Bytes)> BomCsvAsync(NpgsqlConnection conn, Guid id)
+    {
+        var rows = await FetchBomRowsAsync(conn, id);
+
+        var (languageId, _) = await DocumentationLanguageAsync(conn, id);
+        var csv = new StringBuilder();
+        csv.Append(await CsvHeaderLineAsync(conn, languageId, aggregated: false));
+        foreach (var row in rows)
+        {
+            var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
+            var name = row.ItemNumber is not null
+                ? ItemNumbering.RecordName(row.ItemNumber, row.ItemNumberPrefix,
+                    row.ItemNumberDigits, row.ItemNumberWithName, row.FileName)
+                : row.FileName;
+            csv.Append(string.Join(';', new[]
+            {
+                CsvField(string.Join('.', row.Path)),
+                CsvField(name),
+                CsvField(row.Quantity.ToString(CultureInfo.InvariantCulture)),
+                CsvField(PropertyOrEmpty(props, "material")),
+                CsvField(PropertyOrEmpty(props, "norm")),
+                CsvField(PropertyOrEmpty(props, "manufacturer")),
+                CsvField(PropertyOrEmpty(props, "orderNumber")),
+                CsvField(PropertyOrEmpty(props, "orderNumber2")),
+                CsvField(ProcessesOrEmpty(props, languageId)),
+            }));
+            csv.Append("\r\n");
+        }
+
+        var itemLabel = await GetItemLabel(conn, id);
+        var fileName = $"BOM_{itemLabel}.csv".Replace("\"", "");
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray();
+        return (fileName, bytes);
+    }
+
+    // The aggregated BOM as CSV (GET /bom/aggregated-csv), also packed into the documentation ZIP.
+    internal static async Task<(string FileName, byte[] Bytes)> AggregatedBomCsvAsync(NpgsqlConnection conn, Guid id)
+    {
+        var rows = await FetchBomRowsAsync(conn, id);
+        var aggregated = rows
+            .GroupBy(r => r.ChildId)
+            .Select(g => new
+            {
+                g.First().ItemNumber,
+                g.First().ItemNumberPrefix,
+                g.First().ItemNumberDigits,
+                g.First().ItemNumberWithName,
+                g.First().FileName,
+                g.First().PropertiesJson,
+                TotalQuantity = g.Sum(r => r.ExtendedQuantity)
+            })
+            .OrderBy(a => a.ItemNumber ?? int.MaxValue);
+
+        var (languageId, _) = await DocumentationLanguageAsync(conn, id);
+        var csv = new StringBuilder();
+        csv.Append(await CsvHeaderLineAsync(conn, languageId, aggregated: true));
+        foreach (var row in aggregated)
+        {
+            var props = JsonDocument.Parse(row.PropertiesJson).RootElement;
+            var name = row.ItemNumber is not null
+                ? ItemNumbering.RecordName(row.ItemNumber, row.ItemNumberPrefix,
+                    row.ItemNumberDigits, row.ItemNumberWithName, row.FileName)
+                : row.FileName;
+            csv.Append(string.Join(';', new[]
+            {
+                CsvField(name),
+                CsvField(row.TotalQuantity.ToString(CultureInfo.InvariantCulture)),
+                CsvField(PropertyOrEmpty(props, "material")),
+                CsvField(PropertyOrEmpty(props, "norm")),
+                CsvField(PropertyOrEmpty(props, "manufacturer")),
+                CsvField(PropertyOrEmpty(props, "orderNumber")),
+                CsvField(PropertyOrEmpty(props, "orderNumber2")),
+                CsvField(ProcessesOrEmpty(props, languageId)),
+            }));
+            csv.Append("\r\n");
+        }
+
+        var itemLabel = await GetItemLabel(conn, id);
+        var fileName = $"BOM_zsumowany_{itemLabel}.csv".Replace("\"", "");
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray();
+        return (fileName, bytes);
     }
 
     // Odczyt BOM-u (te trzy endpointy) jest świadomie otwarty dla KAŻDEGO zalogowanego

@@ -29,9 +29,13 @@ static class DocumentationEndpoints
             return Results.Ok(extensions);
         });
 
-        // GET /api/items/{id}/documentation?ext=txt&ext=pdf — bez "ext" pobiera wszystkie
-        // rozszerzenia. Odczyt, świadomie otwarty dla KAŻDEGO zalogowanego użytkownika.
-        app.MapGet("/api/items/{id:guid}/documentation", async (Guid id, string[]? ext, HttpContext ctx) =>
+        // GET /api/items/{id}/documentation?ext=txt&ext=pdf&bom=full&bom=aggregated — bez "ext"
+        // pobiera wszystkie rozszerzenia. "bom" dokłada do archiwum (w jego korzeń) te same CSV,
+        // co /bom/csv ("full") i /bom/aggregated-csv ("aggregated"); gdy podano "bom", a nie
+        // podano "ext", archiwum zawiera tylko BOM — w przeciwnym razie odznaczenie wszystkich
+        // rozszerzeń w oknie i zostawienie BOM-u pobierałoby wszystkie załączniki.
+        // Odczyt, świadomie otwarty dla KAŻDEGO zalogowanego użytkownika (jak BOM).
+        app.MapGet("/api/items/{id:guid}/documentation", async (Guid id, string[]? ext, string[]? bom, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -39,8 +43,18 @@ static class DocumentationEndpoints
             if (!await ItemExistsAsync(conn, id))
                 return Results.NotFound();
 
-            var itemIds = await GetSelfAndDescendantIdsAsync(conn, id);
-            var zip = await BuildZipAsync(conn, itemIds, ext);
+            var extraFiles = new List<(string Name, byte[] Bytes)>();
+            if (bom is { Length: > 0 })
+            {
+                if (bom.Contains("full", StringComparer.OrdinalIgnoreCase))
+                    extraFiles.Add(await BomEndpoints.BomCsvAsync(conn, id));
+                if (bom.Contains("aggregated", StringComparer.OrdinalIgnoreCase))
+                    extraFiles.Add(await BomEndpoints.AggregatedBomCsvAsync(conn, id));
+            }
+            var attachmentsWanted = ext is { Length: > 0 } || bom is not { Length: > 0 };
+
+            var itemIds = attachmentsWanted ? await GetSelfAndDescendantIdsAsync(conn, id) : new List<Guid>();
+            var zip = await BuildZipAsync(conn, itemIds, ext, extraFiles);
             if (zip is null)
                 return Results.BadRequest("No attachments match the selected extensions.");
 
@@ -177,9 +191,12 @@ static class DocumentationEndpoints
     // pliki o tej samej nazwie z różnych elementów się nie nadpisują.
     // Zwraca ścieżkę gotowego archiwum w katalogu tymczasowym (zob. TempFiles) albo null, gdy nic
     // nie pasowało do filtra. Wywołujący wysyła je strumieniem, który usuwa plik po wysłaniu.
-    private static async Task<string?> BuildZipAsync(NpgsqlConnection conn, List<Guid> itemIds, string[]? extensionFilter)
+    // "extraFiles" (np. CSV z BOM-em) trafiają do korzenia archiwum, przed załącznikami.
+    private static async Task<string?> BuildZipAsync(NpgsqlConnection conn, List<Guid> itemIds, string[]? extensionFilter,
+        List<(string Name, byte[] Bytes)>? extraFiles = null)
     {
-        if (itemIds.Count == 0)
+        extraFiles ??= new List<(string Name, byte[] Bytes)>();
+        if (itemIds.Count == 0 && extraFiles.Count == 0)
             return null;
 
         const string sql = """
@@ -205,6 +222,14 @@ static class DocumentationEndpoints
             using (var archive = new ZipArchive(zipFile, ZipArchiveMode.Create))
             {
                 var usedEntryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var (name, bytes) in extraFiles)
+                {
+                    var extraEntry = archive.CreateEntry(MakeUniqueEntryName(SanitizeSegment(name), usedEntryNames), CompressionLevel.Fastest);
+                    await using var extraStream = extraEntry.Open();
+                    await extraStream.WriteAsync(bytes);
+                    wroteAny = true;
+                }
 
                 await using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())

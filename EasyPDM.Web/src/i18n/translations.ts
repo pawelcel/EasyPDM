@@ -755,6 +755,8 @@ const pl = {
   "documentation.description": "Wybierz rodzaje plików do pobrania (tylko znalezione załączniki).",
   "documentation.noFiles": "Brak załączników do pobrania.",
   "documentation.download": "Pobierz",
+  "documentation.bomFull": "BOM (CSV)",
+  "documentation.bomAggregated": "BOM zsumowany (CSV)",
 
   "item.owner": "Właściciel",
   "item.ownerNone": "—",
@@ -1726,6 +1728,8 @@ const en: Record<TranslationKey, string> = {
   "documentation.description": "Choose which file types to download (only attachments that exist are listed).",
   "documentation.noFiles": "No attachments to download.",
   "documentation.download": "Download",
+  "documentation.bomFull": "BOM (CSV)",
+  "documentation.bomAggregated": "Aggregated BOM (CSV)",
 
   "item.owner": "Owner",
   "item.ownerNone": "—",
@@ -2694,6 +2698,8 @@ const de: Record<TranslationKey, string> = {
   "documentation.description": "Wählen Sie die herunterzuladenden Dateitypen aus (nur vorhandene Anhänge werden angezeigt).",
   "documentation.noFiles": "Keine Anhänge zum Herunterladen.",
   "documentation.download": "Herunterladen",
+  "documentation.bomFull": "Stückliste (CSV)",
+  "documentation.bomAggregated": "Zusammengefasste Stückliste (CSV)",
 
   "item.owner": "Eigentümer",
   "item.ownerNone": "—",

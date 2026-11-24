@@ -16,24 +16,33 @@ import { useLanguage } from "@/i18n/use-language"
 // razem z całym jego poddrzewem), jak i dla całego projektu; różni je tylko to, skąd biorą
 // listę rozszerzeń i URL do pobrania (przekazywane przez wywołującego). Domyślnie zaznaczone
 // są wszystkie znalezione rozszerzenia — użytkownik odznacza to, czego nie chce.
+// Złożenie może dołożyć do archiwum swój BOM (withBom): te same CSV, co pod listą BOM-u,
+// domyślnie odznaczone, żeby dotychczasowe pobranie dawało to samo co wcześniej.
+type BomExport = "full" | "aggregated"
+const BOM_EXPORTS: BomExport[] = ["full", "aggregated"]
+
 function DocumentationDialog({
   trigger,
   fetchExtensions,
   buildDownloadUrl,
+  withBom = false,
 }: {
   trigger: React.ReactElement
   fetchExtensions: () => Promise<string[]>
-  buildDownloadUrl: (extensions: string[]) => string
+  buildDownloadUrl: (extensions: string[], bom: BomExport[]) => string
+  withBom?: boolean
 }) {
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [extensions, setExtensions] = useState<string[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selectedBom, setSelectedBom] = useState<Set<BomExport>>(new Set())
 
   useEffect(() => {
     if (!open) return
     setLoading(true)
+    setSelectedBom(new Set())
     fetchExtensions()
       .then((exts) => {
         setExtensions(exts)
@@ -56,7 +65,18 @@ function DocumentationDialog({
     })
   }
 
+  function toggleBom(kind: BomExport) {
+    setSelectedBom((prev) => {
+      const next = new Set(prev)
+      if (next.has(kind)) next.delete(kind)
+      else next.add(kind)
+      return next
+    })
+  }
+
   const selectedList = [...selected]
+  const selectedBomList = BOM_EXPORTS.filter((kind) => selectedBom.has(kind))
+  const anythingSelected = selectedList.length > 0 || selectedBomList.length > 0
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -68,11 +88,13 @@ function DocumentationDialog({
 
         {loading ? (
           <Hint>{t("common.loading")}</Hint>
-        ) : extensions.length === 0 ? (
-          <Hint>{t("documentation.noFiles")}</Hint>
         ) : (
           <>
-            <Hint>{t("documentation.description")}</Hint>
+            {extensions.length === 0 ? (
+              <Hint>{t("documentation.noFiles")}</Hint>
+            ) : (
+              <Hint>{t("documentation.description")}</Hint>
+            )}
             <ul className="flex flex-col gap-0.5">
               {extensions.map((ext) => (
                 <li key={ext}>
@@ -88,6 +110,23 @@ function DocumentationDialog({
                 </li>
               ))}
             </ul>
+            {withBom && (
+              <ul className="flex flex-col gap-0.5 border-t pt-2">
+                {BOM_EXPORTS.map((kind) => (
+                  <li key={kind}>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-accent">
+                      <input
+                        type="checkbox"
+                        checked={selectedBom.has(kind)}
+                        onChange={() => toggleBom(kind)}
+                        className="size-3.5 shrink-0 accent-primary"
+                      />
+                      {t(kind === "full" ? "documentation.bomFull" : "documentation.bomAggregated")}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
           </>
         )}
 
@@ -95,14 +134,14 @@ function DocumentationDialog({
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("common.cancel")}
           </Button>
-          {selectedList.length > 0 ? (
+          {anythingSelected ? (
             <Button
               render={
                 // Zamknięcie okna odłożone na kolejny tick — jeśli odepniemy <a> z DOM-u
                 // zanim przeglądarka zdąży zainicjować pobieranie (atrybut "download"), samo
                 // pobranie potrafi się nie odpalić.
                 <a
-                  href={buildDownloadUrl(selectedList)}
+                  href={buildDownloadUrl(selectedList, selectedBomList)}
                   download
                   onClick={() => setTimeout(() => setOpen(false), 0)}
                 />
