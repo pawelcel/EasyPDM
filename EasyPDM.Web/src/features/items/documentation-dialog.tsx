@@ -10,6 +10,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Hint } from "@/components/ui/hint"
+import { api } from "@/api/client"
+import type { Item } from "@/api/types"
 import { useLanguage } from "@/i18n/use-language"
 
 // Okno "Pobierz dokumentację" — działa zarówno dla pojedynczego elementu (Część/Złożenie,
@@ -158,4 +160,18 @@ function DocumentationDialog({
   )
 }
 
-export { DocumentationDialog }
+// "Pobierz dokumentację" for one item (part or assembly with its subtree). The button sits in
+// several places (the item panel, the bar over the item list, the bar over the project tree);
+// they all use this, so an option added here (such as the BOM of an assembly) shows in each.
+function ItemDocumentationDialog({ item, trigger }: { item: Pick<Item, "id" | "itemType">; trigger: React.ReactElement }) {
+  return (
+    <DocumentationDialog
+      trigger={trigger}
+      fetchExtensions={() => api.getItemDocumentationExtensions(item.id)}
+      buildDownloadUrl={(extensions, bom) => api.itemDocumentationUrl(item.id, extensions, bom)}
+      withBom={item.itemType === "assembly"}
+    />
+  )
+}
+
+export { DocumentationDialog, ItemDocumentationDialog }

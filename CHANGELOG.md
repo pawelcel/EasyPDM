@@ -4,6 +4,15 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+## [0.9.6]
+
+**In short:** the BOM option of "Download documentation" now shows wherever the button is, not only in the item's panel.
+
+Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+
+### Fixed
+- **BOM missing from "Download documentation".** 0.9.5 added the BOM and the aggregated BOM to the dialog only when it was opened from the item's panel; the same button in the bar above the item list and above the project tree still showed the file types alone. All three now open the same dialog, with the BOM options for an assembly.
+
 ## [0.9.5]
 
 **In short:** "Download documentation" on an assembly can now put its BOM into the ZIP as well.

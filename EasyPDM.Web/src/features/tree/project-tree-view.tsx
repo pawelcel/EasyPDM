@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select"
 import { ResizeHandle } from "@/components/ui/resize-handle"
 import { AddTagRow } from "@/features/tags/add-tag-row"
-import { DocumentationDialog } from "@/features/items/documentation-dialog"
+import { DocumentationDialog, ItemDocumentationDialog } from "@/features/items/documentation-dialog"
 import { ClientVerificationDialog } from "@/features/items/client-verification-dialog"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
 import { useClientVerifications } from "@/features/items/use-client-verifications"
@@ -509,14 +509,13 @@ function ProjectTreeView({
               </Button>
             )}
             {(selectedItem.itemType === "part" || selectedItem.itemType === "assembly") && (
-              <DocumentationDialog
+              <ItemDocumentationDialog
+                item={selectedItem}
                 trigger={
                   <Button size="sm" variant="outline">
                     {t("documentation.button")}
                   </Button>
                 }
-                fetchExtensions={() => api.getItemDocumentationExtensions(selectedItem.id)}
-                buildDownloadUrl={(extensions) => api.itemDocumentationUrl(selectedItem.id, extensions)}
               />
             )}
             {isAdmin && (

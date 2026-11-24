@@ -40,7 +40,7 @@ import { AddNodeDialog } from "@/features/items/add-node-dialog"
 import { AddTagRow } from "@/features/tags/add-tag-row"
 import { AttachmentsPanel } from "@/features/items/attachments-panel"
 import { useAuth } from "@/features/auth/use-auth"
-import { DocumentationDialog } from "@/features/items/documentation-dialog"
+import { ItemDocumentationDialog } from "@/features/items/documentation-dialog"
 import { ItemHistoryPanel } from "@/features/items/item-history-panel"
 import { UsedInPanel } from "@/features/items/used-in-panel"
 import { OwnerControl } from "@/features/items/owner-control"
@@ -358,15 +358,13 @@ function ItemDetailPanel({
               </Button>
             )}
             {canDownloadDocumentation && (
-              <DocumentationDialog
+              <ItemDocumentationDialog
+                item={item}
                 trigger={
                   <Button size="sm" variant="outline">
                     {t("documentation.button")}
                   </Button>
                 }
-                fetchExtensions={() => api.getItemDocumentationExtensions(item.id)}
-                buildDownloadUrl={(extensions, bom) => api.itemDocumentationUrl(item.id, extensions, bom)}
-                withBom={item.itemType === "assembly"}
               />
             )}
             {onDeleteCompletely && (

@@ -15,7 +15,7 @@ import {
   type DatabaseFilters,
   type KindFilter,
 } from "@/features/items/database-filters"
-import { DocumentationDialog } from "@/features/items/documentation-dialog"
+import { DocumentationDialog, ItemDocumentationDialog } from "@/features/items/documentation-dialog"
 import { ItemDetailPanel } from "@/features/items/item-detail-panel"
 import { ItemRow } from "@/features/items/item-row"
 import { PartKindSelect } from "@/features/items/part-kind-select"
@@ -436,14 +436,13 @@ function ItemList({
               </Button>
             )}
             {(selectedItem.itemType === "part" || selectedItem.itemType === "assembly") && (
-              <DocumentationDialog
+              <ItemDocumentationDialog
+                item={selectedItem}
                 trigger={
                   <Button size="sm" variant="outline">
                     {t("documentation.button")}
                   </Button>
                 }
-                fetchExtensions={() => api.getItemDocumentationExtensions(selectedItem.id)}
-                buildDownloadUrl={(extensions) => api.itemDocumentationUrl(selectedItem.id, extensions)}
               />
             )}
             {isAdmin && (
