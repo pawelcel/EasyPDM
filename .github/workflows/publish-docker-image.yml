@@ -49,6 +49,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # amd64 and arm64 (a Raspberry Pi 4/5, Apple-silicon and ARM servers): with amd64 alone,
+      # an ARM host that built the stack itself could never update it from GHCR ("no matching
+      # manifest"), which is what tools like Dockhand try. QEMU runs only the runtime stages.
+      - uses: docker/setup-qemu-action@v3
+
       - uses: docker/setup-buildx-action@v4
 
       - name: Zaloguj do GitHub Container Registry
@@ -68,6 +73,7 @@ jobs:
           context: .
           file: Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ github.repository_owner }}/easypdm-api:edge
             ghcr.io/${{ github.repository_owner }}/easypdm-api:${{ github.sha }}
@@ -80,6 +86,7 @@ jobs:
           context: .
           file: Dockerfile.postgres
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ github.repository_owner }}/easypdm-postgres:edge
             ghcr.io/${{ github.repository_owner }}/easypdm-postgres:${{ github.sha }}

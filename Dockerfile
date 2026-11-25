@@ -6,7 +6,12 @@
 # ============================================================
 # Etap 1: budowa frontendu (React + Vite)
 # ============================================================
-FROM node:24-alpine AS frontend-build
+# The two build stages run on the build machine's own platform ($BUILDPLATFORM) even when the
+# image is built for another one (linux/arm64 for a Raspberry Pi, see the publish workflows):
+# their output -- the JS bundle and a framework-dependent .NET build with only managed
+# dependencies -- is the same on every architecture, and building it under emulation would
+# take many times longer. Only the runtime stage is per platform.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend-build
 WORKDIR /src
 
 COPY EasyPDM.Web/package.json EasyPDM.Web/package-lock.json EasyPDM.Web/
@@ -20,7 +25,7 @@ RUN mkdir -p EasyPDM.Api/wwwroot && cd EasyPDM.Web && npm run build
 # ============================================================
 # Etap 2: publikacja backendu (.NET)
 # ============================================================
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-build
 WORKDIR /src
 
 COPY EasyPDM.Api/EasyPDM.Api.csproj EasyPDM.Api/
