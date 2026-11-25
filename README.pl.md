@@ -12,7 +12,7 @@ z SolidWorks, FreeCAD i SolidCraft. Koniec z `wspornik_v3_OSTATECZNY_NAPRAWDE.SL
 dysku sieciowym i pytaniem „która wersja jest aktualna?”.
 
 **[⬇ Pobierz najnowsze wydanie](https://github.com/pawelcel/EasyPDM/releases/latest)** ·
-**[Wypróbuj demo](https://easypdmdemo.celmer.info/)** (czyszczone codziennie) ·
+**[Wypróbuj demo](https://easypdmdemo.celmer.info/)** (login `admin`, hasło `admin`, czyszczone codziennie) ·
 **[Obejrzyj filmy](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)** (po angielsku)
 
 ## Dlaczego EasyPDM

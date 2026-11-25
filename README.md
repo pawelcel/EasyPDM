@@ -12,7 +12,7 @@ SolidWorks, FreeCAD and SolidCraft. No more `bracket_v3_FINAL_FOR_REAL.SLDPRT` o
 drive and "which version is the current one?".
 
 **[⬇ Download the latest release](https://github.com/pawelcel/EasyPDM/releases/latest)** ·
-**[Try the live demo](https://easypdmdemo.celmer.info/)** (reset daily) ·
+**[Try the live demo](https://easypdmdemo.celmer.info/)** (log in as `admin` / `admin`, reset daily) ·
 **[Watch the videos](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)**
 
 ## Why EasyPDM

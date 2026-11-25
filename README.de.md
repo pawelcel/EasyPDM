@@ -12,7 +12,7 @@ direkt aus SolidWorks, FreeCAD und SolidCraft. Schluss mit `Halter_v3_FINAL_WIRK
 auf dem Netzlaufwerk und der Frage „welche Version ist die aktuelle?“.
 
 **[⬇ Neueste Version herunterladen](https://github.com/pawelcel/EasyPDM/releases/latest)** ·
-**[Live-Demo ausprobieren](https://easypdmdemo.celmer.info/)** (täglich zurückgesetzt) ·
+**[Live-Demo ausprobieren](https://easypdmdemo.celmer.info/)** (Anmeldung `admin` / `admin`, täglich zurückgesetzt) ·
 **[Videos ansehen](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)** (auf Englisch)
 
 ## Warum EasyPDM
