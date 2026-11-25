@@ -106,7 +106,8 @@ en.PgPageCaption=PostgreSQL Connection
 en.PgPageSubCaption=Superuser password for "postgres"
 en.PgPageDescription=EasyPDM needs it ONCE, to create its own role and database (easypdm) — it is not stored anywhere.
 en.PgFieldLabel=Password for "postgres":
-en.PgNotFoundConfirm=No installed PostgreSQL found (required, version 18 recommended). Open the download page? Run this installer again after installing it.
+en.PgNotFoundChoose=No PostgreSQL found in the usual places (required, version 18 recommended).%n%nYes: PostgreSQL is installed elsewhere - choose its psql.exe (in its bin folder).%nNo: open the download page; run this installer again after installing it.%nCancel: quit.
+en.PgPickPsqlTitle=Choose psql.exe of your PostgreSQL
 en.PgPasswordRequired=Enter the "postgres" superuser password.
 en.PgConnectionFailed=Could not connect to PostgreSQL with this password. Please try again.
 en.PgRoleConfigFailed=Could not configure the PostgreSQL database role. Check the "postgres" superuser password and whether another PostgreSQL instance is running on this port (5432). Details in the log:
@@ -120,7 +121,8 @@ pl.PgPageCaption=Połączenie z PostgreSQL
 pl.PgPageSubCaption=Hasło superużytkownika "postgres"
 pl.PgPageDescription=EasyPDM potrzebuje go JEDNORAZOWO, żeby założyć własną rolę i bazę danych (easypdm) — nie jest nigdzie zapisywane.
 pl.PgFieldLabel=Hasło "postgres":
-pl.PgNotFoundConfirm=Nie znaleziono zainstalowanego PostgreSQL (wymagany, wersja 18 zalecana). Otworzyć stronę pobierania? Po instalacji uruchom ten instalator ponownie.
+pl.PgNotFoundChoose=Nie znaleziono PostgreSQL w typowych miejscach (wymagany, wersja 18 zalecana).%n%nTak: PostgreSQL jest zainstalowany gdzie indziej - wskaż jego psql.exe (w folderze bin).%nNie: otwórz stronę pobierania; po instalacji uruchom ten instalator ponownie.%nAnuluj: zakończ.
+pl.PgPickPsqlTitle=Wskaż psql.exe swojego PostgreSQL
 pl.PgPasswordRequired=Podaj hasło superużytkownika "postgres".
 pl.PgConnectionFailed=Nie udało się połączyć z PostgreSQL tym hasłem. Spróbuj ponownie.
 pl.PgRoleConfigFailed=Nie udało się skonfigurować roli bazy danych PostgreSQL. Sprawdź hasło superużytkownika "postgres" oraz czy na tym porcie (5432) nie działa inna instancja PostgreSQL. Szczegóły w logu:
@@ -134,7 +136,8 @@ de.PgPageCaption=PostgreSQL-Verbindung
 de.PgPageSubCaption=Passwort des Superusers "postgres"
 de.PgPageDescription=EasyPDM benötigt es EINMALIG, um seine eigene Rolle und Datenbank (easypdm) anzulegen — es wird nirgendwo gespeichert.
 de.PgFieldLabel=Passwort für "postgres":
-de.PgNotFoundConfirm=Keine PostgreSQL-Installation gefunden (erforderlich, Version 18 empfohlen). Download-Seite öffnen? Starten Sie dieses Installationsprogramm nach der Installation erneut.
+de.PgNotFoundChoose=Keine PostgreSQL-Installation an den üblichen Orten gefunden (erforderlich, Version 18 empfohlen).%n%nJa: PostgreSQL ist woanders installiert - dessen psql.exe auswählen (im Ordner bin).%nNein: Download-Seite öffnen; dieses Installationsprogramm nach der Installation erneut starten.%nAbbrechen: beenden.
+de.PgPickPsqlTitle=psql.exe Ihrer PostgreSQL-Installation auswählen
 de.PgPasswordRequired=Geben Sie das Passwort des Superusers "postgres" ein.
 de.PgConnectionFailed=Verbindung zu PostgreSQL mit diesem Passwort fehlgeschlagen. Bitte versuchen Sie es erneut.
 de.PgRoleConfigFailed=Die PostgreSQL-Datenbankrolle konnte nicht konfiguriert werden. Überprüfen Sie das Passwort des Superusers "postgres" und ob auf diesem Port (5432) eine andere PostgreSQL-Instanz läuft. Details im Protokoll:
@@ -208,7 +211,7 @@ end;
 
 { Szuka psql.exe w typowej lokalizacji instalatora EDB: C:\Program Files\PostgreSQL\<wersja>\bin\ .
   Zwraca pełną ścieżkę do najnowszej znalezionej wersji, albo pusty string, jeśli nic nie ma. }
-function FindPsqlPath(): String;
+function FindPsqlInProgramFiles(): String;
 var
   FindRec: TFindRec;
   BaseDir, Candidate, Best: String;
@@ -240,6 +243,92 @@ begin
       until not FindNext(FindRec);
     finally
       FindClose(FindRec);
+    end;
+  end;
+end;
+
+{ psql.exe in the folder of a file named by a path that may be quoted and followed by
+  arguments -- a service's ImagePath: '"C:\PG\18\bin\pg_ctl.exe" runservice -N ...'. }
+function PsqlNextTo(const CommandLine: String): String;
+var
+  Exe: String;
+  P: Integer;
+begin
+  Result := '';
+  Exe := Trim(CommandLine);
+  if (Length(Exe) > 0) and (Exe[1] = '"') then
+  begin
+    Delete(Exe, 1, 1);
+    P := Pos('"', Exe);
+    if P > 0 then
+      Exe := Copy(Exe, 1, P - 1);
+  end
+  else
+  begin
+    P := Pos(' ', Exe);
+    if P > 0 then
+      Exe := Copy(Exe, 1, P - 1);
+  end;
+  if Exe = '' then
+    exit;
+  if FileExists(ExtractFilePath(Exe) + 'psql.exe') then
+    Result := ExtractFilePath(Exe) + 'psql.exe';
+end;
+
+{ Where to find psql.exe, most reliable first. Only C:\Program Files\PostgreSQL\<version>
+  was searched before, so a PostgreSQL installed into another folder or onto another drive
+  was reported as missing (GitHub issue #10). Now also: the EDB installer's own registry
+  entries ("Base Directory"), the Windows services of PostgreSQL (the pg_ctl.exe they run sits
+  next to psql.exe), and the folders on PATH. }
+function FindPsqlPath(): String;
+var
+  Names: TArrayOfString;
+  I: Integer;
+  Value, PathRest, Dir: String;
+  P: Integer;
+begin
+  Result := FindPsqlInProgramFiles();
+  if Result <> '' then
+    exit;
+
+  if RegGetSubkeyNames(HKLM64, 'SOFTWARE\PostgreSQL\Installations', Names) then
+    for I := 0 to GetArrayLength(Names) - 1 do
+      if RegQueryStringValue(HKLM64, 'SOFTWARE\PostgreSQL\Installations\' + Names[I], 'Base Directory', Value) then
+        if FileExists(AddBackslash(Value) + 'bin\psql.exe') then
+        begin
+          Result := AddBackslash(Value) + 'bin\psql.exe';
+          exit;
+        end;
+
+  if RegGetSubkeyNames(HKLM64, 'SYSTEM\CurrentControlSet\Services', Names) then
+    for I := 0 to GetArrayLength(Names) - 1 do
+      if Pos('postgres', Lowercase(Names[I])) = 1 then
+        if RegQueryStringValue(HKLM64, 'SYSTEM\CurrentControlSet\Services\' + Names[I], 'ImagePath', Value) then
+        begin
+          Result := PsqlNextTo(Value);
+          if Result <> '' then
+            exit;
+        end;
+
+  PathRest := GetEnv('PATH');
+  while PathRest <> '' do
+  begin
+    P := Pos(';', PathRest);
+    if P > 0 then
+    begin
+      Dir := Copy(PathRest, 1, P - 1);
+      Delete(PathRest, 1, P);
+    end
+    else
+    begin
+      Dir := PathRest;
+      PathRest := '';
+    end;
+    Dir := Trim(RemoveQuotes(Dir));
+    if (Dir <> '') and FileExists(AddBackslash(Dir) + 'psql.exe') then
+    begin
+      Result := AddBackslash(Dir) + 'psql.exe';
+      exit;
     end;
   end;
 end;
@@ -530,7 +619,7 @@ end;
 function InitializeSetup(): Boolean;
 var
   ResultCode: Integer;
-  Installed: String;
+  Installed, PickedPsql: String;
 begin
   { Blokada instalacji STARSZEJ wersji na nowszej. Migracje bazy idą wyłącznie w przód
     (MigrationRunner stosuje brakujące przy każdym starcie, nie umie ich cofać), więc po
@@ -564,10 +653,19 @@ begin
       przydarzyło się w CI po dodaniu analogicznych MsgBox w CurStepChanged poniżej). }
     if not WizardSilent then
     begin
-      if MsgBox(CustomMessage('PgNotFoundConfirm'), mbConfirmation, MB_YESNO) = IDYES then
-        ShellExec('open', 'https://www.postgresql.org/download/windows/', '', '', SW_SHOW, ewNoWait, ResultCode);
+      case MsgBox(CustomMessage('PgNotFoundChoose'), mbConfirmation, MB_YESNOCANCEL) of
+        IDYES:
+          { Installed somewhere none of FindPsqlPath's places know about: let the user point
+            at it rather than send them to download what they already have. }
+          if GetOpenFileName(CustomMessage('PgPickPsqlTitle'), PickedPsql, ExpandConstant('{pf}'),
+                             'psql.exe|psql.exe', 'exe') then
+            if FileExists(PickedPsql) and (Lowercase(ExtractFileName(PickedPsql)) = 'psql.exe') then
+              PsqlPath := PickedPsql;
+        IDNO:
+          ShellExec('open', 'https://www.postgresql.org/download/windows/', '', '', SW_SHOW, ewNoWait, ResultCode);
+      end;
     end;
-    Result := False;
+    Result := PsqlPath <> '';
   end
   else
     Result := True;
