@@ -4,6 +4,16 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+## [0.9.8]
+
+**In short:** the Docker images now run on ARM too (Raspberry Pi 4/5, ARM servers), and the Windows installer finds PostgreSQL installed outside `C:\Program Files`.
+
+Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+
+### Fixed
+- **Docker on ARM.** Both images on GHCR (`easypdm-api`, `easypdm-postgres`) were built for amd64 only, so a Raspberry Pi or another ARM machine could run EasyPDM only by building it itself, and updating it by pulling the new images (as Dockhand and similar dashboards do) failed. They are now published for linux/amd64 and linux/arm64. ([#9](https://github.com/pawelcel/EasyPDM/issues/9))
+- **Windows installer: PostgreSQL not found.** The installer only looked in `C:\Program Files\PostgreSQL\<version>`, so a PostgreSQL installed into another folder or onto another drive was reported as missing. It now also checks the PostgreSQL installer's registry entries, the PostgreSQL Windows services and the folders on PATH, and when nothing is found it lets you choose `psql.exe` yourself before offering the download page. ([#10](https://github.com/pawelcel/EasyPDM/issues/10))
+
 ## [0.9.7]
 
 **In short:** a documentation download is named after what it came from and the day, and its files are no longer sorted into a folder per item.
