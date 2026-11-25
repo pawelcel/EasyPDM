@@ -4,7 +4,7 @@
 
 Dieses Dokument richtet sich an den Administrator, der EasyPDM installiert/betreut, sowie
 an Entwickler. Eine Beschreibung des Werkzeugs selbst (wozu es dient und wie man es beim
-Konstruieren benutzt) finden Sie in [README.de.md](README.de.md).
+Konstruieren benutzt) finden Sie im [Wiki](https://github.com/pawelcel/EasyPDM/wiki) (auf Englisch).
 
 ## Status
 

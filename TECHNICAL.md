@@ -4,7 +4,7 @@
 
 This document is for the administrator who installs/maintains EasyPDM, and for
 developers. A description of the tool itself (what it's for and how to use it while
-designing) is in [README.md](README.md).
+designing) is on the [wiki](https://github.com/pawelcel/EasyPDM/wiki).
 
 ## Status
 

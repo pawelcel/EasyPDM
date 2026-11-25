@@ -4,536 +4,86 @@
 
 [English](README.md) | [Polski](README.pl.md) | **Deutsch**
 
-[<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="136">](https://buymeacoffee.com/easypdm)
-
 [![Release](https://img.shields.io/github/v/release/pawelcel/EasyPDM?label=release)](https://github.com/pawelcel/EasyPDM/releases/latest) [![License: MIT](https://img.shields.io/github/license/pawelcel/EasyPDM)](LICENSE) [![Tests](https://img.shields.io/github/actions/workflow/status/pawelcel/EasyPDM/build.yml?branch=main&label=tests)](https://github.com/pawelcel/EasyPDM/actions/workflows/build.yml) [![Wiki](https://img.shields.io/badge/Doku-Wiki-blue)](https://github.com/pawelcel/EasyPDM/wiki) [![YouTube](https://img.shields.io/badge/YouTube-Videoserie-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)
 
-▶️ **Videoserie auf YouTube** (auf Englisch, [Playlist](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)): [1. Wozu PDM und was EasyPDM ist](https://youtu.be/OaqyJQCHkt4) ·
-[2. Installation — Windows, Docker oder Linux](https://youtu.be/ZwAWCJN9tWg) ·
-[3. Projekte und Struktur](https://youtu.be/ZB3pXQY6-e0) ·
-[4. Von CAD ins PDM — das Upload-Makro](https://youtu.be/vMQPxwWQrGc) ·
-[5. Eine ganze Baugruppe — Hochladen, Herunterladen, Aktualisieren und Zeichnungen](https://youtu.be/vXHYbRlPu_s) ·
-[6. Die Felder eines Teils — Status, Sperren, Werkstoffe und Bearbeitungen](https://youtu.be/JxMLm7bmuck) ·
-[7. PDM → Zeichnung — das Schriftfeld füllt sich selbst](https://youtu.be/ZJiMQNJRsB0)
+**Ein kostenloses, selbst gehostetes PDM für kleine Konstruktionsteams.** Teilenummern,
+Revisionen, Status, eine fertige Stückliste und Schriftfelder, die sich selbst ausfüllen —
+direkt aus SolidWorks, FreeCAD und SolidCraft. Schluss mit `Halter_v3_FINAL_WIRKLICH.SLDPRT`
+auf dem Netzlaufwerk und der Frage „welche Version ist die aktuelle?“.
 
-📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch) — Installation, Arbeit mit EasyPDM, die CAD-Integrationen (auch wo die Zeichnungsblätter liegen), Einstellungen; mit Screenshots. Die Add-ons für FreeCAD, SolidWorks und SolidCraft haben eigene Wikis: [FreeCAD](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki), [SolidWorks](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki), [SolidCraft](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon/wiki).
+**[⬇ Neueste Version herunterladen](https://github.com/pawelcel/EasyPDM/releases/latest)** ·
+**[Live-Demo ausprobieren](https://easypdmdemo.celmer.info/)** (täglich zurückgesetzt) ·
+**[Videos ansehen](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)** (auf Englisch)
 
-EasyPDM ist der Ort, an dem Ihre Teile und Baugruppen eine einzige, für das ganze Team
-gemeinsame Ordnung erhalten: Jedes Element hat seine eigene Nummer, Revision, Status und
-Änderungshistorie, und Baugruppen erhalten eine fertige Stückliste (BOM). Schluss mit
-`halterung_v3_ENDGUELTIG_FINAL.SLDPRT` auf dem gemeinsamen Laufwerk und der Frage
-"welche Version ist eigentlich aktuell?". Für FreeCAD, SolidWorks, Autodesk Inventor und SolidCraft
-gibt es fertige Makros, die Dateien direkt aus dem CAD-Programm heraus senden und abrufen —
-der Rest
-(Browser-Anwendung, Material-/Herstellerkataloge, Stückliste) funktioniert unabhängig
-davon, womit Sie konstruieren, genauso.
+## Warum EasyPDM
 
-Ich bin Konstrukteur im Maschinenbau und wusste genau, wie ein solches Werkzeug
-aussehen und im Arbeitsalltag mit CAD-Dateien funktionieren sollte — was mir gefehlt
-hat. Programmiert habe ich es nicht selbst: Die gesamte Anwendung wurde für mich von
-Claude (einem KI-Modell von Anthropic) anhand meiner Anforderungen und Beschreibungen
-geschrieben. Ich habe EasyPDM für den eigenen Gebrauch gebaut, und da es nun einmal
-existiert und funktioniert — warum es nicht auch anderen zur Verfügung stellen.
+- **Eine Nummer, eine Historie** — jedes Teil und jede Baugruppe hat eine eigene Nummer,
+  Revision, einen Status und ein Protokoll, wer wann was geändert hat.
+- **Senden und Holen aus dem CAD-Programm** — ein Klick lädt ein Teil oder eine ganze
+  Baugruppe hoch, ein Klick holt sie mit allen Komponenten zurück.
+- **Stückliste sofort** — jede Baugruppe listet ihre Komponenten mit Menge, Werkstoff,
+  Hersteller und Bestellnummern, bereit für den CSV-Export.
+- **Zeichnungen füllen sich selbst aus** — Benennung, Zeichnungsnummer, Revision, Werkstoff,
+  Bearbeitungen, Firmenlogo und auf Baugruppenzeichnungen eine Stückliste, nummeriert wie
+  die Positionsnummern.
+- **Status, Prüfung und Sperren** — in Arbeit → in Prüfung → freigegeben, und niemand
+  überschreibt, woran jemand anderes arbeitet.
+- **Ihres, auf Ihrem eigenen Rechner** — kein Cloud-Konto, kein Abo, Open Source (MIT).
 
-## Was es bietet
+## Funktioniert mit Ihrem CAD
 
-- **Eine Nummer, eine Historie** — jedes Teil und jede Baugruppe erhält automatisch eine
-  Nummer, die niemand sonst je wieder bekommt. Man sieht, wer wann was geändert hat, wer
-  ein Element gerade "auf der Werkbank" hat und welche Revision aktuell ist.
-- **Stückliste auf Knopfdruck** — eine Baugruppe zeigt selbst die Liste ihrer Komponenten
-  mit Mengen, Material, Hersteller, Bestellnummern — fertig zum CSV-Export.
-- **Gemeinsame Material- und Herstellerkataloge** — man wählt aus einer Liste, statt es
-  jedes Mal von Hand einzutippen, sodass sich Namen nicht zwischen Projekten
-  auseinanderentwickeln.
-- **Suche über die gesamte Firmendatenbank**, nicht nur im aktuellen Projekt — praktisch,
-  wenn Sie prüfen wollen, ob ein ähnliches Teil schon irgendwo existiert.
-- **Das Schriftfeld füllt sich selbst** — in FreeCAD und SolidWorks übernimmt das Schriftfeld
-  Benennung, Zeichnungsnummer, Revision, Werkstoff, Bearbeitungen und Firmenlogo direkt aus
-  EasyPDM, und wer gezeichnet und wer freigegeben hat, wird bei Prüfung und Freigabe ins PDF
-  der Zeichnung geschrieben. Eine Baugruppenzeichnung in FreeCAD erhält außerdem eine
-  Stückliste, nummeriert wie die Struktur in EasyPDM, und ihre Positionsnummern dieselben
-  Nummern ([Details und Screenshots](https://github.com/pawelcel/EasyPDM/wiki/CAD-Integrations#drawing-sheets), auf Englisch).
-- **Elementsperre** — solange Sie an etwas arbeiten, überschreibt niemand sonst Ihre
-  Änderungen ohne Ihre Zustimmung (ein Administrator kann bei Bedarf eine fremde Sperre
-  übernehmen oder aufheben — z. B. wenn der Besitzer abwesend ist).
-- **Benachrichtigungen** — ein Glockensymbol zeigt, was Ihre Aufmerksamkeit erfordert: ein
-  eigenes Element wartet auf Prüfung, wurde freigegeben oder auf "In Bearbeitung"
-  zurückgesetzt, hat eine neue Revision, es kam eine Rückmeldung des Kunden zu etwas, das
-  Sie konstruiert haben, ein Element wurde einem Projekt hinzugefügt oder daraus entfernt,
-  oder (für Administratoren) wenig Speicherplatz. Jeder Typ lässt sich einzeln in den
-  Einstellungen abschalten.
-
-## Erste Inbetriebnahme
-
-EasyPDM wird EINMAL installiert — auf einem Computer in der Firma (nicht unbedingt ein
-besonderer "Server", ein gewöhnlicher Computer, der einfach eingeschaltet bleibt, reicht
-völlig aus). Von da an verbindet sich jeder mit einem gewöhnlichen Webbrowser damit,
-genau wie mit jeder Webseite — nur unter einer Adresse, die ausschließlich im
-Firmennetzwerk sichtbar ist, nicht im gesamten Internet.
-
-**Wenn EasyPDM in Ihrer Firma bereits läuft** — fragen Sie die Person, die es
-installiert hat, nach der Adresse (sie wird z. B. so aussehen: `http://192.168.1.20:5000`,
-oder `http://localhost:5000`, wenn EasyPDM auf Ihrem eigenen Computer läuft). Geben Sie
-sie in die Adressleiste des Browsers ein, genau wie jede andere Webseiten-Adresse, und
-melden Sie sich an.
-
-**Wenn es noch niemand installiert hat und Sie es tun müssen:**
-
-**Windows** (ohne IT-Kenntnisse) — Gehen Sie auf die
-[Releases-Seite dieses Repositorys](https://github.com/pawelcel/EasyPDM/releases),
-laden Sie die neueste Datei `EasyPDM_Windows_v<Version>.exe` herunter und starten Sie sie — der
-Installationsassistent führt Sie Schritt für Schritt durch den Rest und hinterlässt eine
-Verknüpfung zu EasyPDM auf dem Desktop (das Einzige, wonach er fragen könnte: ob
-PostgreSQL, das Programm zur Datenspeicherung, bereits installiert ist — falls nicht,
-verweist er auf die Download-Seite, bevor er fortfahren kann).
-
-**Linux** (grundlegende Terminal-Kenntnisse reichen — wählen Sie eine Variante):
-
-- *Docker* (empfohlen, wenn Docker auf der Maschine bereits installiert ist):
-  ```bash
-  git clone https://github.com/pawelcel/EasyPDM.git
-  cd EasyPDM
-  ./install-easypdm-docker.sh
-  ```
-- *Native Installation, ohne Docker* — laden Sie das fertige Paket
-  `EasyPDM-Linux-x64_v<Version>.tar.gz` von der
-  [Releases-Seite](https://github.com/pawelcel/EasyPDM/releases) herunter oder klonen Sie
-  das Repo selbst, dann:
-  ```bash
-  mkdir easypdm && tar xzf EasyPDM-Linux-x64_v<Version>.tar.gz -C easypdm && cd easypdm   # falls Sie das Paket heruntergeladen haben
-  sudo ./install-easypdm-linux.sh
-  ```
-  Installiert PostgreSQL (falls nicht vorhanden) und EasyPDM selbst als
-  `systemd`-Dienst, der automatisch mit der Maschine startet.
-
-In beiden Fällen landet EasyPDM unter `http://localhost:5000` (oder der Adresse der
-Maschine im Netzwerk, von einem anderen Computer aus) — oder am nächsten freien Port, falls
-5000 schon belegt ist; das Installationsprogramm nennt die Adresse am Ende. Vollständige Details,
-Aktualisierung und Deinstallation: siehe [`TECHNICAL.de.md`](TECHNICAL.de.md).
-
-Erste Anmeldung bei einem frisch installierten EasyPDM: Benutzername `admin`, Passwort
-`admin` — ändern Sie dieses Passwort sofort nach der Anmeldung (Einstellungen →
-Benutzer → das Konto `admin` in der Liste suchen → Passwort ändern).
-
-Eine ganz neue, leere Datenbank erhält beim ersten Start außerdem ein Beispielprojekt —
-eine Baugruppe mit zwei Teilen, etwas zum Erkunden statt einer leeren Fläche. Eine
-Benachrichtigung weist darauf hin und erinnert daran, es vor dem echten Einsatz zu
-löschen (Einstellungen → Dateispeicher → Gefahrenzone).
-
-Nach der Anmeldung: wählen Sie ein Projekt (oder erstellen Sie ein neues, falls Sie die
-Berechtigung haben) — das ist der Container für Ihre Dateien und die
-Baugruppenstruktur — und installieren Sie das Add-on oder die Makros für Ihr CAD-Programm,
-siehe unten.
-
-## Arbeiten von FreeCAD / SolidWorks / Inventor / SolidCraft aus
-
-Die Makros fügen im CAD-Programm zwei einfache Operationen hinzu: **Upload** (aktives
-Dokument an das PDM senden) und **Download** (Teil/Baugruppe aus dem PDM abrufen,
-zusammen mit der gesamten Baugruppe, und im Programm öffnen). In FreeCAD (ein Arbeitsbereich)
-und SolidWorks (ein Add-in mit eigener Registerkarte) stehen sie neben **Anmelden** (im Browser
-bestätigt, das CAD-Programm sieht Ihr Passwort nie), **Abmelden**, der **Sperre** des Elements und
-einem **Dokumentbereich**, der das geöffnete Element zeigt und bei einer Baugruppe, welche
-Komponenten in EasyPDM eine neuere Datei haben — Upload verweigert das Senden darauf beruhender
-Arbeit. In SolidCraft liegen sie im Menü Plugins.
-
-Installation und Details:
-- FreeCAD (Add-on, eigenes Repository): [pawelcel/EasyPDM-FreeCAD-Addon](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon), mit [eigenem Wiki](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki)
-- SolidWorks (Add-in mit EasyPDM-Registerkarte und Dokumentbereich, Makros, Zeichnungsblatt; im eigenen Repository): [pawelcel/EasyPDM-SolidWorks-Addon](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon), mit [eigenem Wiki](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki)
-- Autodesk Inventor: [`EasyPDM.Inventor/README.md`](EasyPDM.Inventor/README.md)
-- SolidCraft (Plugin + EasyPDM-Begleitprogramm, da SolidCraft-Plugins kein Netzwerk haben):
-  **[Installation Schritt für Schritt](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon/wiki/Installation)** in seinem Wiki (auf Englisch); im eigenen
-  Repository, [pawelcel/EasyPDM-SolidCraft-Addon](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon)
-
-**Upload** — Sie haben eine gespeicherte Datei geöffnet und klicken auf Upload. Der
-Browser öffnet sich (automatisch angemeldet) mit der Frage: neues Element, Duplikat
-eines vorhandenen (kopiert dessen Eigenschaften, ohne Dateien) oder eine neue Version an
-ein bereits vorhandenes Element anhängen. Sie wählen, bestätigen im Browser — das Makro
-erkennt den Abschluss selbstständig und beendet den Upload (benennt die lokale Datei in
-die PDM-Nummer um, hängt die Datei an und exportiert — wenn Sie es im Browser ankreuzen —
-ein STEP und/oder ein PDF und speichert ein Bild des Modells). Für eine ganze Baugruppe: Das Makro erkennt ihre
-Komponenten selbstständig, zeigt sie in einem Fenster als Baum und führt Sie durch jede neue,
-bevor die Hauptdatei gesendet wird. Nur die Hauptdatei fragt, wohin sie gehört — ihre
-Komponenten folgen dem Baum aus dem CAD-Programm und kommen als Stücklistenpositionen in ihr
-Projekt, ohne den Projektbaum für sich allein zu füllen. Komponenten, die schon im PDM und
-in Arbeit sind, werden im selben Lauf aktualisiert (CAD-Datei sowie auf Wunsch STEP/PDF);
-freigegebene oder in Prüfung befindliche werden einmal, vorab, genannt und nicht angetastet.
-
-**Technische Zeichnungen** werden als solche erkannt (eine `.SLDDRW`-/`.idw`-/`.dwg`-Datei
-oder eine TechDraw-Seite aus FreeCAD) und dem Teil/der Baugruppe zugeordnet, die sie
-dokumentieren — indem ausgelesen wird, auf welche Modelle die Ansichten der Zeichnung
-tatsächlich zeigen, und nicht anhand des Dateinamens geraten. Die Zeichnung wird als
-eigener Anhang hochgeladen, einer je Revision, neben der CAD-Datei des Modells selbst, und
-kann optional als PDF exportiert werden. Dokumentiert eine Zeichnung etwas, das nie
-hochgeladen wurde, bietet das Makro an, dieses Teil/diese Baugruppe zuerst zu senden, und
-geht anschließend direkt zur Zeichnung über.
-
-Die Makros für SolidWorks und Inventor schreiben den Namen des Elements zusätzlich in eine
-Dokumenteigenschaft namens `EasyPDM_Name`, damit Ihre Zeichnungsvorlagen und Schriftfelder
-ihn übernehmen können. Beide tragen außerdem **Masse und Material**
-selbst ein: Das Makro schreibt sie in das Dokument, liest sie zurück und setzt sie am Element
-in EasyPDM. In SolidWorks enthalten die beiden Eigenschaften einen SolidWorks-Ausdruck statt
-eines Werts und folgen so dem Modell von selbst; in Inventor sind sie eine Momentaufnahme vom
-Zeitpunkt des Hochladens. Das Material wird außerdem beim Öffnen des Browsers zum
-Anlegen des Elements mitgegeben, sodass das Feld Material bereits ausgefüllt startet, statt
-Sie raten zu lassen — und eines, das EasyPDM noch nicht kennt, wird automatisch in den
-Materialkatalog aufgenommen, damit es sich erneut auswählen und als Filter nutzen
-lässt. Genau das macht das Weglassen des Namens im Dateinamen praktikabel:
-Der Name reist weiterhin mit dem Dokument, nur eben nicht in dessen Dateinamen.
-
-Das FreeCAD-Add-on sendet ebenfalls **Material und Masse eines Teils**. FreeCAD speichert
-keine Masse, daher berechnet das Add-on sie beim Hochladen aus dem Volumen und der Dichte des
-dem Teil zugewiesenen Materials; senden Sie das Teil nach einer Änderung erneut, um den Wert
-zu aktualisieren. Baugruppen werden übersprungen, und ein Teil, dessen Körper verschiedene
-oder keine Materialien haben, bekommt lieber keinen Wert als einen falschen. Das Add-on benennt außerdem den Körper eines Teils und die Links einer Baugruppe nach ihren Elementen im PDM, sodass man beim Einfügen einer Komponente nicht mehr zwischen „Body“ und „Body001“ wählt.
-
-**Download** — Sie klicken auf Download und geben im Browser das abzurufende
-Teil/Baugruppe an. Bei einer Baugruppe wird sofort der GESAMTE Komponentenbaum
-abgerufen, und die Hauptdatei öffnet sich automatisch im CAD-Programm. Eine aktuelle
-Zeichnung wird, sofern vorhanden, neben der Modelldatei gespeichert, ohne geöffnet zu
-werden.
-
-## Arbeiten im Browser
-
-### Projekte und Struktur
-
-Jedes Projekt hat einen Baum: Ordner (reine Container zur Organisation), Teile und
-Baugruppen (haben eine Nummer/Status/Revision) sowie Sonstige Dateien (ein beliebiges
-Dokument ohne eigene Struktur darunter). Eine Baugruppe kann Teile und andere Baugruppen
-enthalten (Stückliste) — dieselbe Komponente kann gleichzeitig in mehreren Baugruppen
-und Projekten verwendet werden, sodass eine Änderung an einer Stelle überall dort
-sichtbar ist, wo diese Komponente verwendet wird. Ordner und Dateien lassen sich genauso
-teilen: Ein Datenblatt kann in mehreren Ordnern liegen, und „Vorhandenes Element“ im
-Hinzufügen-Dialog holt alles zurück, was aus der Struktur gelöst wurde.
-
-Ein Element kann **aus der Struktur gelöst** werden (bleibt in der Datenbank, verschwindet
-nur an der einen angeklickten Stelle im Baum — andere Stellen, an denen es verwendet wird,
-bleiben unberührt) oder **vollständig gelöscht** werden (nur Administrator). Das
-Löschen einer Baugruppe entfernt nur diese Baugruppe — ihre Komponenten bleiben und
-verlieren lediglich diese eine Stücklistenposition, denn eine Baugruppe *verwendet* ihre
-Teile nur, während ein Ordner seinen Inhalt *besitzt*. Das Löschen eines Ordners nimmt
-seinen Inhalt daher mit, abzüglich dessen, was auch außerhalb davon liegt. Ein Teil/eine
-Baugruppe kann auch **dupliziert** werden — die Kopie erhält eine eigene Nummer und landet
-sofort neben dem Original, mit dessen kopierten Eigenschaften.
-
-Beide Arten des Entfernens funktionieren auch für **mehrere Elemente auf einmal**.
-Ausgewählt werden sie mit **Strg+Klick** auf eine Zeile des Baums (oder über die
-Schaltfläche „Mehrere auswählen" und Kontrollkästchen, wenn die Maus lieber ist); die
-Leiste oben zeigt dann, wie viele ausgewählt sind, und erlaubt, sie aus der Struktur zu
-entfernen, vollständig zu löschen, ihnen ein Schlagwort zu geben oder den Status zu
-ändern. Das Entfernen mehrerer wirkt genau wie bei einem einzelnen: Die Elemente bleiben
-in der Datenbank und sind weiterhin unter „Gesamte Datenbank" auffindbar.
-
-Ein fertiges Projekt lässt sich mit einer Schaltfläche in der Leiste **schließen** — es
-fällt aus der Projektauswahl und aus dem Dialog zum Hinzufügen von Elementen heraus, sonst
-ändert sich nichts daran: Seine Elemente bleiben über "Gesamte Datenbank" vollständig
-durchsuchbar, und dieselbe Schaltfläche öffnet es wieder.
-
-Auch das Projekt selbst kann gelöscht werden (nur Administrator) — dies löscht NICHT seine
-Teile/Baugruppen: Sie werden projektlos und bleiben vollständig erhalten (Dateien, Anhänge,
-Tags, Historie, Stücklisten-Beziehungen), danach über "Gesamte Datenbank" erreichbar.
-
-### Auftragsdokumente und wer das Projekt leitet
-
-Neben den Eigenschaften des Projekts selbst liegen die Dokumente, die mit dem Auftrag
-kommen: ein **Angebot** und eine **Auftragsbestätigung** haben jeweils ihr eigenes,
-hervorgehobenes Fenster, dazu kommt eine offene Kategorie für alles Übrige (Korrespondenz,
-Spezifikationen des Kunden, Besprechungsnotizen). Die beiden benannten Fenster nehmen
-mehrere Dateien auf, statt die vorherige zu ersetzen — ein Angebot wird überarbeitet und
-erneut verschickt, und die frühere Fassung ist es wert, aufgehoben zu werden — und bei
-jeder Datei ist zu sehen, wann sie hochgeladen wurde und von wem.
-
-Ein Projekt kann außerdem die **Person benennen, die es auf Kundenseite leitet**,
-ausgewählt aus den Kontakten dieses Kunden (entweder denen des Kunden selbst oder denen des
-konkreten zweiten Namens, mit dem das Projekt verknüpft ist). Eine Schaltfläche neben dem
-Feld zeigt deren Telefon, E-Mail und Position, ohne das Projekt zu verlassen.
-
-### Teile und Baugruppen — Arten und Eigenschaften
-
-Ein Teil hat eine von vier **Arten**, jede mit einem anderen Satz von Feldern:
-
-| Art | Zusätzliche Felder |
+| CAD-Programm | Was Sie bekommen |
 |---|---|
-| Gefertigt | Material, Preis, Zusätzliche Informationen |
-| Zugekauft | Hersteller, Serie/Typ, Untertyp, Bestellnummer 1/2, Preis, Zusätzliche Informationen |
-| Norm | Material, Norm, Zusätzliche Informationen |
-| Kundenteil | Kunde, Name 2, Zusätzliche Informationen |
+| **SolidWorks** | Add-in mit EasyPDM-Registerkarte und Dokumentbereich, Zeichnungsblätter — [Repository](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon) · [Wiki](https://github.com/pawelcel/EasyPDM-SolidWorks-Addon/wiki) |
+| **FreeCAD** | EasyPDM-Arbeitsbereich mit Dokumentbereich, Zeichnungsblätter — [Repository](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon) · [Wiki](https://github.com/pawelcel/EasyPDM-FreeCAD-Addon/wiki) |
+| **SolidCraft** | Plugin und Begleit-App — [Repository](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon) · [Wiki](https://github.com/pawelcel/EasyPDM-SolidCraft-Addon/wiki) |
+| Autodesk Inventor | Upload- und Download-Makros, nicht mehr weiterentwickelt — [Details](EasyPDM.Inventor/README.de.md) |
 
-**Die Masse** steht darüber, denn sie ist das einzige Feld, das alle Arten teilen — ein Teil
-jeder Art ebenso wie eine Baugruppe. Die CAD-Makros tragen sie beim Hochladen ein, und ein
-Wechsel der Art lässt sie unangetastet.
+Alles andere — die Browser-App, Kataloge, Stückliste — ist gleich, egal womit Sie
+konstruieren.
 
-Eine Baugruppe hat eine von drei **Arten**: Gefertigt, Zugekauft (Hersteller, Serie/Typ
-und Untertyp) oder Vom Kunden (Kunde). Unabhängig von der Art kann sie zusätzlich beliebige
-eigene Eigenschaften tragen.
+## Schnellstart
 
-**Kunde** — für die Art „Vom Kunden“, ausgewählt aus demselben Katalog wie der Reiter Kunden.
-Daneben **Name 2** — einer der zweiten Namen/Handelsvarianten dieses Kunden aus dem Katalog
-(ein Kunde kann mehrere haben, z. B. verschiedene Tochtergesellschaften) —
-gesperrt, bis ein Kunde gewählt ist.
+1. **Den Server einmal installieren**, auf einem beliebigen Rechner in der Firma, der
+   eingeschaltet bleibt:
+   - **Windows** — `EasyPDM_Windows_v<Version>.exe` aus der
+     [neuesten Version](https://github.com/pawelcel/EasyPDM/releases/latest) ausführen; der
+     Assistent erledigt den Rest.
+   - **Docker** —
+     ```bash
+     git clone https://github.com/pawelcel/EasyPDM.git && cd EasyPDM && ./install-easypdm-docker.sh
+     ```
+   - **Linux ohne Docker** — das `.tar.gz`-Paket aus derselben Version,
+     [Schritt für Schritt im Wiki](https://github.com/pawelcel/EasyPDM/wiki/Installation).
+2. **`http://localhost:5000` öffnen** (oder die Adresse des Rechners von einem anderen aus)
+   und als `admin` / `admin` anmelden — danach dieses Passwort ändern. Ein Beispielprojekt
+   wartet schon.
+3. **Ihr CAD-Programm anbinden** — das Add-on aus der Tabelle oben installieren und sich
+   darin anmelden.
 
-**Serie/Typ** ist ein Eintrag aus der Liste des gewählten Herstellers (Reiter Hersteller),
-und **Untertyp** verfeinert sie innerhalb dieser Serie (z. B. Serie „Zylinderrollenlager“
-→ Untertypen NU/NJ/NUP), beide nebeneinander angezeigt. Serie/Typ ist gesperrt, bis ein
-Hersteller gewählt ist, Untertyp, bis eine Serie gewählt ist; ein Wechsel des Herstellers
-oder der Serie löscht alles darunter.
+Alle anderen im Team öffnen einfach die Adresse im Browser.
 
-**Wie die Nummer aussieht**, wird einmal eingestellt, unter Einstellungen → Nummerierung:
-Jede Art kann ihr eigenes Buchstabenpräfix bekommen (etwa `C` für Kundenteile), Nummern
-lassen sich auf eine feste Breite mit Nullen auffüllen, und der Name des Elements lässt sich
-ganz aus dem Datensatznamen entfernen — sodass ein Element `C0001(Platte)` oder nur `C0001`
-statt `1(Platte)` lautet. Alle drei werden dem Element bei seiner Erstellung aufgeprägt und
-danach nie neu berechnet — die CAD-Makros bauen aus dieser Nummer den Namen jeder Datei, und
-eine spätere Änderung würde auf den Laufwerken Dateien zurücklassen, die etwas anderes sagen.
-Es lohnt sich also, das vor dem ersten echten Element einzustellen. Die einzige Ausnahme ist
-ein früh bemerkter Fehler: Wird die Art eines Teils korrigiert, wird auch sein Präfix
-korrigiert — aber nur, solange seine Felder CAD/Zeichnung/PDF/3D leer sind. Liegt in einem
-davon bereits eine Datei, steht auch die Art fest, denn die Datei auf der Festplatte trägt
-die Nummer, über die die Art entscheidet.
+## Mehr erfahren
 
-### Die Modellvorschau
+- 📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (auf Englisch, mit Screenshots):
+  [Installation](https://github.com/pawelcel/EasyPDM/wiki/Installation) ·
+  [EasyPDM verwenden](https://github.com/pawelcel/EasyPDM/wiki/Using-EasyPDM) ·
+  [CAD-Integrationen](https://github.com/pawelcel/EasyPDM/wiki/CAD-Integrations) ·
+  [Einstellungen](https://github.com/pawelcel/EasyPDM/wiki/Settings) ·
+  [Technischer Überblick](https://github.com/pawelcel/EasyPDM/wiki/Technical-Overview)
+- ▶️ **[Videoserie](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)** — am besten mit
+  [1. Was ein PDM ist und warum EasyPDM](https://youtu.be/OaqyJQCHkt4) beginnen
+- 🛠 **Administratoren und Entwickler** — Architektur, API und Serverdetails in
+  [`TECHNICAL.md`](TECHNICAL.md)
+- 📝 **Was ist neu** — [`CHANGELOG.md`](CHANGELOG.md)
 
-Über den Eigenschaften eines Elements liegt ein Vorschaufeld mit einem **2D/3D**-Schalter: 2D
-zeigt die PDF-Zeichnung, 3D ein **Bild des Modells**, das das CAD-Makro beim Hochladen aufnimmt.
+## Über das Projekt
 
-Dieses Bild ersetzt das, was hier früher geschah. Die STEP-Datei wurde bei jedem Öffnen eines
-Elements heruntergeladen und im Browser gerendert — und ergab ohnehin ein unbewegtes Bild, denn
-es gab nie etwas zu drehen. Das war langsam, wurde umso langsamer, je detaillierter das Modell
-war (unabhängig davon, wie klein die Datei wirkte), und ließ den ganzen Rechner ins Stocken
-geraten, wenn der Server auf demselben Computer lief. Ein Bild beim Hochladen aufzunehmen, auf
-dem Rechner, der das Modell ohnehin geöffnet hat, erledigt dieselbe Aufgabe einmal statt immer
-wieder.
+Ich bin Konstrukteur im Maschinenbau und wusste genau, was mir bei der Arbeit mit
+CAD-Dateien fehlte. Den Code habe ich nicht selbst geschrieben: Claude, ein KI-Modell von
+Anthropic, hat ihn nach meinen Anforderungen geschrieben. Ich habe EasyPDM für den eigenen
+Gebrauch gebaut, und da es funktioniert — warum nicht teilen.
 
-Daraus folgen zwei Dinge:
-
-- **Das Bild kommt mit dem STEP.** Entfernen Sie im Upload-Fenster das Häkchen bei
-  „STEP-Modell exportieren und hochladen", gibt es auch kein Bild — und das Feld sagt Ihnen das.
-- **Das Löschen des STEP löscht das Bild.** Es stellte nur dieses Modell dar.
-
-Die STEP-Datei selbst bleibt unverändert — sie wird exportiert, hochgeladen und kann genau wie
-bisher heruntergeladen werden. Sie muss nur nicht mehr gerendert werden, damit Sie sehen, wie
-das Teil aussieht. Vor dieser Version hochgeladene Elemente behalten ihr STEP, zeigen aber kein
-Bild, bis sie erneut hochgeladen werden.
-
-Bei großen Modellen warnt das Upload-Fenster, bevor Sie bestätigen: Der STEP-Export läuft in
-Ihrem CAD-Programm, und bei einer großen Baugruppe kann das Minuten dauern, währenddessen ist
-das Programm belegt.
-
-### Eine Baugruppe hochladen
-
-Das Makro braucht für jede neue Komponente ein Formular. Es öffnet dafür keinen eigenen Browser-Tab mehr und bittet auch nicht mehr vor jedem um einen Klick auf OK: Der bereits offene Tab nimmt die Anfrage an und zeigt das Formular an Ort und Stelle. Bei einer Baugruppe mit vierzig Teilen waren das bisher vierzig Klicks und vierzig Tabs. Das Formular für die Hauptbaugruppe, die zuletzt kommt, erscheint im selben Tab.
-
-Ist kein Browser offen, bemerkt das Makro das binnen weniger Sekunden und kehrt zum alten Weg zurück — Meldung und neuer Tab —, sodass in keinem Fall etwas verloren geht.
-
-### Hoch- und Herunterladen mitverfolgen
-
-Während ein Makro Dateien ins PDM sendet oder zurückholt, zeigt die Anwendung rechts eine Liste dieser Dateien. Jede wird nach Abschluss abgehakt, die laufende dreht sich, und ein Zähler sagt „3 von 7". Schlägt etwas fehl, wird der Eintrag rot markiert und der Rest läuft weiter. Die Liste einer Baugruppe ist wie ihr Baum aufgebaut — Unterbaugruppen und Teile eingerückt unter der Baugruppe, zu der sie gehören —, und ein mehrfach verwendetes Teil steht unter jeder davon; gesendet wird es einmal, daher werden alle seine Zeilen gemeinsam abgehakt. Sobald eine Baugruppe samt allem darunter fertig ist, klappt sie zu einer Zeile mit „+N“ zusammen, damit die Liste zeigt, was noch läuft; ein Fehler hält seinen Zweig offen. Auch ein einzelnes Teil bekommt die Liste, mit einer Zeile.
-
-Die Schaltfläche **Abbrechen** an der Liste stoppt den Rest der Übertragung — nach einer Rückfrage. Was schon übertragen ist, bleibt; das Makro hält vor der nächsten Datei an, die gerade laufende wird also noch fertig. Ein Formular des Makros, das gerade auf dem Bildschirm steht, verschwindet, und in den Benachrichtigungen bleibt ein Bericht, wie weit es gekommen ist.
-
-Am meisten bringt das bei einer Baugruppe. Deren Versand war bisher ein Warten ohne jede Rückmeldung — man konnte nicht erkennen, ob das Makro beim zweiten Bauteil oder beim letzten war, noch an welcher Datei es gerade arbeitete. Die Liste erscheint etwa eine Sekunde nach dem Start des Makros und bleibt am Ende einen Moment mit allen Haken stehen, was die Bestätigung ist, dass alles hochgegangen ist.
-
-Aus SolidWorks, Inventor, FreeCAD und SolidCraft verhält es sich identisch, und in beide Richtungen. Bricht unterwegs die Verbindung ab oder startet der Server neu, hört die Liste einfach auf sich zu aktualisieren — das Hoch- oder Herunterladen selbst läuft unberührt weiter.
-
-### Status und Revisionen
-
-Teile/Baugruppen durchlaufen vier Status: **in Bearbeitung → in Prüfung → freigegeben**,
-plus **→ storniert** ab freigegeben (für ein Element, das sich als überflüssig erweist).
-Im Status "in Bearbeitung" kann alles bearbeitet werden; außerhalb davon sind Name und
-Eigenschaften gesperrt (Preis bleibt immer bearbeitbar) und das Element ist immer
-freigegeben (kein Eigentümer). Die Rückkehr von "freigegeben" ODER "storniert" zu "in
-Bearbeitung" erhöht die Revision um einen Buchstaben (A → B → C...) und erlaubt einen
-Kommentar dazu, was sich geändert hat. Eine Baugruppe mit einem stornierten Element
-irgendwo in ihrer Stückliste (auch tief verschachtelt) kann selbst nicht "freigegeben"
-werden — der Versuch zeigt, welches Element storniert ist. Im Baum/in der Liste wird das
-Symbol eines stornierten Elements rot. Am unteren Rand des Elementbereichs sieht man die
-vollständige **Historie**: wer es erstellt hat, jede Statusänderung, jede Revision mit
-Kommentar, jeden hinzugefügten/entfernten Anhang, jede Sperrung/Freigabe.
-
-Standardmäßig kann jeder mit Zugriff auf ein Element es freigeben, auch sein Autor. Wo ein
-zweites Paar Augen gewünscht ist, kann ein Administrator unter Einstellungen → Benutzer
-**„Nur ein Administrator darf den Status Freigegeben setzen“** einschalten: Der Autor gibt
-das Element dann zur Prüfung, und ein Administrator gibt es frei.
-
-**Eine Baugruppe kann ihrer eigenen Stückliste nicht vorauseilen.** Sie geht erst dann
-"in Prüfung", wenn jede Komponente eine Ebene darunter mindestens in Prüfung ist, und erst
-dann "freigegeben", wenn jede von ihnen freigegeben ist. Geprüft wird ausschließlich eine
-Ebene nach unten — worauf es tiefer ankommt, sichert dieselbe Regel, angewandt auf die
-Unterbaugruppe, wenn diese an der Reihe ist; so benennt die Meldung immer etwas, das am
-Bildschirm zu sehen ist. Hängt eine Komponente hinterher, wird die Statusänderung nicht
-abgelehnt, sondern angeboten: ein Fenster listet genau auf, welche es sind, und fragt, ob
-sie zusammen mit der Baugruppe mitgezogen werden sollen. Eine Ablehnung ändert gar nichts;
-eine Zustimmung setzt in einem Zug erst die Komponenten und dann die Baugruppe, und jede
-mitgezogene Komponente erhält ihren eigenen Historieneintrag. Zwei Fälle bleiben von
-diesem Angebot ausgenommen — eine **Unterbaugruppe** hat eine eigene Stückliste und wird
-deshalb nur benannt, damit Sie sie getrennt bearbeiten, und eine Komponente, die
-**storniert, von jemand anderem gesperrt oder in einem Projekt ohne Zugriff** ist, wird
-samt Grund benannt und nicht angerührt.
-
-### Kundenprüfung
-
-Sobald ein Teil/eine Baugruppe **freigegeben** ist, öffnet eine Schaltfläche
-"Kundenprüfung" in der Leiste die laufende Aufzeichnung dessen, was der Kunde dazu gesagt
-hat. Jeder Eintrag trägt ein Ergebnis — **geprüft**, **nachzubessern** oder gar kein
-Ergebnis, was schlicht bedeutet, dass es hinausgegangen ist und Sie warten — einen
-optionalen Kommentar und eigene Anhänge, zum Beispiel die bestätigende E-Mail. Die Einträge
-sammeln sich, sodass eine Runde Anmerkungen und die anschließende Abnahme als Historie
-lesbar bleiben, samt wer sie wann hinzugefügt hat.
-
-Der Projektbereich zeigt das Ganze aufgeteilt in drei Tabellen (nachzubessern, in Prüfung,
-geprüft), mit einer Schaltfläche in jeder Zeile, die direkt zu diesem Element in der
-Struktur springt. Das jüngste Ergebnis erscheint auch als Plakette im Bereich des Elements
-selbst, mit Datum und der Revision, die es betraf. Trifft eine Rückmeldung ein, erhält die
-Person, die das Element erstellt hat, eine Benachrichtigung.
-
-Die Prüfung gehört zum Element **in diesem Projekt**, nicht zum Element allein: Dasselbe
-Teil, für zwei Kunden verwendet, wird von zwei verschiedenen Personen abgenommen, also
-führt jedes Projekt seine eigene Aufzeichnung, und nichts davon erscheint in "Gesamte
-Datenbank", wo es keinen Projektkontext gibt. Jeder Eintrag merkt sich zudem, welche
-Revision er betraf — nach der Freigabe einer neuen Revision bleibt die alte Abnahme
-sichtbar, ist aber deutlich als nicht mehr zutreffend für den jetzigen Stand des Elements
-gekennzeichnet.
-
-### Wer bearbeitet — Elementsperre
-
-Der Ersteller eines Teils/einer Baugruppe wird sofort dessen/deren Eigentümer, und das
-Element wird gesperrt — solange die Sperre besteht, kann nur der Eigentümer dessen
-Eigenschaften bearbeiten (nicht einmal ein Administrator umgeht dies). Ein Administrator
-kann jedoch eine fremde Sperre übernehmen oder aufheben und den Status eines gesperrten
-Elements ändern — z. B. wenn ein Mitarbeiter abwesend ist und dessen unfertiges Element
-freigegeben werden muss. Im Baum wird dies durch die Farbe des Schloss-Symbols angezeigt:
-grün — von Ihnen gesperrt, gelb — von jemand anderem, offen — freigegeben (jeder kann es
-sperren). Ein freigegebenes Element ist immer entsperrt.
-
-### Stückliste (BOM)
-
-Eine Baugruppe zeigt die Liste ihrer Komponenten: Position, Name, Menge, Material, Norm,
-Hersteller, Bestellnummern — zusammen mit den Komponenten verschachtelter Baugruppen.
-Die Reihenfolge der Positionen kann per Ziehen oder durch direkte Eingabe einer Nummer
-geändert werden. CSV-Export in zwei Varianten: vollständig (jedes Vorkommen einzeln
-aufgeführt) oder zusammengefasst (dieselbe Komponente mehrfach verwendet — eine Zeile mit
-der Gesamtmenge).
-
-Auch die umgekehrte Ansicht ist verfügbar — **Verwendet in**: Der Detailbereich eines
-Elements zeigt jede Baugruppe, in beliebiger Tiefe und projektübergreifend, die es
-enthält, mit einer Schaltfläche zum direkten Wechsel dorthin.
-
-### Materialien, Hersteller und Kunden
-
-Separate, unternehmensweite Kataloge (Reiter **Materialliste**, **Hersteller** und
-**Kunden** im Hauptmenü) — ein Material hat einen Namen und eine Gruppe/Untergruppe, ein
-Hersteller hat einen Namen, Kontaktpersonen und eine Serie/Typ + Untertyp-Liste dessen,
-was er liefert. Sie werden beim Ausfüllen der Eigenschaften eines Teils/einer Baugruppe
-aus einer Liste ausgewählt, statt von Hand eingetippt zu werden.
-
-Das Menü **Bearbeitung** enthält die Bearbeitungsarten der Firma — Laserschneiden, Biegen,
-Schweißen, Härten —, jede mit einer Beschreibung und der Wahl, ob sie für Teile, Baugruppen
-oder beide gilt. Derselbe Name darf mehrfach mit unterschiedlicher Beschreibung vorkommen:
-„Härten“ bis 50 HRC und „Härten“ induktiv sind ein Verfahren mit zwei Spezifikationen. Ein
-gefertigtes Teil oder eine gefertigte Baugruppe wählt daraus beliebig viele oder keine: Ein
-Klick ins Feld öffnet die Liste, Tippen grenzt sie nach Name und Beschreibung ein. Die
-gewählten Bearbeitungen stehen mit Beschreibung unter dem Feld, jede mit einem × zum
-Entfernen. Ein
-Element behält Name und Beschreibung aus dem Moment der Auswahl, ein freigegebenes Teil also
-die Spezifikation, mit der es freigegeben wurde, auch wenn sich der Katalog später ändert.
-Die gewählten Bearbeitungen erscheinen auch als Spalte in der Stückliste und in beiden
-CSV-Exporten. Der Katalog selbst lässt sich per Text filtern und danach, ob eine
-Bearbeitung für Teile oder Baugruppen gilt.
-
-Ein **Kunde** hat einen Namen (optional einen Standort), eine Liste zweiter Namen/
-Handelsvarianten (beliebig viele — die Eingabe des Namens eines bereits vorhandenen Kunden
-im Dialog „Kunde hinzufügen" fügt diesem stattdessen einen weiteren hinzu, statt einen
-doppelten Kunden anzulegen), eigene Kontaktpersonen und einen eigenen Dokumentenbaum, z. B.
-für Normen oder Referenzdateien — getrennt von den Projektdateien. Ein Projekt kann
-optional mit einem Kunden verknüpft werden — und, wenn dieser mehrere hat, mit einem
-bestimmten zweiten Namen. Die Projektauswahl zeigt dann "Projekt (Kunde, Zweiter Name)",
-und der Detailbereich des Kunden listet jedes ihm zugewiesene Projekt auf, mit einer
-Schaltfläche zum direkten Wechsel dorthin.
-
-### Dokumentationssprachen
-
-Dokumentationssprachen sind unabhängig von der Oberflächensprache, die jeder für sich
-wählt. Unter **Einstellungen → Sprache** pflegt ein Administrator die Liste der Sprachen,
-in denen die Firma dokumentiert — vollständiger Name und ein Kürzel aus bis zu drei
-Großbuchstaben; zu Beginn stehen English (EN) und Polish (PL) darauf — und wählt die
-Standardsprache der Dokumentation.
-
-Jedes Projekt hat eine **Hauptsprache**, beim Anlegen die Standardsprache, und kann als
-**mehrsprachig** markiert werden, mit den Sprachen, in denen seine Dokumentation entsteht;
-beides wird in den Projekteigenschaften eingestellt. Der Dialog zum Hinzufügen eines
-Elements nennt die Projektsprache im Titel, damit klar ist, in welcher Sprache das neue
-Element beschrieben wird.
-
-**Bearbeitungen** werden in der Standardsprache der Dokumentation eingegeben, und eine
-Schaltfläche bei jeder öffnet ihre Übersetzungen: oben die Standardfassung, darunter
-jeweils eine andere Sprache, gewählt aus einer Liste, die zeigt, was schon übersetzt ist.
-Der Katalog folgt der Standardsprache und markiert Bearbeitungen ohne Übersetzung. Ein
-Teil oder eine Baugruppe behält seine Bearbeitungen in allen Sprachen und zeigt sie in der
-Hauptsprache des Projekts — im Elementbereich, in der Stückliste und in beiden
-CSV-Exporten.
-
-Der **Name eines Teils oder einer Baugruppe** wird über die Schaltfläche links vom
-Namensfeld übersetzt. Beim Hinzufügen eines neuen Elements schlägt das Namensfeld Namen
-vor, die vorhandene Teile oder Baugruppen in der Projektsprache schon haben, und die Wahl
-eines Vorschlags übernimmt dessen Übersetzungen — eine zweite „Kostka“ kommt gleich mit
-ihrem „Cube“.
-
-### Suche und gesamte Datenbank
-
-Der Reiter **Gesamte Datenbank** durchsucht alle Elemente unabhängig vom Projekt — nach
-Name, Nummer, Tags, Art. Mehrere Tags lassen sich gleichzeitig ankreuzen; die Liste zeigt dann
-die Elemente, die alle davon tragen. Gefundene Filter können zur Wiederverwendung gespeichert
-werden, und eine Schaltfläche "Filter zurücksetzen" setzt alles auf einmal zurück.
-
-Beim Hinzufügen eines Tags zu einem Element schlägt das Feld die bereits verwendeten Tags vor
-(die das Element noch nicht hat) und grenzt sie beim Tippen ein; die Auswahl fügt den Tag hinzu,
-ein neuer wird eingetippt und mit Enter hinzugefügt. Tags bleiben aber freier Text, daher sammeln sich mit der Zeit Tippfehler und Bezeichnungen,
-die niemand mehr nutzt. Ein Administrator sieht alle Tags unter **Einstellungen → Tags**,
-jeweils mit der Zahl der Elemente, die ihn tragen, und kann nur die unbenutzten anzeigen.
-Das Löschen eines Tags dort entfernt ihn auf einmal von allen Elementen, auch freigegebenen,
-sowie aus Vorschlägen und Filter.
-
-### Herunterladbare Dokumentation
-
-Von einem Projekt, einer Baugruppe oder einem Teil aus lässt sich der komplette Satz
-angehängter Dateien als ZIP herunterladen (mit Auswahl, welche Dateierweiterungen
-einbezogen werden sollen) — praktisch z. B., um einen kompletten Zeichnungssatz an einen
-Kunden zu senden.
-
-### Benachrichtigungen
-
-Ein Glockensymbol (oben rechts, neben Ihrem Namen) zeigt eine Liste von Ereignissen: ein
-eigenes Element wartet auf Prüfung, wurde freigegeben oder auf "In Bearbeitung"
-zurückgesetzt, hat eine neue Revision, es kam ein Ergebnis der Kundenprüfung (Anmerkungen
-oder Abnahme) zu einem von Ihnen erstellten Element, Sie wurden einem Projekt hinzugefügt
-oder daraus entfernt, ein zugewiesenes Projekt wurde gelöscht, Ihr Passwort wurde von einem
-Administrator geändert, oder (nur Administratoren) wenig Speicherplatz im Dateispeicher.
-Auch ein beendeter CAD-Makrolauf hinterlässt hier einen Bericht: wie viele Dateien hoch-
-oder heruntergingen, welche fehlschlugen und welche übersprungen wurden, weil sie bereits
-im PDM waren.
-Jede Benachrichtigung kann einzeln als gelesen markiert oder gelöscht werden, und jeder
-Typ lässt sich unter Einstellungen → Benachrichtigungen abschalten.
-
-## Konten und Zugriff
-
-Zwei Rollen: **Administrator** (voller Zugriff, sieht alle Projekte, verwaltet Konten
-und Servereinstellungen) und **Benutzer** (sieht und arbeitet nur in den Projekten, denen
-er zugewiesen wurde). Jeder verwaltet seine eigene Oberflächensprache
-(Polnisch/Englisch/Deutsch) und den hellen/dunklen Modus selbst in den Einstellungen.
-
-Jedes Konto hat einen **Vor- und Nachnamen**, getrennt vom Anzeigenamen und für das
-Zeichnungsschriftfeld gedacht. Beide sind beim Anlegen eines Kontos Pflicht; Einstellungen
-→ Benutzer markiert Konten, denen sie fehlen, und die Bearbeiten-Schaltfläche beim Konto
-ergänzt sie.
-
-**Einstellungen → Firma** (Administratoren) enthält Firmenname und Logo — PNG oder JPEG,
-am besten quadratisch — für das Zeichnungsschriftfeld.
-
-Zwei Schalter unter **Einstellungen → Benutzer**, beide standardmäßig aus, schränken ein,
-was gewöhnliche Benutzer dürfen: Nur Administratoren setzen den Status „Freigegeben“, und
-nur Administratoren ändern die Firmenkataloge (Materialien, Bearbeitungen, Hersteller,
-Kunden) — alle anderen sehen sie weiterhin und wählen daraus.
-
-## Für Administratoren und Entwickler
-
-Serverinstallation (Docker / Linux / Windows), Architektur, die vollständige Liste der
-API-Endpunkte und bekannte Einschränkungen — siehe [`TECHNICAL.de.md`](TECHNICAL.de.md).
+Einen Fehler gefunden oder fehlt etwas? [Issue eröffnen](https://github.com/pawelcel/EasyPDM/issues).
+Wenn EasyPDM Ihnen Zeit spart, können Sie mir
+[einen Kaffee spendieren](https://buymeacoffee.com/easypdm). Lizenz: [MIT](LICENSE).
