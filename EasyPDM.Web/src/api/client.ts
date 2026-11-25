@@ -128,6 +128,15 @@ function json(body: unknown): RequestInit {
   }
 }
 
+// Today's date as year-month-day in the user's own time zone, for the name of a downloaded
+// documentation ZIP: "5(Assembly).A 2026-11-25.zip" (sorts by date). Sent from the browser
+// because a server in Docker often runs on UTC and would name the wrong day around midnight.
+function localDateForFileName(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 export const api = {
   getProjects: () => fetch(`${BASE}/projects`).then((r) => handleResponse<Project[]>(r)),
 
@@ -522,13 +531,17 @@ export const api = {
     `${BASE}/items/${itemId}/documentation?${[
       ...extensions.map((e) => `ext=${encodeURIComponent(e)}`),
       ...bom.map((b) => `bom=${encodeURIComponent(b)}`),
+      `date=${encodeURIComponent(localDateForFileName())}`,
     ].join("&")}`,
 
   getProjectDocumentationExtensions: (projectId: string) =>
     fetch(`${BASE}/projects/${projectId}/documentation/extensions`).then((r) => handleResponse<string[]>(r)),
 
   projectDocumentationUrl: (projectId: string, extensions: string[]) =>
-    `${BASE}/projects/${projectId}/documentation?${extensions.map((e) => `ext=${encodeURIComponent(e)}`).join("&")}`,
+    `${BASE}/projects/${projectId}/documentation?${[
+      ...extensions.map((e) => `ext=${encodeURIComponent(e)}`),
+      `date=${encodeURIComponent(localDateForFileName())}`,
+    ].join("&")}`,
 
   getMaterials: () => fetch(`${BASE}/materials`).then((r) => handleResponse<Material[]>(r)),
 

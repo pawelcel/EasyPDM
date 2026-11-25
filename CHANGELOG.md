@@ -4,6 +4,16 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+## [0.9.7]
+
+**In short:** a documentation download is named after what it came from and the day, and its files are no longer sorted into a folder per item.
+
+Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+
+### Changed
+- **Name of the documentation ZIP.** "Download documentation" no longer saves every archive as `dokumentacja.zip`: it is named after the item it was downloaded from (number, name and revision, as in its CAD file names) or the project, followed by the date as year-month-day, e.g. `5(Assembly).A 2026-11-25.zip`, so several downloads do not get mixed up and sort by date.
+- **All files on one level.** The archive no longer has a folder per item: every file is at its top, as the CAD add-ons already put the record name into their file names. Two attachments with the same name from different items are kept as `name.ext` and `name (2).ext`.
+
 ## [0.9.6]
 
 **In short:** the BOM option of "Download documentation" now shows wherever the button is, not only in the item's panel.

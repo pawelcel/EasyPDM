@@ -35,7 +35,7 @@ static class DocumentationEndpoints
         // podano "ext", archiwum zawiera tylko BOM — w przeciwnym razie odznaczenie wszystkich
         // rozszerzeń w oknie i zostawienie BOM-u pobierałoby wszystkie załączniki.
         // Odczyt, świadomie otwarty dla KAŻDEGO zalogowanego użytkownika (jak BOM).
-        app.MapGet("/api/items/{id:guid}/documentation", async (Guid id, string[]? ext, string[]? bom, HttpContext ctx) =>
+        app.MapGet("/api/items/{id:guid}/documentation", async (Guid id, string[]? ext, string[]? bom, string? date, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -58,7 +58,7 @@ static class DocumentationEndpoints
             if (zip is null)
                 return Results.BadRequest("No attachments match the selected extensions.");
 
-            return Results.File(TempFiles.OpenDeleteOnClose(zip), "application/zip", "dokumentacja.zip");
+            return Results.File(TempFiles.OpenDeleteOnClose(zip), "application/zip", ZipFileName(await ItemRecordNameAsync(conn, id), date));
         });
 
         // GET /api/projects/{projectId}/documentation/extensions
@@ -78,7 +78,7 @@ static class DocumentationEndpoints
         });
 
         // GET /api/projects/{projectId}/documentation?ext=txt&ext=pdf
-        app.MapGet("/api/projects/{projectId:guid}/documentation", async (Guid projectId, string[]? ext, HttpContext ctx) =>
+        app.MapGet("/api/projects/{projectId:guid}/documentation", async (Guid projectId, string[]? ext, string? date, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -93,8 +93,51 @@ static class DocumentationEndpoints
             if (zip is null)
                 return Results.BadRequest("No attachments match the selected extensions.");
 
-            return Results.File(TempFiles.OpenDeleteOnClose(zip), "application/zip", "dokumentacja.zip");
+            return Results.File(TempFiles.OpenDeleteOnClose(zip), "application/zip", ZipFileName(await ProjectNameAsync(conn, projectId), date));
         });
+    }
+
+    // The archive is named after what it was downloaded from -- the item's record name with
+    // its revision ("5(Assembly).A", as in its file names) or the project's name
+    // -- and the day as yyyy-MM-dd, so several downloads do not all arrive as
+    // "dokumentacja.zip" and get mixed up, and they sort by date. The day comes from the browser
+    // ("date", the user's own time zone); anything not shaped yyyy-MM-dd is replaced by the
+    // server's. Characters Windows does not allow in a file name become "-".
+    private static string ZipFileName(string? baseName, string? date)
+    {
+        var day = date is not null && System.Text.RegularExpressions.Regex.IsMatch(date, @"^\d{4}-\d{2}-\d{2}$")
+            ? date
+            : DateTime.Now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var name = string.IsNullOrWhiteSpace(baseName) ? "documentation" : baseName.Trim();
+        var invalid = Path.GetInvalidFileNameChars().Concat(new[] { '\\', '/', ':', '*', '?', '"', '<', '>', '|' }).ToHashSet();
+        string Clean(string s) => new string(s.Select(c => invalid.Contains(c) || char.IsControl(c) ? '-' : c).ToArray()).Trim();
+        return $"{Clean(name)} {Clean(day)}.zip";
+    }
+
+    private static async Task<string?> ItemRecordNameAsync(NpgsqlConnection conn, Guid id)
+    {
+        await using var cmd = new NpgsqlCommand("""
+            SELECT item_number, item_number_prefix, item_number_digits, item_number_with_name, file_name, revision_number
+            FROM items WHERE id = @id;
+            """, conn);
+        cmd.Parameters.AddWithValue("id", id);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync()) return null;
+        // The same as the item's CAD file names: record name and revision, "5(Assembly).A".
+        var recordName = ItemNumbering.RecordName(
+            reader.IsDBNull(0) ? null : reader.GetInt32(0),
+            reader.IsDBNull(1) ? null : reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetInt32(2),
+            reader.IsDBNull(3) ? null : reader.GetBoolean(3),
+            reader.GetString(4));
+        return reader.IsDBNull(5) ? recordName : $"{recordName}.{RevisionLabeling.Label(reader.GetInt32(5))}";
+    }
+
+    private static async Task<string?> ProjectNameAsync(NpgsqlConnection conn, Guid projectId)
+    {
+        await using var cmd = new NpgsqlCommand("SELECT name FROM projects WHERE id = @id;", conn);
+        cmd.Parameters.AddWithValue("id", projectId);
+        return await cmd.ExecuteScalarAsync() as string;
     }
 
     private static IResult AccessForbidden() =>
@@ -186,9 +229,8 @@ static class DocumentationEndpoints
     }
 
     // Zwraca bajty gotowego ZIP-a albo null, jeśli nie znaleziono żadnego pasującego pliku
-    // (pusty "ext" = wszystkie rozszerzenia). Wewnątrz ZIP-a każdy załącznik trafia do
-    // folderu nazwanego numerem/nazwą elementu, do którego jest podpięty — dzięki temu
-    // pliki o tej samej nazwie z różnych elementów się nie nadpisują.
+    // (pusty "ext" = wszystkie rozszerzenia). Wszystkie pliki leżą w jednym katalogu
+    // archiwum; powtórzona nazwa dostaje " (2)", więc nic się nie nadpisuje.
     // Zwraca ścieżkę gotowego archiwum w katalogu tymczasowym (zob. TempFiles) albo null, gdy nic
     // nie pasowało do filtra. Wywołujący wysyła je strumieniem, który usuwa plik po wysłaniu.
     // "extraFiles" (np. CSV z BOM-em) trafiają do korzenia archiwum, przed załącznikami.
@@ -236,11 +278,6 @@ static class DocumentationEndpoints
                 {
                     var attachmentFileName = reader.GetString(0);
                     var attachmentPath = reader.GetString(1);
-                    var itemNumber = reader.IsDBNull(2) ? (int?)null : reader.GetInt32(2);
-                    var itemNumberPrefix = reader.IsDBNull(3) ? "" : reader.GetString(3);
-                    var itemName = reader.GetString(4);
-                    var itemNumberDigits = reader.IsDBNull(5) ? (int?)null : reader.GetInt32(5);
-                    var itemNumberWithName = reader.IsDBNull(6) ? (bool?)null : reader.GetBoolean(6);
 
                     var extension = Path.GetExtension(attachmentFileName).TrimStart('.').ToLowerInvariant();
                     if (wantedExtensions is not null && !wantedExtensions.Contains(extension))
@@ -248,9 +285,10 @@ static class DocumentationEndpoints
                     if (!File.Exists(attachmentPath))
                         continue;
 
-                    var folderName = SanitizeSegment(ItemNumbering.RecordName(
-                        itemNumber, itemNumberPrefix, itemNumberDigits, itemNumberWithName, itemName));
-                    var entryName = MakeUniqueEntryName($"{folderName}/{SanitizeSegment(attachmentFileName)}", usedEntryNames);
+                    // Everything on one level: the files the CAD add-ons upload already carry the
+                    // record name ("13(Assem1).A.pdf"), and a folder per item made people dig.
+                    // Two attachments with the same name get " (2)" (MakeUniqueEntryName).
+                    var entryName = MakeUniqueEntryName(SanitizeSegment(attachmentFileName), usedEntryNames);
 
                     var entry = archive.CreateEntry(entryName, CompressionLevel.Fastest);
                     await using var entryStream = entry.Open();
