@@ -11,7 +11,7 @@ All notable changes to EasyPDM are documented in this file.
 Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
 
 ### Changed
-- **Sections in the item panel.** The BOM of an assembly, "Used in" and the history now each sit in a card of their own, like the sections of Settings, instead of running straight on from the properties and from each other.
+- **Sections in the item panel.** The item panel is now a stack of cards on the page background, like the sections of Settings: the fields, the BOM of an assembly, the attachments, "Used in" and the history each in a card of their own, instead of one long column.
 
 ## [0.9.8]
 

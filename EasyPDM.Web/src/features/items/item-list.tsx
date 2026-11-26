@@ -501,7 +501,7 @@ function ItemList({
 
           <ResizeHandle onMouseDown={startResize} />
 
-          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
             {selectedItem ? (
               <ItemDetailPanel
                 key={selectedItem.id}
@@ -522,6 +522,7 @@ function ItemList({
                 hideActions
               />
             ) : selectedProject ? (
+              <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
               <ProjectDetailPanel
                 key={selectedProject.id}
                 project={selectedProject}
@@ -533,8 +534,11 @@ function ItemList({
                 }}
                 hideActions
               />
+              </div>
             ) : (
-              <Hint>{t("database.selectItemHint")}</Hint>
+              <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+                <Hint>{t("database.selectItemHint")}</Hint>
+              </div>
             )}
           </div>
         </div>

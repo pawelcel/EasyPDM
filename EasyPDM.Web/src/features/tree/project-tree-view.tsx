@@ -560,7 +560,7 @@ function ProjectTreeView({
 
         <ResizeHandle onMouseDown={startResize} />
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {selectedItem ? (
             <ItemDetailPanel
               key={selectedItem.id}
@@ -579,7 +579,8 @@ function ProjectTreeView({
               hideActions
             />
           ) : (
-            <ProjectDetailPanel
+            <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+              <ProjectDetailPanel
               project={project}
               isAdmin={isAdmin}
               onUpdated={onProjectUpdated}
@@ -590,6 +591,7 @@ function ProjectTreeView({
               onSelectItem={(itemId) => setSelection({ kind: "item", id: itemId, parentId: undefined })}
               hideActions
             />
+            </div>
           )}
         </div>
       </div>
