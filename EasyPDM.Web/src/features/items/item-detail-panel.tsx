@@ -55,10 +55,10 @@ import { useLanguage } from "@/i18n/use-language"
 import { useOptimisticOrder } from "@/lib/optimistic-order"
 import { previewKindOf } from "@/lib/file-preview"
 
-// The BOM, "used in" and the history are lists of their own, longer than the fields above;
-// a gap and a thin rule before each keep them from running into the properties and into
-// each other.
-const SEPARATED_SECTION = "mt-6 border-t pt-1"
+// The BOM, "used in" and the history are lists of their own, longer than the fields above,
+// so each sits in a card of its own -- the same card as the sections of Settings (e.g.
+// Settings -> Users), so the two look alike.
+const SEPARATED_SECTION = "mt-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
 
 // W BOM-ie nie każda Część ma Materiał/Producenta/Numery zamówieniowe (zależy od "rodzaju") —
 // brakującą wartość pokazujemy jako "-", zamiast pustej komórki.
