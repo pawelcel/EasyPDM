@@ -58,6 +58,19 @@ Everything else — the browser app, catalogs, BOM — is the same whatever you 
 
 Everyone else in the team just opens the address in a browser.
 
+## Videos
+
+On YouTube, in English — [the whole playlist](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA):
+
+1. [What a PDM is and why EasyPDM](https://youtu.be/OaqyJQCHkt4)
+2. [Installation — Windows, Docker or Linux](https://youtu.be/ZwAWCJN9tWg)
+3. [Projects and structure](https://youtu.be/ZB3pXQY6-e0)
+4. [From CAD to PDM — the upload macro](https://youtu.be/vMQPxwWQrGc)
+5. [A whole assembly — upload, download, update and drawings](https://youtu.be/vXHYbRlPu_s)
+6. [Every field of a part — statuses, locks, materials and processes](https://youtu.be/JxMLm7bmuck)
+7. [PDM → Drawing — the title block fills itself in](https://youtu.be/ZJiMQNJRsB0)
+8. [BOM and documentation — the bill of materials nobody retypes](https://youtu.be/mJW8TSQ7EpU)
+
 ## Learn more
 
 - 📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** — with screenshots:
@@ -66,9 +79,6 @@ Everyone else in the team just opens the address in a browser.
   [CAD Integrations](https://github.com/pawelcel/EasyPDM/wiki/CAD-Integrations) ·
   [Settings](https://github.com/pawelcel/EasyPDM/wiki/Settings) ·
   [Technical Overview](https://github.com/pawelcel/EasyPDM/wiki/Technical-Overview)
-- ▶️ **[Video series](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)** — start with
-  [1. What a PDM is and why EasyPDM](https://youtu.be/OaqyJQCHkt4); newest:
-  [8. BOM and documentation](https://youtu.be/mJW8TSQ7EpU)
 - 🛠 **Administrators and developers** — architecture, API and server details in
   [`TECHNICAL.md`](TECHNICAL.md)
 - 📝 **What's new** — [`CHANGELOG.md`](CHANGELOG.md)

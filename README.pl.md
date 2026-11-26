@@ -59,6 +59,19 @@ tego, w czym projektujesz.
 
 Reszta zespołu po prostu otwiera ten adres w przeglądarce.
 
+## Filmy
+
+Na YouTube, po angielsku — [cała playlista](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA):
+
+1. [Po co PDM i czym jest EasyPDM](https://youtu.be/OaqyJQCHkt4)
+2. [Instalacja — Windows, Docker albo Linux](https://youtu.be/ZwAWCJN9tWg)
+3. [Projekty i struktura](https://youtu.be/ZB3pXQY6-e0)
+4. [Z CAD do PDM — makro wysyłania](https://youtu.be/vMQPxwWQrGc)
+5. [Całe złożenie — wysyłanie, pobieranie, aktualizacja i rysunki](https://youtu.be/vXHYbRlPu_s)
+6. [Pola części — statusy, blokady, materiały i obróbki](https://youtu.be/JxMLm7bmuck)
+7. [PDM → rysunek — tabelka wypełnia się sama](https://youtu.be/ZJiMQNJRsB0)
+8. [BOM i dokumentacja — zestawienie, którego nikt nie przepisuje](https://youtu.be/mJW8TSQ7EpU)
+
 ## Więcej informacji
 
 - 📖 **[Wiki](https://github.com/pawelcel/EasyPDM/wiki)** (po angielsku, ze zrzutami
@@ -67,9 +80,6 @@ Reszta zespołu po prostu otwiera ten adres w przeglądarce.
   [Programy CAD](https://github.com/pawelcel/EasyPDM/wiki/CAD-Integrations) ·
   [Ustawienia](https://github.com/pawelcel/EasyPDM/wiki/Settings) ·
   [Przegląd techniczny](https://github.com/pawelcel/EasyPDM/wiki/Technical-Overview)
-- ▶️ **[Seria filmów](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)** — zacznij od
-  [1. Po co PDM i czym jest EasyPDM](https://youtu.be/OaqyJQCHkt4); najnowszy:
-  [8. BOM i dokumentacja](https://youtu.be/mJW8TSQ7EpU)
 - 🛠 **Administratorzy i programiści** — architektura, API i szczegóły serwera w
   [`TECHNICAL.md`](TECHNICAL.md)
 - 📝 **Co nowego** — [`CHANGELOG.md`](CHANGELOG.md)
