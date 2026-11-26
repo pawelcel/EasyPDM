@@ -4,6 +4,15 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+## [0.9.9]
+
+**In short:** an item's BOM, "Used in" and history stand apart from its properties, so the panel is easier to read.
+
+Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+
+### Changed
+- **Sections in the item panel.** The BOM of an assembly, "Used in" and the history now each start after a gap and a thin line, instead of running straight on from the properties and from each other.
+
 ## [0.9.8]
 
 **In short:** the Docker images now run on ARM too (Raspberry Pi 4/5, ARM servers), and the Windows installer finds PostgreSQL installed outside `C:\Program Files`.

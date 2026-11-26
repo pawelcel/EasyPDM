@@ -55,6 +55,11 @@ import { useLanguage } from "@/i18n/use-language"
 import { useOptimisticOrder } from "@/lib/optimistic-order"
 import { previewKindOf } from "@/lib/file-preview"
 
+// The BOM, "used in" and the history are lists of their own, longer than the fields above;
+// a gap and a thin rule before each keep them from running into the properties and into
+// each other.
+const SEPARATED_SECTION = "mt-6 border-t pt-1"
+
 // W BOM-ie nie każda Część ma Materiał/Producenta/Numery zamówieniowe (zależy od "rodzaju") —
 // brakującą wartość pokazujemy jako "-", zamiast pustej komórki.
 // Obróbki (properties.processes) w kolumnie BOM-u po przecinku, z opisem w nawiasie — ta sama
@@ -526,7 +531,7 @@ function ItemDetailPanel({
       )}
 
       {item.itemType === "assembly" && (
-        <>
+        <div className={SEPARATED_SECTION}>
           <div className="flex items-end justify-between gap-2">
             <SectionLabel>{t("item.bom")}</SectionLabel>
             <div className="mb-1 flex items-center gap-3 text-[12.5px]">
@@ -600,7 +605,7 @@ function ItemDetailPanel({
             <Hint>{t("item.noPartsInAssembly")}</Hint>
           )}
           <FormError>{bomError}</FormError>
-        </>
+        </div>
       )}
 
       {item.itemType === "folder" && (
@@ -697,11 +702,15 @@ function ItemDetailPanel({
       )}
 
       {(item.itemType === "part" || item.itemType === "assembly") && (
-        <UsedInPanel itemId={item.id} onSelectChild={onSelectChild} />
+        <div className={SEPARATED_SECTION}>
+          <UsedInPanel itemId={item.id} onSelectChild={onSelectChild} />
+        </div>
       )}
 
       {(item.itemType === "part" || item.itemType === "assembly") && (
-        <ItemHistoryPanel itemId={item.id} refreshSignal={historyRefreshSignal} />
+        <div className={SEPARATED_SECTION}>
+          <ItemHistoryPanel itemId={item.id} refreshSignal={historyRefreshSignal} />
+        </div>
       )}
     </div>
     </DocumentationLanguageProvider>
