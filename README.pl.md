@@ -68,7 +68,8 @@ Reszta zespołu po prostu otwiera ten adres w przeglądarce.
   [Ustawienia](https://github.com/pawelcel/EasyPDM/wiki/Settings) ·
   [Przegląd techniczny](https://github.com/pawelcel/EasyPDM/wiki/Technical-Overview)
 - ▶️ **[Seria filmów](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)** — zacznij od
-  [1. Po co PDM i czym jest EasyPDM](https://youtu.be/OaqyJQCHkt4)
+  [1. Po co PDM i czym jest EasyPDM](https://youtu.be/OaqyJQCHkt4); najnowszy:
+  [8. BOM i dokumentacja](https://youtu.be/mJW8TSQ7EpU)
 - 🛠 **Administratorzy i programiści** — architektura, API i szczegóły serwera w
   [`TECHNICAL.md`](TECHNICAL.md)
 - 📝 **Co nowego** — [`CHANGELOG.md`](CHANGELOG.md)

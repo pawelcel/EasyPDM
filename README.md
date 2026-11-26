@@ -67,7 +67,8 @@ Everyone else in the team just opens the address in a browser.
   [Settings](https://github.com/pawelcel/EasyPDM/wiki/Settings) ·
   [Technical Overview](https://github.com/pawelcel/EasyPDM/wiki/Technical-Overview)
 - ▶️ **[Video series](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)** — start with
-  [1. What a PDM is and why EasyPDM](https://youtu.be/OaqyJQCHkt4)
+  [1. What a PDM is and why EasyPDM](https://youtu.be/OaqyJQCHkt4); newest:
+  [8. BOM and documentation](https://youtu.be/mJW8TSQ7EpU)
 - 🛠 **Administrators and developers** — architecture, API and server details in
   [`TECHNICAL.md`](TECHNICAL.md)
 - 📝 **What's new** — [`CHANGELOG.md`](CHANGELOG.md)

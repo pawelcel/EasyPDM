@@ -72,7 +72,8 @@ Alle anderen im Team öffnen einfach die Adresse im Browser.
   [Einstellungen](https://github.com/pawelcel/EasyPDM/wiki/Settings) ·
   [Technischer Überblick](https://github.com/pawelcel/EasyPDM/wiki/Technical-Overview)
 - ▶️ **[Videoserie](https://www.youtube.com/playlist?list=PLe2vSF7-ieUA)** — am besten mit
-  [1. Was ein PDM ist und warum EasyPDM](https://youtu.be/OaqyJQCHkt4) beginnen
+  [1. Was ein PDM ist und warum EasyPDM](https://youtu.be/OaqyJQCHkt4) beginnen; die neueste:
+  [8. Stückliste und Dokumentation](https://youtu.be/mJW8TSQ7EpU)
 - 🛠 **Administratoren und Entwickler** — Architektur, API und Serverdetails in
   [`TECHNICAL.md`](TECHNICAL.md)
 - 📝 **Was ist neu** — [`CHANGELOG.md`](CHANGELOG.md)
