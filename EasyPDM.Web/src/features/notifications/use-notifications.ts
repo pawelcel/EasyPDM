@@ -66,5 +66,15 @@ export function useNotifications() {
     }
   }
 
-  return { unreadCount, items, refetch, markRead, markAllRead, deleteNotification }
+  async function deleteAllNotifications() {
+    setItems([])
+    setUnreadCount(0)
+    try {
+      await api.deleteAllNotifications()
+    } catch {
+      await refetch()
+    }
+  }
+
+  return { unreadCount, items, refetch, markRead, markAllRead, deleteNotification, deleteAllNotifications }
 }

@@ -354,6 +354,9 @@ export const api = {
   deleteNotification: (id: string) =>
     fetch(`${BASE}/notifications/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
+  deleteAllNotifications: () =>
+    fetch(`${BASE}/notifications`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
   getNotificationPreferences: () =>
     fetch(`${BASE}/notification-preferences`).then((r) => handleResponse<NotificationPreference[]>(r)),
 

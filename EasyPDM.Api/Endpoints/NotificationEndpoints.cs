@@ -106,6 +106,22 @@ static class NotificationEndpoints
             return Results.Ok();
         });
 
+        // DELETE /api/notifications — deletes ALL of the caller's notifications, so a long list
+        // need not be cleared one by one. Only the caller's own rows (WHERE user_id), as above.
+        app.MapDelete("/api/notifications", async (HttpContext ctx) =>
+        {
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+
+            await using var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+
+            await using var cmd = new NpgsqlCommand("DELETE FROM notifications WHERE user_id = @userId;", conn);
+            cmd.Parameters.AddWithValue("userId", user.Id);
+            await cmd.ExecuteNonQueryAsync();
+
+            return Results.Ok();
+        });
+
         // POST /api/notifications/read-all — oznacza WSZYSTKIE powiadomienia wołającego.
         app.MapPost("/api/notifications/read-all", async (HttpContext ctx) =>
         {

@@ -23,11 +23,17 @@ function NotificationBell({
   onNavigateToSettings?: () => void
 }) {
   const { t, language } = useLanguage()
-  const { unreadCount, items, refetch, markRead, markAllRead, deleteNotification } = useNotifications()
+  const { unreadCount, items, refetch, markRead, markAllRead, deleteNotification, deleteAllNotifications } =
+    useNotifications()
+  // "Delete all" asks once, in place: the first click turns the button into a red "Confirm",
+  // which a second click carries out. A modal would open under this panel (z-70 over the
+  // dialogs' z-50), and the list is gone for good once deleted.
+  const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false)
   const [open, setOpen] = useState(false)
 
   function toggle() {
     if (!open) refetch()
+    setConfirmingDeleteAll(false)
     setOpen((prev) => !prev)
   }
 
@@ -70,13 +76,44 @@ function NotificationBell({
               raport z biegu ląduje tu W CHWILI, gdy lista plików jeszcze wisi na ekranie, więc
               przy niższej warstwie panel postępu przykrywałby dokładnie to powiadomienie,
               które właśnie zapowiedział (wyłapane zrzutem ekranu przy weryfikacji). */}
-          <div className="fixed inset-0 z-[65]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed inset-0 z-[65]"
+            onClick={() => {
+              setConfirmingDeleteAll(false)
+              setOpen(false)
+            }}
+          />
           <div className="absolute top-full right-0 z-[70] mt-2 w-96 rounded-xl bg-card p-2 shadow-lg ring-1 ring-foreground/10">
-            <div className="flex items-center justify-between px-1.5 pt-1 pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 px-1.5 pt-1 pb-2">
               <span className="text-[12.5px] font-medium">{t("notifications.title")}</span>
-              <Button type="button" variant="link" size="xs" onClick={markAllRead} disabled={unreadCount === 0}>
-                {t("notifications.markAllRead")}
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button type="button" variant="link" size="xs" onClick={markAllRead} disabled={unreadCount === 0}>
+                  {t("notifications.markAllRead")}
+                </Button>
+                {confirmingDeleteAll ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="xs"
+                    onClick={() => {
+                      setConfirmingDeleteAll(false)
+                      void deleteAllNotifications()
+                    }}
+                  >
+                    {t("notifications.deleteAllConfirm")}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="xs"
+                    onClick={() => setConfirmingDeleteAll(true)}
+                    disabled={items.length === 0}
+                  >
+                    {t("notifications.deleteAll")}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {items.length === 0 ? (
