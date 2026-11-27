@@ -8,6 +8,16 @@ All notable changes to EasyPDM are documented in this file.
 
 **In short:** who is involved in a project, on both sides. A project names its lead and the people taking part in the company, with their roles, and the people on the client's side with theirs; each assembly lists who of the team works on it and who leads that work, and a new "My work" page collects their progress entries for the lead to accept or comment on. The item and project panels are split into cards, and a client's second name lists its projects.
 
+![My work: an assembly's progress entries, one accepted and one with the lead's remarks, and the form for a new one](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/using-my-work.png)
+
+![My work as the project's lead: Accept and Remarks next to each entry](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/using-my-work-lead.png)
+
+![A project's people in the company: the lead and the people taking part with their roles](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/using-project-team.png)
+
+![An assembly's card of people working on it, the lead marked with a star](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/using-assembly-assignees.png)
+
+![The project's order documents and, below them, the people on the client's side with their roles](https://raw.githubusercontent.com/wiki/pawelcel/EasyPDM/images/using-project-people.png)
+
 Update as usual: run the new installer over the old one, or pull the new Docker images. The database is updated by itself on the first start.
 
 ### Added
