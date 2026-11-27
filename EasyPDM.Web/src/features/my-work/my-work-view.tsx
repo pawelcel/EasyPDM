@@ -127,12 +127,10 @@ function AssemblyProgress({
           className="group flex min-w-0 items-baseline gap-2 rounded-md text-left hover:text-primary"
           title={t("myWork.openAssembly")}
         >
-          {assembly.number && (
-            <span className="rounded-md bg-primary/15 px-2 py-0.5 font-mono text-base font-bold text-primary">
-              {assembly.number}
-            </span>
-          )}
-          <span className="truncate text-base font-semibold group-hover:underline">{assembly.name}</span>
+          {/* The record name as everywhere else (tree, BOM, file names): "4(Drive frame)". */}
+          <span className="truncate text-base font-semibold group-hover:underline">
+            {assembly.label}
+          </span>
           {assembly.revisionLabel && (
             <span className="shrink-0 text-sm text-muted-foreground">
               {t("item.revisionShort")} {assembly.revisionLabel}
