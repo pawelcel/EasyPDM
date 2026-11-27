@@ -25,7 +25,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
 
 - **`db/schema.sql`** — das vollständige Schema von Grund auf (aktueller Stand nach allen
   Migrationen).
-- **`db/migrations/`** — Migrationen `002`–`082` für eine bereits bestehende Datenbank:
+- **`db/migrations/`** — Migrationen `002`–`083` für eine bereits bestehende Datenbank:
   Projekte, Elementtypen, Sichtbarkeit im Baum, Status/Revisionen, Materialien
   (+ Gruppen/Untergruppen), Anhänge, Stücklisten-Reihenfolge, Revisionskommentare,
   Anmeldung und Rollen, Projekteigenschaften, kaskadierendes Löschen, Reihenfolge der
@@ -52,7 +52,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
   Dokumentationssprachen und Übersetzungen, Vor- und Nachnamen der Benutzer, Firmendaten,
   Beschriftungen in Dokumenten, Makro-Tokens, gehashte Sitzungstokens, die Änderungshistorie
   eines Elements, Upload-Regeln, das Blattformat eines PDFs, (081) jede CAD-Dateiversion, die
-  ein Element hatte, und (082) die Personen auf Kundenseite eines Projekts mit ihren Rollen. Seit Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
+  ein Element hatte, und (082, 083) die Personen auf Kundenseite eines Projekts mit ihren Rollen, eine Person auch mehrfach. Seit Migration 027 sind die Dateien aus diesem Ordner in das Programm eingebettet (embedded
   resources) und werden **automatisch bei jedem Start** angewendet — siehe
   `MigrationRunner.cs` und "Inbetriebnahme" unten — sie müssen nicht mehr manuell per
   psql ausgeführt werden.
@@ -709,7 +709,7 @@ Meldung des Servers unverändert.
 | PATCH | `/api/projects/{id}/closed` | Projekt schließen / wieder öffnen (eigener Endpunkt, damit er nicht mit dem Speichern des Projektformulars konkurriert) |
 | GET/POST | `/api/projects/{projectId}/attachments` | die Auftragsdokumente des Projekts: Angebot, Auftragsbestätigung (je mehrere Dateien) und Sonstiges |
 | GET/POST | `/api/projects/{projectId}/contacts` | Personen auf Kundenseite des Projekts mit ihren Rollen; aus den Kontakten des Kunden und der Name 2 des Projekts (POST: Administrator) |
-| PATCH/DELETE | `/api/projects/{projectId}/contacts/{contactId}` | Rolle einer Person ändern / sie aus dem Projekt nehmen (Administrator); ein Wechsel von Kunde oder Name 2 des Projekts entfernt Personen, die nicht mehr dazugehören |
+| PATCH/DELETE | `/api/projects/{projectId}/contacts/{id}` | Rolle eines Eintrags ändern (einer Zeile: eine Person kann mehrmals mit verschiedenen Rollen im Projekt sein) / ihn entfernen (Administrator); ein Wechsel von Kunde oder Name 2 des Projekts entfernt Personen, die nicht mehr dazugehören |
 | GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | eines davon herunterladen / löschen |
 | GET | `/api/projects/{projectId}/client-verifications` | Übersicht der Kundenprüfung im Projekt (Nacharbeit / in Arbeit / geprüft) |
 | GET/POST | `/api/projects/{projectId}/items/{itemId}/client-verifications` | Prüfverlauf eines Elements in diesem Projekt / Eintrag hinzufügen (Ergebnis, Kommentar, Anhänge) |

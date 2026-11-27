@@ -711,17 +711,17 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contactId, role }),
-    }).then((r) => handleResponse<void>(r)),
+    }).then((r) => handleResponse<{ id: number }>(r)),
 
-  updateProjectContactRole: (projectId: string, contactId: number, role: string) =>
-    fetch(`${BASE}/projects/${projectId}/contacts/${contactId}`, {
+  updateProjectContactRole: (projectId: string, id: number, role: string) =>
+    fetch(`${BASE}/projects/${projectId}/contacts/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role }),
     }).then((r) => handleResponse<void>(r)),
 
-  removeProjectContact: (projectId: string, contactId: number) =>
-    fetch(`${BASE}/projects/${projectId}/contacts/${contactId}`, { method: "DELETE" }).then((r) =>
+  removeProjectContact: (projectId: string, id: number) =>
+    fetch(`${BASE}/projects/${projectId}/contacts/${id}`, { method: "DELETE" }).then((r) =>
       handleResponse<void>(r)
     ),
 

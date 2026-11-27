@@ -13,7 +13,6 @@ import {
   ComboboxList,
 } from "@/components/ui/combobox"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
@@ -24,6 +23,7 @@ import { useClients } from "@/features/clients/use-clients"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { ClientVerificationOverview } from "@/features/projects/client-verification-overview"
 import { ProjectAttachmentsPanel } from "@/features/projects/project-attachments-panel"
+import { ContactInfoDialog } from "@/features/projects/contact-info-dialog"
 import { ProjectContactsField } from "@/features/projects/project-contacts-field"
 import { ProjectLanguagesField } from "@/features/projects/project-languages-field"
 import { useLanguage } from "@/i18n/use-language"
@@ -328,85 +328,6 @@ function ProjectDetailPanel({
           </ComboboxContent>
         </Combobox>
 
-        <Label htmlFor="project-lead-contact">{t("project.leadContact")}</Label>
-        {form.clientId && leadContacts.length > 0 ? (
-          <div className="flex items-center gap-1.5">
-            <div className="flex-1">
-              <Combobox
-                items={leadContacts.map((c) => c.id)}
-                value={form.leadContactId}
-                onValueChange={(v) => {
-                  const next = { ...form, leadContactId: (v as number | null) ?? null }
-                  setForm(next)
-                  save(next)
-                }}
-                itemToStringLabel={(id: number) => contactLabel(leadContacts.find((c) => c.id === id))}
-                disabled={!isAdmin}
-              >
-                <ComboboxInput id="project-lead-contact" placeholder={t("part.searchPlaceholder")} showClear />
-                <ComboboxContent>
-                  <ComboboxEmpty>{t("project.noMatchingLeadContact")}</ComboboxEmpty>
-                  <ComboboxList>
-                    {(id: number) => (
-                      <ComboboxItem key={id} value={id}>
-                        {contactLabel(leadContacts.find((c) => c.id === id))}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-            </div>
-            {selectedLeadContact && (
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                aria-label={t("project.leadContactDetailsAria")}
-                onClick={() => setShowingLeadContact(true)}
-              >
-                <Info className="size-4" />
-              </Button>
-            )}
-          </div>
-        ) : (
-          <Hint>{form.clientId ? t("project.noLeadContactsHint") : t("project.leadContactNeedsClientHint")}</Hint>
-        )}
-
-        <ProjectContactsField
-          projectId={project.id}
-          clientId={project.clientId}
-          clientName2Id={project.clientName2Id}
-          availableContacts={leadContacts}
-          isAdmin={isAdmin}
-        />
-
-        {showingLeadContact && selectedLeadContact && (
-          <Dialog open onOpenChange={setShowingLeadContact}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{contactLabel(selectedLeadContact)}</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-2 text-sm">
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">{t("common.position")}</span>
-                  <span>{selectedLeadContact.position || "-"}</span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">{t("common.phone")}</span>
-                  <span>{selectedLeadContact.phone || "-"}</span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">{t("common.email")}</span>
-                  <span>{selectedLeadContact.email || "-"}</span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">{t("common.address")}</span>
-                  <span>{selectedLeadContact.address || "-"}</span>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
 
         <div className="flex gap-2">
           <div className="flex flex-1 flex-col gap-2">
@@ -445,6 +366,67 @@ function ProjectDetailPanel({
           nie tylko dla administratora edytującego właściwości. */}
       <div className={PANEL_CARD}>
         <ProjectAttachmentsPanel projectId={project.id} />
+      </div>
+
+      <div className={PANEL_CARD}>
+        <SectionLabel>{t("project.clientPeople")}</SectionLabel>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="project-lead-contact">{t("project.leadContact")}</Label>
+          {form.clientId && leadContacts.length > 0 ? (
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1">
+                <Combobox
+                  items={leadContacts.map((c) => c.id)}
+                  value={form.leadContactId}
+                  onValueChange={(v) => {
+                    const next = { ...form, leadContactId: (v as number | null) ?? null }
+                    setForm(next)
+                    save(next)
+                  }}
+                  itemToStringLabel={(id: number) => contactLabel(leadContacts.find((c) => c.id === id))}
+                  disabled={!isAdmin}
+                >
+                  <ComboboxInput id="project-lead-contact" placeholder={t("part.searchPlaceholder")} showClear />
+                  <ComboboxContent>
+                    <ComboboxEmpty>{t("project.noMatchingLeadContact")}</ComboboxEmpty>
+                    <ComboboxList>
+                      {(id: number) => (
+                        <ComboboxItem key={id} value={id}>
+                          {contactLabel(leadContacts.find((c) => c.id === id))}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </div>
+              {selectedLeadContact && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  aria-label={t("project.leadContactDetailsAria")}
+                  onClick={() => setShowingLeadContact(true)}
+                >
+                  <Info className="size-4" />
+                </Button>
+              )}
+            </div>
+          ) : (
+            <Hint>{form.clientId ? t("project.noLeadContactsHint") : t("project.leadContactNeedsClientHint")}</Hint>
+          )}
+
+          <ProjectContactsField
+            projectId={project.id}
+            clientId={project.clientId}
+            clientName2Id={project.clientName2Id}
+            availableContacts={leadContacts}
+            isAdmin={isAdmin}
+          />
+
+          {showingLeadContact && selectedLeadContact && (
+            <ContactInfoDialog contact={selectedLeadContact} onClose={() => setShowingLeadContact(false)} />
+          )}
+        </div>
       </div>
 
       <ClientVerificationOverview summaries={clientVerifications} onSelectItem={onSelectItem} />

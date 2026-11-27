@@ -23,7 +23,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`082` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`083` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
@@ -47,7 +47,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
   obrazka modelu, obróbki, języki dokumentacji i tłumaczenia, imiona i nazwiska użytkowników,
   dane firmy, etykiety w dokumentach, tokeny makr, haszowane tokeny sesji, historia zmian
   elementu, reguły uploadu, układ arkusza PDF, (081) każda wersja pliku CAD, jaką miał
-  element, i (082) osoby po stronie klienta w projekcie z ich rolami. Od migracji 027 pliki z tego folderu są wbudowane
+  element, i (082, 083) osoby po stronie klienta w projekcie z ich rolami, jedna osoba może mieć kilka. Od migracji 027 pliki z tego folderu są wbudowane
   w program (embedded resources) i stosowane **automatycznie przy każdym starcie** — zob.
   `MigrationRunner.cs` i "Jak uruchomić" niżej — nie trzeba ich już odpalać ręcznie przez psql.
 - **`EasyPDM.Api/`** — ASP.NET Core (minimal API, Npgsql bez ORM), endpointy podzielone
@@ -647,7 +647,7 @@ zmian.
 | PATCH | `/api/projects/{id}/closed` | zamknięcie / ponowne otwarcie projektu (osobny endpoint, żeby nie ścigał się z zapisem formularza projektu) |
 | GET/POST | `/api/projects/{projectId}/attachments` | dokumenty zamówienia projektu: oferta, potwierdzenie zamówienia (po kilka plików) i pozostałe |
 | GET/POST | `/api/projects/{projectId}/contacts` | osoby po stronie klienta w projekcie z ich rolami; dodawane z kontaktów klienta i Nazwy 2 projektu (POST: administrator) |
-| PATCH/DELETE | `/api/projects/{projectId}/contacts/{contactId}` | zmiana roli osoby / usunięcie jej z projektu (administrator); zmiana klienta lub Nazwy 2 projektu usuwa osoby, które już do niego nie należą |
+| PATCH/DELETE | `/api/projects/{projectId}/contacts/{id}` | zmiana roli jednego wpisu (wiersza: osoba może być w projekcie kilka razy z różnymi rolami) / jego usunięcie (administrator); zmiana klienta lub Nazwy 2 projektu usuwa osoby, które już do niego nie należą |
 | GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | pobranie / usunięcie jednego z nich |
 | GET | `/api/projects/{projectId}/client-verifications` | przegląd weryfikacji klienta w projekcie (do poprawy / w toku / zweryfikowane) |
 | GET/POST | `/api/projects/{projectId}/items/{itemId}/client-verifications` | historia weryfikacji elementu w tym projekcie / dodanie wpisu (wynik, komentarz, załączniki) |

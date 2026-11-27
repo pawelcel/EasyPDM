@@ -11,7 +11,7 @@ All notable changes to EasyPDM are documented in this file.
 Update as usual: run the new installer over the old one, or pull the new Docker images. The database is updated by itself on the first start.
 
 ### Added
-- **People on the client's side of a project.** Under the project lead, a project now lists the people involved on the client's side, each with a role (purchasing, acceptance, commissioning…), picked from the same contacts as the lead: the client's own and those of the project's second name. An administrator adds them, edits their roles and removes them; when the project's client or second name changes, the people who no longer belong are taken off.
+- **People on the client's side of a project.** A project has a section of its own, below the order documents, for the people on the client's side: the project lead and everyone else involved, each with a role (purchasing, acceptance, commissioning…) and an ⓘ that shows their phone, e-mail and position. They are picked from the same contacts as the lead (the client's own and those of the project's second name), and one person can be added several times with different roles. An administrator adds them, edits their roles and removes them; when the project's client or second name changes, the people who no longer belong are taken off.
 - **Projects of a second name.** A client's second name now lists the projects filed under it, as the client lists its own, each with a jump to the project.
 
 ### Changed

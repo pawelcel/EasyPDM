@@ -25,7 +25,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`082` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`083` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -48,8 +48,8 @@ PostgreSQL 18.
   numbering settings (digits, name in the record name), the model-image role, processes,
   documentation languages and translations, users' first/last names, the company profile,
   document labels, macro tokens, hashed session tokens, item change history, upload rules,
-  the drawing sheet layout of a PDF, (081) every CAD file version an item has had, and (082) the
-  people on the client's side of a project with their roles. Since
+  the drawing sheet layout of a PDF, (081) every CAD file version an item has had, and (082, 083) the
+  people on the client's side of a project with their roles, one person possibly in several. Since
   migration 027, files in this folder are embedded in the program
   (embedded resources) and applied **automatically on every startup** — see
   `MigrationRunner.cs` and "How to run" below — you no longer need to run them
@@ -931,7 +931,7 @@ and the server's message otherwise; the CAD macros show the server's message as 
 | PATCH | `/api/projects/{id}/closed` | close / reopen a project (its own endpoint so it cannot race a save of the project's form) |
 | GET/POST | `/api/projects/{projectId}/attachments` | the project's order documents: quote, order confirmation (several files each) and other |
 | GET/POST | `/api/projects/{projectId}/contacts` | people on the client's side of the project with their roles; added from the client's contacts and those of the project's Name 2 (POST: administrator) |
-| PATCH/DELETE | `/api/projects/{projectId}/contacts/{contactId}` | change a person's role / take them off the project (administrator); a change of the project's client or Name 2 drops the people who no longer belong |
+| PATCH/DELETE | `/api/projects/{projectId}/contacts/{id}` | change the role of one entry (a row: a person can be on a project several times with different roles) / take it off (administrator); a change of the project's client or Name 2 drops the people who no longer belong |
 | GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | download / delete one of them |
 | GET | `/api/projects/{projectId}/client-verifications` | the project's client verification overview (needs work / in progress / verified) |
 | GET/POST | `/api/projects/{projectId}/items/{itemId}/client-verifications` | an item's verification record in that project / add an entry (result, comment, attachments) |

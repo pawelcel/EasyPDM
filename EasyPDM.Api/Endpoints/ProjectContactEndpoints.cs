@@ -1,7 +1,8 @@
 using Npgsql;
 
 // People on the client's side involved in a project, each with a role (project_contacts), next to
-// the project lead. Picked from the same contacts as the lead -- the client's own and those of the
+// the project lead. A person may be on it several times with different roles; a row is addressed
+// by its own id. Picked from the same contacts as the lead -- the client's own and those of the
 // project's Name 2 (ProjectEndpoints.ValidateLeadContactAsync checks both the same way). Everyone
 // with access to the project sees them; only an administrator changes them, as the other project
 // fields.
@@ -22,7 +23,7 @@ static class ProjectContactEndpoints
                 return Results.Text("You do not have access to this project.", statusCode: StatusCodes.Status403Forbidden);
 
             const string sql = """
-                SELECT c.id, c.first_name, c.last_name, c.phone, c.position, c.email, c.address, pc.role
+                SELECT c.id, c.first_name, c.last_name, c.phone, c.position, c.email, c.address, pc.role, pc.id
                 FROM project_contacts pc
                 JOIN client_contacts c ON c.id = pc.contact_id
                 WHERE pc.project_id = @projectId
@@ -45,6 +46,7 @@ static class ProjectContactEndpoints
                     email = S(5),
                     address = S(6),
                     role = reader.GetString(7),
+                    id = reader.GetInt64(8),
                 });
             }
             return Results.Ok(result);
@@ -73,18 +75,19 @@ static class ProjectContactEndpoints
 
             await using var cmd = new NpgsqlCommand("""
                 INSERT INTO project_contacts (project_id, contact_id, role) VALUES (@projectId, @contactId, @role)
-                ON CONFLICT DO NOTHING;
+                ON CONFLICT DO NOTHING
+                RETURNING id;
                 """, conn);
             cmd.Parameters.AddWithValue("projectId", projectId);
             cmd.Parameters.AddWithValue("contactId", body.ContactId.Value);
             cmd.Parameters.AddWithValue("role", role);
-            if (await cmd.ExecuteNonQueryAsync() == 0)
-                return Results.Conflict("This person is already on the project.");
-            return Results.Ok();
+            if (await cmd.ExecuteScalarAsync() is not long id)
+                return Results.Conflict("This person already has this role on the project.");
+            return Results.Ok(new { id });
         });
 
-        // PATCH /api/projects/{projectId}/contacts/{contactId}   body: { role }
-        app.MapPatch("/api/projects/{projectId:guid}/contacts/{contactId:int}", async (Guid projectId, int contactId, HttpContext ctx, ProjectContactRequest body) =>
+        // PATCH /api/projects/{projectId}/contacts/{id}   body: { role }  (id: the row, not the contact)
+        app.MapPatch("/api/projects/{projectId:guid}/contacts/{id:long}", async (Guid projectId, long id, HttpContext ctx, ProjectContactRequest body) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
                 return AdminOnly();
@@ -95,24 +98,31 @@ static class ProjectContactEndpoints
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
             await using var cmd = new NpgsqlCommand(
-                "UPDATE project_contacts SET role = @role WHERE project_id = @projectId AND contact_id = @contactId;", conn);
+                "UPDATE project_contacts SET role = @role WHERE project_id = @projectId AND id = @id;", conn);
             cmd.Parameters.AddWithValue("role", role);
             cmd.Parameters.AddWithValue("projectId", projectId);
-            cmd.Parameters.AddWithValue("contactId", contactId);
-            return await cmd.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.Ok();
+            cmd.Parameters.AddWithValue("id", id);
+            try
+            {
+                return await cmd.ExecuteNonQueryAsync() == 0 ? Results.NotFound() : Results.Ok();
+            }
+            catch (PostgresException ex) when (ex.SqlState == "23505")
+            {
+                return Results.Conflict("This person already has this role on the project.");
+            }
         });
 
-        // DELETE /api/projects/{projectId}/contacts/{contactId}
-        app.MapDelete("/api/projects/{projectId:guid}/contacts/{contactId:int}", async (Guid projectId, int contactId, HttpContext ctx) =>
+        // DELETE /api/projects/{projectId}/contacts/{id}  (id: the row, not the contact)
+        app.MapDelete("/api/projects/{projectId:guid}/contacts/{id:long}", async (Guid projectId, long id, HttpContext ctx) =>
         {
             if (!AuthEndpoints.IsAdmin(ctx))
                 return AdminOnly();
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
             await using var cmd = new NpgsqlCommand(
-                "DELETE FROM project_contacts WHERE project_id = @projectId AND contact_id = @contactId;", conn);
+                "DELETE FROM project_contacts WHERE project_id = @projectId AND id = @id;", conn);
             cmd.Parameters.AddWithValue("projectId", projectId);
-            cmd.Parameters.AddWithValue("contactId", contactId);
+            cmd.Parameters.AddWithValue("id", id);
             await cmd.ExecuteNonQueryAsync();
             return Results.Ok();
         });

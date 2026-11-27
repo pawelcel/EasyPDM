@@ -562,6 +562,8 @@ export interface ClientContact {
 
 // A person on the client's side involved in a project, with their role in it.
 export interface ProjectContact extends Omit<ClientContact, "id"> {
+  // The row: one person can be on a project several times, with different roles.
+  id: number
   contactId: number
   role: string
 }

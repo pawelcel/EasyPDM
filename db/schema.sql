@@ -352,15 +352,18 @@ CREATE INDEX idx_projects_lead_contact ON projects (lead_contact_id);
 
 -- People on the client's side involved in a project, each with their role in it, next to the
 -- project lead; from the same contacts as the lead (the client's own and its Name 2's), kept in
--- step by the application when the project's client or Name 2 changes.
+-- step by the application when the project's client or Name 2 changes. One person may hold
+-- several roles (one row each), but not the same role twice (migrations 082, 083).
 CREATE TABLE project_contacts (
     project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     contact_id  INTEGER NOT NULL REFERENCES client_contacts(id) ON DELETE CASCADE,
     role        TEXT NOT NULL DEFAULT '',
     added_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (project_id, contact_id)
+    id          BIGSERIAL PRIMARY KEY
 );
 CREATE INDEX idx_project_contacts_contact ON project_contacts (contact_id);
+CREATE UNIQUE INDEX uq_project_contacts_role ON project_contacts (project_id, contact_id, role);
+CREATE INDEX idx_project_contacts_project ON project_contacts (project_id);
 
 -- ============================================================
 -- Powiadomienia -- zdarzenia dotyczące elementów/projektów/konta, adresowane do

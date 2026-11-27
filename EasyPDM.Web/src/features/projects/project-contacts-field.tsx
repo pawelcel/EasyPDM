@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { X } from "lucide-react"
+import { Info, X } from "lucide-react"
 
 import { api } from "@/api/client"
 import type { ClientContact, ProjectContact } from "@/api/types"
@@ -16,6 +16,7 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ContactInfoDialog } from "@/features/projects/contact-info-dialog"
 import { useLanguage } from "@/i18n/use-language"
 
 function personLabel(contact: { firstName: string | null; lastName: string | null } | undefined): string {
@@ -25,7 +26,8 @@ function personLabel(contact: { firstName: string | null; lastName: string | nul
 
 // People on the client's side involved in the project, each with a role (purchasing,
 // acceptance...), under the project lead and picked from the same contacts: the client's own and
-// those of the project's Name 2 (availableContacts, loaded by the panel for the lead). The server
+// those of the project's Name 2 (availableContacts, loaded by the panel for the lead). One person
+// can be added several times with different roles, so a row is addressed by its own id. The server
 // drops the ones who no longer belong when the client or Name 2 changes, so the list is reloaded
 // whenever those change. Only an administrator edits it, as the other project fields.
 function ProjectContactsField({
@@ -47,12 +49,13 @@ function ProjectContactsField({
   const [newContactId, setNewContactId] = useState<number | null>(null)
   const [newRole, setNewRole] = useState("")
   const [error, setError] = useState("")
+  const [showing, setShowing] = useState<ProjectContact | null>(null)
 
   async function reload() {
     try {
       const list = await api.getProjectContacts(projectId)
       setPeople(list)
-      setRoles(Object.fromEntries(list.map((p) => [p.contactId, p.role])))
+      setRoles(Object.fromEntries(list.map((p) => [p.id, p.role])))
     } catch {
       setPeople([])
     }
@@ -63,8 +66,7 @@ function ProjectContactsField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, clientId, clientName2Id])
 
-  const taken = new Set(people.map((p) => p.contactId))
-  const candidates = availableContacts.filter((c) => !taken.has(c.id))
+  const candidates = availableContacts
 
   async function add() {
     if (newContactId === null) return
@@ -79,22 +81,22 @@ function ProjectContactsField({
     }
   }
 
-  async function saveRole(contactId: number) {
-    const role = (roles[contactId] ?? "").trim()
-    if (role === people.find((p) => p.contactId === contactId)?.role) return
+  async function saveRole(id: number) {
+    const role = (roles[id] ?? "").trim()
+    if (role === people.find((p) => p.id === id)?.role) return
     setError("")
     try {
-      await api.updateProjectContactRole(projectId, contactId, role)
+      await api.updateProjectContactRole(projectId, id, role)
       await reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
   }
 
-  async function remove(contactId: number) {
+  async function remove(id: number) {
     setError("")
     try {
-      await api.removeProjectContact(projectId, contactId)
+      await api.removeProjectContact(projectId, id)
       await reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -113,7 +115,7 @@ function ProjectContactsField({
           ) : (
             <ul className="flex flex-col gap-1.5">
               {people.map((p) => (
-                <li key={p.contactId} className="flex items-center gap-2">
+                <li key={p.id} className="flex items-center gap-2">
                   <div className="w-1/3 min-w-0 truncate text-sm">
                     {personLabel(p)}
                     {p.position && <span className="ml-1.5 text-[12.5px] text-muted-foreground">{p.position}</span>}
@@ -121,15 +123,25 @@ function ProjectContactsField({
                   {isAdmin ? (
                     <Input
                       className="flex-1"
-                      value={roles[p.contactId] ?? ""}
+                      value={roles[p.id] ?? ""}
                       placeholder={t("project.contactRolePlaceholder")}
                       aria-label={t("project.contactRole")}
-                      onChange={(e) => setRoles((r) => ({ ...r, [p.contactId]: e.target.value }))}
-                      onBlur={() => saveRole(p.contactId)}
+                      onChange={(e) => setRoles((r) => ({ ...r, [p.id]: e.target.value }))}
+                      onBlur={() => saveRole(p.id)}
                     />
                   ) : (
                     <span className="flex-1 truncate text-sm text-muted-foreground">{p.role || "-"}</span>
                   )}
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    aria-label={t("project.contactDetailsAria")}
+                    title={t("project.contactDetailsAria")}
+                    onClick={() => setShowing(p)}
+                  >
+                    <Info className="size-4" />
+                  </Button>
                   {isAdmin && (
                     <Button
                       type="button"
@@ -137,7 +149,7 @@ function ProjectContactsField({
                       variant="ghost"
                       aria-label={t("project.removeContactAria")}
                       title={t("project.removeContactAria")}
-                      onClick={() => remove(p.contactId)}
+                      onClick={() => remove(p.id)}
                     >
                       <X />
                     </Button>
@@ -187,6 +199,7 @@ function ProjectContactsField({
               availableContacts.length === 0 && <Hint>{t("project.noLeadContactsHint")}</Hint>
             ))}
           <FormError>{error}</FormError>
+          {showing && <ContactInfoDialog contact={showing} onClose={() => setShowing(null)} />}
         </>
       )}
     </div>

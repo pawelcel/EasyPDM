@@ -42,16 +42,23 @@ public class ProjectContactTests
         var projectId = projectBody.GetProperty("id").GetGuid();
         var projectName = projectBody.GetProperty("name").GetString()!;
 
-        (await admin.PostAsJsonAsync($"/api/projects/{projectId}/contacts", new { contactId = anna, role = "Zakupy" })).EnsureSuccessStatusCode();
-        (await admin.PostAsJsonAsync($"/api/projects/{projectId}/contacts", new { contactId = piotr, role = " Odbiór techniczny " })).EnsureSuccessStatusCode();
-        Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync($"/api/projects/{projectId}/contacts", new { contactId = anna, role = "x" })).StatusCode);
+        async Task<long> AddAsync(int contactId, string role)
+        {
+            var r = await admin.PostAsJsonAsync($"/api/projects/{projectId}/contacts", new { contactId, role });
+            r.EnsureSuccessStatusCode();
+            return (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt64();
+        }
+        var annaPurchasing = await AddAsync(anna, "Zakupy");
+        var annaAcceptance = await AddAsync(anna, "Odbiór");   // one person, two roles
+        await AddAsync(piotr, " Odbiór techniczny ");
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync($"/api/projects/{projectId}/contacts", new { contactId = anna, role = "Zakupy" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await admin.PostAsJsonAsync($"/api/projects/{projectId}/contacts", new { contactId = obcy, role = "x" })).StatusCode);
 
-        (await admin.PatchAsJsonAsync($"/api/projects/{projectId}/contacts/{anna}", new { role = "Zakupy i logistyka" })).EnsureSuccessStatusCode();
+        (await admin.PatchAsJsonAsync($"/api/projects/{projectId}/contacts/{annaPurchasing}", new { role = "Zakupy i logistyka" })).EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.PatchAsJsonAsync($"/api/projects/{projectId}/contacts/{annaAcceptance}", new { role = "Zakupy i logistyka" })).StatusCode);
         var list = await admin.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/contacts");
-        var roles = list.EnumerateArray().ToDictionary(c => c.GetProperty("contactId").GetInt32(), c => c.GetProperty("role").GetString());
-        Assert.Equal("Zakupy i logistyka", roles[anna]);
-        Assert.Equal("Odbiór techniczny", roles[piotr]);
+        var rows = list.EnumerateArray().Select(c => (c.GetProperty("contactId").GetInt32(), c.GetProperty("role").GetString()!)).ToList();
+        Assert.Equal(new[] { (anna, "Zakupy i logistyka"), (anna, "Odbiór"), (piotr, "Odbiór techniczny") }, rows);
 
         // A user with access sees them but cannot change them.
         var userName = "pc" + Guid.NewGuid().ToString("N")[..8];
@@ -59,15 +66,16 @@ public class ProjectContactTests
         await admin.GrantProjectAccessAsync(projectId, userId);
         using var user = factory.CreateClient();
         await user.LoginAsync(userName, "haslo123");
-        Assert.Equal(2, (await user.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/contacts")).GetArrayLength());
-        Assert.Equal(HttpStatusCode.Forbidden, (await user.DeleteAsync($"/api/projects/{projectId}/contacts/{anna}")).StatusCode);
+        Assert.Equal(3, (await user.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/contacts")).GetArrayLength());
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.DeleteAsync($"/api/projects/{projectId}/contacts/{annaPurchasing}")).StatusCode);
 
         // Dropping the project's Name 2 drops the person who belongs to it; the client's own stays.
         (await admin.PatchAsJsonAsync($"/api/projects/{projectId}", Project(projectName, clientId, null))).EnsureSuccessStatusCode();
         list = await admin.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/contacts");
-        Assert.Equal(new[] { anna }, list.EnumerateArray().Select(c => c.GetProperty("contactId").GetInt32()));
+        Assert.Equal(new[] { anna, anna }, list.EnumerateArray().Select(c => c.GetProperty("contactId").GetInt32()));
 
-        (await admin.DeleteAsync($"/api/projects/{projectId}/contacts/{anna}")).EnsureSuccessStatusCode();
+        (await admin.DeleteAsync($"/api/projects/{projectId}/contacts/{annaPurchasing}")).EnsureSuccessStatusCode();
+        (await admin.DeleteAsync($"/api/projects/{projectId}/contacts/{annaAcceptance}")).EnsureSuccessStatusCode();
         Assert.Equal(0, (await admin.GetFromJsonAsync<JsonElement>($"/api/projects/{projectId}/contacts")).GetArrayLength());
     }
 }
