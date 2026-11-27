@@ -11,6 +11,7 @@ import type {
   ProjectContact,
   ProjectTeam,
   AssemblyAssignees,
+  MyWork,
   ClientNode,
   ClientVerification,
   ClientVerificationSummary,
@@ -753,6 +754,35 @@ export const api = {
 
   removeProjectTeamMember: (projectId: string, id: number) =>
     fetch(`${BASE}/projects/${projectId}/team/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  getMyWork: () => fetch(`${BASE}/my-work`).then((r) => handleResponse<MyWork>(r)),
+
+  addProgress: (itemId: string, note: string, percent: number) =>
+    fetch(`${BASE}/items/${itemId}/progress`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note, percent }),
+    }).then((r) => handleResponse<{ id: number }>(r)),
+
+  deleteProgress: (id: number) =>
+    fetch(`${BASE}/progress/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  reviewProgress: (id: number, status: "accepted" | "remarks", comment: string) =>
+    fetch(`${BASE}/progress/${id}/review`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, comment }),
+    }).then((r) => handleResponse<void>(r)),
+
+  getProgressPolicy: () =>
+    fetch(`${BASE}/settings/progress-policy`).then((r) => handleResponse<{ deleteMinutes: number }>(r)),
+
+  setProgressPolicy: (deleteMinutes: number) =>
+    fetch(`${BASE}/settings/progress-policy`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deleteMinutes }),
+    }).then((r) => handleResponse<{ deleteMinutes: number }>(r)),
 
   getAssemblyAssignees: (itemId: string) =>
     fetch(`${BASE}/items/${itemId}/assignees`).then((r) => handleResponse<AssemblyAssignees>(r)),

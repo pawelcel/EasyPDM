@@ -3,6 +3,7 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Database,
   Factory,
   FolderKanban,
@@ -26,6 +27,7 @@ interface SidebarOption {
 
 const OPTIONS: SidebarOption[] = [
   { id: "welcome", labelKey: "nav.welcome", icon: Home },
+  { id: "myWork", labelKey: "nav.myWork", icon: ClipboardCheck },
   { id: "projects", labelKey: "nav.projects", icon: FolderKanban },
   { id: "database", labelKey: "nav.database", icon: Database },
   { id: "materials", labelKey: "nav.materials", icon: Layers },

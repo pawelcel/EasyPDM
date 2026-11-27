@@ -25,7 +25,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`085` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`086` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -937,6 +937,11 @@ and the server's message otherwise; the CAD macros show the server's message as 
 | POST/PATCH/DELETE | `/api/projects/{projectId}/team[/{id}]` | add a person with a role / change the role of one entry / take it off (administrator); losing access to the project takes a person off its team and its assemblies |
 | GET/POST | `/api/items/{itemId}/assignees` | who works on an assembly, from its project's team or lead; `canEdit` only for the project's lead, who assigns them; the person assigned gets an `assembly_assigned` notification (migration 085) |
 | PUT/DELETE | `/api/items/{itemId}/assignees/{userId}[/lead]` | make a person the assembly's lead (one at a time) / unassign them |
+| GET | `/api/my-work` | "My work": the projects the caller takes part in, their assigned assemblies (all with people on them in a project they lead) and the progress entries, with `canDelete` / `canReport` |
+| POST | `/api/items/{itemId}/progress` | add a progress entry (note, percent) — someone assigned to the assembly |
+| DELETE | `/api/progress/{id}` | the author's latest entry, within `progress_delete_minutes` and before review |
+| PUT | `/api/progress/{id}/review` | the project's lead accepts an entry or adds remarks (comment required); the author gets a `progress_reviewed` notification |
+| GET/PATCH | `/api/settings/progress-policy` | minutes an author can still delete their latest entry (PATCH: administrator; migration 086) |
 | GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | download / delete one of them |
 | GET | `/api/projects/{projectId}/client-verifications` | the project's client verification overview (needs work / in progress / verified) |
 | GET/POST | `/api/projects/{projectId}/items/{itemId}/client-verifications` | an item's verification record in that project / add an entry (result, comment, attachments) |

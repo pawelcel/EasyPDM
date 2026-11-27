@@ -390,6 +390,22 @@ CREATE TABLE item_assignees (
 CREATE UNIQUE INDEX uq_item_assignees_lead ON item_assignees (item_id) WHERE is_lead;
 CREATE INDEX idx_item_assignees_user ON item_assignees (user_id);
 
+-- Progress reports on an assembly by the people working on it, reviewed by the project's lead
+-- (migration 086).
+CREATE TABLE item_progress (
+    id              BIGSERIAL PRIMARY KEY,
+    item_id         UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    user_id         UUID REFERENCES users(id) ON DELETE SET NULL,
+    note            TEXT NOT NULL,
+    percent         INTEGER NOT NULL CHECK (percent BETWEEN 0 AND 100),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    review_status   TEXT CHECK (review_status IN ('accepted', 'remarks')),
+    review_comment  TEXT,
+    reviewed_by     UUID REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at     TIMESTAMPTZ
+);
+CREATE INDEX idx_item_progress_item ON item_progress (item_id, created_at);
+
 -- ============================================================
 -- Powiadomienia -- zdarzenia dotyczące elementów/projektów/konta, adresowane do
 -- konkretnego użytkownika, plus per-użytkownik wyłączenia poszczególnych typów.
@@ -410,7 +426,9 @@ CREATE TABLE notifications (
         -- za nią niewidoczne. Zob. db/migrations/058.
         'cad_transfer_finished',
         -- Przypisanie do pracy nad złożeniem (item_assignees, migracje 084, 085).
-        'assembly_assigned'
+        'assembly_assigned',
+        -- Prowadzący ocenił wpis postępu (item_progress, migracja 086).
+        'progress_reviewed'
     )),
     -- Dane do wyrenderowania treści PO STRONIE FRONTU (i18n, 3 języki) -- ten sam
     -- wzorzec co HistoryEntry/ItemHistoryPanel: zapisujemy surowe dane (nazwy/numery
@@ -705,7 +723,9 @@ CREATE TABLE system_state (
     -- Czy status "Wydany" może nadać tylko administrator (domyślnie każdy z dostępem).
     release_admin_only     BOOLEAN NOT NULL DEFAULT false,
     -- Czy katalogi (Materiały, Obróbki, Producenci, Klienci) zmienia tylko administrator.
-    catalogs_admin_only    BOOLEAN NOT NULL DEFAULT false
+    catalogs_admin_only    BOOLEAN NOT NULL DEFAULT false,
+    -- Ile minut autor może jeszcze usunąć swój ostatni wpis postępu (migracja 086).
+    progress_delete_minutes INTEGER NOT NULL DEFAULT 15 CHECK (progress_delete_minutes BETWEEN 0 AND 10080)
 );
 GRANT SELECT, INSERT, UPDATE ON system_state TO CURRENT_USER;
 

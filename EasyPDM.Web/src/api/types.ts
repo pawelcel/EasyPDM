@@ -398,6 +398,8 @@ export type NotificationType =
   | "cad_transfer_finished"
   // Assigned to work on an assembly by the project's lead (data: itemLabel, projectName, assignedBy).
   | "assembly_assigned"
+  // The project's lead reviewed a progress report (data: itemLabel, projectName, status, reviewedBy).
+  | "progress_reviewed"
 
 // "data" niesie surowe dane zapisane w momencie zdarzenia (np. itemLabel, projectName) —
 // treść jest renderowana po stronie frontu (i18n), zob. describe() w notification-bell.tsx.
@@ -583,6 +585,34 @@ export interface AssemblyAssignees {
   assignees: (TeamUser & { isLead: boolean })[]
   candidates: TeamUser[]
   canEdit: boolean
+}
+
+// "My work": a progress report on an assembly, with the project lead's review.
+export interface ProgressEntry {
+  id: number
+  authorId: string | null
+  authorName: string
+  note: string
+  percent: number
+  createdAt: string
+  reviewStatus: "accepted" | "remarks" | null
+  reviewComment: string | null
+  reviewerName: string | null
+  reviewedAt: string | null
+  canDelete: boolean
+}
+
+export interface MyWorkAssembly {
+  itemId: string
+  label: string
+  canReport: boolean
+  assignees: (TeamUser & { isLead: boolean })[]
+  entries: ProgressEntry[]
+}
+
+export interface MyWork {
+  deleteMinutes: number
+  projects: { projectId: string; projectName: string; isLead: boolean; assemblies: MyWorkAssembly[] }[]
 }
 
 // A person on the client's side involved in a project, with their role in it.

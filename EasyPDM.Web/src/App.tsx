@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { MyWorkView } from "@/features/my-work/my-work-view"
 import { useAuth } from "@/features/auth/use-auth"
 import { LoginView } from "@/features/auth/login-view"
 import { NewProjectDialog } from "@/features/projects/new-project-dialog"
@@ -47,9 +48,9 @@ import { LanguageSelect } from "@/i18n/language-select"
 import { useLanguage } from "@/i18n/use-language"
 import { APP_VERSION } from "@/version"
 
-type View = "welcome" | "projects" | "database" | "materials" | "processes" | "manufacturers" | "clients" | "settings"
+type View = "welcome" | "myWork" | "projects" | "database" | "materials" | "processes" | "manufacturers" | "clients" | "settings"
 
-const VIEWS: View[] = ["welcome", "projects", "database", "materials", "processes", "manufacturers", "clients", "settings"]
+const VIEWS: View[] = ["welcome", "myWork", "projects", "database", "materials", "processes", "manufacturers", "clients", "settings"]
 
 // Nawigacja żyje wyłącznie w stanie Reacta -- bez tego F5 zawsze zerowałoby użytkownika
 // do ekranu powitalnego. Odczytujemy początkowy widok/projekt/sekcję ustawień z query
@@ -340,6 +341,7 @@ function App() {
                 <Hint>{t("catalog.readOnlyHint")}</Hint>
               </div>
             )}
+          {view === "myWork" && <MyWorkView onOpenProject={navigateToProject} />}
           {view === "materials" && <MaterialsView readOnly={catalogsReadOnly} />}
           {view === "processes" && <ProcessesView readOnly={catalogsReadOnly} />}
 

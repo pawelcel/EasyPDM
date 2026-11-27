@@ -19,7 +19,7 @@ static class NotificationEndpoints
         "project_assigned", "project_unassigned", "project_deleted",
         "password_changed", "low_disk_space", "sample_project",
         "client_verification_needs_work", "client_verification_verified",
-        "assembly_assigned"
+        "assembly_assigned", "progress_reviewed"
     ];
 
     public static void MapNotificationEndpoints(this WebApplication app, string connectionString)

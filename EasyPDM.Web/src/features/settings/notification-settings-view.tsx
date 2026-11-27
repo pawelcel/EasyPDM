@@ -19,6 +19,7 @@ const ITEM_TYPES: { type: NotificationType; labelKey: TranslationKey }[] = [
 const PROJECT_TYPES: { type: NotificationType; labelKey: TranslationKey }[] = [
   { type: "project_assigned", labelKey: "notifications.pref.projectAssigned" },
   { type: "assembly_assigned", labelKey: "notifications.pref.assemblyAssigned" },
+  { type: "progress_reviewed", labelKey: "notifications.pref.progressReviewed" },
   { type: "project_unassigned", labelKey: "notifications.pref.projectUnassigned" },
   { type: "project_deleted", labelKey: "notifications.pref.projectDeleted" },
 ]

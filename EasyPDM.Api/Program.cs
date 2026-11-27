@@ -188,6 +188,7 @@ app.MapUserEndpoints(connectionString);
 app.MapProjectEndpoints(connectionString);
 app.MapProjectContactEndpoints(connectionString);
 app.MapProjectTeamEndpoints(connectionString);
+app.MapMyWorkEndpoints(connectionString);
 app.MapProjectAccessEndpoints(connectionString);
 app.MapItemEndpoints(connectionString, storage, createTicketStore, drawingTicketStore, uploadPolicy);
 app.MapTagEndpoints(connectionString);

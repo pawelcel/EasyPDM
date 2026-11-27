@@ -1,15 +1,16 @@
-import { Building2, Database, Factory, FolderKanban, Layers, Settings, Wrench } from "lucide-react"
+import { Building2, ClipboardCheck, Database, Factory, FolderKanban, Layers, Settings, Wrench } from "lucide-react"
 
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { TranslationKey } from "@/i18n/translations"
 import { useLanguage } from "@/i18n/use-language"
 
-type WelcomeTarget = "projects" | "database" | "materials" | "processes" | "manufacturers" | "clients" | "settings"
+type WelcomeTarget = "myWork" | "projects" | "database" | "materials" | "processes" | "manufacturers" | "clients" | "settings"
 
 function WelcomeView({ onNavigate }: { onNavigate: (view: WelcomeTarget) => void }) {
   const { t } = useLanguage()
 
   const tiles: { target: WelcomeTarget; icon: typeof FolderKanban; titleKey: TranslationKey; descriptionKey: TranslationKey }[] = [
+    { target: "myWork", icon: ClipboardCheck, titleKey: "welcome.myWorkTitle", descriptionKey: "welcome.myWorkDescription" },
     { target: "projects", icon: FolderKanban, titleKey: "welcome.projectsTitle", descriptionKey: "welcome.projectsDescription" },
     { target: "database", icon: Database, titleKey: "welcome.databaseTitle", descriptionKey: "welcome.databaseDescription" },
     { target: "materials", icon: Layers, titleKey: "welcome.materialsTitle", descriptionKey: "welcome.materialsDescription" },

@@ -25,7 +25,7 @@ getestet auf: CachyOS, .NET 10, PostgreSQL 18.
 
 - **`db/schema.sql`** — das vollständige Schema von Grund auf (aktueller Stand nach allen
   Migrationen).
-- **`db/migrations/`** — Migrationen `002`–`085` für eine bereits bestehende Datenbank:
+- **`db/migrations/`** — Migrationen `002`–`086` für eine bereits bestehende Datenbank:
   Projekte, Elementtypen, Sichtbarkeit im Baum, Status/Revisionen, Materialien
   (+ Gruppen/Untergruppen), Anhänge, Stücklisten-Reihenfolge, Revisionskommentare,
   Anmeldung und Rollen, Projekteigenschaften, kaskadierendes Löschen, Reihenfolge der
@@ -715,6 +715,11 @@ Meldung des Servers unverändert.
 | POST/PATCH/DELETE | `/api/projects/{projectId}/team[/{id}]` | Person mit Rolle hinzufügen / Rolle eines Eintrags ändern / entfernen (Administrator); wer den Projektzugriff verliert, verlässt Team und Baugruppen |
 | GET/POST | `/api/items/{itemId}/assignees` | wer an einer Baugruppe arbeitet, aus dem Projektteam oder seiner Leitung; `canEdit` nur für die Projektleitung, die zuweist; die zugewiesene Person erhält eine Benachrichtigung `assembly_assigned` (Migration 085) |
 | PUT/DELETE | `/api/items/{itemId}/assignees/{userId}[/lead]` | Person zur Leitung der Baugruppe machen (eine zur Zeit) / abziehen |
+| GET | `/api/my-work` | „Meine Arbeit“: Projekte, an denen der Aufrufer beteiligt ist, seine Baugruppen (in geleiteten Projekten alle mit zugewiesenen Personen) und Fortschrittseinträge, mit `canDelete` / `canReport` |
+| POST | `/api/items/{itemId}/progress` | Fortschrittseintrag hinzufügen (Text, Prozent) — durch eine der Baugruppe zugewiesene Person |
+| DELETE | `/api/progress/{id}` | den letzten Eintrag des Autors, innerhalb von `progress_delete_minutes` und vor der Prüfung |
+| PUT | `/api/progress/{id}/review` | die Projektleitung nimmt einen Eintrag an oder fügt Anmerkungen hinzu (Kommentar nötig); der Autor erhält `progress_reviewed` |
+| GET/PATCH | `/api/settings/progress-policy` | Minuten, in denen ein Autor seinen letzten Eintrag löschen kann (PATCH: Administrator; Migration 086) |
 | GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | eines davon herunterladen / löschen |
 | GET | `/api/projects/{projectId}/client-verifications` | Übersicht der Kundenprüfung im Projekt (Nacharbeit / in Arbeit / geprüft) |
 | GET/POST | `/api/projects/{projectId}/items/{itemId}/client-verifications` | Prüfverlauf eines Elements in diesem Projekt / Eintrag hinzufügen (Ergebnis, Kommentar, Anhänge) |

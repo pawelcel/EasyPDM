@@ -160,6 +160,7 @@ function UsersView() {
 
       <ReleasePolicySection />
       <CatalogPolicySection />
+      <ProgressPolicySection />
       <MacroTokensSection />
 
       {deletingUser && (
@@ -540,6 +541,60 @@ function CatalogPolicySection() {
           className="size-3.5 shrink-0 accent-primary"
         />
         {t("users.catalogLabel")}
+      </label>
+      <FormError>{error}</FormError>
+    </div>
+  )
+}
+
+// How long the author of a progress report ("My work") can still delete their latest one.
+function ProgressPolicySection() {
+  const { t } = useLanguage()
+  const [minutes, setMinutes] = useState("")
+  const [saved, setSaved] = useState<number | null>(null)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    api
+      .getProgressPolicy()
+      .then((p) => {
+        setMinutes(String(p.deleteMinutes))
+        setSaved(p.deleteMinutes)
+      })
+      .catch(() => {})
+  }, [])
+
+  async function save() {
+    const value = Number(minutes)
+    if (minutes.trim() === "" || value === saved) return
+    setError("")
+    try {
+      const p = await api.setProgressPolicy(value)
+      setSaved(p.deleteMinutes)
+      setMinutes(String(p.deleteMinutes))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("users.releaseSaveFailed"))
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10">
+      <SectionLabel>{t("users.progressTitle")}</SectionLabel>
+      <Hint>{t("users.progressHint")}</Hint>
+      <label className="mt-2 flex items-center gap-2 text-sm">
+        <Input
+          className="w-24"
+          type="number"
+          min={0}
+          max={10080}
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+          onBlur={() => void save()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void save()
+          }}
+        />
+        {t("users.progressLabel")}
       </label>
       <FormError>{error}</FormError>
     </div>

@@ -23,7 +23,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`085` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`086` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
@@ -653,6 +653,11 @@ zmian.
 | POST/PATCH/DELETE | `/api/projects/{projectId}/team[/{id}]` | dodanie osoby z rolą / zmiana roli jednego wpisu / usunięcie (administrator); utrata dostępu do projektu zdejmuje osobę z zespołu i ze złożeń |
 | GET/POST | `/api/items/{itemId}/assignees` | osoby pracujące nad złożeniem, z zespołu projektu lub jego prowadzący; `canEdit` tylko dla prowadzącego projekt, który je przypisuje; przypisana osoba dostaje powiadomienie `assembly_assigned` (migracja 085) |
 | PUT/DELETE | `/api/items/{itemId}/assignees/{userId}[/lead]` | ustawienie lidera złożenia (jeden naraz) / odpięcie osoby |
+| GET | `/api/my-work` | „Moje informacje”: projekty, w których wołający bierze udział, przypisane złożenia (w projektach, które prowadzi — wszystkie z przypisanymi osobami) i wpisy postępu, z `canDelete` / `canReport` |
+| POST | `/api/items/{itemId}/progress` | dodanie wpisu postępu (opis, procent) — przez osobę przypisaną do złożenia |
+| DELETE | `/api/progress/{id}` | ostatni wpis autora, w czasie `progress_delete_minutes` i przed oceną |
+| PUT | `/api/progress/{id}/review` | prowadzący akceptuje wpis albo dodaje uwagi (wymagany komentarz); autor dostaje powiadomienie `progress_reviewed` |
+| GET/PATCH | `/api/settings/progress-policy` | ile minut autor może usunąć swój ostatni wpis (PATCH: administrator; migracja 086) |
 | GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | pobranie / usunięcie jednego z nich |
 | GET | `/api/projects/{projectId}/client-verifications` | przegląd weryfikacji klienta w projekcie (do poprawy / w toku / zweryfikowane) |
 | GET/POST | `/api/projects/{projectId}/items/{itemId}/client-verifications` | historia weryfikacji elementu w tym projekcie / dodanie wpisu (wynik, komentarz, załączniki) |
