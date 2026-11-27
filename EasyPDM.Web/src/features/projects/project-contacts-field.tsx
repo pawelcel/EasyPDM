@@ -46,8 +46,8 @@ function ProjectContactsField({
   const { t } = useLanguage()
   const [people, setPeople] = useState<ProjectContact[]>([])
   const [roles, setRoles] = useState<Record<number, string>>({})
-  const [newContactId, setNewContactId] = useState<number | null>(null)
-  const [newRole, setNewRole] = useState("")
+  // The row just added: its role field takes the focus, so the role is typed straight away.
+  const [justAdded, setJustAdded] = useState<number | null>(null)
   const [error, setError] = useState("")
   const [showing, setShowing] = useState<ProjectContact | null>(null)
 
@@ -68,13 +68,12 @@ function ProjectContactsField({
 
   const candidates = availableContacts
 
-  async function add() {
-    if (newContactId === null) return
+  // Picking a person adds them at once, with no role yet; the role is typed in their new row.
+  async function add(contactId: number) {
     setError("")
     try {
-      await api.addProjectContact(projectId, newContactId, newRole)
-      setNewContactId(null)
-      setNewRole("")
+      const { id } = await api.addProjectContact(projectId, contactId, "")
+      setJustAdded(id)
       await reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -123,6 +122,7 @@ function ProjectContactsField({
                   {isAdmin ? (
                     <Input
                       className="flex-1"
+                      autoFocus={p.id === justAdded}
                       value={roles[p.id] ?? ""}
                       placeholder={t("project.contactRolePlaceholder")}
                       aria-label={t("project.contactRole")}
@@ -160,41 +160,27 @@ function ProjectContactsField({
           )}
           {isAdmin &&
             (candidates.length > 0 ? (
-              <div className="flex items-center gap-2">
-                <div className="w-1/3 min-w-0">
-                  <Combobox
-                    items={candidates.map((c) => c.id)}
-                    value={newContactId}
-                    onValueChange={(v) => setNewContactId((v as number | null) ?? null)}
-                    itemToStringLabel={(id: number) => personLabel(candidates.find((c) => c.id === id))}
-                  >
-                    <ComboboxInput placeholder={t("project.addContactPlaceholder")} showClear />
-                    <ComboboxContent>
-                      <ComboboxEmpty>{t("project.noMatchingLeadContact")}</ComboboxEmpty>
-                      <ComboboxList>
-                        {(id: number) => (
-                          <ComboboxItem key={id} value={id}>
-                            {personLabel(candidates.find((c) => c.id === id))}
-                          </ComboboxItem>
-                        )}
-                      </ComboboxList>
-                    </ComboboxContent>
-                  </Combobox>
-                </div>
-                <Input
-                  className="flex-1"
-                  value={newRole}
-                  placeholder={t("project.contactRolePlaceholder")}
-                  aria-label={t("project.contactRole")}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void add()
-                  }}
-                />
-                <Button type="button" size="sm" variant="outline" disabled={newContactId === null} onClick={add}>
-                  {t("project.addContact")}
-                </Button>
-              </div>
+              <Combobox
+                key={people.length}
+                items={candidates.map((c) => c.id)}
+                value={null}
+                onValueChange={(v) => {
+                  if (v !== null && v !== undefined) void add(v as number)
+                }}
+                itemToStringLabel={(id: number) => personLabel(candidates.find((c) => c.id === id))}
+              >
+                <ComboboxInput placeholder={t("project.addContactPlaceholder")} />
+                <ComboboxContent>
+                  <ComboboxEmpty>{t("project.noMatchingLeadContact")}</ComboboxEmpty>
+                  <ComboboxList>
+                    {(id: number) => (
+                      <ComboboxItem key={id} value={id}>
+                        {personLabel(candidates.find((c) => c.id === id))}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
             ) : (
               availableContacts.length === 0 && <Hint>{t("project.noLeadContactsHint")}</Hint>
             ))}

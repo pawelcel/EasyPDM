@@ -22,8 +22,8 @@ function ProjectTeamCard({ projectId, isAdmin }: { projectId: string; isAdmin: b
   const { t } = useLanguage()
   const [team, setTeam] = useState<ProjectTeam | null>(null)
   const [roles, setRoles] = useState<Record<number, string>>({})
-  const [newUserId, setNewUserId] = useState<string | null>(null)
-  const [newRole, setNewRole] = useState("")
+  // The row just added: its role field takes the focus, so the role is typed straight away.
+  const [justAdded, setJustAdded] = useState<number | null>(null)
   const [error, setError] = useState("")
 
   async function reload() {
@@ -81,6 +81,7 @@ function ProjectTeamCard({ projectId, isAdmin }: { projectId: string; isAdmin: b
                 {isAdmin ? (
                   <Input
                     className="flex-1"
+                    autoFocus={m.id === justAdded}
                     value={roles[m.id] ?? ""}
                     placeholder={t("team.rolePlaceholder")}
                     aria-label={t("project.contactRole")}
@@ -109,48 +110,22 @@ function ProjectTeamCard({ projectId, isAdmin }: { projectId: string; isAdmin: b
             ))}
           </ul>
         )}
+        {/* Picking a person adds them at once, with no role yet; the role is typed in their
+            new row. The list stays, for the next person. */}
         {isAdmin && (
-          <div className="flex items-center gap-2">
-            <div className="w-1/3 min-w-0">
-              <UserCombobox
-                users={team.candidates}
-                value={newUserId}
-                onChange={setNewUserId}
-                placeholder={t("team.pickPerson")}
-              />
-            </div>
-            <Input
-              className="flex-1"
-              value={newRole}
-              placeholder={t("team.rolePlaceholder")}
-              aria-label={t("project.contactRole")}
-              onChange={(e) => setNewRole(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newUserId)
-                  void run(async () => {
-                    await api.addProjectTeamMember(projectId, newUserId, newRole)
-                    setNewUserId(null)
-                    setNewRole("")
-                  })
-              }}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={newUserId === null}
-              onClick={() =>
-                newUserId &&
-                run(async () => {
-                  await api.addProjectTeamMember(projectId, newUserId, newRole)
-                  setNewUserId(null)
-                  setNewRole("")
+          <UserCombobox
+            key={team.members.length}
+            users={team.candidates}
+            value={null}
+            onChange={(userId) => {
+              if (userId)
+                void run(async () => {
+                  const { id } = await api.addProjectTeamMember(projectId, userId, "")
+                  setJustAdded(id)
                 })
-              }
-            >
-              {t("project.addContact")}
-            </Button>
-          </div>
+            }}
+            placeholder={t("team.addPlaceholder")}
+          />
         )}
         {isAdmin && <Hint>{t("team.candidatesHint")}</Hint>}
         <FormError>{error}</FormError>
