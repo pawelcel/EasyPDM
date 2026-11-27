@@ -4,6 +4,9 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Sections in the project panel.** The project panel is now a stack of cards like the item panel: the project's fields, the order documents (quote, order confirmation, other attachments) and the client verification overview each in a card of their own.
+
 ## [0.9.9]
 
 **In short:** the item panel is split into cards, so its BOM, "Used in" and history stand apart, and all notifications can be deleted at once.
@@ -14,7 +17,7 @@ Update as usual: run the new installer over the old one, or pull the new Docker 
 - **Delete all notifications.** The notifications panel has a "Delete all" button next to "Mark all as read", so a long list no longer has to be cleared one by one. It asks once, in place: the first click turns it into a red "Really delete?", the second deletes your notifications (only yours).
 
 ### Changed
-- **Sections in the item panel.** The item panel is now a stack of cards on the page background, like the sections of Settings: the fields, the BOM of an assembly, the attachments, "Used in" and the history each in a card of their own, instead of one long column. The project panel is split the same way: the project's fields, the order documents (quote, order confirmation, other attachments) and the client verification overview.
+- **Sections in the item panel.** The item panel is now a stack of cards on the page background, like the sections of Settings: the fields, the BOM of an assembly, the attachments, "Used in" and the history each in a card of their own, instead of one long column.
 
 ## [0.9.8]
 
