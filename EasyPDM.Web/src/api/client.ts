@@ -8,6 +8,7 @@ import type {
   ClientDetail,
   ClientFileSearchResult,
   ClientName2Detail,
+  ProjectContact,
   ClientNode,
   ClientVerification,
   ClientVerificationSummary,
@@ -700,6 +701,28 @@ export const api = {
   addClientName2: (clientId: number, name2: string) =>
     fetch(`${BASE}/clients/${clientId}/name2`, json({ name2 })).then((r) =>
       handleResponse<{ id: number }>(r)
+    ),
+
+  getProjectContacts: (projectId: string) =>
+    fetch(`${BASE}/projects/${projectId}/contacts`).then((r) => handleResponse<ProjectContact[]>(r)),
+
+  addProjectContact: (projectId: string, contactId: number, role: string) =>
+    fetch(`${BASE}/projects/${projectId}/contacts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactId, role }),
+    }).then((r) => handleResponse<void>(r)),
+
+  updateProjectContactRole: (projectId: string, contactId: number, role: string) =>
+    fetch(`${BASE}/projects/${projectId}/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeProjectContact: (projectId: string, contactId: number) =>
+    fetch(`${BASE}/projects/${projectId}/contacts/${contactId}`, { method: "DELETE" }).then((r) =>
+      handleResponse<void>(r)
     ),
 
   getClientName2: (clientId: number, name2Id: number) =>

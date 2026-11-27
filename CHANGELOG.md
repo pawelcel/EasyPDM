@@ -6,11 +6,12 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [0.9.10]
 
-**In short:** the project panel is split into cards like the item panel, and a client's second name lists its projects.
+**In short:** a project lists the people on the client's side with their roles, its panel is split into cards like the item panel, and a client's second name lists its projects.
 
-Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+Update as usual: run the new installer over the old one, or pull the new Docker images. The database is updated by itself on the first start.
 
 ### Added
+- **People on the client's side of a project.** Under the project lead, a project now lists the people involved on the client's side, each with a role (purchasing, acceptance, commissioning…), picked from the same contacts as the lead: the client's own and those of the project's second name. An administrator adds them, edits their roles and removes them; when the project's client or second name changes, the people who no longer belong are taken off.
 - **Projects of a second name.** A client's second name now lists the projects filed under it, as the client lists its own, each with a jump to the project.
 
 ### Changed

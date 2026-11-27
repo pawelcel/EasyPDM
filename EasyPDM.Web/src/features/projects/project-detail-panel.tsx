@@ -24,6 +24,7 @@ import { useClients } from "@/features/clients/use-clients"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
 import { ClientVerificationOverview } from "@/features/projects/client-verification-overview"
 import { ProjectAttachmentsPanel } from "@/features/projects/project-attachments-panel"
+import { ProjectContactsField } from "@/features/projects/project-contacts-field"
 import { ProjectLanguagesField } from "@/features/projects/project-languages-field"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -370,6 +371,14 @@ function ProjectDetailPanel({
         ) : (
           <Hint>{form.clientId ? t("project.noLeadContactsHint") : t("project.leadContactNeedsClientHint")}</Hint>
         )}
+
+        <ProjectContactsField
+          projectId={project.id}
+          clientId={project.clientId}
+          clientName2Id={project.clientName2Id}
+          availableContacts={leadContacts}
+          isAdmin={isAdmin}
+        />
 
         {showingLeadContact && selectedLeadContact && (
           <Dialog open onOpenChange={setShowingLeadContact}>

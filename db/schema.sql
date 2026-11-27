@@ -350,6 +350,18 @@ ALTER TABLE projects ADD COLUMN closed BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE projects ADD COLUMN lead_contact_id INTEGER REFERENCES client_contacts(id) ON DELETE SET NULL;
 CREATE INDEX idx_projects_lead_contact ON projects (lead_contact_id);
 
+-- People on the client's side involved in a project, each with their role in it, next to the
+-- project lead; from the same contacts as the lead (the client's own and its Name 2's), kept in
+-- step by the application when the project's client or Name 2 changes.
+CREATE TABLE project_contacts (
+    project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    contact_id  INTEGER NOT NULL REFERENCES client_contacts(id) ON DELETE CASCADE,
+    role        TEXT NOT NULL DEFAULT '',
+    added_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, contact_id)
+);
+CREATE INDEX idx_project_contacts_contact ON project_contacts (contact_id);
+
 -- ============================================================
 -- Powiadomienia -- zdarzenia dotyczące elementów/projektów/konta, adresowane do
 -- konkretnego użytkownika, plus per-użytkownik wyłączenia poszczególnych typów.

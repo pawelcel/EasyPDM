@@ -560,6 +560,12 @@ export interface ClientContact {
   address: string | null
 }
 
+// A person on the client's side involved in a project, with their role in it.
+export interface ProjectContact extends Omit<ClientContact, "id"> {
+  contactId: number
+  role: string
+}
+
 export interface ClientProjectSummary {
   id: string
   name: string

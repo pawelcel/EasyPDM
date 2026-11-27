@@ -163,10 +163,17 @@ static class ProjectEndpoints
 
             try
             {
-                await using var reader = await cmd.ExecuteReaderAsync();
-                if (!await reader.ReadAsync())
-                    return Results.NotFound();
-                return Results.Ok(ReadProject(reader));
+                object project;
+                await using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    if (!await reader.ReadAsync())
+                        return Results.NotFound();
+                    project = ReadProject(reader);
+                }
+                // A changed client or Name 2 leaves out the people on the client's side who
+                // belong to the old one (project_contacts), as the lead check above would.
+                await ProjectContactEndpoints.PruneAsync(conn, id);
+                return Results.Ok(project);
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
@@ -406,7 +413,7 @@ static class ProjectEndpoints
     // przypisanym dokładnie do tej Nazwy 2, którą ma projekt (client_name2_id) -- ten sam
     // zakres "główna + podrzędna dla wybranej Nazwy 2", z którego front buduje listę do
     // wyboru (GET .../clients/{id} + GET .../clients/{id}/name2/{name2Id}).
-    private static async Task<string?> ValidateLeadContactAsync(NpgsqlConnection conn, int? clientId, int? clientName2Id, int? leadContactId)
+    internal static async Task<string?> ValidateLeadContactAsync(NpgsqlConnection conn, int? clientId, int? clientName2Id, int? leadContactId)
     {
         if (leadContactId is null)
             return null;
