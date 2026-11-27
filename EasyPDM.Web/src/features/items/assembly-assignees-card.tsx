@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils"
 function AssemblyAssigneesCard({ itemId }: { itemId: string }) {
   const { t } = useLanguage()
   const [data, setData] = useState<AssemblyAssignees | null>(null)
-  const [newUserId, setNewUserId] = useState<string | null>(null)
   const [error, setError] = useState("")
 
   async function reload() {
@@ -95,37 +94,21 @@ function AssemblyAssigneesCard({ itemId }: { itemId: string }) {
             ))}
           </ul>
         )}
+        {/* Picking a person in the list assigns them at once; the list clears and stays there,
+            so more people can be added at any time. */}
         {data.canEdit &&
           (data.candidates.length === 0 ? (
             <Hint>{t("assignees.noTeamHint")}</Hint>
           ) : (
-            candidates.length > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <UserCombobox
-                    users={candidates}
-                    value={newUserId}
-                    onChange={setNewUserId}
-                    placeholder={t("team.pickPerson")}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={newUserId === null}
-                  onClick={() =>
-                    newUserId &&
-                    run(async () => {
-                      await api.addAssemblyAssignee(itemId, newUserId)
-                      setNewUserId(null)
-                    })
-                  }
-                >
-                  {t("project.addContact")}
-                </Button>
-              </div>
-            )
+            <UserCombobox
+              key={data.assignees.length}
+              users={candidates}
+              value={null}
+              onChange={(userId) => {
+                if (userId) void run(() => api.addAssemblyAssignee(itemId, userId))
+              }}
+              placeholder={t("assignees.addPlaceholder")}
+            />
           ))}
         <FormError>{error}</FormError>
       </div>
