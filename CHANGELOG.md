@@ -4,13 +4,15 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
-## [0.9.10]
+## [0.10.0]
 
-**In short:** a project lists the people on the client's side with their roles, its panel is split into cards like the item panel, and a client's second name lists its projects.
+**In short:** who is involved in a project, on both sides. A project names its lead and the people taking part in the company, with their roles, and the people on the client's side with theirs; each assembly lists who of the team works on it and who leads that work. The item and project panels are split into cards, and a client's second name lists its projects.
 
 Update as usual: run the new installer over the old one, or pull the new Docker images. The database is updated by itself on the first start.
 
 ### Added
+- **People in the company on a project.** A project has a card for its side of the company: the project lead, picked among EasyPDM users, and the people taking part, each with a role (design, process planning…); one person can hold several roles. They are picked from the users who can see the project and the administrators. An administrator edits it; whoever loses access to the project leaves its team.
+- **People working on an assembly.** An assembly in a project has a card listing who of the project's team works on it — any number of people, and a person can work on several assemblies — with a star for the one who leads the work. The project's lead or an administrator assigns them; people who leave the project's team are taken off its assemblies.
 - **People on the client's side of a project.** A project has a section of its own, below the order documents, for the people on the client's side: the project lead and everyone else involved, each with a role (purchasing, acceptance, commissioning…) and an ⓘ that shows their phone, e-mail and position. They are picked from the same contacts as the lead (the client's own and those of the project's second name), and one person can be added several times with different roles. An administrator adds them, edits their roles and removes them; when the project's client or second name changes, the people who no longer belong are taken off.
 - **Projects of a second name.** A client's second name now lists the projects filed under it, as the client lists its own, each with a jump to the project.
 

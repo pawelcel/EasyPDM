@@ -9,6 +9,8 @@ import type {
   ClientFileSearchResult,
   ClientName2Detail,
   ProjectContact,
+  ProjectTeam,
+  AssemblyAssignees,
   ClientNode,
   ClientVerification,
   ClientVerificationSummary,
@@ -724,6 +726,53 @@ export const api = {
     fetch(`${BASE}/projects/${projectId}/contacts/${id}`, { method: "DELETE" }).then((r) =>
       handleResponse<void>(r)
     ),
+
+  getProjectTeam: (projectId: string) =>
+    fetch(`${BASE}/projects/${projectId}/team`).then((r) => handleResponse<ProjectTeam>(r)),
+
+  setProjectLeadUser: (projectId: string, userId: string | null) =>
+    fetch(`${BASE}/projects/${projectId}/lead-user`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    }).then((r) => handleResponse<void>(r)),
+
+  addProjectTeamMember: (projectId: string, userId: string, role: string) =>
+    fetch(`${BASE}/projects/${projectId}/team`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, role }),
+    }).then((r) => handleResponse<{ id: number }>(r)),
+
+  updateProjectTeamRole: (projectId: string, id: number, role: string) =>
+    fetch(`${BASE}/projects/${projectId}/team/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeProjectTeamMember: (projectId: string, id: number) =>
+    fetch(`${BASE}/projects/${projectId}/team/${id}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
+
+  getAssemblyAssignees: (itemId: string) =>
+    fetch(`${BASE}/items/${itemId}/assignees`).then((r) => handleResponse<AssemblyAssignees>(r)),
+
+  addAssemblyAssignee: (itemId: string, userId: string) =>
+    fetch(`${BASE}/items/${itemId}/assignees`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    }).then((r) => handleResponse<void>(r)),
+
+  setAssemblyAssigneeLead: (itemId: string, userId: string, isLead: boolean) =>
+    fetch(`${BASE}/items/${itemId}/assignees/${userId}/lead`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isLead }),
+    }).then((r) => handleResponse<void>(r)),
+
+  removeAssemblyAssignee: (itemId: string, userId: string) =>
+    fetch(`${BASE}/items/${itemId}/assignees/${userId}`, { method: "DELETE" }).then((r) => handleResponse<void>(r)),
 
   getClientName2: (clientId: number, name2Id: number) =>
     fetch(`${BASE}/clients/${clientId}/name2/${name2Id}`).then((r) =>

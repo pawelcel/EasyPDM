@@ -50,6 +50,7 @@ import { PropertyEditor } from "@/features/items/property-editor"
 import { StatusControl } from "@/features/items/status-control"
 import { ItemPreviewBox } from "@/features/preview/item-preview-box"
 import { PreviewDialog } from "@/features/preview/preview-dialog"
+import { AssemblyAssigneesCard } from "@/features/items/assembly-assignees-card"
 import { DocumentationLanguageProvider } from "@/features/project-languages/documentation-language"
 import { useDocumentationLanguageId } from "@/features/project-languages/use-documentation-language-id"
 import { useLanguage } from "@/i18n/use-language"
@@ -607,6 +608,8 @@ function ItemDetailPanel({
           <FormError>{bomError}</FormError>
         </div>
       )}
+
+      {item.itemType === "assembly" && item.projectId && <AssemblyAssigneesCard itemId={item.id} />}
 
     <div className={PANEL_CARD}>
       {item.itemType === "folder" && (

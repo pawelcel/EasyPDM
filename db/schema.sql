@@ -365,6 +365,31 @@ CREATE INDEX idx_project_contacts_contact ON project_contacts (contact_id);
 CREATE UNIQUE INDEX uq_project_contacts_role ON project_contacts (project_id, contact_id, role);
 CREATE INDEX idx_project_contacts_project ON project_contacts (project_id);
 
+-- The company's side of a project (migration 084): its lead among EasyPDM users and the people
+-- taking part with their roles, picked from the users who can see the project and the
+-- administrators; and who works on each assembly, from that team, one of them possibly leading.
+ALTER TABLE projects ADD COLUMN lead_user_id UUID REFERENCES users(id) ON DELETE SET NULL;
+
+CREATE TABLE project_team (
+    id          BIGSERIAL PRIMARY KEY,
+    project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role        TEXT NOT NULL DEFAULT '',
+    added_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX uq_project_team_role ON project_team (project_id, user_id, role);
+CREATE INDEX idx_project_team_user ON project_team (user_id);
+
+CREATE TABLE item_assignees (
+    item_id   UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    user_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    is_lead   BOOLEAN NOT NULL DEFAULT false,
+    added_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (item_id, user_id)
+);
+CREATE UNIQUE INDEX uq_item_assignees_lead ON item_assignees (item_id) WHERE is_lead;
+CREATE INDEX idx_item_assignees_user ON item_assignees (user_id);
+
 -- ============================================================
 -- Powiadomienia -- zdarzenia dotyczące elementów/projektów/konta, adresowane do
 -- konkretnego użytkownika, plus per-użytkownik wyłączenia poszczególnych typów.

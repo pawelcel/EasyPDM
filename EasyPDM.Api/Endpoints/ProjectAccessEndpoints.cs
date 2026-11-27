@@ -85,6 +85,11 @@ static class ProjectAccessEndpoints
             if (affected > 0 && projectName is not null)
                 await Notifications.NotifyAsync(conn, app.Logger, userId, "project_unassigned", new { projectName }, projectId: projectId);
 
+            // Without access the person can no longer lead it, take part in it or work on its
+            // assemblies (ProjectTeamEndpoints).
+            if (affected > 0)
+                await ProjectTeamEndpoints.PruneAsync(conn, projectId);
+
             return Results.Ok();
         });
     }

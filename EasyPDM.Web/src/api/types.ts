@@ -560,6 +560,29 @@ export interface ClientContact {
   address: string | null
 }
 
+// An EasyPDM user as the project's team shows them: first and last name, else display name.
+export interface TeamUser {
+  userId: string
+  name: string
+}
+
+// The company's side of a project: its lead and the people taking part with their roles
+// (one person may hold several); candidates are the users who can see the project.
+export interface ProjectTeam {
+  leadUserId: string | null
+  leadName: string | null
+  members: (TeamUser & { id: number; role: string })[]
+  candidates: TeamUser[]
+}
+
+// Who works on an assembly, from its project's team; canEdit for an administrator or the
+// project's lead.
+export interface AssemblyAssignees {
+  assignees: (TeamUser & { isLead: boolean })[]
+  candidates: TeamUser[]
+  canEdit: boolean
+}
+
 // A person on the client's side involved in a project, with their role in it.
 export interface ProjectContact extends Omit<ClientContact, "id"> {
   // The row: one person can be on a project several times, with different roles.

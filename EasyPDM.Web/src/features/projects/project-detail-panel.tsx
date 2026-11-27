@@ -25,6 +25,7 @@ import { ClientVerificationOverview } from "@/features/projects/client-verificat
 import { ProjectAttachmentsPanel } from "@/features/projects/project-attachments-panel"
 import { ContactInfoDialog } from "@/features/projects/contact-info-dialog"
 import { ProjectContactsField } from "@/features/projects/project-contacts-field"
+import { ProjectTeamCard } from "@/features/projects/project-team-card"
 import { ProjectLanguagesField } from "@/features/projects/project-languages-field"
 import { useLanguage } from "@/i18n/use-language"
 
@@ -428,6 +429,8 @@ function ProjectDetailPanel({
           )}
         </div>
       </div>
+
+      <ProjectTeamCard projectId={project.id} isAdmin={isAdmin} />
 
       <ClientVerificationOverview summaries={clientVerifications} onSelectItem={onSelectItem} />
 

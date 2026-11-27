@@ -25,7 +25,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`083` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`084` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -49,7 +49,7 @@ PostgreSQL 18.
   documentation languages and translations, users' first/last names, the company profile,
   document labels, macro tokens, hashed session tokens, item change history, upload rules,
   the drawing sheet layout of a PDF, (081) every CAD file version an item has had, and (082, 083) the
-  people on the client's side of a project with their roles, one person possibly in several. Since
+  people on the client's side of a project with their roles, one person possibly in several, and (084) the company's side: a project's lead among users, its team with roles and who works on each assembly. Since
   migration 027, files in this folder are embedded in the program
   (embedded resources) and applied **automatically on every startup** — see
   `MigrationRunner.cs` and "How to run" below — you no longer need to run them
@@ -932,6 +932,11 @@ and the server's message otherwise; the CAD macros show the server's message as 
 | GET/POST | `/api/projects/{projectId}/attachments` | the project's order documents: quote, order confirmation (several files each) and other |
 | GET/POST | `/api/projects/{projectId}/contacts` | people on the client's side of the project with their roles; added from the client's contacts and those of the project's Name 2 (POST: administrator) |
 | PATCH/DELETE | `/api/projects/{projectId}/contacts/{id}` | change the role of one entry (a row: a person can be on a project several times with different roles) / take it off (administrator); a change of the project's client or Name 2 drops the people who no longer belong |
+| GET | `/api/projects/{projectId}/team` | the company's side of a project: its lead, the people taking part with their roles, and the users who can be picked (with access to the project, or administrators) |
+| PUT | `/api/projects/{projectId}/lead-user` | set or clear the project's lead in the company (administrator) |
+| POST/PATCH/DELETE | `/api/projects/{projectId}/team[/{id}]` | add a person with a role / change the role of one entry / take it off (administrator); losing access to the project takes a person off its team and its assemblies |
+| GET/POST | `/api/items/{itemId}/assignees` | who works on an assembly, from its project's team or lead; `canEdit` for an administrator or the project's lead, who assign them |
+| PUT/DELETE | `/api/items/{itemId}/assignees/{userId}[/lead]` | make a person the assembly's lead (one at a time) / unassign them |
 | GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | download / delete one of them |
 | GET | `/api/projects/{projectId}/client-verifications` | the project's client verification overview (needs work / in progress / verified) |
 | GET/POST | `/api/projects/{projectId}/items/{itemId}/client-verifications` | an item's verification record in that project / add an entry (result, comment, attachments) |
