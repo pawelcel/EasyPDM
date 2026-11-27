@@ -6,8 +6,8 @@ using Npgsql;
 //     users who can see the project (project_users) and the administrators. Everyone with access
 //     sees them; only an administrator changes them, like the project's other fields.
 //   - who works on an assembly (item_assignees): people of its project's team or its lead, any
-//     number, one of them possibly leading. Changed by an administrator or by the project's lead,
-//     who hands out the work.
+//     number, one of them possibly leading. Changed only by the project's lead, who hands out
+//     the work (an administrator sets the lead); the person assigned is notified.
 // Losing access to the project, or leaving its team, takes a person off what depended on it
 // (PruneAsync), so nobody stays assigned to work they can no longer see.
 static class ProjectTeamEndpoints
@@ -20,6 +20,7 @@ static class ProjectTeamEndpoints
 
     public static void MapProjectTeamEndpoints(this WebApplication app, string connectionString)
     {
+        const string onlyLead = "Only the project's lead assigns people to its assemblies.";
         // GET /api/projects/{projectId}/team -> { leadUserId, leadName, members, candidates }
         app.MapGet("/api/projects/{projectId:guid}/team", async (Guid projectId, HttpContext ctx) =>
         {
@@ -209,7 +210,7 @@ static class ProjectTeamEndpoints
             if (projectId is null)
                 return Results.NotFound();
             if (!await CanAssignAsync(conn, ctx, projectId.Value))
-                return Results.Text("Only an administrator or the project's lead assigns people.", statusCode: StatusCodes.Status403Forbidden);
+                return Results.Text(onlyLead, statusCode: StatusCodes.Status403Forbidden);
             if (!await IsOnTeamAsync(conn, projectId.Value, body.UserId.Value))
                 return Results.BadRequest("Only a person of the project's team can be assigned.");
 
@@ -219,6 +220,15 @@ static class ProjectTeamEndpoints
             cmd.Parameters.AddWithValue("userId", body.UserId.Value);
             if (await cmd.ExecuteNonQueryAsync() == 0)
                 return Results.Conflict("This person is already assigned.");
+
+            // Tell the person, unless the lead assigned themselves.
+            var me = (CurrentUser)ctx.Items["CurrentUser"]!;
+            if (body.UserId.Value != me.Id)
+            {
+                var (itemLabel, projectName) = await ItemAndProjectNamesAsync(conn, itemId);
+                await Notifications.NotifyAsync(conn, app.Logger, body.UserId.Value, "assembly_assigned",
+                    new { itemLabel, projectName, assignedBy = me.DisplayName }, itemId: itemId, projectId: projectId.Value);
+            }
             return Results.Ok();
         });
 
@@ -231,7 +241,7 @@ static class ProjectTeamEndpoints
             if (projectId is null)
                 return Results.NotFound();
             if (!await CanAssignAsync(conn, ctx, projectId.Value))
-                return Results.Text("Only an administrator or the project's lead assigns people.", statusCode: StatusCodes.Status403Forbidden);
+                return Results.Text(onlyLead, statusCode: StatusCodes.Status403Forbidden);
 
             await using var tx = await conn.BeginTransactionAsync();
             if (body.IsLead)
@@ -260,7 +270,7 @@ static class ProjectTeamEndpoints
             if (projectId is null)
                 return Results.NotFound();
             if (!await CanAssignAsync(conn, ctx, projectId.Value))
-                return Results.Text("Only an administrator or the project's lead assigns people.", statusCode: StatusCodes.Status403Forbidden);
+                return Results.Text(onlyLead, statusCode: StatusCodes.Status403Forbidden);
             await using var cmd = new NpgsqlCommand("DELETE FROM item_assignees WHERE item_id = @itemId AND user_id = @userId;", conn);
             cmd.Parameters.AddWithValue("itemId", itemId);
             cmd.Parameters.AddWithValue("userId", userId);
@@ -335,16 +345,34 @@ static class ProjectTeamEndpoints
         return await cmd.ExecuteScalarAsync() is not null;
     }
 
-    // An administrator, or the project's lead on the company side.
+    // Only the project's lead on the company side hands out the work on its assemblies.
     private static async Task<bool> CanAssignAsync(NpgsqlConnection conn, HttpContext ctx, Guid projectId)
     {
-        if (AuthEndpoints.IsAdmin(ctx))
-            return true;
         var user = (CurrentUser)ctx.Items["CurrentUser"]!;
         await using var cmd = new NpgsqlCommand("SELECT 1 FROM projects WHERE id = @id AND lead_user_id = @userId;", conn);
         cmd.Parameters.AddWithValue("id", projectId);
         cmd.Parameters.AddWithValue("userId", user.Id);
         return await cmd.ExecuteScalarAsync() is not null;
+    }
+
+    private static async Task<(string ItemLabel, string ProjectName)> ItemAndProjectNamesAsync(NpgsqlConnection conn, Guid itemId)
+    {
+        await using var cmd = new NpgsqlCommand("""
+            SELECT i.item_number, i.item_number_prefix, i.item_number_digits, i.item_number_with_name, i.file_name, p.name
+            FROM items i JOIN projects p ON p.id = i.project_id
+            WHERE i.id = @id;
+            """, conn);
+        cmd.Parameters.AddWithValue("id", itemId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+            return ("", "");
+        var label = ItemNumbering.RecordName(
+            reader.IsDBNull(0) ? null : reader.GetInt32(0),
+            reader.IsDBNull(1) ? null : reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetInt32(2),
+            reader.IsDBNull(3) ? null : reader.GetBoolean(3),
+            reader.GetString(4));
+        return (label, reader.GetString(5));
     }
 
     // The project of an assembly with one; null for anything else (the people are an assembly's).

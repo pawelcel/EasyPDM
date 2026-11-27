@@ -13,8 +13,9 @@ import { useLanguage } from "@/i18n/use-language"
 import { cn } from "@/lib/utils"
 
 // Who works on an assembly: people of its project's team (or the project's lead), any number of
-// them, one of whom may lead the work (the star). A person may work on several assemblies. An
-// administrator or the project's lead edits it (canEdit from the server); others see it.
+// them, one of whom may lead the work (the star). A person may work on several assemblies. Only
+// the project's lead edits it (canEdit from the server), and each person assigned is notified;
+// everyone else sees it.
 function AssemblyAssigneesCard({ itemId }: { itemId: string }) {
   const { t } = useLanguage()
   const [data, setData] = useState<AssemblyAssignees | null>(null)

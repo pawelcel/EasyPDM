@@ -25,7 +25,7 @@ PostgreSQL 18.
 
 - **`db/schema.sql`** — the full schema from scratch (current state after all
   migrations).
-- **`db/migrations/`** — migrations `002`–`084` for an already existing database:
+- **`db/migrations/`** — migrations `002`–`085` for an already existing database:
   projects, item types, tree visibility, status/revisions, materials (+ groups/
   subgroups), attachments, BOM ordering, revision comments, login and roles, project
   properties, cascading deletes, tree root ordering, manufacturers, saved filters,
@@ -935,7 +935,7 @@ and the server's message otherwise; the CAD macros show the server's message as 
 | GET | `/api/projects/{projectId}/team` | the company's side of a project: its lead, the people taking part with their roles, and the users who can be picked (with access to the project, or administrators) |
 | PUT | `/api/projects/{projectId}/lead-user` | set or clear the project's lead in the company (administrator) |
 | POST/PATCH/DELETE | `/api/projects/{projectId}/team[/{id}]` | add a person with a role / change the role of one entry / take it off (administrator); losing access to the project takes a person off its team and its assemblies |
-| GET/POST | `/api/items/{itemId}/assignees` | who works on an assembly, from its project's team or lead; `canEdit` for an administrator or the project's lead, who assign them |
+| GET/POST | `/api/items/{itemId}/assignees` | who works on an assembly, from its project's team or lead; `canEdit` only for the project's lead, who assigns them; the person assigned gets an `assembly_assigned` notification (migration 085) |
 | PUT/DELETE | `/api/items/{itemId}/assignees/{userId}[/lead]` | make a person the assembly's lead (one at a time) / unassign them |
 | GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | download / delete one of them |
 | GET | `/api/projects/{projectId}/client-verifications` | the project's client verification overview (needs work / in progress / verified) |

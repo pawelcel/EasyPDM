@@ -396,6 +396,8 @@ export type NotificationType =
   // Raport z zakończonego biegu makra CAD — zob. BuildReport w TransferProgressEndpoints.cs
   // po kształt "data" (kind/total/done/skipped/failed/pending/entries/omitted).
   | "cad_transfer_finished"
+  // Assigned to work on an assembly by the project's lead (data: itemLabel, projectName, assignedBy).
+  | "assembly_assigned"
 
 // "data" niesie surowe dane zapisane w momencie zdarzenia (np. itemLabel, projectName) —
 // treść jest renderowana po stronie frontu (i18n), zob. describe() w notification-bell.tsx.

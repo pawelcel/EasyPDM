@@ -175,6 +175,12 @@ function describe(entry: NotificationEntry, t: LanguageContextValue["t"]): strin
       return t("notifications.newRevision", { itemLabel: data.itemLabel })
     case "project_assigned":
       return t("notifications.projectAssigned", { projectName: data.projectName })
+    case "assembly_assigned":
+      return t("notifications.assemblyAssigned", {
+        itemLabel: data.itemLabel,
+        projectName: data.projectName,
+        assignedBy: data.assignedBy,
+      })
     case "project_unassigned":
       return t("notifications.projectUnassigned", { projectName: data.projectName })
     case "project_deleted":

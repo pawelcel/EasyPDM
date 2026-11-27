@@ -51,14 +51,24 @@ public class ProjectTeamTests
         Assert.Equal(lead, team.GetProperty("leadUserId").GetGuid());
         Assert.Equal(2, team.GetProperty("members").GetArrayLength());
 
-        // The project's lead hands out the work; a team member cannot.
+        // Only the project's lead hands out the work: not a team member, not an administrator.
         Assert.Equal(HttpStatusCode.Forbidden, (await ewaClient.PostAsJsonAsync($"/api/items/{frame}/assignees", new { userId = ewa })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await admin.PostAsJsonAsync($"/api/items/{frame}/assignees", new { userId = ewa })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await leadClient.PostAsJsonAsync($"/api/items/{frame}/assignees", new { userId = outsider })).StatusCode);
         (await leadClient.PostAsJsonAsync($"/api/items/{frame}/assignees", new { userId = ewa })).EnsureSuccessStatusCode();
         (await leadClient.PostAsJsonAsync($"/api/items/{frame}/assignees", new { userId = lead })).EnsureSuccessStatusCode();
         (await leadClient.PostAsJsonAsync($"/api/items/{gearbox}/assignees", new { userId = ewa })).EnsureSuccessStatusCode();   // one person, two assemblies
         (await leadClient.PutAsJsonAsync($"/api/items/{frame}/assignees/{ewa}/lead", new { isLead = true })).EnsureSuccessStatusCode();
         (await leadClient.PutAsJsonAsync($"/api/items/{frame}/assignees/{lead}/lead", new { isLead = true })).EnsureSuccessStatusCode();
+
+        // Ewa is told about both assemblies; the lead, who assigned themselves, is not.
+        async Task<List<JsonElement>> AssignedNotesAsync(HttpClient c) =>
+            (await c.GetFromJsonAsync<JsonElement>("/api/notifications")).GetProperty("items").EnumerateArray()
+                .Where(n => n.GetProperty("type").GetString() == "assembly_assigned").ToList();
+        var notes = await AssignedNotesAsync(ewaClient);
+        Assert.Equal(2, notes.Count);
+        Assert.Contains(notes, n => n.GetProperty("itemId").GetGuid() == frame && n.GetProperty("data").GetProperty("itemLabel").GetString()!.Contains("Rama"));
+        Assert.Empty(await AssignedNotesAsync(leadClient));
 
         var frameAssignees = await ewaClient.GetFromJsonAsync<JsonElement>($"/api/items/{frame}/assignees");
         Assert.False(frameAssignees.GetProperty("canEdit").GetBoolean());
@@ -71,7 +81,9 @@ public class ProjectTeamTests
         Assert.Equal(0, team.GetProperty("members").GetArrayLength());
         var gearboxAssignees = await admin.GetFromJsonAsync<JsonElement>($"/api/items/{gearbox}/assignees");
         Assert.Equal(0, gearboxAssignees.GetProperty("assignees").GetArrayLength());
-        Assert.Equal(1, (await admin.GetFromJsonAsync<JsonElement>($"/api/items/{frame}/assignees")).GetProperty("assignees").GetArrayLength());
+        var adminView = await admin.GetFromJsonAsync<JsonElement>($"/api/items/{frame}/assignees");
+        Assert.Equal(1, adminView.GetProperty("assignees").GetArrayLength());
+        Assert.False(adminView.GetProperty("canEdit").GetBoolean());
 
         // Clearing the lead takes them off the assembly too (they were assigned as the lead only).
         (await admin.PutAsJsonAsync($"/api/projects/{projectId}/lead-user", new { userId = (Guid?)null })).EnsureSuccessStatusCode();

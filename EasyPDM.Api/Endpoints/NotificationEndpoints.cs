@@ -18,7 +18,8 @@ static class NotificationEndpoints
         "status_review", "status_released", "status_regressed", "new_revision",
         "project_assigned", "project_unassigned", "project_deleted",
         "password_changed", "low_disk_space", "sample_project",
-        "client_verification_needs_work", "client_verification_verified"
+        "client_verification_needs_work", "client_verification_verified",
+        "assembly_assigned"
     ];
 
     public static void MapNotificationEndpoints(this WebApplication app, string connectionString)

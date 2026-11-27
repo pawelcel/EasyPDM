@@ -408,7 +408,9 @@ CREATE TABLE notifications (
         -- Raport z biegu makra CAD (wysyłka albo pobieranie -- rozróżnia data->>'kind').
         -- Zastąpił blokujące okno w CAD-zie, które po oddaniu fokusu przeglądarce wisiało
         -- za nią niewidoczne. Zob. db/migrations/058.
-        'cad_transfer_finished'
+        'cad_transfer_finished',
+        -- Przypisanie do pracy nad złożeniem (item_assignees, migracje 084, 085).
+        'assembly_assigned'
     )),
     -- Dane do wyrenderowania treści PO STRONIE FRONTU (i18n, 3 języki) -- ten sam
     -- wzorzec co HistoryEntry/ItemHistoryPanel: zapisujemy surowe dane (nazwy/numery

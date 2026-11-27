@@ -23,7 +23,7 @@ niemiecki) i ma tryb jasny/ciemny. Przetestowane na żywo: CachyOS, .NET 10, Pos
 ## Co tu jest
 
 - **`db/schema.sql`** — pełny schemat od zera (aktualny stan po wszystkich migracjach).
-- **`db/migrations/`** — migracje `002`–`084` dla już istniejącej bazy: projekty, typy
+- **`db/migrations/`** — migracje `002`–`085` dla już istniejącej bazy: projekty, typy
   elementów, widoczność w drzewku, status/rewizje, materiały (+ grupy/podgrupy), załączniki,
   kolejność BOM, komentarze do rewizji, logowanie i role, właściwości projektu, kaskadowe
   usuwanie, kolejność korzeni drzewka, producenci, zapisane filtry, dostęp do projektów per
@@ -651,7 +651,7 @@ zmian.
 | GET | `/api/projects/{projectId}/team` | strona firmy w projekcie: prowadzący, osoby biorące udział z rolami i użytkownicy do wyboru (z dostępem do projektu albo administratorzy) |
 | PUT | `/api/projects/{projectId}/lead-user` | ustawienie / wyczyszczenie prowadzącego projekt w firmie (administrator) |
 | POST/PATCH/DELETE | `/api/projects/{projectId}/team[/{id}]` | dodanie osoby z rolą / zmiana roli jednego wpisu / usunięcie (administrator); utrata dostępu do projektu zdejmuje osobę z zespołu i ze złożeń |
-| GET/POST | `/api/items/{itemId}/assignees` | osoby pracujące nad złożeniem, z zespołu projektu lub jego prowadzący; `canEdit` dla administratora albo prowadzącego projekt, którzy je przypisują |
+| GET/POST | `/api/items/{itemId}/assignees` | osoby pracujące nad złożeniem, z zespołu projektu lub jego prowadzący; `canEdit` tylko dla prowadzącego projekt, który je przypisuje; przypisana osoba dostaje powiadomienie `assembly_assigned` (migracja 085) |
 | PUT/DELETE | `/api/items/{itemId}/assignees/{userId}[/lead]` | ustawienie lidera złożenia (jeden naraz) / odpięcie osoby |
 | GET/DELETE | `/api/project-attachments/{id}/download`, `/api/project-attachments/{id}` | pobranie / usunięcie jednego z nich |
 | GET | `/api/projects/{projectId}/client-verifications` | przegląd weryfikacji klienta w projekcie (do poprawy / w toku / zweryfikowane) |
