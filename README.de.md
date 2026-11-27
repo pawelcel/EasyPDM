@@ -75,6 +75,7 @@ Auf YouTube, auf Englisch — [die ganze Playlist](https://www.youtube.com/playl
 6. [Die Felder eines Teils — Status, Sperren, Werkstoffe und Bearbeitungen](https://youtu.be/JxMLm7bmuck)
 7. [PDM → Zeichnung — das Schriftfeld füllt sich selbst](https://youtu.be/ZJiMQNJRsB0)
 8. [Stückliste und Dokumentation — die Stückliste, die niemand abtippt](https://youtu.be/mJW8TSQ7EpU)
+9. [Kunde — für wen Sie konstruieren](https://youtu.be/hkTmkpIT-MA)
 
 ## Mehr erfahren
 

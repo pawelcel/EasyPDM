@@ -70,6 +70,7 @@ On YouTube, in English — [the whole playlist](https://www.youtube.com/playlist
 6. [Every field of a part — statuses, locks, materials and processes](https://youtu.be/JxMLm7bmuck)
 7. [PDM → Drawing — the title block fills itself in](https://youtu.be/ZJiMQNJRsB0)
 8. [BOM and documentation — the bill of materials nobody retypes](https://youtu.be/mJW8TSQ7EpU)
+9. [Client — who you design for](https://youtu.be/hkTmkpIT-MA)
 
 ## Learn more
 

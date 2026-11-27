@@ -71,6 +71,7 @@ Na YouTube, po angielsku — [cała playlista](https://www.youtube.com/playlist?
 6. [Pola części — statusy, blokady, materiały i obróbki](https://youtu.be/JxMLm7bmuck)
 7. [PDM → rysunek — tabelka wypełnia się sama](https://youtu.be/ZJiMQNJRsB0)
 8. [BOM i dokumentacja — zestawienie, którego nikt nie przepisuje](https://youtu.be/mJW8TSQ7EpU)
+9. [Klient — dla kogo projektujesz](https://youtu.be/hkTmkpIT-MA)
 
 ## Więcej informacji
 
