@@ -117,42 +117,43 @@ function AssemblyProgress({
 
   return (
     <div className="rounded-lg border p-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        {/* The number first and large -- it is how people refer to an assembly -- and the whole
-            label opens the assembly in its project. */}
+      {/* First line: the assembly itself -- number, name and revision -- which people refer to it
+          by, and which opens it in its project; the progress bar on the right. Who works on it
+          goes on the line below. */}
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onOpen}
-          className="group flex items-baseline gap-2 rounded-md text-left hover:text-primary"
+          className="group flex min-w-0 items-baseline gap-2 rounded-md text-left hover:text-primary"
           title={t("myWork.openAssembly")}
         >
           {assembly.number && (
-            <span className="rounded-md bg-primary/15 px-2 py-0.5 font-mono text-[15px] font-bold text-primary">
+            <span className="rounded-md bg-primary/15 px-2 py-0.5 font-mono text-base font-bold text-primary">
               {assembly.number}
             </span>
           )}
-          <span className="text-sm font-medium group-hover:underline">{assembly.name}</span>
+          <span className="truncate text-base font-semibold group-hover:underline">{assembly.name}</span>
           {assembly.revisionLabel && (
-            <span className="text-[12.5px] text-muted-foreground">
+            <span className="shrink-0 text-sm text-muted-foreground">
               {t("item.revisionShort")} {assembly.revisionLabel}
             </span>
           )}
-          <ArrowUpRight className="size-3.5 self-center text-muted-foreground group-hover:text-primary" />
+          <ArrowUpRight className="size-4 shrink-0 self-center text-muted-foreground group-hover:text-primary" />
         </button>
-        <div className="flex flex-wrap gap-1.5 text-[12.5px] text-muted-foreground">
-          {assembly.assignees.map((u) => (
-            <span key={u.userId} className="inline-flex items-center gap-1">
-              {u.isLead && <Star className="size-3 fill-amber-400 text-amber-400" />}
-              {u.name}
-            </span>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-2 text-[12.5px] text-muted-foreground">
+        <div className="ml-auto flex shrink-0 items-center gap-2 text-[12.5px] text-muted-foreground">
           <div className="h-1.5 w-28 overflow-hidden rounded-full bg-muted">
             <div className="h-full rounded-full bg-primary" style={{ width: `${latest}%` }} />
           </div>
           {latest}%
         </div>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12.5px] text-muted-foreground">
+        {assembly.assignees.map((u) => (
+          <span key={u.userId} className="inline-flex items-center gap-1">
+            {u.isLead && <Star className="size-3 fill-amber-400 text-amber-400" />}
+            {u.name}
+          </span>
+        ))}
       </div>
 
       {assembly.entries.length === 0 ? (
