@@ -127,15 +127,12 @@ function AssemblyProgress({
           className="group flex min-w-0 items-baseline gap-2 rounded-md text-left hover:text-primary"
           title={t("myWork.openAssembly")}
         >
-          {/* The record name as everywhere else (tree, BOM, file names): "4(Drive frame)". */}
-          <span className="truncate text-base font-semibold group-hover:underline">
+          {/* The record name as everywhere else (tree, BOM, file names) and the revision, in one
+              piece and one style: "4(Drive frame) rev. A". */}
+          <span className="truncate text-lg font-semibold group-hover:underline">
             {assembly.label}
+            {assembly.revisionLabel && ` ${t("item.revisionShort")} ${assembly.revisionLabel}`}
           </span>
-          {assembly.revisionLabel && (
-            <span className="shrink-0 text-sm text-muted-foreground">
-              {t("item.revisionShort")} {assembly.revisionLabel}
-            </span>
-          )}
           <ArrowUpRight className="size-4 shrink-0 self-center text-muted-foreground group-hover:text-primary" />
         </button>
         <div className="ml-auto flex shrink-0 items-center gap-2 text-[12.5px] text-muted-foreground">
