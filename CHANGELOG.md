@@ -4,6 +4,12 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+## [0.9.10]
+
+**In short:** the project panel is split into cards like the item panel, and a client's second name lists its projects.
+
+Update as usual: run the new installer over the old one, or pull the new Docker images. Nothing to change in the database by hand.
+
 ### Added
 - **Projects of a second name.** A client's second name now lists the projects filed under it, as the client lists its own, each with a jump to the project.
 
