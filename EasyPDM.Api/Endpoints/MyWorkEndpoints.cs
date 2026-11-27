@@ -44,9 +44,9 @@ static class MyWorkEndpoints
             var ledIds = projects.Where(p => p.IsLead).Select(p => p.Id).ToArray();
 
             // Assemblies to show: all with people on them in a project I lead, mine elsewhere.
-            var assemblies = new List<(Guid Id, Guid ProjectId, string Label)>();
+            var assemblies = new List<(Guid Id, Guid ProjectId, string Label, string? Number, string Name, int? Revision)>();
             await using (var cmd = new NpgsqlCommand("""
-                SELECT i.id, i.project_id, i.item_number, i.item_number_prefix, i.item_number_digits, i.item_number_with_name, i.file_name
+                SELECT i.id, i.project_id, i.item_number, i.item_number_prefix, i.item_number_digits, i.item_number_with_name, i.file_name, i.revision_number
                 FROM items i
                 WHERE i.item_type = 'assembly' AND i.project_id = ANY(@projects)
                   AND (EXISTS (SELECT 1 FROM item_assignees a WHERE a.item_id = i.id AND a.user_id = @me)
@@ -59,12 +59,15 @@ static class MyWorkEndpoints
                 cmd.Parameters.AddWithValue("me", me.Id);
                 await using var reader = await cmd.ExecuteReaderAsync();
                 while (await reader.ReadAsync())
-                    assemblies.Add((reader.GetGuid(0), reader.GetGuid(1), ItemNumbering.RecordName(
-                        reader.IsDBNull(2) ? null : reader.GetInt32(2),
-                        reader.IsDBNull(3) ? null : reader.GetString(3),
-                        reader.IsDBNull(4) ? null : reader.GetInt32(4),
-                        reader.IsDBNull(5) ? null : reader.GetBoolean(5),
-                        reader.GetString(6))));
+                {
+                    int? number = reader.IsDBNull(2) ? null : reader.GetInt32(2);
+                    string? prefix = reader.IsDBNull(3) ? null : reader.GetString(3);
+                    int? digits = reader.IsDBNull(4) ? null : reader.GetInt32(4);
+                    assemblies.Add((reader.GetGuid(0), reader.GetGuid(1),
+                        ItemNumbering.RecordName(number, prefix, digits, reader.IsDBNull(5) ? null : reader.GetBoolean(5), reader.GetString(6)),
+                        ItemNumbering.Label(number, prefix, digits), reader.GetString(6),
+                        reader.IsDBNull(7) ? null : reader.GetInt32(7)));
+                }
             }
             var itemIds = assemblies.Select(a => a.Id).ToArray();
 
@@ -144,6 +147,9 @@ static class MyWorkEndpoints
                     {
                         itemId = a.Id,
                         label = a.Label,
+                        number = a.Number,
+                        name = a.Name,
+                        revisionLabel = a.Revision is null ? null : RevisionLabeling.Label(a.Revision.Value),
                         canReport = mine.Contains(a.Id),
                         assignees = assignees.GetValueOrDefault(a.Id) ?? [],
                         entries = (entries.GetValueOrDefault(a.Id) ?? []).Select(e => EntryJson(e, a.Id)),

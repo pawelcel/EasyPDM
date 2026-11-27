@@ -91,6 +91,7 @@ function App() {
   // konsumuje to raz (zob. jego własny useEffect) i zgłasza zużycie przez
   // onPendingItemSelectionConsumed, żeby nie zaznaczać tego samego elementu w kółko.
   const [pendingItemSelection, setPendingItemSelection] = useState<string | null>(initialUrlState.itemId)
+  const [pendingProjectItem, setPendingProjectItem] = useState<string | null>(null)
 
   const { projects, refetch: refetchProjects } = useProjects()
   const { tags: allTags, refetch: refetchTags } = useTags()
@@ -169,6 +170,13 @@ function App() {
 
   function navigateToProject(id: string) {
     setProjectId(id)
+    setView("projects")
+  }
+
+  // "My work" opens an assembly inside its project, not in the whole database.
+  function navigateToProjectItem(projectId: string, itemId: string) {
+    setProjectId(projectId)
+    setPendingProjectItem(itemId)
     setView("projects")
   }
 
@@ -308,6 +316,8 @@ function App() {
                   setProjectId("")
                   await refetchProjects()
                 }}
+                openItemId={pendingProjectItem}
+                onOpenItemConsumed={() => setPendingProjectItem(null)}
               />
             ) : (
               <Hint>{t("app.selectProjectHint")}</Hint>
@@ -341,7 +351,7 @@ function App() {
                 <Hint>{t("catalog.readOnlyHint")}</Hint>
               </div>
             )}
-          {view === "myWork" && <MyWorkView onOpenProject={navigateToProject} />}
+          {view === "myWork" && <MyWorkView onOpenProject={navigateToProject} onOpenItem={navigateToProjectItem} />}
           {view === "materials" && <MaterialsView readOnly={catalogsReadOnly} />}
           {view === "processes" && <ProcessesView readOnly={catalogsReadOnly} />}
 

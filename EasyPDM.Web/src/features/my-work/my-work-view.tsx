@@ -16,7 +16,13 @@ import { cn } from "@/lib/utils"
 // their progress reports one under another. A project I lead shows all its assemblies that have
 // people on them, and I accept each report or send it back with remarks. My latest report can be
 // deleted for a while after writing it (Settings -> Users) and only until it is reviewed.
-function MyWorkView({ onOpenProject }: { onOpenProject: (projectId: string) => void }) {
+function MyWorkView({
+  onOpenProject,
+  onOpenItem,
+}: {
+  onOpenProject: (projectId: string) => void
+  onOpenItem: (projectId: string, itemId: string) => void
+}) {
   const { t } = useLanguage()
   const [work, setWork] = useState<MyWork | null>(null)
   const [error, setError] = useState("")
@@ -66,6 +72,7 @@ function MyWorkView({ onOpenProject }: { onOpenProject: (projectId: string) => v
                 <AssemblyProgress
                   key={a.itemId}
                   assembly={a}
+                  onOpen={() => onOpenItem(p.projectId, a.itemId)}
                   isLead={p.isLead}
                   deleteMinutes={work.deleteMinutes}
                   onChanged={reload}
@@ -84,8 +91,10 @@ function AssemblyProgress({
   isLead,
   deleteMinutes,
   onChanged,
+  onOpen,
 }: {
   assembly: MyWorkAssembly
+  onOpen: () => void
   isLead: boolean
   deleteMinutes: number
   onChanged: () => Promise<void>
@@ -109,7 +118,27 @@ function AssemblyProgress({
   return (
     <div className="rounded-lg border p-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div className="text-sm font-medium">{assembly.label}</div>
+        {/* The number first and large -- it is how people refer to an assembly -- and the whole
+            label opens the assembly in its project. */}
+        <button
+          type="button"
+          onClick={onOpen}
+          className="group flex items-baseline gap-2 rounded-md text-left hover:text-primary"
+          title={t("myWork.openAssembly")}
+        >
+          {assembly.number && (
+            <span className="rounded-md bg-primary/15 px-2 py-0.5 font-mono text-[15px] font-bold text-primary">
+              {assembly.number}
+            </span>
+          )}
+          <span className="text-sm font-medium group-hover:underline">{assembly.name}</span>
+          {assembly.revisionLabel && (
+            <span className="text-[12.5px] text-muted-foreground">
+              {t("item.revisionShort")} {assembly.revisionLabel}
+            </span>
+          )}
+          <ArrowUpRight className="size-3.5 self-center text-muted-foreground group-hover:text-primary" />
+        </button>
         <div className="flex flex-wrap gap-1.5 text-[12.5px] text-muted-foreground">
           {assembly.assignees.map((u) => (
             <span key={u.userId} className="inline-flex items-center gap-1">

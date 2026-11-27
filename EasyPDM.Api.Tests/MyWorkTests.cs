@@ -57,6 +57,8 @@ public class MyWorkTests
         Assert.False(project.GetProperty("isLead").GetBoolean());
         var assembly = project.GetProperty("assemblies").EnumerateArray().Single();
         Assert.True(assembly.GetProperty("canReport").GetBoolean());
+        Assert.Equal("Rama", assembly.GetProperty("name").GetString());
+        Assert.False(string.IsNullOrEmpty(assembly.GetProperty("number").GetString()));   // the number is shown first
         var entries = assembly.GetProperty("entries").EnumerateArray().ToList();
         Assert.Equal(new[] { 30, 60 }, entries.Select(e => e.GetProperty("percent").GetInt32()));
         Assert.Equal(new[] { false, true }, entries.Select(e => e.GetProperty("canDelete").GetBoolean()));

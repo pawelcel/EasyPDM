@@ -605,6 +605,10 @@ export interface ProgressEntry {
 export interface MyWorkAssembly {
   itemId: string
   label: string
+  // The item number on its own (null when the item has none), the name and the revision letter.
+  number: string | null
+  name: string
+  revisionLabel: string | null
   canReport: boolean
   assignees: (TeamUser & { isLead: boolean })[]
   entries: ProgressEntry[]

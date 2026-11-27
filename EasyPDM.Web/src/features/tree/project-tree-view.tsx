@@ -44,6 +44,8 @@ function ProjectTreeView({
   onTagsRefetch,
   onProjectUpdated,
   onProjectDeleted,
+  openItemId,
+  onOpenItemConsumed,
 }: {
   project: Project
   isAdmin: boolean
@@ -52,6 +54,9 @@ function ProjectTreeView({
   onTagsRefetch: () => void | Promise<void>
   onProjectUpdated: () => void | Promise<void>
   onProjectDeleted: () => void | Promise<void>
+  // An item to select on arrival (e.g. an assembly picked in "My work"); consumed once shown.
+  openItemId?: string | null
+  onOpenItemConsumed?: () => void
 }) {
   const { t } = useLanguage()
   const tree = useProjectTree(project.id)
@@ -60,7 +65,15 @@ function ProjectTreeView({
   const [verifyingItemId, setVerifyingItemId] = useState<string | null>(null)
   // Domyślnie zaznaczony jest sam projekt — to teraz pierwsza (i zawsze widoczna) pozycja
   // w strukturze, więc naturalnie jest tym, co widać po wejściu w projekt.
-  const [selection, setSelection] = useState<Selection>({ kind: "project" })
+  const [selection, setSelection] = useState<Selection>(
+    openItemId ? { kind: "item", id: openItemId, parentId: undefined } : { kind: "project" }
+  )
+  useEffect(() => {
+    if (!openItemId) return
+    setSelection({ kind: "item", id: openItemId, parentId: undefined })
+    onOpenItemConsumed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openItemId])
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deletingPending, setDeletingPending] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -139,12 +152,14 @@ function ProjectTreeView({
     }
   }
 
-  // Jeśli wybrany element zniknął z drzewka (np. go usunięto), wracamy do projektu.
+  // Jeśli wybrany element zniknął z drzewka (np. go usunięto), wracamy do projektu. Not while the
+  // tree is still loading: an item to open on arrival (openItemId) is not in it yet.
   useEffect(() => {
+    if (tree.loading) return
     if (selection.kind === "item" && !tree.itemsById.has(selection.id)) {
       setSelection({ kind: "project" })
     }
-  }, [selection, tree.itemsById])
+  }, [selection, tree.itemsById, tree.loading])
 
   // Analogicznie dla zaznaczenia masowego — elementy usunięte gdzie indziej znikają z Setu.
   useEffect(() => {
