@@ -4,6 +4,9 @@ All notable changes to EasyPDM are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Projects of a second name.** A client's second name now lists the projects filed under it, as the client lists its own, each with a jump to the project.
+
 ### Changed
 - **Sections in the project panel.** The project panel is now a stack of cards like the item panel: the project's fields, the order documents (quote, order confirmation, other attachments) and the client verification overview each in a card of their own.
 

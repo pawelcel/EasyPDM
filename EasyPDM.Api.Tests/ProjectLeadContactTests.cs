@@ -156,4 +156,22 @@ public class ProjectLeadContactTests(EasyPDMWebApplicationFactory factory) : ICl
         var patched = await patchResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(contactId, patched.GetProperty("leadContactId").GetInt32());
     }
+
+    // A second name lists the projects filed under it, as the client lists its own.
+    [Fact]
+    public async Task Nazwa2_wypisuje_swoje_projekty()
+    {
+        var client = await AdminClientAsync();
+        var clientId = await CreateClientAsync(client, $"Klient P {Guid.NewGuid()}");
+        var name2Id = await AddName2Async(client, clientId, "Oddzial P");
+        var otherName2Id = await AddName2Async(client, clientId, "Oddzial Q");
+        var mine = $"Projekt P {Guid.NewGuid()}";
+        (await client.PostAsJsonAsync("/api/projects", ProjectBody(mine, clientId, name2Id, null))).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/projects", ProjectBody($"Projekt Q {Guid.NewGuid()}", clientId, otherName2Id, null))).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/projects", ProjectBody($"Projekt K {Guid.NewGuid()}", clientId, null, null))).EnsureSuccessStatusCode();
+
+        var detail = await client.GetFromJsonAsync<JsonElement>($"/api/clients/{clientId}/name2/{name2Id}");
+        var names = detail.GetProperty("projects").EnumerateArray().Select(p => p.GetProperty("name").GetString()).ToList();
+        Assert.Equal(new[] { mine }, names);
+    }
 }

@@ -581,6 +581,7 @@ export interface ClientName2 {
 // tego poziomu) front dociąga osobno przez getClient(clientId).contacts.
 export interface ClientName2Detail extends ClientName2 {
   contacts: ClientContact[]
+  projects: ClientProjectSummary[]
 }
 
 export interface ClientDetail {

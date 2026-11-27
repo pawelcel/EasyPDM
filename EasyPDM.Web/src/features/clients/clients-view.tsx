@@ -161,6 +161,7 @@ function ClientsView({ onNavigateToProject }: { onNavigateToProject?: (id: strin
             name2Id={selection.name2Id}
             onClientsRefetch={refetch}
             onDeleted={() => setSelection({ clientId: selection.clientId, name2Id: null })}
+            onNavigateToProject={onNavigateToProject}
           />
         )}
       </div>

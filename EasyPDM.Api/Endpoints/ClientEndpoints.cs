@@ -343,7 +343,7 @@ static class ClientEndpoints
         // osobno panel po stronie frontu przez GET /api/clients/{id}, żeby dało się je
         // pokazać w osobnej, wyraźnie podpisanej, tylko-do-odczytu sekcji zamiast mieszać
         // je z własnymi kontaktami tej Nazwy 2).
-        app.MapGet("/api/clients/{id:int}/name2/{name2Id:int}", async (int id, int name2Id) =>
+        app.MapGet("/api/clients/{id:int}/name2/{name2Id:int}", async (int id, int name2Id, HttpContext ctx) =>
         {
             await using var conn = new NpgsqlConnection(connectionString);
             await conn.OpenAsync();
@@ -378,7 +378,31 @@ static class ClientEndpoints
                     contacts.Add(ReadContact(reader));
             }
 
-            return Results.Ok(new { id = name2Id, name2, location, contacts });
+            // Projects whose second name is this one (projects.client_name2_id), filtered like those
+            // of GET /api/clients/{id}: an ordinary user sees only projects they have access to.
+            var user = (CurrentUser)ctx.Items["CurrentUser"]!;
+            const string projectsSql = """
+                SELECT id, name
+                FROM projects
+                WHERE client_id = @clientId AND client_name2_id = @name2Id
+                  AND (@isAdmin OR EXISTS (
+                      SELECT 1 FROM project_users pu WHERE pu.project_id = projects.id AND pu.user_id = @userId
+                  ))
+                ORDER BY name;
+                """;
+            var projects = new List<object>();
+            await using (var projectsCmd = new NpgsqlCommand(projectsSql, conn))
+            {
+                projectsCmd.Parameters.AddWithValue("clientId", id);
+                projectsCmd.Parameters.AddWithValue("name2Id", name2Id);
+                projectsCmd.Parameters.AddWithValue("isAdmin", user.Role == "admin");
+                projectsCmd.Parameters.AddWithValue("userId", user.Id);
+                await using var reader = await projectsCmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                    projects.Add(new { id = reader.GetGuid(0), name = reader.GetString(1) });
+            }
+
+            return Results.Ok(new { id = name2Id, name2, location, contacts, projects });
         });
 
         // PATCH /api/clients/{id}/name2/{name2Id}   body: { "name2": "...", "location": "..." }

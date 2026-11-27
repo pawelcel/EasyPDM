@@ -10,6 +10,7 @@ import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SectionLabel } from "@/components/ui/section-label"
+import { ClientProjectsList } from "@/features/clients/client-projects-list"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ContactDialog } from "@/features/clients/client-contact-dialog"
 import { ClientFileSearch } from "@/features/clients/client-file-search"
@@ -17,8 +18,8 @@ import { ClientFileTree } from "@/features/clients/client-file-tree"
 import { useCatalogEditable } from "@/features/settings/catalog-editable-context"
 import { useLanguage } from "@/i18n/use-language"
 
-// Szczegóły JEDNEJ Nazwy 2 -- odpowiednik client-detail-panel.tsx, ale bez sekcji Projekty
-// (poza zakresem: Nazwa 2 to wariant handlowy klienta, nie osobny byt spięty z projektami).
+// Szczegóły JEDNEJ Nazwy 2 -- odpowiednik client-detail-panel.tsx, z projektami, w których
+// wybrano tę Nazwę 2 (projects.client_name2_id), tak jak klient ma swoje.
 // Przycisk usunięcia jest tu, w tym samym miejscu co u klienta (nagłówek, po prawej) --
 // zamiast przy wierszu w liście po lewej, żeby nie trzeba było wchodzić w szczegóły, żeby
 // zobaczyć, co dokładnie się usuwa. Kluczowa różnica, powtórzona zarówno dla kontaktów jak
@@ -31,11 +32,13 @@ function ClientName2DetailPanel({
   name2Id,
   onClientsRefetch,
   onDeleted,
+  onNavigateToProject,
 }: {
   clientId: number
   name2Id: number
   onClientsRefetch: () => void | Promise<void>
   onDeleted: () => void
+  onNavigateToProject?: (id: string) => void
 }) {
   const { t } = useLanguage()
   const editable = useCatalogEditable()
@@ -185,6 +188,12 @@ function ClientName2DetailPanel({
           </Button>
         )}
       </div>
+
+      <ClientProjectsList
+        projects={detail.projects}
+        emptyHint={t("client.noProjectsName2")}
+        onNavigateToProject={onNavigateToProject}
+      />
 
       {/* Odziedziczone z klienta-rodzica -- tylko do odczytu z tego poziomu (edycja i
           dodawanie nadal wyłącznie w panelu samego klienta). */}

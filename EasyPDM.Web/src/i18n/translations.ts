@@ -716,6 +716,7 @@ const pl = {
   "client.noMatchingClients": "Brak pasujących klientów.",
   "client.projectsLabel": "Projekty",
   "client.noProjects": "Brak projektów przypisanych do tego klienta.",
+  "client.noProjectsName2": "Brak projektów z tą drugą nazwą.",
   "client.goToProjectAria": "Przejdź do projektu",
 
   "item.removeFromStructure": "Usuń ze struktury",
@@ -1691,6 +1692,7 @@ const en: Record<TranslationKey, string> = {
   "client.noMatchingClients": "No matching clients.",
   "client.projectsLabel": "Projects",
   "client.noProjects": "No projects assigned to this client.",
+  "client.noProjectsName2": "No projects with this second name.",
   "client.goToProjectAria": "Go to project",
 
   "item.removeFromStructure": "Remove from structure",
@@ -2663,6 +2665,7 @@ const de: Record<TranslationKey, string> = {
   "client.noMatchingClients": "Keine passenden Kunden.",
   "client.projectsLabel": "Projekte",
   "client.noProjects": "Diesem Kunden sind keine Projekte zugeordnet.",
+  "client.noProjectsName2": "Keine Projekte mit diesem zweiten Namen.",
   "client.goToProjectAria": "Zum Projekt wechseln",
 
   "item.removeFromStructure": "Aus der Struktur entfernen",
