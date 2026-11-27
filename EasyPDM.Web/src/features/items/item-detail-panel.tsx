@@ -33,6 +33,7 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PANEL_CARD } from "@/components/ui/panel-card"
 import { SectionLabel } from "@/components/ui/section-label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { TagPill } from "@/components/ui/tag-pill"
@@ -55,11 +56,6 @@ import { useLanguage } from "@/i18n/use-language"
 import { useOptimisticOrder } from "@/lib/optimistic-order"
 import { previewKindOf } from "@/lib/file-preview"
 
-// The panel is a stack of cards on the page background -- the fields, the BOM, the
-// attachments, "used in", the history -- the same cards and gaps as the sections of Settings
-// (e.g. Settings -> Users), so the long lists stand apart from the fields. A card's first
-// section heading drops its top margin, which only spaces headings within a card.
-const CARD = "rounded-xl bg-card p-4 ring-1 ring-foreground/10 [&>h4:first-child]:mt-0 [&>div:first-child>h4]:mt-0"
 
 // W BOM-ie nie każda Część ma Materiał/Producenta/Numery zamówieniowe (zależy od "rodzaju") —
 // brakującą wartość pokazujemy jako "-", zamiast pustej komórki.
@@ -349,7 +345,7 @@ function ItemDetailPanel({
   return (
     <DocumentationLanguageProvider languageId={documentationLanguageId} languageIds={documentationLanguageIds}>
     <div className="flex flex-col gap-4">
-    <div className={CARD}>
+    <div className={PANEL_CARD}>
       {!hideActions &&
         (onRemoveFromStructure || canDuplicate || canDownloadDocumentation || onDeleteCompletely) && (
         <div className="mb-3 flex flex-col gap-1.5 border-b pb-3">
@@ -535,7 +531,7 @@ function ItemDetailPanel({
     </div>
 
       {item.itemType === "assembly" && (
-        <div className={CARD}>
+        <div className={PANEL_CARD}>
           <div className="flex items-end justify-between gap-2">
             <SectionLabel>{t("item.bom")}</SectionLabel>
             <div className="mb-1 flex items-center gap-3 text-[12.5px]">
@@ -612,7 +608,7 @@ function ItemDetailPanel({
         </div>
       )}
 
-    <div className={CARD}>
+    <div className={PANEL_CARD}>
       {item.itemType === "folder" && (
         <>
           <SectionLabel>{t("item.files")}</SectionLabel>
@@ -709,13 +705,13 @@ function ItemDetailPanel({
     </div>
 
       {(item.itemType === "part" || item.itemType === "assembly") && (
-        <div className={CARD}>
+        <div className={PANEL_CARD}>
           <UsedInPanel itemId={item.id} onSelectChild={onSelectChild} />
         </div>
       )}
 
       {(item.itemType === "part" || item.itemType === "assembly") && (
-        <div className={CARD}>
+        <div className={PANEL_CARD}>
           <ItemHistoryPanel itemId={item.id} refreshSignal={historyRefreshSignal} />
         </div>
       )}

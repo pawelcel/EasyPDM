@@ -579,8 +579,7 @@ function ProjectTreeView({
               hideActions
             />
           ) : (
-            <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
-              <ProjectDetailPanel
+            <ProjectDetailPanel
               project={project}
               isAdmin={isAdmin}
               onUpdated={onProjectUpdated}
@@ -591,7 +590,6 @@ function ProjectTreeView({
               onSelectItem={(itemId) => setSelection({ kind: "item", id: itemId, parentId: undefined })}
               hideActions
             />
-            </div>
           )}
         </div>
       </div>

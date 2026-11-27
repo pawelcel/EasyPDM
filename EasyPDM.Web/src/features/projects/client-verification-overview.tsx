@@ -3,6 +3,7 @@ import { ArrowUpRight } from "lucide-react"
 import { itemDisplayLabel, revisionLabel, type ClientVerificationSummary } from "@/api/types"
 import { Button } from "@/components/ui/button"
 import { Hint } from "@/components/ui/hint"
+import { PANEL_CARD } from "@/components/ui/panel-card"
 import { SectionLabel } from "@/components/ui/section-label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useLanguage } from "@/i18n/use-language"
@@ -123,8 +124,9 @@ function ClientVerificationOverview({
   const verified = summaries.filter((s) => s.result === "zweryfikowany").sort(byNewestFirst)
   const needsWork = summaries.filter((s) => s.result === "do_poprawy").sort(byNewestFirst)
 
+  // A card of its own in the project panel (see PANEL_CARD); nothing at all when empty.
   return (
-    <>
+    <div className={PANEL_CARD}>
       <SectionLabel>{t("clientVerification.overviewLabel")}</SectionLabel>
       {/* Kolejność nieprzypadkowa: najpierw to, co wymaga działania (do poprawy), potem to,
           na co się czeka (w trakcie), a zaakceptowane na końcu — tam nic już nie trzeba robić. */}
@@ -146,7 +148,7 @@ function ClientVerificationOverview({
         emptyHint={t("clientVerification.noneVerified")}
         onSelectItem={onSelectItem}
       />
-    </>
+    </div>
   )
 }
 

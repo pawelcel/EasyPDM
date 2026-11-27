@@ -522,7 +522,6 @@ function ItemList({
                 hideActions
               />
             ) : selectedProject ? (
-              <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
               <ProjectDetailPanel
                 key={selectedProject.id}
                 project={selectedProject}
@@ -534,7 +533,6 @@ function ItemList({
                 }}
                 hideActions
               />
-              </div>
             ) : (
               <div className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
                 <Hint>{t("database.selectItemHint")}</Hint>

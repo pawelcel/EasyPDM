@@ -18,6 +18,7 @@ import { FormError } from "@/components/ui/form-error"
 import { Hint } from "@/components/ui/hint"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PANEL_CARD } from "@/components/ui/panel-card"
 import { SectionLabel } from "@/components/ui/section-label"
 import { useClients } from "@/features/clients/use-clients"
 import { DocumentationDialog } from "@/features/items/documentation-dialog"
@@ -191,7 +192,8 @@ function ProjectDetailPanel({
   const created = new Date(project.createdAt).toLocaleString(language)
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+    <div className={PANEL_CARD}>
       {!hideActions && (
         <div className="mb-3 flex flex-col gap-1.5 border-b pb-3">
           <div className="flex flex-wrap gap-1.5">
@@ -427,10 +429,14 @@ function ProjectDetailPanel({
         <ProjectLanguagesField project={project} isAdmin={isAdmin} onUpdated={onUpdated} />
       </div>
 
-      {/* Dokumenty całego zlecenia (oferta / potwierdzenie / pozostałe) -- poza blokiem
-          właściwości, bo to osobna rzecz niż pola projektu, i widoczna dla każdego z dostępem
-          do projektu, nie tylko dla administratora edytującego właściwości. */}
-      <ProjectAttachmentsPanel projectId={project.id} />
+    </div>
+
+      {/* Dokumenty całego zlecenia (oferta / potwierdzenie / pozostałe) -- w osobnej karcie,
+          bo to osobna rzecz niż pola projektu, i widoczna dla każdego z dostępem do projektu,
+          nie tylko dla administratora edytującego właściwości. */}
+      <div className={PANEL_CARD}>
+        <ProjectAttachmentsPanel projectId={project.id} />
+      </div>
 
       <ClientVerificationOverview summaries={clientVerifications} onSelectItem={onSelectItem} />
 
